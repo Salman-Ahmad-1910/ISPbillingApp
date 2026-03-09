@@ -1,0 +1,1088 @@
+{
+  "advanceLoans": [
+    {
+      "id": "ADV-001",
+      "staffId": "STAFF-001",
+      "staffName": "Ali Raza",
+      "amount": 5000,
+      "date": "2024-07-15",
+      "description": "Personal advance",
+      "repaymentStatus": "pending",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "ADV-002",
+      "staffId": "STAFF-004",
+      "staffName": "Kamran Akmal",
+      "amount": 10000,
+      "date": "2024-06-10",
+      "description": "Bike repair",
+      "repaymentStatus": "deducted",
+      "companyId": "COMP-002"
+    }
+  ],
+  "areas": [
+    {
+      "id": "AREA-001",
+      "city": "Karachi",
+      "zone": "South",
+      "locality": "DHA Phase 6",
+      "subLocality": "Street 1-10",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "AREA-002",
+      "city": "Karachi",
+      "zone": "Central",
+      "locality": "Gulshan-e-Iqbal",
+      "subLocality": "Block 13-D",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "AREA-003",
+      "city": "Lahore",
+      "zone": "Cantt",
+      "locality": "Cavalry Ground",
+      "subLocality": "Main Boulevard",
+      "companyId": "COMP-002"
+    }
+  ],
+  "attendance": [
+    {
+      "id": "ATT-001",
+      "staffId": "STAFF-001",
+      "staffName": "Ali Raza",
+      "date": "2024-07-20",
+      "status": "present",
+      "checkIn": "09:05",
+      "checkOut": "17:03",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "ATT-002",
+      "staffId": "STAFF-002",
+      "staffName": "Basit Ali",
+      "date": "2024-07-20",
+      "status": "late",
+      "checkIn": "09:35",
+      "checkOut": "17:15",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "ATT-003",
+      "staffId": "STAFF-003",
+      "staffName": "Sana Mir",
+      "date": "2024-07-20",
+      "status": "leave",
+      "checkIn": "",
+      "checkOut": "",
+      "companyId": "COMP-002"
+    }
+  ],
+  "bankLedger": [
+    {
+      "id": "BANK-001",
+      "date": "2024-07-01",
+      "description": "Opening Balance",
+      "debit": 500000,
+      "credit": 0,
+      "balance": 500000,
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "BANK-002",
+      "date": "2024-07-01",
+      "description": "Opening Balance",
+      "debit": 1200000,
+      "credit": 0,
+      "balance": 1200000,
+      "companyId": "COMP-002"
+    }
+  ],
+  "cashLedger": [
+    {
+      "id": "CASH-001",
+      "date": "2024-07-01",
+      "description": "Opening Balance",
+      "debit": 100000,
+      "credit": 0,
+      "balance": 100000,
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "CASH-002",
+      "date": "2024-07-01",
+      "description": "Opening Balance",
+      "debit": 250000,
+      "credit": 0,
+      "balance": 250000,
+      "companyId": "COMP-002"
+    }
+  ],
+  "companies": [
+    {
+      "id": "COMP-001",
+      "name": "Alpha Communications",
+      "logo": "https://picsum.photos/seed/alpha/100/100",
+      "contact1": "0300-1111111",
+      "contact2": "0300-2222222",
+      "email": "support@alphacom.com",
+      "address": "123 Alpha Avenue, Karachi",
+      "description": "Leading ISP in the southern region.",
+      "taxRules": "17% GST",
+      "invoiceTemplate": "alpha_default"
+    },
+    {
+      "id": "COMP-002",
+      "name": "Beta Broadband",
+      "logo": "https://picsum.photos/seed/beta/100/100",
+      "contact1": "0321-3333333",
+      "contact2": "0321-4444444",
+      "email": "contact@betabroadband.net",
+      "address": "456 Beta Boulevard, Lahore",
+      "description": "High-speed fiber for Punjab.",
+      "taxRules": "16% PRA",
+      "invoiceTemplate": "beta_classic"
+    }
+  ],
+  "complaints": [
+    {
+      "id": "COMP-001",
+      "subscriberId": "SUB-002",
+      "subscriberName": "Aisha Khan",
+      "category": "network",
+      "description": "Internet not working since morning",
+      "status": "in-progress",
+      "assignedToId": "STAFF-001",
+      "createdAt": "2024-07-18T09:00:00Z",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "COMP-002",
+      "subscriberId": "SUB-003",
+      "subscriberName": "Imran Bhatti",
+      "category": "billing",
+      "description": "Incorrect amount on invoice",
+      "status": "open",
+      "createdAt": "2024-07-19T11:30:00Z",
+      "companyId": "COMP-002"
+    }
+  ],
+  "corporateCustomers": [
+    {
+      "id": "CORP-001",
+      "companyName": "Creative Solutions Inc.",
+      "contactPerson": "Mr. Asif",
+      "contactPhone": "0333-1112222",
+      "negotiatedPricing": "Flat 10% discount",
+      "contractStartDate": "2024-01-01",
+      "contractEndDate": "2025-01-01",
+      "totalConnections": 15,
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "CORP-002",
+      "companyName": "Logistics Pro",
+      "contactPerson": "Ms. Maria",
+      "contactPhone": "0345-9876543",
+      "negotiatedPricing": "Custom Package",
+      "contractStartDate": "2023-06-01",
+      "contractEndDate": "2024-06-01",
+      "totalConnections": 8,
+      "companyId": "COMP-002"
+    }
+  ],
+  "customBills": [
+    {
+      "id": "BILL-001",
+      "subscriberId": "SUB-001",
+      "subscriberName": "Haris Ahmed",
+      "amount": 500,
+      "description": "Router repair charges",
+      "status": "paid",
+      "createdAt": "2024-07-15T10:00:00Z",
+      "companyId": "COMP-001",
+      "dealerId": "DLR-001"
+    },
+    {
+      "id": "BILL-002",
+      "subscriberId": "SUB-002",
+      "subscriberName": "Aisha Khan",
+      "amount": 1000,
+      "description": "Installation charges adjustment",
+      "status": "pending",
+      "createdAt": "2024-07-18T14:30:00Z",
+      "companyId": "COMP-001",
+      "dealerId": "DLR-001"
+    }
+  ],
+  "customerLedger": [
+    {
+      "id": "CL-001",
+      "customerId": "CUST-001",
+      "date": "2024-06-01",
+      "description": "Invoice INV-001",
+      "debit": 10000,
+      "credit": 0,
+      "balance": 10000,
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "CL-002",
+      "customerId": "CUST-001",
+      "date": "2024-06-05",
+      "description": "Payment",
+      "debit": 0,
+      "credit": 5000,
+      "balance": 5000,
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "CL-003",
+      "customerId": "CUST-002",
+      "date": "2024-06-01",
+      "description": "Invoice INV-LHR-01",
+      "debit": 8000,
+      "credit": 0,
+      "balance": 8000,
+      "companyId": "COMP-002"
+    }
+  ],
+  "customers": [
+    {
+      "id": "CUST-001",
+      "name": "Build Corp",
+      "cnic": "11111",
+      "phone": "0300-123",
+      "city": "Karachi",
+      "status": "active",
+      "totalInvoices": 5,
+      "outstandingBalance": 15000,
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "CUST-002",
+      "name": "Printastic",
+      "cnic": "22222",
+      "phone": "0300-456",
+      "city": "Lahore",
+      "status": "inactive",
+      "totalInvoices": 2,
+      "outstandingBalance": 0,
+      "companyId": "COMP-002"
+    }
+  ],
+  "dealerCollections": [
+    {
+      "id": "DC-001",
+      "dealerId": "DLR-001",
+      "dealerName": "QuickNet Communications",
+      "subscriberId": "SUB-002",
+      "subscriberName": "Aisha Khan",
+      "amount": 1500,
+      "collectionDate": "2024-07-12",
+      "settlementStatus": "pending",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "DC-002",
+      "dealerId": "DLR-002",
+      "dealerName": "Lahore Links",
+      "subscriberId": "SUB-003",
+      "subscriberName": "Imran Bhatti",
+      "amount": 2500,
+      "collectionDate": "2024-07-15",
+      "settlementStatus": "settled",
+      "companyId": "COMP-002"
+    }
+  ],
+  "dealerFranchises": [
+    {
+      "id": "FRAN-001",
+      "name": "Karachi Connect",
+      "contactPerson": "Mr. Owais",
+      "contactPhone": "0300-5555555",
+      "status": "approved",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "FRAN-002",
+      "name": "Punjab Networks",
+      "contactPerson": "Mr. Bilal",
+      "contactPhone": "0321-6666666",
+      "status": "pending",
+      "companyId": "COMP-002"
+    }
+  ],
+  "dealers": [
+    {
+      "id": "DLR-001",
+      "name": "QuickNet Communications",
+      "phone": "0345-1122333",
+      "cnic": "42101-9988776-5",
+      "commissionRate": 15,
+      "walletBalance": 15200,
+      "companyId": "COMP-001",
+      "franchiseId": "FRAN-001"
+    },
+    {
+      "id": "DLR-002",
+      "name": "Lahore Links",
+      "phone": "0333-8877665",
+      "cnic": "35202-1122334-5",
+      "commissionRate": 12,
+      "walletBalance": 8500,
+      "companyId": "COMP-002",
+      "franchiseId": "FRAN-002"
+    },
+    {
+      "id": "DLR-003",
+      "name": "Clifton Net (Sub-Dealer)",
+      "phone": "0315-1231231",
+      "cnic": "42101-1231231-1",
+      "commissionRate": 10,
+      "walletBalance": 5000,
+      "companyId": "COMP-001",
+      "parentDealerId": "DLR-001"
+    }
+  ],
+  "expenses": [
+    {
+      "id": "EXP-001",
+      "category": "Office Rent",
+      "amount": 50000,
+      "date": "2024-07-01",
+      "description": "July office rent",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "EXP-002",
+      "category": "Utilities",
+      "amount": 15000,
+      "date": "2024-07-05",
+      "description": "Electricity and Internet bills",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "EXP-003",
+      "category": "Salaries",
+      "amount": 250000,
+      "date": "2024-07-30",
+      "description": "July staff salaries",
+      "companyId": "COMP-002"
+    }
+  ],
+  "guarantors": [
+    {
+      "id": "GUAR-001",
+      "name": "John Doe",
+      "cnic": "33333",
+      "phone": "0300-789",
+      "customerId": "CUST-001",
+      "customerName": "Build Corp",
+      "companyId": "COMP-001"
+    }
+  ],
+  "inquiries": [
+    {
+      "id": "INQ-001",
+      "name": "Fahad",
+      "phone": "0321-9876543",
+      "address": "Askari 4, Karachi",
+      "status": "new",
+      "createdAt": "2024-07-18T15:00:00Z",
+      "assignedToId": "STAFF-001",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "INQ-002",
+      "name": "Sobia",
+      "phone": "0333-1234567",
+      "address": "Model Town, Lahore",
+      "status": "follow-up",
+      "createdAt": "2024-07-17T11:00:00Z",
+      "assignedToId": "STAFF-003",
+      "companyId": "COMP-002"
+    }
+  ],
+  "installmentPlans": [
+    {
+      "id": "IP-001",
+      "name": "6 Month Plan",
+      "productId": "PROD-001",
+      "productName": "Accounting Pro",
+      "downPayment": 10000,
+      "installments": 6,
+      "installmentAmount": 7000,
+      "totalAmount": 52000,
+      "companyId": "COMP-001"
+    }
+  ],
+  "inventoryItems": [
+    {
+      "id": "ITEM-001",
+      "name": "Fiber-Home Router",
+      "type": "router",
+      "stock": 50,
+      "price": 3000,
+      "status": "in_stock",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "ITEM-002",
+      "name": "Huawei ONT",
+      "type": "ont",
+      "stock": 25,
+      "price": 2500,
+      "status": "in_stock",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "ITEM-003",
+      "name": "Fiber Cable (meter)",
+      "type": "cable",
+      "stock": 5000,
+      "price": 20,
+      "status": "in_stock",
+      "companyId": "COMP-002"
+    },
+    {
+      "id": "ITEM-004",
+      "name": "TP-Link Router",
+      "type": "router",
+      "stock": 30,
+      "price": 3500,
+      "status": "in_stock",
+      "companyId": "COMP-002"
+    }
+  ],
+  "invoices": [
+    {
+      "id": "INV-2024-001",
+      "subscriberId": "SUB-001",
+      "subscriberName": "Haris Ahmed",
+      "amount": 2500,
+      "dueDate": "2024-07-10",
+      "status": "paid",
+      "billingPeriod": "Jun 2024",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "INV-2024-002",
+      "subscriberId": "SUB-002",
+      "subscriberName": "Aisha Khan",
+      "amount": 1500,
+      "dueDate": "2024-07-10",
+      "status": "overdue",
+      "billingPeriod": "Jun 2024",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "INV-2024-003",
+      "subscriberId": "SUB-003",
+      "subscriberName": "Imran Bhatti",
+      "amount": 5000,
+      "dueDate": "2024-07-20",
+      "status": "pending",
+      "billingPeriod": "Jul 2024",
+      "companyId": "COMP-002"
+    }
+  ],
+  "olts": [
+    {
+      "id": "OLT-001",
+      "name": "DHA-OLT-1",
+      "location": "DHA Phase 6 PoP",
+      "ipAddress": "10.10.1.1",
+      "ports": 16,
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "OLT-002",
+      "name": "CANTT-OLT-1",
+      "location": "Cantt PoP",
+      "ipAddress": "10.20.1.1",
+      "ports": 32,
+      "companyId": "COMP-002"
+    }
+  ],
+  "packages": [
+    {
+      "id": "PKG-001",
+      "name": "Bronze",
+      "speed": "10 Mbps",
+      "price": 1500,
+      "dataLimit": "Unlimited",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "PKG-002",
+      "name": "Silver",
+      "speed": "30 Mbps",
+      "price": 2500,
+      "dataLimit": "Unlimited",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "PKG-003",
+      "name": "Gold",
+      "speed": "50 Mbps",
+      "price": 3500,
+      "dataLimit": "Unlimited",
+      "companyId": "COMP-002"
+    },
+    {
+      "id": "PKG-004",
+      "name": "Platinum",
+      "speed": "100 Mbps",
+      "price": 5000,
+      "dataLimit": "Unlimited",
+      "companyId": "COMP-002"
+    }
+  ],
+  "payments": [
+    {
+      "id": "PAY-2024-001",
+      "invoiceId": "INV-2024-001",
+      "subscriberId": "SUB-001",
+      "subscriberName": "Haris Ahmed",
+      "amount": 2500,
+      "paymentDate": "2024-07-05",
+      "method": "cash",
+      "collectorId": "STAFF-002",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "PAY-2024-002",
+      "invoiceId": "INV-2024-002",
+      "subscriberId": "SUB-002",
+      "subscriberName": "Aisha Khan",
+      "amount": 1000,
+      "paymentDate": "2024-07-12",
+      "method": "dealer",
+      "collectorId": "DLR-001",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "PAY-2024-003",
+      "invoiceId": "INV-2024-003",
+      "subscriberId": "SUB-003",
+      "subscriberName": "Imran Bhatti",
+      "amount": 5000,
+      "paymentDate": "2024-07-18",
+      "method": "online",
+      "companyId": "COMP-002"
+    }
+  ],
+  "pops": [
+    {
+      "id": "POP-001",
+      "name": "DHA Phase 6 PoP",
+      "location": "Office 1, Comm. Street 10",
+      "status": "online",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "POP-002",
+      "name": "Gulshan PoP",
+      "location": "Near Disco Bakery",
+      "status": "online",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "POP-003",
+      "name": "Cantt PoP",
+      "location": "Main Exchange Building",
+      "status": "offline",
+      "lastOutage": "2024-07-19T14:00:00Z",
+      "companyId": "COMP-002"
+    }
+  ],
+  "pricingPlans": [
+    {
+      "id": "PLAN-001",
+      "name": "Basic",
+      "price": 10000,
+      "features": [
+        "Feature A",
+        "Feature B"
+      ],
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "PLAN-002",
+      "name": "Pro",
+      "price": 25000,
+      "features": [
+        "Feature A",
+        "Feature B",
+        "Feature C"
+      ],
+      "companyId": "COMP-002"
+    }
+  ],
+  "products": [
+    {
+      "id": "PROD-001",
+      "name": "Accounting Pro",
+      "category": "Software",
+      "price": 50000,
+      "stock": 10,
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "PROD-002",
+      "name": "HR Suite",
+      "category": "Software",
+      "price": 75000,
+      "stock": 5,
+      "companyId": "COMP-002"
+    }
+  ],
+  "recoveryReportData": [
+    {
+      "month": "Jan",
+      "target": 40000,
+      "recovered": 24000,
+      "companyId": "COMP-001"
+    },
+    {
+      "month": "Feb",
+      "target": 30000,
+      "recovered": 13980,
+      "companyId": "COMP-001"
+    },
+    {
+      "month": "Mar",
+      "target": 50000,
+      "recovered": 48000,
+      "companyId": "COMP-001"
+    },
+    {
+      "month": "Apr",
+      "target": 45000,
+      "recovered": 39080,
+      "companyId": "COMP-001"
+    },
+    {
+      "month": "May",
+      "target": 60000,
+      "recovered": 48000,
+      "companyId": "COMP-001"
+    },
+    {
+      "month": "Jun",
+      "target": 55000,
+      "recovered": 38000,
+      "companyId": "COMP-001"
+    },
+    {
+      "month": "Jul",
+      "target": 70000,
+      "recovered": 43000,
+      "companyId": "COMP-001"
+    },
+    {
+      "month": "Jan",
+      "target": 35000,
+      "recovered": 22000,
+      "companyId": "COMP-002"
+    },
+    {
+      "month": "Feb",
+      "target": 28000,
+      "recovered": 15000,
+      "companyId": "COMP-002"
+    },
+    {
+      "month": "Mar",
+      "target": 48000,
+      "recovered": 45000,
+      "companyId": "COMP-002"
+    },
+    {
+      "month": "Apr",
+      "target": 42000,
+      "recovered": 38000,
+      "companyId": "COMP-002"
+    },
+    {
+      "month": "May",
+      "target": 55000,
+      "recovered": 49000,
+      "companyId": "COMP-002"
+    },
+    {
+      "month": "Jun",
+      "target": 52000,
+      "recovered": 41000,
+      "companyId": "COMP-002"
+    },
+    {
+      "month": "Jul",
+      "target": 65000,
+      "recovered": 53000,
+      "companyId": "COMP-002"
+    }
+  ],
+  "recoveryTransactions": [
+    {
+      "id": "RTX-001",
+      "officerId": "STAFF-002",
+      "date": "2024-07-20",
+      "description": "Cash float received from office",
+      "type": "credit",
+      "amount": 10000,
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "RTX-002",
+      "officerId": "STAFF-002",
+      "date": "2024-07-20",
+      "description": "Fuel expenses",
+      "type": "debit",
+      "amount": 500,
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "RTX-003",
+      "officerId": "STAFF-004",
+      "date": "2024-07-21",
+      "description": "Cash float received",
+      "type": "credit",
+      "amount": 15000,
+      "companyId": "COMP-002"
+    }
+  ],
+  "roles": [
+    {
+      "id": "ROLE-000",
+      "name": "Super Admin",
+      "description": "Manages companies and system-wide settings.",
+      "permissions": [
+        "all"
+      ],
+      "companyId": ""
+    },
+    {
+      "id": "ROLE-001",
+      "name": "Administrator",
+      "description": "Full access to all modules and settings for their company.",
+      "permissions": [
+        "all_company"
+      ],
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "ROLE-002",
+      "name": "Network Operator",
+      "description": "Manage network infrastructure and complaints.",
+      "permissions": [
+        "manage_network",
+        "manage_support"
+      ],
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "ROLE-003",
+      "name": "Billing Manager",
+      "description": "Manage subscribers, billing, and collections.",
+      "permissions": [
+        "manage_subscribers",
+        "manage_billing",
+        "view_reports"
+      ],
+      "companyId": "COMP-002"
+    },
+    {
+      "id": "ROLE-004",
+      "name": "Dealer",
+      "description": "Limited access for managing their own subscribers.",
+      "permissions": [
+        "view_own_subscribers",
+        "collect_payments"
+      ],
+      "companyId": "COMP-002"
+    },
+    {
+      "id": "ROLE-005",
+      "name": "Dealer Franchise",
+      "description": "Manages dealers and their assigned areas.",
+      "permissions": [
+        "manage_dealers",
+        "view_reports"
+      ],
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "ROLE-006",
+      "name": "Recovery Officer",
+      "description": "Manages collections in assigned areas.",
+      "permissions": [
+        "view_assigned_collections",
+        "update_payments"
+      ],
+      "companyId": "COMP-001"
+    }
+  ],
+  "salesVsRecovery": [
+    {
+      "month": "Jan",
+      "sales": 65,
+      "recovery": 60,
+      "companyId": "COMP-001"
+    },
+    {
+      "month": "Feb",
+      "sales": 70,
+      "recovery": 62,
+      "companyId": "COMP-001"
+    },
+    {
+      "month": "Jan",
+      "sales": 45,
+      "recovery": 40,
+      "companyId": "COMP-002"
+    }
+  ],
+  "splitters": [
+    {
+      "id": "SPL-001",
+      "name": "DHA-P6-S1",
+      "oltId": "OLT-001",
+      "location": "Street 5, DHA P6",
+      "totalPorts": 8,
+      "availablePorts": 5,
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "SPL-002",
+      "name": "GUL-B13-S1",
+      "oltId": "OLT-001",
+      "location": "Main Road, Gulshan B13",
+      "totalPorts": 16,
+      "availablePorts": 12,
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "SPL-003",
+      "name": "CAV-S1",
+      "oltId": "OLT-002",
+      "location": "Near Main Gate, Cavalry",
+      "totalPorts": 8,
+      "availablePorts": 3,
+      "companyId": "COMP-002"
+    }
+  ],
+  "staff": [
+    {
+      "id": "STAFF-001",
+      "name": "Ali Raza",
+      "phone": "0311-1234567",
+      "designation": "Technician",
+      "department": "technical",
+      "salary": 45000,
+      "companyId": "COMP-001",
+      "areaId": "AREA-002"
+    },
+    {
+      "id": "STAFF-002",
+      "name": "Basit Ali",
+      "phone": "0312-1234567",
+      "designation": "Recovery Officer",
+      "department": "recovery",
+      "salary": 40000,
+      "companyId": "COMP-001",
+      "areaId": "AREA-001",
+      "target": 100000,
+      "collected": 75000
+    },
+    {
+      "id": "STAFF-003",
+      "name": "Sana Mir",
+      "phone": "0313-1234567",
+      "designation": "Sales Executive",
+      "department": "sales",
+      "salary": 50000,
+      "companyId": "COMP-002"
+    },
+    {
+      "id": "STAFF-004",
+      "name": "Kamran Akmal",
+      "phone": "0314-1234567",
+      "designation": "Recovery Officer",
+      "department": "recovery",
+      "salary": 42000,
+      "companyId": "COMP-002",
+      "areaId": "AREA-003",
+      "target": 120000,
+      "collected": 95000
+    }
+  ],
+  "subscribers": [
+    {
+      "id": "SUB-001",
+      "name": "Haris Ahmed",
+      "cnic": "42201-1111111-1",
+      "phone": "0301-1111111",
+      "installationAddress": "123, Street 4, DHA Phase 6",
+      "packageId": "PKG-002",
+      "packageName": "Silver",
+      "billingCycle": "monthly",
+      "status": "active",
+      "balance": 0,
+      "areaId": "AREA-001",
+      "areaName": "DHA Phase 6, Karachi",
+      "splitterId": "SPL-001",
+      "splitterPort": 1,
+      "connectionDate": "2023-05-10",
+      "collectorId": "STAFF-002",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "SUB-002",
+      "name": "Aisha Khan",
+      "cnic": "42201-2222222-2",
+      "phone": "0302-2222222",
+      "installationAddress": "A-45, Block 13, Gulshan",
+      "packageId": "PKG-001",
+      "packageName": "Bronze",
+      "billingCycle": "monthly",
+      "status": "suspended",
+      "balance": 1500,
+      "areaId": "AREA-002",
+      "areaName": "Gulshan-e-Iqbal, Karachi",
+      "splitterId": "SPL-002",
+      "splitterPort": 3,
+      "connectionDate": "2023-01-15",
+      "dealerId": "DLR-001",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "SUB-003",
+      "name": "Imran Bhatti",
+      "cnic": "35201-3333333-3",
+      "phone": "0303-3333333",
+      "installationAddress": "House 78-B, Cavalry Ground",
+      "packageId": "PKG-004",
+      "packageName": "Platinum",
+      "billingCycle": "quarterly",
+      "status": "active",
+      "balance": -1000,
+      "areaId": "AREA-003",
+      "areaName": "Cavalry Ground, Lahore",
+      "splitterId": "SPL-003",
+      "splitterPort": 5,
+      "connectionDate": "2022-11-20",
+      "companyId": "COMP-002"
+    },
+    {
+      "id": "SUB-004",
+      "name": "Fatima Jilani",
+      "cnic": "42201-4444444-4",
+      "phone": "0304-4444444",
+      "installationAddress": "9, Sunset Lane, DHA Phase 6",
+      "packageId": "PKG-003",
+      "packageName": "Gold",
+      "billingCycle": "monthly",
+      "status": "deactivated",
+      "balance": 7000,
+      "areaId": "AREA-003",
+      "areaName": "Cavalry Ground, Lahore",
+      "splitterId": "SPL-003",
+      "splitterPort": 2,
+      "connectionDate": "2021-02-01",
+      "companyId": "COMP-002"
+    }
+  ],
+  "systemLogs": [
+    {
+      "id": "LOG-001",
+      "timestamp": "2024-07-19T10:05:00Z",
+      "user": "admin@alphacom.com",
+      "action": "LOGIN",
+      "details": "User logged in successfully",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "LOG-002",
+      "timestamp": "2024-07-19T10:06:00Z",
+      "user": "admin@alphacom.com",
+      "action": "UPDATE_SUBSCRIBER",
+      "details": "Updated status for SUB-002 to suspended",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "LOG-003",
+      "timestamp": "2024-07-19T11:00:00Z",
+      "user": "admin@betabb.com",
+      "action": "CREATE_PACKAGE",
+      "details": "Created new package: Platinum",
+      "companyId": "COMP-002"
+    },
+    {
+      "id": "LOG-004",
+      "timestamp": "2024-07-19T11:30:00Z",
+      "user": "super@fintrack.com",
+      "action": "CREATE_COMPANY",
+      "details": "Created new company: Beta Broadband"
+    }
+  ],
+  "users": [
+    {
+      "id": "USER-001",
+      "name": "Super Admin",
+      "email": "super@fintrack.com",
+      "role": "Super Admin",
+      "status": "active"
+    },
+    {
+      "id": "USER-002",
+      "name": "Alpha Admin",
+      "email": "admin@alphacom.com",
+      "role": "Administrator",
+      "status": "active",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "USER-003",
+      "name": "Beta Admin",
+      "email": "admin@betabb.com",
+      "role": "Administrator",
+      "status": "active",
+      "companyId": "COMP-002"
+    },
+    {
+      "id": "USER-004",
+      "name": "Alpha NOC",
+      "email": "noc@alphacom.com",
+      "role": "Network Operator",
+      "status": "active",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "USER-005",
+      "name": "Karachi Connect",
+      "email": "franchise@kconnect.com",
+      "role": "Dealer Franchise",
+      "status": "active",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "USER-006",
+      "name": "QuickNet",
+      "email": "dealer@quicknet.com",
+      "role": "Dealer",
+      "status": "active",
+      "companyId": "COMP-001"
+    },
+    {
+      "id": "USER-007",
+      "name": "Basit Ali",
+      "email": "basit.ali@alphacom.com",
+      "role": "Recovery Officer",
+      "status": "active",
+      "companyId": "COMP-001"
+    }
+  ]
+}
