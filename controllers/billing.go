@@ -214,3 +214,16 @@ func CreateInvoice(c *gin.Context) {
 
 	utils.CreatedResponse(c, "Invoice created successfully", invoice)
 }
+
+// DeletePayment handles deleting a payment
+func DeletePayment(c *gin.Context) {
+	id := c.Param("id")
+	companyID, _ := c.Get("companyID")
+
+	if err := config.DB.Where("id = ? AND company_id = ?", id, companyID).Delete(&models.Payment{}).Error; err != nil {
+		utils.ErrorResponse(c, 500, "Failed to delete payment", err.Error())
+		return
+	}
+
+	utils.SuccessResponse(c, "Payment deleted successfully", nil)
+}

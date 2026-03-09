@@ -14,8 +14,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 interface SubDealerColumnsProps {
-    onEdit: (dealer: Dealer) => void;
-    onDelete: (dealer: Dealer) => void;
+  onEdit: (dealer: Dealer) => void;
+  onDelete: (dealer: Dealer) => void;
 }
 
 export const getColumns = ({ onEdit, onDelete }: SubDealerColumnsProps): ColumnDef<Dealer>[] => [
@@ -48,7 +48,7 @@ export const getColumns = ({ onEdit, onDelete }: SubDealerColumnsProps): ColumnD
   {
     id: 'actions',
     cell: ({ row }) => {
-        const dealer = row.original;
+      const dealer = row.original;
       return (
         <div className="text-right">
           <DropdownMenu>
@@ -60,9 +60,9 @@ export const getColumns = ({ onEdit, onDelete }: SubDealerColumnsProps): ColumnD
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem>View details</DropdownMenuItem>
+              {/* <DropdownMenuItem>View details</DropdownMenuItem> */}
               <DropdownMenuItem onClick={() => onEdit(dealer)}>Edit Sub-Dealer</DropdownMenuItem>
-              <DropdownMenuSeparator />
+              {/* <DropdownMenuSeparator /> */}
               <DropdownMenuItem className="text-destructive" onClick={() => onDelete(dealer)}>
                 Remove Sub-Dealer
               </DropdownMenuItem>

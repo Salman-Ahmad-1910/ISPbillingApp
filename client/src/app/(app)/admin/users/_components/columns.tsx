@@ -28,16 +28,16 @@ export const getColumns = ({ onEdit, onDelete, onChangeStatus, currentUserRole }
     accessorKey: 'name',
     header: 'Name',
     cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-            <Avatar className="h-8 w-8">
-                {/* <AvatarImage src={`https://picsum.photos/seed/${row.original.id}/40/40`} /> */}
-                <AvatarFallback>{row.original.name?.charAt(0) || 'U'}</AvatarFallback>
-            </Avatar>
-            <div>
-                <div className="font-medium">{row.original.name || '-'}</div>
-                <div className="text-sm text-muted-foreground">{row.original.email || '-'}</div>
-            </div>
+      <div className="flex items-center gap-2">
+        <Avatar className="h-8 w-8">
+          {/* <AvatarImage src={`https://picsum.photos/seed/${row.original.id}/40/40`} /> */}
+          <AvatarFallback>{row.original.name?.charAt(0) || 'U'}</AvatarFallback>
+        </Avatar>
+        <div>
+          <div className="font-medium">{row.original.name || '-'}</div>
+          <div className="text-sm text-muted-foreground">{row.original.email || '-'}</div>
         </div>
+      </div>
     ),
   },
   {
@@ -67,12 +67,12 @@ export const getColumns = ({ onEdit, onDelete, onChangeStatus, currentUserRole }
     id: 'actions',
     cell: ({ row }) => {
       const user = row.original;
-      
+
       // Define permissions based on current user role
       const canEdit = currentUserRole === 'admin' || currentUserRole === 'owner';
       const canDelete = currentUserRole === 'admin' || currentUserRole === 'owner';
       const canChangeStatus = currentUserRole === 'admin' || currentUserRole === 'owner' || currentUserRole === 'manager';
-      
+
       return (
         <div className="text-right">
           <DropdownMenu>
@@ -84,21 +84,21 @@ export const getColumns = ({ onEdit, onDelete, onChangeStatus, currentUserRole }
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              
+
               {/* Edit action - only for admins */}
               {canEdit && (
                 <DropdownMenuItem onClick={() => onEdit(user)}>
                   Edit user
                 </DropdownMenuItem>
               )}
-              
+
               {/* Change role - only for admins */}
               {/* {canEdit && (
                 <DropdownMenuItem>Change role</DropdownMenuItem>
               )} */}
-              
+
               {/* Status change - for admins and managers */}
-              {canChangeStatus && (
+              {/* {canChangeStatus && (
                 <>
                   {canEdit && <DropdownMenuSeparator />}
                   {user.status === 'active' ? (
@@ -111,8 +111,8 @@ export const getColumns = ({ onEdit, onDelete, onChangeStatus, currentUserRole }
                     </DropdownMenuItem>
                   )}
                 </>
-              )}
-              
+              )} */}
+
               {/* Delete action - only for admins */}
               {canDelete && canChangeStatus && (
                 <>

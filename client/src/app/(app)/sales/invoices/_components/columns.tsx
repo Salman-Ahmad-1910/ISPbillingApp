@@ -51,7 +51,7 @@ export const getColumns = ({ onPrint, onEdit, onDelete }: InvoiceColumnsProps): 
         <Badge
           variant={
             status === 'paid' ? 'default' :
-            status === 'overdue' ? 'destructive' : 'secondary'
+              status === 'overdue' ? 'destructive' : 'secondary'
           }
           className={status === 'paid' ? 'bg-green-600' : ''}
         >
@@ -75,14 +75,14 @@ export const getColumns = ({ onPrint, onEdit, onDelete }: InvoiceColumnsProps): 
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem>View details</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onEdit(invoice)}>Edit Invoice</DropdownMenuItem>
+              {/* <DropdownMenuItem>View details</DropdownMenuItem> */}
               <DropdownMenuItem onClick={() => onPrint(invoice)}>
                 <Printer className="mr-2 h-4 w-4" />
                 Print Invoice
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>Send Reminder</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onEdit(invoice)}>Edit Invoice</DropdownMenuItem>
+              {/* <DropdownMenuSeparator /> */}
+              {/* <DropdownMenuItem>Send Reminder</DropdownMenuItem> */}
               <DropdownMenuItem className="text-destructive" onClick={() => onDelete(invoice)}>Delete Invoice</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

@@ -56,7 +56,6 @@ type Inquiry struct {
 	Status       string     `gorm:"type:varchar(20);default:'new'" json:"status"`
 	AssignedToID *uuid.UUID `gorm:"type:uuid" json:"assignedToId"`
 	Notes        string     `gorm:"type:text" json:"notes"`
-	CreatedAt    string     `gorm:"type:varchar(50)" json:"createdAt"`
 }
 
 // CorporateCustomer specialized billing

@@ -36,16 +36,8 @@ export default function DealerDashboardPage() {
         { title: 'New This Month', value: dashboardData?.newSubscribersThisMonth || 0, icon: UserPlus },
     ];
 
-    // Process real collection data (mock for now since we don't have daily collection endpoint)
-    const dailyCollection = [
-        { day: 'Mon', collection: 7500 },
-        { day: 'Tue', collection: 9000 },
-        { day: 'Wed', collection: 6500 },
-        { day: 'Thu', collection: 11000 },
-        { day: 'Fri', collection: 8200 },
-        { day: 'Sat', collection: 15000 },
-        { day: 'Sun', collection: 4500 },
-    ];
+    // Process real collection data
+    const dailyCollection = dashboardData?.dailyCollection || [];
 
     return (
         <>

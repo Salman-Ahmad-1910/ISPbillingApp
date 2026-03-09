@@ -15,8 +15,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 interface ColumnsProps {
-    onEdit: (pop: POP) => void;
-    onDelete: (pop: POP) => void;
+  onEdit: (pop: POP) => void;
+  onDelete: (pop: POP) => void;
 }
 
 export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<POP>[] => [
@@ -51,7 +51,7 @@ export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<POP>[]
   {
     id: 'actions',
     cell: ({ row }) => {
-        const pop = row.original;
+      const pop = row.original;
       return (
         <div className="text-right">
           <DropdownMenu>
@@ -63,7 +63,7 @@ export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<POP>[]
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem>View Details</DropdownMenuItem>
+              {/* <DropdownMenuItem>View Details</DropdownMenuItem> */}
               <DropdownMenuItem onClick={() => onEdit(pop)}>Edit POP</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive" onClick={() => onDelete(pop)}>

@@ -48,8 +48,8 @@ export const getColumns = ({ onEdit, onDelete }: CustomerColumnsProps): ColumnDe
             status === 'active'
               ? 'default'
               : status === 'blacklisted'
-              ? 'destructive'
-              : 'secondary'
+                ? 'destructive'
+                : 'secondary'
           }
           className={status === 'active' ? 'bg-green-600' : ''}
         >
@@ -82,11 +82,11 @@ export const getColumns = ({ onEdit, onDelete }: CustomerColumnsProps): ColumnDe
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <Link href={`/crm/customers/${customer.id}`}>
+              {/* <Link href={`/crm/customers/${customer.id}`}>
                 <DropdownMenuItem>View details</DropdownMenuItem>
-              </Link>
+              </Link> */}
               <DropdownMenuItem onClick={() => onEdit(customer)}>Edit customer</DropdownMenuItem>
-              <DropdownMenuSeparator />
+              {/* <DropdownMenuSeparator /> */}
               <DropdownMenuItem className="text-destructive" onClick={() => onDelete(customer)}>
                 Delete customer
               </DropdownMenuItem>

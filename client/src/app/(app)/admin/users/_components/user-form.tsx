@@ -34,7 +34,7 @@ interface UserFormProps {
 export function UserForm({ user, roles, onSave, onCancel, isSaving }: UserFormProps) {
   const isEditMode = !!user;
   const [showPassword, setShowPassword] = useState(false);
-  
+
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userSchema),
     defaultValues: {
@@ -45,8 +45,17 @@ export function UserForm({ user, roles, onSave, onCancel, isSaving }: UserFormPr
       contact2: '',
       role: '',
       status: 'active',
+      id: '',
     },
   });
+
+  // Log form errors to console for debugging
+  const errors = form.formState.errors;
+  useEffect(() => {
+    if (Object.keys(errors).length > 0) {
+      console.log('UserForm Validation Errors:', errors);
+    }
+  }, [errors]);
 
   // Set form values when editing a user
   useEffect(() => {
@@ -59,6 +68,7 @@ export function UserForm({ user, roles, onSave, onCancel, isSaving }: UserFormPr
         contact2: user.contact2 || '',
         role: user.role || '',
         status: user.status || 'active',
+        id: user.id,
       });
     } else {
       // Reset to empty defaults for add user
@@ -70,13 +80,19 @@ export function UserForm({ user, roles, onSave, onCancel, isSaving }: UserFormPr
         contact2: '',
         role: '',
         status: 'active',
+        id: '',
       });
     }
   }, [user, form]);
 
   function onSubmit(values: UserFormValues) {
+    console.log('UserForm - onSubmit triggered with values:', values);
     onSave(values);
   }
+
+  const onInvalid = (errors: any) => {
+    console.error('UserForm - Validation failed:', errors);
+  };
 
   // Default role options
   const defaultRoles = [
@@ -90,7 +106,7 @@ export function UserForm({ user, roles, onSave, onCancel, isSaving }: UserFormPr
   const allRoles = useMemo(() => {
     const roleNames = new Set();
     const combined = [...defaultRoles];
-    
+
     // Add API roles that aren't already in default roles
     roles.forEach(role => {
       if (!roleNames.has(role.name)) {
@@ -98,18 +114,28 @@ export function UserForm({ user, roles, onSave, onCancel, isSaving }: UserFormPr
         roleNames.add(role.name);
       }
     });
-    
+
     // Add default roles to set for deduplication
     defaultRoles.forEach(role => {
       roleNames.add(role.name);
     });
-    
+
     return combined;
   }, [roles]);
 
+  // ... rest of the component
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-4">
+        {/* Hidden field for ID to ensure it is registered in the form */}
+        <FormField
+          control={form.control}
+          name="id"
+          render={({ field }) => (
+            <input type="hidden" {...field} value={field.value || ''} />
+          )}
+        />
+
         <FormField
           control={form.control}
           name="name"
@@ -123,7 +149,7 @@ export function UserForm({ user, roles, onSave, onCancel, isSaving }: UserFormPr
             </FormItem>
           )}
         />
-        
+
         <FormField
           control={form.control}
           name="email"
@@ -131,10 +157,10 @@ export function UserForm({ user, roles, onSave, onCancel, isSaving }: UserFormPr
             <FormItem>
               <FormLabel>Email</FormLabel>
               <FormControl>
-                <Input 
-                  type="email" 
-                  placeholder="e.g., john.doe@example.com" 
-                  {...field} 
+                <Input
+                  type="email"
+                  placeholder="e.g., john.doe@example.com"
+                  {...field}
                   disabled={isEditMode}
                   className={isEditMode ? 'bg-gray-100' : ''}
                 />
@@ -157,10 +183,10 @@ export function UserForm({ user, roles, onSave, onCancel, isSaving }: UserFormPr
                 <FormLabel>Password</FormLabel>
                 <FormControl>
                   <div className="relative">
-                    <Input 
-                      type={showPassword ? "text" : "password"} 
-                      placeholder="Enter password (min 6 characters)" 
-                      {...field} 
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Enter password (min 6 characters)"
+                      {...field}
                       className="pr-10"
                     />
                     <button
@@ -192,7 +218,7 @@ export function UserForm({ user, roles, onSave, onCancel, isSaving }: UserFormPr
               </FormItem>
             )}
           />
-          
+
           <FormField
             control={form.control}
             name="contact2"
@@ -233,7 +259,7 @@ export function UserForm({ user, roles, onSave, onCancel, isSaving }: UserFormPr
               </FormItem>
             )}
           />
-          
+
           <FormField
             control={form.control}
             name="status"

@@ -29,11 +29,21 @@ export const dealerSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1, 'Name is required'),
   phone: z.string().min(1, 'Phone is required'),
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  email: z.string().email('Invalid email address').optional().or(z.literal('')),
+  password: z.string().min(6, 'Password must be at least 6 characters').optional().or(z.literal('')),
   cnic: z.string().min(1, 'CNIC is required'),
   commissionRate: z.coerce.number().min(0, 'Commission must be a positive number'),
   parentDealerId: z.string().optional(),
+}).refine((data) => {
+  // Email and Password are required only for new dealers
+  if (!data.id) {
+    if (!data.email || data.email.trim() === '') return false;
+    if (!data.password || data.password.trim() === '') return false;
+  }
+  return true;
+}, {
+  message: "Email and Password are required for new dealers",
+  path: ["email"], // This will attach the error to the email field, but we check both
 });
 
 export const expenseSchema = z.object({
@@ -65,9 +75,9 @@ export const areaSchema = z.object({
   city: z.string().min(1, 'City is required'),
   zone: z.string().min(1, 'Zone is required'),
   locality: z.string().min(1, 'Locality is required'),
-  subLocality: z.string().optional(),
-  recoveryOfficerId: z.string().optional(),
-  companyId: z.string().optional(),
+  subLocality: z.string().nullable().optional(),
+  recoveryOfficerId: z.string().nullable().optional(),
+  companyId: z.string().nullable().optional(),
 });
 
 export const popSchema = z.object({
@@ -153,7 +163,7 @@ export const paymentSchema = z.object({
   amount: z.coerce.number().min(1, 'Amount must be greater than 0'),
   paymentDate: z.string().min(1, 'Payment date is required'),
   method: z.enum(['cash', 'bank', 'online', 'dealer']),
-  collectorId: z.string().optional(),
+  collectorId: z.string().nullable().optional(),
 });
 
 export const recoveryTransactionSchema = z.object({
@@ -270,12 +280,21 @@ export const recoveryOfficerSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1, 'Name is required'),
   email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z.string().min(6, 'Password must be at least 6 characters').optional().or(z.literal('')),
   phone: z.string().min(1, 'Phone number is required'),
   secondaryPhone: z.string().optional(),
   areaId: z.string().nullable().optional(),
   role: z.literal('recovery_officer'),
   companyId: z.string().optional(),
+}).refine((data) => {
+  // Password is required only for new ones (no id)
+  if (!data.id && (!data.password || data.password.trim() === '')) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Password is required for new recovery officers",
+  path: ["password"],
 });
 
 export const attendanceSchema = z.object({
@@ -310,7 +329,7 @@ export const userSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1, 'Name is required'),
   email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters').optional(),
+  password: z.string().min(6, 'Password must be at least 6 characters').optional().or(z.literal('')),
   contact1: z.string().optional(),
   contact2: z.string().optional(),
   role: z.string().min(1, 'Role is required'),

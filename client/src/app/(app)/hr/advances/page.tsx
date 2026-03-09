@@ -14,10 +14,10 @@ export default function AdvancesPage() {
 
   const { data: advancesResponse, isLoading: isLoadingAdvances } = useGenericQuery<AdvanceLoan[]>('hr/advances', companyId ?? undefined);
   const { data: staffResponse, isLoading: isLoadingStaff } = useGenericQuery<Staff[]>('hr/staff', companyId ?? undefined);
-  
+
   // Extract data arrays from API responses
-  const advances = advancesResponse?.data || [];
-  const staff = staffResponse?.data || [];
+  const advances = advancesResponse || [];
+  const staff = staffResponse || [];
 
   if (companyId && (isLoadingAdvances || isLoadingStaff)) {
     return <div className="flex h-[50vh] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;

@@ -30,12 +30,12 @@ export default function StockPage() {
         title="Inventory & Stock"
         description="Manage your stock of routers, ONTs, and other equipment."
       >
-        <div className="flex items-center gap-2">
+        {/* <div className="flex items-center gap-2">
           <Button variant="outline">
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
-        </div>
+        </div> */}
       </PageHeader>
 
       <Card>

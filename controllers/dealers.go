@@ -165,6 +165,12 @@ func GetDealerDashboard(c *gin.Context) {
 		return
 	}
 
+	// Define struct for daily collection data
+	type DailyCollection struct {
+		Day        string  `json:"day"`
+		Collection float64 `json:"collection"`
+	}
+
 	// Check if user is admin/owner - if so, return aggregated data for all dealers
 	if user.Role == "admin" || user.Role == "owner" {
 		// Get all dealers for this company
@@ -189,6 +195,23 @@ func GetDealerDashboard(c *gin.Context) {
 			WHERE s.company_id = ? AND s.dealer_id IS NOT NULL AND i.status = 'paid'
 		`, companyID).Scan(&totalCollection)
 
+		// Get daily collection for the last 7 days
+		var dailyCollection []DailyCollection
+		config.DB.Raw(`
+			SELECT
+			  to_char(series, 'Dy') as day,
+			  COALESCE(SUM(i.amount), 0) as collection
+			FROM generate_series(CURRENT_DATE - INTERVAL '6 days', CURRENT_DATE, '1 day'::interval) AS series
+			LEFT JOIN (
+			  SELECT i.amount, DATE_TRUNC('day', i.updated_at) as paid_date
+			  FROM invoices i
+			  JOIN subscribers s ON i.subscriber_id = s.id
+			  WHERE s.company_id = ? AND s.dealer_id IS NOT NULL AND i.status = 'paid'
+			) i ON i.paid_date = series
+			GROUP BY series
+			ORDER BY series;
+		`, companyID).Scan(&dailyCollection)
+
 		// Count sub-dealers (dealers with parent_dealer_id)
 		var subDealerCount int64
 		config.DB.Model(&models.Dealer{}).Where("company_id = ? AND parent_dealer_id IS NOT NULL", companyID).Count(&subDealerCount)
@@ -201,6 +224,7 @@ func GetDealerDashboard(c *gin.Context) {
 			"newSubscribersThisMonth": newSubscribersThisMonth,
 			"dealers":                 dealers,
 			"userRole":                user.Role,
+			"dailyCollection":         dailyCollection,
 		})
 		return
 	}
@@ -231,6 +255,23 @@ func GetDealerDashboard(c *gin.Context) {
 		Total *float64
 	}{&invoiceCount, &totalCollection})
 
+	// Get daily collection for this specific dealer for the last 7 days
+	var dailyCollection []DailyCollection
+	config.DB.Raw(`
+		SELECT
+		  to_char(series, 'Dy') as day,
+		  COALESCE(SUM(i.amount), 0) as collection
+		FROM generate_series(CURRENT_DATE - INTERVAL '6 days', CURRENT_DATE, '1 day'::interval) AS series
+		LEFT JOIN (
+		  SELECT i.amount, DATE_TRUNC('day', i.updated_at) as paid_date
+		  FROM invoices i
+		  JOIN subscribers s ON i.subscriber_id = s.id
+		  WHERE s.company_id = ? AND s.dealer_id = ? AND i.status = 'paid'
+		) i ON i.paid_date = series
+		GROUP BY series
+		ORDER BY series;
+	`, companyID, dealer.ID).Scan(&dailyCollection)
+
 	// Get sub-dealers count
 	var subDealerCount int64
 	config.DB.Model(&models.Dealer{}).Where("parent_dealer_id = ? AND company_id = ?", dealer.ID, companyID).Count(&subDealerCount)
@@ -246,6 +287,7 @@ func GetDealerDashboard(c *gin.Context) {
 		"subDealerCount":          subDealerCount,
 		"newSubscribersThisMonth": newSubscribersThisMonth,
 		"subscribers":             subscribers,
+		"dailyCollection":         dailyCollection,
 	})
 }
 
@@ -281,4 +323,37 @@ func GetFranchiseDashboard(c *gin.Context) {
 		"totalCollection": totalCollection,
 		"dealers":         dealers,
 	})
+}
+
+// DeleteDealer handles deleting a dealer and its associated user account
+func DeleteDealer(c *gin.Context) {
+	companyID, _ := c.Get("companyID")
+	id := c.Param("id")
+
+	var dealer models.Dealer
+	if err := config.DB.Where("id = ? AND company_id = ?", id, companyID).First(&dealer).Error; err != nil {
+		utils.ErrorResponse(c, 404, "Dealer not found", err.Error())
+		return
+	}
+
+	err := config.DB.Transaction(func(tx *gorm.DB) error {
+		// Delete the associated user based on email
+		if err := tx.Where("email = ?", dealer.Email).Delete(&models.User{}).Error; err != nil {
+			return err
+		}
+
+		// Delete the dealer
+		if err := tx.Delete(&dealer).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		utils.ErrorResponse(c, 500, "Failed to delete dealer", err.Error())
+		return
+	}
+
+	utils.SuccessResponse(c, "Dealer deleted successfully", nil)
 }

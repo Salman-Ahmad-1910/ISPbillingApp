@@ -15,8 +15,8 @@ import {
 import { Progress } from '@/components/ui/progress';
 
 interface ColumnsProps {
-    onEdit: (splitter: Splitter) => void;
-    onDelete: (splitter: Splitter) => void;
+  onEdit: (splitter: Splitter) => void;
+  onDelete: (splitter: Splitter) => void;
 }
 
 export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<Splitter>[] => [
@@ -45,21 +45,21 @@ export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<Splitt
   {
     header: 'Utilization',
     cell: ({ row }) => {
-        if (row.original.totalPorts === 0) {
-            return (
-                <div className="flex items-center gap-2">
-                    <Progress value={0} className="w-24" />
-                    <span>0%</span>
-                </div>
-            )
-        }
-        const utilization = ((row.original.totalPorts - row.original.availablePorts) / row.original.totalPorts) * 100;
+      if (row.original.totalPorts === 0) {
         return (
-            <div className="flex items-center gap-2">
-                <Progress value={utilization} className="w-24" />
-                <span>{utilization.toFixed(0)}%</span>
-            </div>
+          <div className="flex items-center gap-2">
+            <Progress value={0} className="w-24" />
+            <span>0%</span>
+          </div>
         )
+      }
+      const utilization = ((row.original.totalPorts - row.original.availablePorts) / row.original.totalPorts) * 100;
+      return (
+        <div className="flex items-center gap-2">
+          <Progress value={utilization} className="w-24" />
+          <span>{utilization.toFixed(0)}%</span>
+        </div>
+      )
     }
   },
   {
@@ -77,7 +77,7 @@ export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<Splitt
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem>View Details</DropdownMenuItem>
+              {/* <DropdownMenuItem>View Details</DropdownMenuItem> */}
               <DropdownMenuItem onClick={() => onEdit(splitter)}>Edit Splitter</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive" onClick={() => onDelete(splitter)}>

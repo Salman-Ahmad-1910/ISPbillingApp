@@ -68,9 +68,9 @@ export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<Inquir
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuItem onClick={() => onEdit(inquiry)}>Edit Inquiry</DropdownMenuItem>
-              <DropdownMenuItem>Follow Up</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>Convert to Subscriber</DropdownMenuItem>
+              {/* <DropdownMenuItem>Follow Up</DropdownMenuItem> */}
+              {/* <DropdownMenuSeparator /> */}
+              {/* <DropdownMenuItem>Convert to Subscriber</DropdownMenuItem> */}
               <DropdownMenuItem className="text-destructive" onClick={() => onDelete(inquiry)}>
                 Delete Inquiry
               </DropdownMenuItem>

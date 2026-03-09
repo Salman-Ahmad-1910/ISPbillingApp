@@ -40,7 +40,7 @@ export function ClientPage({ invoices: data, subscribers }: ClientPageProps) {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  
+
   // Advanced pagination state
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
@@ -69,11 +69,11 @@ export function ClientPage({ invoices: data, subscribers }: ClientPageProps) {
     const pages = [];
     const startPage = Math.max(1, currentPage - 3);
     const endPage = Math.min(totalPages, currentPage + 3);
-    
+
     for (let i = startPage; i <= endPage; i++) {
       pages.push(i);
     }
-    
+
     return pages;
   };
 
@@ -174,16 +174,16 @@ export function ClientPage({ invoices: data, subscribers }: ClientPageProps) {
   const columns = getColumns({ onPrint: handlePrint, onEdit: handleEdit, onDelete: openDeleteDialog });
 
   return (
-    <>
+    <div>
       <PageHeader
         title="Invoices"
         description="Create and manage customer invoices."
       >
         <div className="flex items-center gap-2">
-          <Button variant="outline">
+          {/* <Button variant="outline">
             <Download className="mr-2 h-4 w-4" />
             Export
-          </Button>
+          </Button> */}
           <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
             <DialogTrigger asChild>
               <Button onClick={() => setSelectedInvoice(null)}>
@@ -216,7 +216,7 @@ export function ClientPage({ invoices: data, subscribers }: ClientPageProps) {
           />
         </div>
         <DataTable columns={columns} data={getPaginatedData()} />
-        
+
         {/* Advanced Pagination */}
         <div className="flex items-center justify-between mt-4">
           <div className="text-sm text-muted-foreground">
@@ -243,7 +243,7 @@ export function ClientPage({ invoices: data, subscribers }: ClientPageProps) {
             >
               Previous
             </Button>
-            
+
             {/* Page numbers - show current page ± 3 */}
             <div className="flex items-center gap-1">
               {getVisiblePages().map(page => (
@@ -257,7 +257,7 @@ export function ClientPage({ invoices: data, subscribers }: ClientPageProps) {
                   {page}
                 </Button>
               ))}
-              
+
               {/* Show ellipsis if there are more pages */}
               {currentPage + 3 < totalPages && (
                 <>
@@ -273,7 +273,7 @@ export function ClientPage({ invoices: data, subscribers }: ClientPageProps) {
                 </>
               )}
             </div>
-            
+
             {/* Page input */}
             <div className="flex items-center gap-1">
               <Input
@@ -296,7 +296,7 @@ export function ClientPage({ invoices: data, subscribers }: ClientPageProps) {
                 Go
               </Button>
             </div>
-            
+
             <Button
               variant="outline"
               size="sm"
@@ -320,6 +320,6 @@ export function ClientPage({ invoices: data, subscribers }: ClientPageProps) {
         onDelete={handleDelete}
         itemName={`Invoice ${selectedInvoice?.id}`}
       />
-    </>
+    </div>
   );
 }

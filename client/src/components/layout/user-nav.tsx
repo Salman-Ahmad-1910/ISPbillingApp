@@ -27,30 +27,30 @@ export function UserNav() {
 
   const [imageExists, setImageExists] = useState(false);
 
-useEffect(() => {
-  const check = async () => {
-    if (!companyId) {
-      setImageExists(false);
-      return;
-    }
-    const url = `${api?.defaults?.baseURL}/uploads/company_images/${companyId}`;
-    const exists = await checkImageExists(url);
-    setImageExists(exists);
+  useEffect(() => {
+    const check = async () => {
+      if (!companyId) {
+        setImageExists(false);
+        return;
+      }
+      const url = `${api?.defaults?.baseURL}/uploads/company_images/${companyId}`;
+      const exists = await checkImageExists(url);
+      setImageExists(exists);
+    };
+
+    check();
+  }, [companyId]);
+
+  const checkImageExists = (imageUrl: string): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+
+      img.onload = () => resolve(true);
+      img.onerror = () => resolve(false);
+
+      img.src = imageUrl;
+    });
   };
-
-  check();
-}, [companyId]);
-
-const checkImageExists = (imageUrl: string): Promise<boolean> => {
-  return new Promise((resolve) => {
-    const img = new Image();
-
-    img.onload = () => resolve(true);
-    img.onerror = () => resolve(false);
-
-    img.src = imageUrl;
-  });
-};
 
   return (
     <DropdownMenu>
@@ -79,7 +79,7 @@ const checkImageExists = (imageUrl: string): Promise<boolean> => {
               Profile
             </DropdownMenuItem>
           </Link>
-          <Link href="/billing/subscription">
+          {/* <Link href="/billing/subscription">
             <DropdownMenuItem>
               Billing
             </DropdownMenuItem>
@@ -88,13 +88,13 @@ const checkImageExists = (imageUrl: string): Promise<boolean> => {
             <DropdownMenuItem>
               Settings
             </DropdownMenuItem>
-          </Link>
+          </Link> */}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <LogoutButton>
-            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                Log out
-            </DropdownMenuItem>
+          <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+            Log out
+          </DropdownMenuItem>
         </LogoutButton>
       </DropdownMenuContent>
     </DropdownMenu>

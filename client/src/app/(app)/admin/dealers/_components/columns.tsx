@@ -15,8 +15,8 @@ import {
 import Link from 'next/link';
 
 interface DealerColumnsProps {
-    onEdit: (dealer: Dealer) => void;
-    onDelete: (dealer: Dealer) => void;
+  onEdit: (dealer: Dealer) => void;
+  onDelete: (dealer: Dealer) => void;
 }
 
 export const getColumns = ({ onEdit, onDelete }: DealerColumnsProps): ColumnDef<Dealer>[] => [
@@ -61,11 +61,11 @@ export const getColumns = ({ onEdit, onDelete }: DealerColumnsProps): ColumnDef<
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <Link href={`/admin/dealers/${dealer.id}`}>
+              {/* <Link href={`/admin/dealers/${dealer.id}`}>
                 <DropdownMenuItem>View details</DropdownMenuItem>
-              </Link>
+              </Link> */}
               <DropdownMenuItem onClick={() => onEdit(dealer)}>Edit dealer</DropdownMenuItem>
-              <DropdownMenuSeparator />
+              {/* <DropdownMenuSeparator /> */}
               <DropdownMenuItem className="text-destructive" onClick={() => onDelete(dealer)}>
                 Delete dealer
               </DropdownMenuItem>

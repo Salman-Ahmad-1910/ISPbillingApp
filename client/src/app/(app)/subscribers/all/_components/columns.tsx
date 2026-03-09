@@ -86,11 +86,11 @@ export const getColumns = ({ onEdit, onDelete }: SubscriberColumnsProps): Column
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem>View details</DropdownMenuItem>
+              {/* <DropdownMenuItem>View details</DropdownMenuItem> */}
               <DropdownMenuItem onClick={() => onEdit(subscriber)}>Edit subscriber</DropdownMenuItem>
-              <DropdownMenuItem>Receive Payment</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>Suspend</DropdownMenuItem>
+              {/* <DropdownMenuItem>Receive Payment</DropdownMenuItem> */}
+              {/* <DropdownMenuSeparator /> */}
+              {/* <DropdownMenuItem>Suspend</DropdownMenuItem> */}
               <DropdownMenuItem className="text-destructive" onClick={() => onDelete(subscriber)}>
                 Delete Subscriber
               </DropdownMenuItem>

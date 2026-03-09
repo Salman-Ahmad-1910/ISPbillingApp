@@ -84,10 +84,10 @@ export function RecoveryOfficerForm({ recoveryOfficer, onSave, onCancel, isSavin
     const validateForm = () => {
         try {
             // For edit mode, don't validate password if it's empty
-            const dataToValidate = recoveryOfficer && !formData.password 
+            const dataToValidate = recoveryOfficer && !formData.password
                 ? { ...formData, password: 'placeholder' } // Skip password validation
                 : formData;
-            
+
             recoveryOfficerSchema.parse(dataToValidate);
             setErrors({});
             return true;
@@ -103,13 +103,13 @@ export function RecoveryOfficerForm({ recoveryOfficer, onSave, onCancel, isSavin
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         if (!validateForm()) {
             return;
         }
 
         // For edit mode, if password is empty, remove it from payload
-        const payload = recoveryOfficer && !formData.password 
+        const payload = recoveryOfficer && !formData.password
             ? { ...formData, password: undefined }
             : formData;
 
@@ -201,37 +201,6 @@ export function RecoveryOfficerForm({ recoveryOfficer, onSave, onCancel, isSavin
                             </Button>
                         </div>
                         {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
-                    </div>
-                )}
-
-                {isEditMode && (
-                    <div className="space-y-2">
-                        <Label htmlFor="password">Password</Label>
-                        <div className="relative">
-                            <Input
-                                id="password"
-                                type={showPassword ? 'text' : 'password'}
-                                value={formData.password}
-                                onChange={(e) => handleInputChange('password', e.target.value)}
-                                placeholder="Leave empty to keep current password"
-                                className={errors.password ? 'border-red-500' : ''}
-                            />
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                                onClick={() => setShowPassword(!showPassword)}
-                            >
-                                {showPassword ? (
-                                    <EyeOff className="h-4 w-4 text-gray-500" />
-                                ) : (
-                                    <Eye className="h-4 w-4 text-gray-500" />
-                                )}
-                            </Button>
-                        </div>
-                        {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
-                        <p className="text-xs text-gray-500">Leave empty to keep current password</p>
                     </div>
                 )}
 

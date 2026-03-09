@@ -109,8 +109,8 @@ export default function CompanyProfilePage() {
                     }}
                     className="w-20 h-20"
                   />
-                  <div className="space-y-1">
-                    <CardTitle className="text-2xl">{name}</CardTitle>
+                  <CardTitle className="text-2xl">{name}</CardTitle>
+                  {/* <div className="space-y-1">
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                       {email && (
                         <div className="flex items-center gap-1">
@@ -143,7 +143,7 @@ export default function CompanyProfilePage() {
                         <span className="line-clamp-2">{description}</span>
                       </div>
                     )}
-                  </div>
+                  </div> */}
                 </div>
                 <div className="flex items-center gap-2">
                   <Button type="submit" disabled={isSaving}>

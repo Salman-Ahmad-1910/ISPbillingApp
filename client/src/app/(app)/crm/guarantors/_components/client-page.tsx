@@ -42,7 +42,7 @@ export function ClientPage({ data }: ClientPageProps) {
     const [selectedGuarantor, setSelectedGuarantor] = useState<Guarantor | null>(null);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
-    
+
     // Advanced pagination state
     const [currentPage, setCurrentPage] = useState<number>(1);
     const [pageSize, setPageSize] = useState<number>(10);
@@ -54,7 +54,7 @@ export function ClientPage({ data }: ClientPageProps) {
         setGuarantors(data);
     }, [data]);
 
-    console.log('companyId: ',companyId??'-')
+    console.log('companyId: ', companyId ?? '-')
 
 
     const filteredData = useMemo(() => guarantors.filter(guarantor =>
@@ -76,11 +76,11 @@ export function ClientPage({ data }: ClientPageProps) {
         const pages = [];
         const startPage = Math.max(1, currentPage - 3);
         const endPage = Math.min(totalPages, currentPage + 3);
-        
+
         for (let i = startPage; i <= endPage; i++) {
             pages.push(i);
         }
-        
+
         return pages;
     };
 
@@ -189,10 +189,10 @@ export function ClientPage({ data }: ClientPageProps) {
                         className="max-w-sm"
                     />
                     <div className="flex items-center gap-2">
-                        <Button variant="outline">
+                        {/* <Button variant="outline">
                             <Download className="mr-2 h-4 w-4" />
                             Export
-                        </Button>
+                        </Button> */}
                         <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
                             <DialogTrigger asChild>
                                 <Button onClick={() => setSelectedGuarantor(null)}>
@@ -216,7 +216,7 @@ export function ClientPage({ data }: ClientPageProps) {
                     </div>
                 </div>
                 <DataTable columns={columns} data={getPaginatedData()} />
-                
+
                 {/* Advanced Pagination */}
                 <div className="flex items-center justify-between mt-4">
                     <div className="text-sm text-muted-foreground">
@@ -243,7 +243,7 @@ export function ClientPage({ data }: ClientPageProps) {
                         >
                             Previous
                         </Button>
-                        
+
                         {/* Page numbers - show current page ± 3 */}
                         <div className="flex items-center gap-1">
                             {getVisiblePages().map(page => (
@@ -257,7 +257,7 @@ export function ClientPage({ data }: ClientPageProps) {
                                     {page}
                                 </Button>
                             ))}
-                            
+
                             {/* Show ellipsis if there are more pages */}
                             {currentPage + 3 < totalPages && (
                                 <>
@@ -273,7 +273,7 @@ export function ClientPage({ data }: ClientPageProps) {
                                 </>
                             )}
                         </div>
-                        
+
                         {/* Page input */}
                         <div className="flex items-center gap-1">
                             <Input
@@ -296,7 +296,7 @@ export function ClientPage({ data }: ClientPageProps) {
                                 Go
                             </Button>
                         </div>
-                        
+
                         <Button
                             variant="outline"
                             size="sm"

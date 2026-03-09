@@ -47,7 +47,7 @@ export function CustomerClientPage({ data }: CustomerClientPageProps) {
     const [customers, setCustomers] = useState<Customer[]>(data);
     const [filter, setFilter] = useState('');
     const [statusFilters, setStatusFilters] = useState<string[]>([]);
-    
+
     // Advanced pagination state
     const [currentPage, setCurrentPage] = useState<number>(1);
     const [pageSize, setPageSize] = useState<number>(10);
@@ -58,7 +58,7 @@ export function CustomerClientPage({ data }: CustomerClientPageProps) {
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
-    console.log('companyId: ',companyId??'-')
+    console.log('companyId: ', companyId ?? '-')
 
     useEffect(() => {
         setCustomers(data);
@@ -85,11 +85,11 @@ export function CustomerClientPage({ data }: CustomerClientPageProps) {
         const pages = [];
         const startPage = Math.max(1, currentPage - 3);
         const endPage = Math.min(totalPages, currentPage + 3);
-        
+
         for (let i = startPage; i <= endPage; i++) {
             pages.push(i);
         }
-        
+
         return pages;
     };
 
@@ -225,10 +225,10 @@ export function CustomerClientPage({ data }: CustomerClientPageProps) {
                                 ))}
                             </DropdownMenuContent>
                         </DropdownMenu>
-                        <Button variant="outline" onClick={handleExport}>
+                        {/* <Button variant="outline" onClick={handleExport}>
                             <Download className="mr-2 h-4 w-4" />
                             Export
-                        </Button>
+                        </Button> */}
                         <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
                             <DialogTrigger asChild>
                                 <Button onClick={() => setSelectedCustomer(null)}>
@@ -251,7 +251,7 @@ export function CustomerClientPage({ data }: CustomerClientPageProps) {
                     </div>
                 </div>
                 <DataTable columns={columns} data={getPaginatedData()} />
-                
+
                 {/* Advanced Pagination */}
                 <div className="flex items-center justify-between mt-4">
                     <div className="text-sm text-muted-foreground">
@@ -278,7 +278,7 @@ export function CustomerClientPage({ data }: CustomerClientPageProps) {
                         >
                             Previous
                         </Button>
-                        
+
                         {/* Page numbers - show current page ± 3 */}
                         <div className="flex items-center gap-1">
                             {getVisiblePages().map(page => (
@@ -292,7 +292,7 @@ export function CustomerClientPage({ data }: CustomerClientPageProps) {
                                     {page}
                                 </Button>
                             ))}
-                            
+
                             {/* Show ellipsis if there are more pages */}
                             {currentPage + 3 < totalPages && (
                                 <>
@@ -308,7 +308,7 @@ export function CustomerClientPage({ data }: CustomerClientPageProps) {
                                 </>
                             )}
                         </div>
-                        
+
                         {/* Page input */}
                         <div className="flex items-center gap-1">
                             <Input
@@ -331,7 +331,7 @@ export function CustomerClientPage({ data }: CustomerClientPageProps) {
                                 Go
                             </Button>
                         </div>
-                        
+
                         <Button
                             variant="outline"
                             size="sm"

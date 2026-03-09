@@ -56,7 +56,7 @@ export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<Corpor
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem>View Details</DropdownMenuItem>
+              {/* <DropdownMenuItem>View Details</DropdownMenuItem> */}
               <DropdownMenuItem onClick={() => onEdit(customer)}>Edit Customer</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive" onClick={() => onDelete(customer)}>

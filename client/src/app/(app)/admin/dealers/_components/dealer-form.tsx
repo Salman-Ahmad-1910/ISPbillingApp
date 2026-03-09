@@ -40,7 +40,7 @@ interface DealerFormProps {
 
 export function DealerForm({ dealer, dealers, onSave, onCancel, isSaving }: DealerFormProps) {
   const [showPassword, setShowPassword] = useState(false);
-  
+
   const form = useForm<DealerFormValues>({
     resolver: zodResolver(dealerSchema),
     defaultValues: dealer || {
@@ -87,90 +87,92 @@ export function DealerForm({ dealer, dealers, onSave, onCancel, isSaving }: Deal
           )}
         />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField
+          <FormField
             control={form.control}
             name="phone"
             render={({ field }) => (
-                <FormItem>
+              <FormItem>
                 <FormLabel>Phone Number</FormLabel>
                 <FormControl>
-                    <Input placeholder="e.g., 0300-1234567" {...field} />
+                  <Input placeholder="e.g., 0300-1234567" {...field} />
                 </FormControl>
                 <FormMessage />
-                </FormItem>
+              </FormItem>
             )}
-            />
-            <FormField
+          />
+          <FormField
             control={form.control}
             name="cnic"
             render={({ field }) => (
-                <FormItem>
+              <FormItem>
                 <FormLabel>CNIC</FormLabel>
                 <FormControl>
-                    <Input placeholder="e.g., 42201-1234567-8" {...field} />
+                  <Input placeholder="e.g., 42201-1234567-8" {...field} />
                 </FormControl>
                 <FormMessage />
-                </FormItem>
+              </FormItem>
             )}
-            />
+          />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField
+          <FormField
             control={form.control}
             name="email"
             render={({ field }) => (
-                <FormItem>
+              <FormItem>
                 <FormLabel>Email Address</FormLabel>
                 <FormControl>
-                    <Input type="email" placeholder="e.g., dealer@example.com" {...field} />
+                  <Input type="email" placeholder="e.g., dealer@example.com" disabled={!!dealer} {...field} />
                 </FormControl>
                 <FormMessage />
-                </FormItem>
+              </FormItem>
             )}
-            />
+          />
+          {!dealer && (
             <FormField
-            control={form.control}
-            name="password"
-            render={({ field }) => (
+              control={form.control}
+              name="password"
+              render={({ field }) => (
                 <FormItem>
-                <FormLabel>Password</FormLabel>
-                <FormControl>
+                  <FormLabel>Password</FormLabel>
+                  <FormControl>
                     <div className="relative">
-                        <Input 
-                            type={showPassword ? "text" : "password"} 
-                            placeholder="Enter password" 
-                            {...field} 
-                            className="pr-10"
-                        />
-                        <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                        >
-                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
+                      <Input
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Enter password"
+                        {...field}
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
                     </div>
-                </FormControl>
-                <FormMessage />
+                  </FormControl>
+                  <FormMessage />
                 </FormItem>
-            )}
+              )}
             />
+          )}
         </div>
 
         <FormField
-            control={form.control}
-            name="commissionRate"
-            render={({ field }) => (
-                <FormItem>
-                <FormLabel>Commission Rate (%)</FormLabel>
-                <FormControl>
-                    <Input type="number" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
-                </FormControl>
-                <FormMessage />
-                </FormItem>
-            )}
-            />
+          control={form.control}
+          name="commissionRate"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Commission Rate (%)</FormLabel>
+              <FormControl>
+                <Input type="number" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <FormField
           control={form.control}
@@ -185,19 +187,19 @@ export function DealerForm({ dealer, dealers, onSave, onCancel, isSaving }: Deal
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                    <SelectItem value="none">None (Top-level Dealer)</SelectItem>
-                    {dealers.map((d) => (
-                        <SelectItem key={d.id} value={d.id}>
-                            {d.name}
-                        </SelectItem>
-                    ))}
+                  <SelectItem value="none">None (Top-level Dealer)</SelectItem>
+                  {dealers.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <FormMessage />
             </FormItem>
           )}
         />
-        
+
         <div className="flex justify-end gap-2 pt-4 border-t">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSaving}>
             Cancel

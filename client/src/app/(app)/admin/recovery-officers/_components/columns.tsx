@@ -68,9 +68,9 @@ export const getColumns = ({ onEdit, onDelete }: RecoveryOfficerColumnsProps): C
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <Link href={`/admin/recovery-officers/${officer.id}`}>
+              {/* <Link href={`/admin/recovery-officers/${officer.id}`}>
                 <DropdownMenuItem>View details</DropdownMenuItem>
-              </Link>
+              </Link> */}
               <DropdownMenuItem onClick={() => onEdit(officer)}>Edit officer</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive" onClick={() => onDelete(officer)}>

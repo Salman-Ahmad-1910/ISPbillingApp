@@ -24,7 +24,7 @@ export const getColumns = ({ onEdit, onDelete }: PaymentColumnsProps): ColumnDef
     accessorKey: 'id',
     header: 'Payment ID',
   },
-    {
+  {
     accessorKey: 'invoiceId',
     header: 'Invoice ID',
   },
@@ -36,7 +36,7 @@ export const getColumns = ({ onEdit, onDelete }: PaymentColumnsProps): ColumnDef
     accessorKey: 'paymentDate',
     header: 'Payment Date',
   },
-   {
+  {
     accessorKey: 'method',
     header: 'Method',
     cell: ({ row }) => <Badge variant="outline" className="capitalize">{row.original.method}</Badge>
@@ -66,7 +66,7 @@ export const getColumns = ({ onEdit, onDelete }: PaymentColumnsProps): ColumnDef
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuItem onClick={() => onEdit(payment)}>Edit Payment</DropdownMenuItem>
-              <DropdownMenuItem>Send Receipt</DropdownMenuItem>
+              {/* <DropdownMenuItem>Send Receipt</DropdownMenuItem> */}
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive" onClick={() => onDelete(payment)}>
                 Delete Payment

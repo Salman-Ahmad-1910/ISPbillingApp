@@ -41,6 +41,8 @@ export type User = {
   email: string;
   role: string;
   status: 'active' | 'inactive';
+  contact1?: string;
+  contact2?: string;
   companyId?: string;
 };
 
@@ -384,7 +386,7 @@ export type pricingPlans = {
   id: string;
   name: string;
   price: number;
-  features: string[];
+  features: string;
   companyId: string;
 }
 

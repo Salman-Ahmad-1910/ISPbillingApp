@@ -16,19 +16,16 @@ export default function MyDealersPage() {
   const currentFranchiseId = 'FRAN-001'; // This would be dynamic
 
   const { data: dealers = [], isLoading: isLoadingdealers } = useGenericQuery<any>('dealers', companyId ?? undefined);
-  
+
   return (
     <>
       <PageHeader
         title="My Dealers"
         description="Manage all dealers operating under your franchise."
       >
-        <Button>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Onboard New Dealer
-        </Button>
+
       </PageHeader>
-      
+
       <Card>
         <CardContent className="p-0">
           <ClientPage data={dealers} />

@@ -17,9 +17,10 @@ import {
 interface ColumnsProps {
   onEdit: (bill: CustomBill) => void;
   onDelete: (bill: CustomBill) => void;
+  subscribers?: any[];
 }
 
-export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<CustomBill>[] => [
+export const getColumns = ({ onEdit, onDelete, subscribers = [] }: ColumnsProps): ColumnDef<CustomBill>[] => [
   {
     accessorKey: 'date',
     header: 'Date',
@@ -33,8 +34,16 @@ export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<Custom
     header: 'Subscriber',
     cell: ({ row }) => {
       const bill = row.original;
-      // Use subscriberName populated by backend, fallback to relationship if needed
-      return bill.subscriberName || bill.subscriber?.name || 'N/A';
+
+      // 1. Try backend populated subscriberName
+      if (bill.subscriberName) return bill.subscriberName;
+      // 2. Try nested object relation
+      if (bill.subscriber?.name) return bill.subscriber.name;
+      // 3. Fallback: Search local subscribers array (if backend didn't supply it)
+      const localSub = subscribers.find((s) => s.id === bill.subscriberId);
+      if (localSub) return localSub.name;
+
+      return 'Unknown';
     },
   },
   {

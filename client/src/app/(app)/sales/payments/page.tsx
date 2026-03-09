@@ -22,7 +22,7 @@ export default function PaymentsPage() {
     );
   }
 
-  console.log('payments: ',payments)
+  console.log('payments: ', payments)
 
   if (error) {
     return <div className="p-4 text-red-500">Failed to load payments</div>;
@@ -34,12 +34,7 @@ export default function PaymentsPage() {
         title="Payments / Recoveries"
         description="Record and track customer payments and installment recoveries."
       >
-        <div className="flex items-center gap-2">
-          <Button variant="outline">
-            <Download className="mr-2 h-4 w-4" />
-            Export
-          </Button>
-        </div>
+
       </PageHeader>
 
       <Card>

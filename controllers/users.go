@@ -35,6 +35,22 @@ type CreateSubUserRequest struct {
 	SecondaryPhone string `json:"secondaryPhone,omitempty"` // For recovery officers
 }
 
+type UpdateSubUserRequest struct {
+	Name           string     `json:"name" binding:"required"`
+	Email          string     `json:"email" binding:"required,email"`
+	Password       string     `json:"password" binding:"omitempty,min=6"`
+	Role           string     `json:"role" binding:"required"`
+	Phone          string     `json:"phone,omitempty"`
+	AreaID         *uuid.UUID `json:"areaId,omitempty"`
+	FranchiseID    *uuid.UUID `json:"franchiseId,omitempty"`
+	ParentDealerID *uuid.UUID `json:"parentDealerId,omitempty"`
+	Department     string     `json:"department,omitempty"`
+	Designation    string     `json:"designation,omitempty"`
+	Salary         float64    `json:"salary,omitempty"`
+	CommissionRate float64    `json:"commissionRate,omitempty"`
+	SecondaryPhone string     `json:"secondaryPhone,omitempty"`
+}
+
 // GetRecoveryOfficers retrieves all recovery officers for a company
 func GetRecoveryOfficers(c *gin.Context) {
 	companyID, exists := c.Get("companyID")
@@ -60,7 +76,7 @@ func UpdateSubUser(c *gin.Context) {
 		return
 	}
 
-	var req CreateSubUserRequest
+	var req UpdateSubUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.ErrorResponse(c, 400, "Validation failed", err.Error())
 		return
@@ -100,6 +116,14 @@ func UpdateSubUser(c *gin.Context) {
 	// Start transaction
 	tx := config.DB.Begin()
 
+	// Verify user belongs to company
+	var userCompany models.UserCompany
+	if err := tx.Where("user_id = ? AND company_id = ?", id, companyID).First(&userCompany).Error; err != nil {
+		tx.Rollback()
+		utils.ErrorResponse(c, 404, "User not found in this company", err.Error())
+		return
+	}
+
 	// Update user
 	user := models.User{
 		Name:  req.Name,
@@ -111,7 +135,7 @@ func UpdateSubUser(c *gin.Context) {
 		user.Password = string(hashedPassword)
 	}
 
-	if err := tx.Model(&user).Where("id = ? AND company_id = ?", id, companyID).Updates(&user).Error; err != nil {
+	if err := tx.Model(&models.User{}).Where("id = ?", id).Updates(&user).Error; err != nil {
 		tx.Rollback()
 		utils.ErrorResponse(c, 500, "Failed to update user", err.Error())
 		return
@@ -199,9 +223,18 @@ func DeleteSubUser(c *gin.Context) {
 	// Start transaction
 	tx := config.DB.Begin()
 
+	// Verify user belongs to company
+	fmt.Printf("DEBUG: Verifying user-company relationship for UserID: %s, CompanyID: %s (IN DELETE)\n", id, companyID)
+	var userCompany models.UserCompany
+	if err := tx.Where("user_id = ? AND company_id = ?", id, companyID).First(&userCompany).Error; err != nil {
+		tx.Rollback()
+		utils.ErrorResponse(c, 404, "User not found in this company", err.Error())
+		return
+	}
+
 	// Get user to determine role
 	var user models.User
-	if err := tx.Where("id = ? AND company_id = ?", id, companyID).First(&user).Error; err != nil {
+	if err := tx.Where("id = ?", id).First(&user).Error; err != nil {
 		tx.Rollback()
 		utils.ErrorResponse(c, 404, "User not found", err.Error())
 		return
@@ -232,7 +265,7 @@ func DeleteSubUser(c *gin.Context) {
 	}
 
 	// Delete user record
-	if err := tx.Where("id = ? AND company_id = ?", id, companyID).Delete(&models.User{}).Error; err != nil {
+	if err := tx.Where("id = ?", id).Delete(&models.User{}).Error; err != nil {
 		tx.Rollback()
 		utils.ErrorResponse(c, 500, "Failed to delete user", err.Error())
 		return
@@ -477,7 +510,7 @@ func GetStaff(c *gin.Context) {
 		var user models.User
 		fmt.Printf("DEBUG: Looking for user with ID: %s and companyID: %v\n", s.ID, companyID)
 
-		if err := config.DB.Where("id = ? AND company_id = ?", s.ID, companyID).First(&user).Error; err != nil {
+		if err := config.DB.Where("id = ?", s.ID).First(&user).Error; err != nil {
 			fmt.Printf("DEBUG: User not found for staff ID %s: %v\n", s.ID, err)
 			usersNotFound++
 

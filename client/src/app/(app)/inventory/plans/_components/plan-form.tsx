@@ -31,9 +31,11 @@ export function PlanForm({ plan, onSave, onCancel, isSaving }: PlanFormProps) {
   const form = useForm<PlanFormValues>({
     resolver: zodResolver(pricingPlanSchema),
     defaultValues: plan ? {
-        ...plan,
-        price: Number(plan.price),
-        features: plan.features.join('\n'),
+      ...plan,
+      price: Number(plan.price),
+      features: typeof plan.features === 'string'
+        ? plan.features.replaceAll(',', '\n')
+        : (Array.isArray(plan.features) ? plan.features.join('\n') : ''),
     } : {
       name: '',
       price: 0,
@@ -80,7 +82,7 @@ export function PlanForm({ plan, onSave, onCancel, isSaving }: PlanFormProps) {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Features</FormLabel>
-               <FormControl>
+              <FormControl>
                 <Textarea placeholder="Enter one feature per line..." {...field} rows={5} />
               </FormControl>
               <FormMessage />

@@ -18,14 +18,14 @@ export function useUser() {
         .catch((error) => {
           console.error('Auth check failed:', error);
           // Clear expired token and redirect to login
-          localStorage.removeItem('token');
-          localStorage.removeItem('companies');
-          localStorage.removeItem('selectedCompany');
-          setUser(null);
+          // localStorage.removeItem('token');
+          // localStorage.removeItem('companies');
+          // localStorage.removeItem('selectedCompany');
+          // setUser(null);
           // Only redirect if not already on login/signup pages
-          if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/signup')) {
-            window.location.href = '/login';
-          }
+          // if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/signup')) {
+          //   window.location.href = '/login';
+          // }
         });
     } else {
       setUser(null);
@@ -36,18 +36,18 @@ export function useUser() {
     try {
       // Call backend logout
       await api.post('/auth/logout', {});
-      
+
       // Update user status to offline
       await api.put('/auth/status', { status: 'offline' });
-      
+
       // Clear local storage
       localStorage.removeItem('token');
       localStorage.removeItem('companies');
       localStorage.removeItem('selectedCompany');
-      
+
       // Clear user state
       setUser(null);
-      
+
       // Redirect to login page
       window.location.href = '/login';
     } catch (error) {

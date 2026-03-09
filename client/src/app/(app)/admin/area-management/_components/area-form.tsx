@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -25,23 +26,46 @@ interface AreaFormProps {
 }
 
 export function AreaForm({ area, onSave, onCancel }: AreaFormProps) {
+  const getDefaultValues = (areaData: Area | null) => {
+    if (!areaData) {
+      return {
+        city: '',
+        zone: '',
+        locality: '',
+        subLocality: '',
+      };
+    }
+    return {
+      id: areaData.id,
+      city: areaData.city || '',
+      zone: areaData.zone || '',
+      locality: areaData.locality || '',
+      subLocality: areaData.subLocality || '',
+      recoveryOfficerId: areaData.recoveryOfficerId,
+      companyId: areaData.companyId,
+    };
+  };
+
   const form = useForm<AreaFormValues>({
     resolver: zodResolver(areaSchema),
-    defaultValues: area || {
-      city: '',
-      zone: '',
-      locality: '',
-      subLocality: '',
-    },
+    defaultValues: getDefaultValues(area),
   });
+
+  useEffect(() => {
+    form.reset(getDefaultValues(area));
+  }, [area, form]);
 
   function onSubmit(values: AreaFormValues) {
     onSave(values);
   }
 
+  function onError(errors: any) {
+    console.error("Area Form Validation Errors:", errors);
+  }
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit, onError)} className="space-y-4">
         <FormField
           control={form.control}
           name="city"

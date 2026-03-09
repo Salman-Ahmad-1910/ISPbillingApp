@@ -79,15 +79,20 @@ func CreateCustomBill(c *gin.Context) {
 		customBill.Date = time.Now().Format("2006-01-02T15:04:05Z07:00")
 	}
 
-	// Get subscriber name
+	// Get subscriber name and full subscriber data to return in response
 	var subscriber models.Subscriber
-	if err := config.DB.Where("id = ?", customBill.SubscriberID).First(&subscriber).Error; err == nil {
+	if err := config.DB.Where("id = ? AND company_id = ?", customBill.SubscriberID, companyID).First(&subscriber).Error; err == nil {
 		customBill.SubscriberName = subscriber.Name
 	}
 
 	if err := config.DB.Create(&customBill).Error; err != nil {
 		utils.ErrorResponse(c, 500, "Failed to create custom bill", err.Error())
 		return
+	}
+
+	// Attach the full subscriber object to the response after creation so GORM doesn't duplicate it during creation
+	if subscriber.ID != uuid.Nil {
+		customBill.Subscriber = subscriber
 	}
 
 	utils.CreatedResponse(c, "Custom bill created successfully", customBill)
@@ -110,15 +115,20 @@ func UpdateCustomBill(c *gin.Context) {
 
 	customBill.ID = uuid.MustParse(id)
 
-	// Get subscriber name if subscriber ID changed
+	// Get subscriber name if subscriber ID changed, and attach full subscriber for response
 	var subscriber models.Subscriber
-	if err := config.DB.Where("id = ?", customBill.SubscriberID).First(&subscriber).Error; err == nil {
+	if err := config.DB.Where("id = ? AND company_id = ?", customBill.SubscriberID, customBill.CompanyID).First(&subscriber).Error; err == nil {
 		customBill.SubscriberName = subscriber.Name
 	}
 
 	if err := config.DB.Save(&customBill).Error; err != nil {
 		utils.ErrorResponse(c, 500, "Failed to update custom bill", err.Error())
 		return
+	}
+
+	// Attach the full subscriber object to the response after update so GORM doesn't duplicate it
+	if subscriber.ID != uuid.Nil {
+		customBill.Subscriber = subscriber
 	}
 
 	utils.SuccessResponse(c, "Custom bill updated successfully", customBill)

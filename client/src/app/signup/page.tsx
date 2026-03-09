@@ -40,7 +40,7 @@ export default function SignupPage() {
         router.refresh();
       } else {
         // Fallback if no token returned
-        router.push('/login?registered=true');
+        // router.push('/login?registered=true');
       }
     } catch (err: any) {
       setError(err.response?.data?.message || "Registration failed. Please try again.");
@@ -55,13 +55,13 @@ export default function SignupPage() {
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white overflow-y-auto">
         <div className="w-full max-w-md">
           <div className="mb-4">
-                <Link href="/" className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors">
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                  </svg>
-                  Back to Home
-                </Link>
-              </div>
+            <Link href="/" className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Back to Home
+            </Link>
+          </div>
           {/* <Link href="/" className="flex items-center gap-2 justify-center mb-8">
             <div className="w-10 h-10 bg-gradient-to-br from-gray-900 to-black rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-lg">F</span>
@@ -166,7 +166,7 @@ export default function SignupPage() {
               Transform Your ISP Business Today
             </h1>
             <p className="text-base text-gray-300 mb-10 leading-relaxed">
-              Get started with the world's most comprehensive ISP management platform. 
+              Get started with the world's most comprehensive ISP management platform.
               Join 500+ ISPs already using Fintrack ERP worldwide.
             </p>
 

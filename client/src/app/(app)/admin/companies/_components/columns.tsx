@@ -26,12 +26,12 @@ export const columns = ({ onEdit, onDelete }: CompanyColumnsProps): ColumnDef<Co
     cell: ({ row }) => (
       <div className="flex items-center gap-3">
         <Avatar>
-            <AvatarImage src={row.original.logo} alt={row.original.name} />
-            <AvatarFallback>{row.original.name.charAt(0)}</AvatarFallback>
+          <AvatarImage src={row.original.logo} alt={row.original.name} />
+          <AvatarFallback>{row.original.name.charAt(0)}</AvatarFallback>
         </Avatar>
         <div>
-            <div className="font-medium">{row.original.name}</div>
-            <div className="text-sm text-muted-foreground">{row.original.email}</div>
+          <div className="font-medium">{row.original.name}</div>
+          <div className="text-sm text-muted-foreground">{row.original.email}</div>
         </div>
       </div>
     ),
@@ -61,7 +61,7 @@ export const columns = ({ onEdit, onDelete }: CompanyColumnsProps): ColumnDef<Co
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuItem onClick={() => onEdit(company)}>Edit company</DropdownMenuItem>
-              <DropdownMenuSeparator />
+              {/* <DropdownMenuSeparator /> */}
               <DropdownMenuItem className="text-destructive" onClick={() => onDelete(company)}>
                 Delete company
               </DropdownMenuItem>

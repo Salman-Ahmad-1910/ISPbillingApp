@@ -42,7 +42,7 @@ export function ClientPage({ data }: ClientPageProps) {
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const currentDealerId = 'DLR-001'; // This would be dynamic based on logged in user
-  
+
     // Advanced pagination state
     const [currentPage, setCurrentPage] = useState<number>(1);
     const [pageSize, setPageSize] = useState<number>(10);
@@ -59,52 +59,52 @@ export function ClientPage({ data }: ClientPageProps) {
         (bill.description?.toLowerCase() || '').includes(filter.toLowerCase())
     ), [bills, filter]);
 
-  // Pagination helpers
-  const totalPages = Math.ceil(filteredData.length / pageSize);
+    // Pagination helpers
+    const totalPages = Math.ceil(filteredData.length / pageSize);
 
-  const getPaginatedData = () => {
-    const startIndex = (currentPage - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    return filteredData.slice(startIndex, endIndex);
-  };
+    const getPaginatedData = () => {
+        const startIndex = (currentPage - 1) * pageSize;
+        const endIndex = startIndex + pageSize;
+        return filteredData.slice(startIndex, endIndex);
+    };
 
-  const getVisiblePages = () => {
-    const pages = [];
-    const startPage = Math.max(1, currentPage - 3);
-    const endPage = Math.min(totalPages, currentPage + 3);
-    
-    for (let i = startPage; i <= endPage; i++) {
-      pages.push(i);
-    }
-    
-    return pages;
-  };
+    const getVisiblePages = () => {
+        const pages = [];
+        const startPage = Math.max(1, currentPage - 3);
+        const endPage = Math.min(totalPages, currentPage + 3);
 
-  const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (value === '' || /^\d+$/.test(value)) {
-      setPageInput(value);
-    }
-  };
+        for (let i = startPage; i <= endPage; i++) {
+            pages.push(i);
+        }
 
-  const handlePageSubmit = () => {
-    const page = parseInt(pageInput);
-    if (page && page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
-      setPageInput('');
-    }
-  };
+        return pages;
+    };
 
-  const handlePageKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handlePageSubmit();
-    }
-  };
+    const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        if (value === '' || /^\d+$/.test(value)) {
+            setPageInput(value);
+        }
+    };
 
-  // Reset pagination when filter changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filter]);
+    const handlePageSubmit = () => {
+        const page = parseInt(pageInput);
+        if (page && page >= 1 && page <= totalPages) {
+            setCurrentPage(page);
+            setPageInput('');
+        }
+    };
+
+    const handlePageKeyPress = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            handlePageSubmit();
+        }
+    };
+
+    // Reset pagination when filter changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filter]);
 
     const handleSave = async (formData: BillFormValues) => {
         setIsSaving(true);
@@ -173,6 +173,7 @@ export function ClientPage({ data }: ClientPageProps) {
     const columns = getColumns({
         onEdit: handleEdit,
         onDelete: openDeleteDialog,
+        subscribers: companySubscribers,
     });
 
     return (
@@ -207,7 +208,7 @@ export function ClientPage({ data }: ClientPageProps) {
                     </Dialog>
                 </div>
                 <DataTable columns={columns} data={getPaginatedData()} />
-                
+
                 {/* Advanced Pagination */}
                 <div className="flex items-center justify-between mt-4">
                     <div className="text-sm text-muted-foreground">
@@ -234,7 +235,7 @@ export function ClientPage({ data }: ClientPageProps) {
                         >
                             Previous
                         </Button>
-                        
+
                         {/* Page numbers - show current page ± 3 */}
                         <div className="flex items-center gap-1">
                             {getVisiblePages().map(page => (
@@ -248,7 +249,7 @@ export function ClientPage({ data }: ClientPageProps) {
                                     {page}
                                 </Button>
                             ))}
-                            
+
                             {/* Show ellipsis if there are more pages */}
                             {currentPage + 3 < totalPages && (
                                 <>
@@ -264,7 +265,7 @@ export function ClientPage({ data }: ClientPageProps) {
                                 </>
                             )}
                         </div>
-                        
+
                         {/* Page input */}
                         <div className="flex items-center gap-1">
                             <Input
@@ -287,7 +288,7 @@ export function ClientPage({ data }: ClientPageProps) {
                                 Go
                             </Button>
                         </div>
-                        
+
                         <Button
                             variant="outline"
                             size="sm"

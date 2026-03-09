@@ -35,11 +35,11 @@ export const getColumns = ({ onEdit, onDelete }: GuarantorColumnsProps): ColumnD
   {
     accessorKey: 'customerName',
     header: 'Customer',
-    cell: ({ row }) => (
-        <Link href={`/crm/customers/${row.original.customerId}`} className="text-primary hover:underline">
-            {row.original.customerName}
-        </Link>
-    )
+    // cell: ({ row }) => (
+    //   <Link href={`/crm/customers/${row.original.customerId}`} className="text-primary hover:underline">
+    //     {row.original.customerName}
+    //   </Link>
+    // )
   },
   {
     id: 'actions',
@@ -57,7 +57,7 @@ export const getColumns = ({ onEdit, onDelete }: GuarantorColumnsProps): ColumnD
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuItem onClick={() => onEdit(guarantor)}>Edit guarantor</DropdownMenuItem>
-              <DropdownMenuSeparator />
+              {/* <DropdownMenuSeparator /> */}
               <DropdownMenuItem className="text-destructive" onClick={() => onDelete(guarantor)}>
                 Remove guarantor
               </DropdownMenuItem>

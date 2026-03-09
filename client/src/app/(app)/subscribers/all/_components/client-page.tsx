@@ -68,52 +68,52 @@ export function ClientPage({ data }: ClientPageProps) {
         .filter(subscriber => statusFilters.length === 0 || statusFilters.includes(subscriber.status)),
         [subscribers, filter, statusFilters]);
 
-  // Pagination helpers
-  const totalPages = Math.ceil(filteredData.length / pageSize);
+    // Pagination helpers
+    const totalPages = Math.ceil(filteredData.length / pageSize);
 
-  const getPaginatedData = () => {
-    const startIndex = (currentPage - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    return filteredData.slice(startIndex, endIndex);
-  };
+    const getPaginatedData = () => {
+        const startIndex = (currentPage - 1) * pageSize;
+        const endIndex = startIndex + pageSize;
+        return filteredData.slice(startIndex, endIndex);
+    };
 
-  const getVisiblePages = () => {
-    const pages = [];
-    const startPage = Math.max(1, currentPage - 3);
-    const endPage = Math.min(totalPages, currentPage + 3);
-    
-    for (let i = startPage; i <= endPage; i++) {
-      pages.push(i);
-    }
-    
-    return pages;
-  };
+    const getVisiblePages = () => {
+        const pages = [];
+        const startPage = Math.max(1, currentPage - 3);
+        const endPage = Math.min(totalPages, currentPage + 3);
 
-  const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (value === '' || /^\d+$/.test(value)) {
-      setPageInput(value);
-    }
-  };
+        for (let i = startPage; i <= endPage; i++) {
+            pages.push(i);
+        }
 
-  const handlePageSubmit = () => {
-    const page = parseInt(pageInput);
-    if (page && page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
-      setPageInput('');
-    }
-  };
+        return pages;
+    };
 
-  const handlePageKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handlePageSubmit();
-    }
-  };
+    const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        if (value === '' || /^\d+$/.test(value)) {
+            setPageInput(value);
+        }
+    };
 
-  // Reset pagination when filter changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filter, statusFilters]);
+    const handlePageSubmit = () => {
+        const page = parseInt(pageInput);
+        if (page && page >= 1 && page <= totalPages) {
+            setCurrentPage(page);
+            setPageInput('');
+        }
+    };
+
+    const handlePageKeyPress = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            handlePageSubmit();
+        }
+    };
+
+    // Reset pagination when filter changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filter, statusFilters]);
 
     const handleSave = async (formData: SubscriberFormValues) => {
         setIsSaving(true);
@@ -209,10 +209,10 @@ export function ClientPage({ data }: ClientPageProps) {
                                 ))}
                             </DropdownMenuContent>
                         </DropdownMenu>
-                        <Button variant="outline">
+                        {/* <Button variant="outline">
                             <Download className="mr-2 h-4 w-4" />
                             Export
-                        </Button>
+                        </Button> */}
                         <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
                             <DialogTrigger asChild>
                                 <Button onClick={() => setSelectedSubscriber(null)}>
@@ -238,7 +238,7 @@ export function ClientPage({ data }: ClientPageProps) {
                     </div>
                 </div>
                 <DataTable columns={columns} data={getPaginatedData()} />
-                
+
                 {/* Advanced Pagination */}
                 <div className="flex items-center justify-between mt-4">
                     <div className="text-sm text-muted-foreground">
@@ -265,7 +265,7 @@ export function ClientPage({ data }: ClientPageProps) {
                         >
                             Previous
                         </Button>
-                        
+
                         {/* Page numbers - show current page ± 3 */}
                         <div className="flex items-center gap-1">
                             {getVisiblePages().map(page => (
@@ -279,7 +279,7 @@ export function ClientPage({ data }: ClientPageProps) {
                                     {page}
                                 </Button>
                             ))}
-                            
+
                             {/* Show ellipsis if there are more pages */}
                             {currentPage + 3 < totalPages && (
                                 <>
@@ -295,7 +295,7 @@ export function ClientPage({ data }: ClientPageProps) {
                                 </>
                             )}
                         </div>
-                        
+
                         {/* Page input */}
                         <div className="flex items-center gap-1">
                             <Input
@@ -318,7 +318,7 @@ export function ClientPage({ data }: ClientPageProps) {
                                 Go
                             </Button>
                         </div>
-                        
+
                         <Button
                             variant="outline"
                             size="sm"

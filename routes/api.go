@@ -65,8 +65,6 @@ func SetupRoutes(r *gin.Engine) {
 	{
 		auth.POST("/login", controllers.Login)
 		auth.POST("/signup", controllers.Register)
-		auth.POST("/logout", controllers.Logout)
-		auth.PUT("/status", controllers.UpdateUserStatus)
 	}
 
 	// Protected routes that don't require company context
@@ -74,6 +72,8 @@ func SetupRoutes(r *gin.Engine) {
 	authProtected.Use(middleware.AuthMiddleware())
 	{
 		authProtected.GET("/me", controllers.GetMe)
+		authProtected.POST("/logout", controllers.Logout)
+		authProtected.PUT("/status", controllers.UpdateUserStatus)
 	}
 
 	// Admin routes for company management
@@ -155,6 +155,8 @@ func SetupRoutes(r *gin.Engine) {
 			billing.POST("/payments/process", middleware.RBACMiddleware(config.DB, "billing", "add"), controllers.ProcessPayment)
 			billing.GET("/payments", controllers.GetPayments)
 			billing.POST("/payments", controllers.CreatePayment)
+			billing.PUT("/payments/:id", controllers.UpdatePayment)
+			billing.DELETE("/payments/:id", controllers.DeletePayment)
 		}
 
 		// CRM routes (temporarily public for testing)
@@ -298,12 +300,12 @@ func SetupRoutes(r *gin.Engine) {
 		})
 		{
 			dealers.POST("", controllers.CreateDealer)
-			// Register only GET, PUT, DELETE for dealers (POST handled by CreateDealer)
+			// Register only GET, PUT for generic CRUD, DELETE uses custom logic
 			crud := controllers.GenericCRUD[models.Dealer]{IsScoped: true}
 			dealers.GET("", crud.FindAll)
 			dealers.GET("/:id", crud.FindOne)
 			dealers.PUT("/:id", crud.Update)
-			dealers.DELETE("/:id", crud.Delete)
+			dealers.DELETE("/:id", controllers.DeleteDealer)
 			controllers.RegisterGenericCRUD[models.DealerFranchise](dealers, "/franchises")
 			controllers.RegisterGenericCRUD[models.DealerCollection](dealers, "/collections")
 			dealers.POST("/sub-dealer", controllers.CreateSubDealer)

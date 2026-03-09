@@ -33,8 +33,13 @@ export function PaymentForm({ payment, subscribers, invoices, onSave, onCancel, 
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
     defaultValues: payment ? {
-        ...payment,
-        amount: Number(payment.amount),
+      id: payment.id,
+      invoiceId: payment.invoiceId,
+      subscriberId: payment.subscriberId,
+      amount: Number(payment.amount),
+      paymentDate: payment.paymentDate,
+      method: payment.method,
+      collectorId: payment.collectorId || null,
     } : {
       invoiceId: '',
       subscriberId: '',
@@ -100,55 +105,55 @@ export function PaymentForm({ payment, subscribers, invoices, onSave, onCancel, 
           )}
         />
         <div className="grid grid-cols-2 gap-4">
-            <FormField
-                control={form.control}
-                name="amount"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Amount (PKR)</FormLabel>
-                    <FormControl>
-                        <Input type="number" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
-            />
-             <FormField
-                control={form.control}
-                name="paymentDate"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Payment Date</FormLabel>
-                    <FormControl>
-                        <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
-            />
+          <FormField
+            control={form.control}
+            name="amount"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Amount (PKR)</FormLabel>
+                <FormControl>
+                  <Input type="number" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="paymentDate"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Payment Date</FormLabel>
+                <FormControl>
+                  <Input type="date" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         </div>
         <FormField
-            control={form.control}
-            name="method"
-            render={({ field }) => (
-                <FormItem>
-                <FormLabel>Payment Method</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Select a payment method" />
-                        </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                            <SelectItem value="cash">Cash</SelectItem>
-                            <SelectItem value="bank">Bank Transfer</SelectItem>
-                            <SelectItem value="online">Online</SelectItem>
-                            <SelectItem value="dealer">Dealer</SelectItem>
-                        </SelectContent>
-                    </Select>
-                <FormMessage />
-                </FormItem>
-            )}
+          control={form.control}
+          name="method"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Payment Method</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a payment method" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="bank">Bank Transfer</SelectItem>
+                  <SelectItem value="online">Online</SelectItem>
+                  <SelectItem value="dealer">Dealer</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
         />
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSaving}>

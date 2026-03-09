@@ -18,7 +18,7 @@ export default function CashBankLedgerPage() {
   const { data: cashLedger = [], isLoading: isLoadingCash, error: cashError } = useGenericQuery<LedgerEntry>('accounts/ledger?accountType=cash', companyId ?? undefined);
   const { data: bankLedger = [], isLoading: isLoadingBank, error: bankError } = useGenericQuery<LedgerEntry>('accounts/ledger?accountType=bank', companyId ?? undefined);
 
-  if (isLoadingCash || isLoadingBank) {
+  if ((isLoadingCash && cashLedger.length === 0) || (isLoadingBank && bankLedger.length === 0)) {
     return <div className="flex h-[50vh] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
   }
 

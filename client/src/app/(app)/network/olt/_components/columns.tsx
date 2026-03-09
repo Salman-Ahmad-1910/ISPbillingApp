@@ -14,8 +14,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 interface ColumnsProps {
-    onEdit: (olt: OLT) => void;
-    onDelete: (olt: OLT) => void;
+  onEdit: (olt: OLT) => void;
+  onDelete: (olt: OLT) => void;
 }
 
 export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<OLT>[] => [
@@ -51,7 +51,7 @@ export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<OLT>[]
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem>View Details</DropdownMenuItem>
+              {/* <DropdownMenuItem>View Details</DropdownMenuItem> */}
               <DropdownMenuItem onClick={() => onEdit(olt)}>Edit OLT</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive" onClick={() => onDelete(olt)}>

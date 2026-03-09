@@ -40,7 +40,7 @@ function ClientPageWithProvider() {
     const [selectedDealer, setSelectedDealer] = useState<Dealer | null>(null);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
-    
+
     // Advanced pagination state
     const [currentPage, setCurrentPage] = useState<number>(1);
     const [pageSize, setPageSize] = useState<number>(10);
@@ -53,52 +53,52 @@ function ClientPageWithProvider() {
         dealer.cnic.includes(filter)
     ), [dealers, filter]);
 
-  // Pagination helpers
-  const totalPages = Math.ceil(filteredData.length / pageSize);
+    // Pagination helpers
+    const totalPages = Math.ceil(filteredData.length / pageSize);
 
-  const getPaginatedData = () => {
-    const startIndex = (currentPage - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    return filteredData.slice(startIndex, endIndex);
-  };
+    const getPaginatedData = () => {
+        const startIndex = (currentPage - 1) * pageSize;
+        const endIndex = startIndex + pageSize;
+        return filteredData.slice(startIndex, endIndex);
+    };
 
-  const getVisiblePages = () => {
-    const pages = [];
-    const startPage = Math.max(1, currentPage - 3);
-    const endPage = Math.min(totalPages, currentPage + 3);
-    
-    for (let i = startPage; i <= endPage; i++) {
-      pages.push(i);
-    }
-    
-    return pages;
-  };
+    const getVisiblePages = () => {
+        const pages = [];
+        const startPage = Math.max(1, currentPage - 3);
+        const endPage = Math.min(totalPages, currentPage + 3);
 
-  const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (value === '' || /^\d+$/.test(value)) {
-      setPageInput(value);
-    }
-  };
+        for (let i = startPage; i <= endPage; i++) {
+            pages.push(i);
+        }
 
-  const handlePageSubmit = () => {
-    const page = parseInt(pageInput);
-    if (page && page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
-      setPageInput('');
-    }
-  };
+        return pages;
+    };
 
-  const handlePageKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handlePageSubmit();
-    }
-  };
+    const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        if (value === '' || /^\d+$/.test(value)) {
+            setPageInput(value);
+        }
+    };
 
-  // Reset pagination when filter changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filter]);
+    const handlePageSubmit = () => {
+        const page = parseInt(pageInput);
+        if (page && page >= 1 && page <= totalPages) {
+            setCurrentPage(page);
+            setPageInput('');
+        }
+    };
+
+    const handlePageKeyPress = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            handlePageSubmit();
+        }
+    };
+
+    // Reset pagination when filter changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filter]);
 
     const handleSave = async (formData: DealerFormValues) => {
         setIsSaving(true);
@@ -109,7 +109,7 @@ function ClientPageWithProvider() {
             } else {
                 // Create dealer and get response
                 const response = await api.post(`/dealers?companyId=${companyId}`, { ...formData, companyId, walletBalance: 0 });
-                
+
                 // Show user creation notification with the created user details
                 showNotification({
                     name: formData.name,
@@ -120,7 +120,7 @@ function ClientPageWithProvider() {
                     company: 'Company Name', // You might want to get actual company name
                     createdAt: new Date().toISOString()
                 });
-                
+
                 toast({ title: "Success", description: "Dealer added successfully." });
             }
             queryClient.invalidateQueries({ queryKey: ['dealers', companyId] });
@@ -173,7 +173,7 @@ function ClientPageWithProvider() {
     return (
         <>
             <div className="p-6">
-                    <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-4">
                     <Input
                         placeholder="Filter by name or CNIC..."
                         value={filter}
@@ -202,7 +202,7 @@ function ClientPageWithProvider() {
                     </Dialog>
                 </div>
                 <DataTable columns={columns} data={getPaginatedData()} />
-                
+
                 {/* Advanced Pagination */}
                 <div className="flex items-center justify-between mt-4">
                     <div className="text-sm text-muted-foreground">
@@ -229,7 +229,7 @@ function ClientPageWithProvider() {
                         >
                             Previous
                         </Button>
-                        
+
                         {/* Page numbers - show current page ± 3 */}
                         <div className="flex items-center gap-1">
                             {getVisiblePages().map(page => (
@@ -243,7 +243,7 @@ function ClientPageWithProvider() {
                                     {page}
                                 </Button>
                             ))}
-                            
+
                             {/* Show ellipsis if there are more pages */}
                             {currentPage + 3 < totalPages && (
                                 <>
@@ -259,7 +259,7 @@ function ClientPageWithProvider() {
                                 </>
                             )}
                         </div>
-                        
+
                         {/* Page input */}
                         <div className="flex items-center gap-1">
                             <Input
@@ -282,7 +282,7 @@ function ClientPageWithProvider() {
                                 Go
                             </Button>
                         </div>
-                        
+
                         <Button
                             variant="outline"
                             size="sm"
@@ -301,8 +301,8 @@ function ClientPageWithProvider() {
                 onDelete={handleDelete}
                 itemName={selectedDealer?.name}
             />
-            
-            <UserCreationNotification 
+
+            <UserCreationNotification
                 isOpen={isOpen}
                 onClose={onClose}
                 userData={notificationData}

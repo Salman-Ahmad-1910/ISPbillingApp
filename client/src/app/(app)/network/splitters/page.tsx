@@ -23,10 +23,7 @@ export default function SplitterPage() {
         title="Splitter Management"
         description="Track your fiber optic splitters and port utilization."
       >
-        <Button>
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Add Splitter
-        </Button>
+
       </PageHeader>
 
       <Card>

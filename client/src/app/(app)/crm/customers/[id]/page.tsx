@@ -19,13 +19,23 @@ export default function CustomerDetailPage() {
     const params = useParams<{ id: string }>();
     const { companyId } = useCompany();
 
+    const { data: allCustomers = [], isLoading: isLoadingCustomers } = useGenericQuery<any[]>('crm/customers', companyId ?? undefined);
+
     const customer = useMemo(() => {
         const cust = allCustomers.find(c => c.id === params.id);
         // Security check: ensure the customer belongs to the current company
         if (cust?.companyId !== companyId) return null;
         return cust;
-    }, [params.id, companyId]);
-    
+    }, [allCustomers, params.id, companyId]);
+
+    if (isLoadingCustomers) {
+        return (
+            <div className="flex h-[50vh] items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+        );
+    }
+
     if (!customer) {
         // Don't use notFound() directly in a client component with hooks
         // Show a message instead, or redirect
@@ -52,7 +62,7 @@ export default function CustomerDetailPage() {
                 description={`Details for customer ${customer.id}`}
             >
                 <div className="flex items-center gap-2">
-                     <Link href="/crm/customers">
+                    <Link href="/crm/customers">
                         <Button variant="outline">
                             <ArrowLeft className="mr-2 h-4 w-4" />
                             Back to Customers
@@ -64,18 +74,18 @@ export default function CustomerDetailPage() {
                     </Button>
                 </div>
             </PageHeader>
-            
+
             <div className="grid gap-8 lg:grid-cols-3">
                 <div className="lg:col-span-1 flex flex-col gap-8">
                     <Card>
                         <CardHeader className="items-center text-center">
-                             <Avatar className="h-24 w-24 mb-2">
+                            <Avatar className="h-24 w-24 mb-2">
                                 <AvatarImage src={`https://picsum.photos/seed/${customer.id}/100/100`} />
                                 <AvatarFallback>{customer.name.charAt(0)}</AvatarFallback>
                             </Avatar>
                             <CardTitle>{customer.name}</CardTitle>
                             <CardDescription>
-                                <Badge 
+                                <Badge
                                     variant={customer.status === 'active' ? 'default' : customer.status === 'blacklisted' ? 'destructive' : 'secondary'}
                                     className={customer.status === 'active' ? 'bg-green-600' : ''}
                                 >
@@ -88,7 +98,7 @@ export default function CustomerDetailPage() {
                                 <Phone className="h-4 w-4 text-muted-foreground" />
                                 <span>{customer.phone}</span>
                             </div>
-                             <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2">
                                 <Mail className="h-4 w-4 text-muted-foreground" />
                                 <span>{customer.name.toLowerCase().replace(' ', '.')}@example.com</span>
                             </div>
@@ -101,11 +111,11 @@ export default function CustomerDetailPage() {
                                     <span className="text-muted-foreground">City</span>
                                     <span>{customer.city}</span>
                                 </div>
-                                 <div className="flex justify-between">
+                                <div className="flex justify-between">
                                     <span className="text-muted-foreground">Total Invoices</span>
                                     <span>{customer.totalInvoices}</span>
                                 </div>
-                                 <div className="flex justify-between font-medium">
+                                <div className="flex justify-between font-medium">
                                     <span className="text-muted-foreground">Outstanding</span>
                                     <span>PKR {customer.outstandingBalance.toLocaleString()}</span>
                                 </div>
@@ -136,7 +146,7 @@ export default function CustomerDetailPage() {
                                                 <TableCell>PKR {invoice.amount.toLocaleString()}</TableCell>
                                                 <TableCell>{invoice.dueDate}</TableCell>
                                                 <TableCell>
-                                                    <Badge 
+                                                    <Badge
                                                         variant={invoice.status === 'paid' ? 'default' : invoice.status === 'overdue' ? 'destructive' : 'secondary'}
                                                         className={invoice.status === 'paid' ? 'bg-green-600' : ''}
                                                     >
