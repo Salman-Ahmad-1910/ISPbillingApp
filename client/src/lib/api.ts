@@ -44,7 +44,7 @@ api.interceptors.response.use(
           localStorage.removeItem('selectedCompanyId');
           // Only redirect if not already on auth pages
           if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/signup')) {
-            window.location.href = '/login';
+            window.location.href = '/';
           }
         }
       }
@@ -58,7 +58,7 @@ api.interceptors.response.use(
         if (typeof window !== 'undefined') {
           localStorage.removeItem('selectedCompanyId');
           // Redirect to login page instead of non-existent company-select page
-          window.location.href = '/login';
+          window.location.href = '/';
         }
       }
     }
