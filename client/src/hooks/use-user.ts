@@ -37,8 +37,8 @@ export function useUser() {
       // Call backend logout
       await api.post('/auth/logout', {});
 
-      // Update user status to offline
-      await api.put('/auth/status', { status: 'offline' });
+      // Don't update user status to offline - let them stay active for next login
+      // await api.put('/auth/status', { status: 'offline' });
 
       // Clear local storage
       localStorage.removeItem('token');

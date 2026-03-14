@@ -46,8 +46,8 @@ func Login(c *gin.Context) {
 	}
 
 	var user models.User
-	// Load user companies and relationships
-	if err := config.DB.Preload("UserCompanies.Company").Where("email = ? AND status = 'active'", req.Email).First(&user).Error; err != nil {
+	// Load user companies and relationships - accept both active and offline users
+	if err := config.DB.Preload("UserCompanies.Company").Where("email = ? AND status IN ('active', 'offline')", req.Email).First(&user).Error; err != nil {
 		utils.ErrorResponse(c, 401, "Invalid credentials or inactive user", nil)
 		return
 	}
@@ -56,6 +56,14 @@ func Login(c *gin.Context) {
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
 		utils.ErrorResponse(c, 401, "Invalid credentials", nil)
 		return
+	}
+
+	// Set user status back to active when logging in
+	if user.Status != "active" {
+		if err := config.DB.Model(&models.User{}).Where("id = ?", user.ID).Update("status", "active").Error; err != nil {
+			log.Printf("Failed to update user status to active: %v", err)
+			// Continue anyway, but log the error
+		}
 	}
 
 	// Get first company for user (in real app, this would be selectable)
