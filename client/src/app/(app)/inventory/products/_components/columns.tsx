@@ -34,6 +34,18 @@ export const columns = ({ onEdit, onDelete }: ProductColumnsProps): ColumnDef<Pr
     cell: ({ row }) => <Badge variant="outline">{row.original.category}</Badge>,
   },
   {
+    accessorKey: 'unitType',
+    header: 'Unit Type',
+    cell: ({ row }) => {
+      const unitType = row.original.unitType;
+      return (
+        <Badge variant={unitType === 'piece' ? 'default' : 'secondary'}>
+          {unitType === 'piece' ? 'Per Piece' : 'Per Meter'}
+        </Badge>
+      );
+    },
+  },
+  {
     accessorKey: 'price',
     header: 'Price (PKR)',
     cell: ({ row }) => {

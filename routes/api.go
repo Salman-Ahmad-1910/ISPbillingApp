@@ -159,7 +159,6 @@ func SetupRoutes(r *gin.Engine) {
 			billing.DELETE("/payments/:id", controllers.DeletePayment)
 		}
 
-		// CRM routes (temporarily public for testing)
 		crm := api.Group("/crm")
 		crm.Use(func(c *gin.Context) {
 			// Get company ID from header first, then query parameter
@@ -187,6 +186,14 @@ func SetupRoutes(r *gin.Engine) {
 		{
 			controllers.RegisterGenericCRUD[models.Customer](crm, "/customers")
 			controllers.RegisterGenericCRUD[models.Guarantor](crm, "/guarantors")
+			controllers.RegisterGenericCRUD[models.Vendor](crm, "/vendors")
+
+			// Vendor Invoice specific routes
+			crm.GET("/vendor-invoices", controllers.GetVendorInvoices)
+			crm.GET("/vendor-invoices/:id", controllers.GetVendorInvoiceByID)
+			crm.POST("/vendor-invoices", controllers.CreateVendorInvoice)
+			crm.PUT("/vendor-invoices/:id", controllers.UpdateVendorInvoice)
+			crm.DELETE("/vendor-invoices/:id", controllers.DeleteVendorInvoice)
 		}
 
 		// Roles and permissions

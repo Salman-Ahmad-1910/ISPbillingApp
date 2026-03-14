@@ -37,6 +37,7 @@ import {
   ShieldCheck,
   FileCog,
   FileClock,
+  FileText,
   Headphones,
   Settings,
   LogOut,
@@ -111,6 +112,8 @@ const navItems: NavItemGroup[] = [
     items: [
       { title: 'Customers', href: '/crm/customers', icon: Users, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
       { title: 'Guarantors', href: '/crm/guarantors', icon: UserRound, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
+      { title: 'Vendors', href: '/vendors', icon: Building2, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
+      { title: 'Vendor Invoices', href: '/vendor-invoices', icon: FileText, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
     ],
   },
   {

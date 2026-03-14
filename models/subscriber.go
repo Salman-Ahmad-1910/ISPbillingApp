@@ -14,6 +14,7 @@ type Package struct {
 // Subscriber is the main entity linked geographically and technically
 type Subscriber struct {
 	TenantModel
+	SubscriberIdentity  string `gorm:"type:varchar(100);uniqueIndex" json:"subscriber_identity"`
 	Name                string `gorm:"type:varchar(255);not null" json:"name"`
 	Cnic                string `gorm:"type:varchar(20);not null" json:"cnic"`
 	Phone               string `gorm:"type:varchar(20);not null" json:"phone"`

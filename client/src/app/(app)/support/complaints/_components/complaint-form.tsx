@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SubscriberSelect } from '@/components/ui/subscriber-select';
 import type { Complaint, Subscriber, Staff } from '@/lib/types';
 import { complaintSchema } from '@/lib/schemas';
 import { Loader2 } from 'lucide-react';
@@ -54,20 +55,15 @@ export function ComplaintForm({ complaint, subscribers, staff, onSave, onCancel,
           render={({ field }) => (
             <FormItem>
               <FormLabel>Subscriber</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a subscriber" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {subscribers.map((subscriber) => (
-                    <SelectItem key={subscriber.id} value={subscriber.id}>
-                      {subscriber.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <FormControl>
+                <SubscriberSelect
+                  subscribers={subscribers}
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  placeholder="Search by subscriber ID or name..."
+                  disabled={!!complaint}
+                />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}

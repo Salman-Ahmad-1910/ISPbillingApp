@@ -35,6 +35,7 @@ export function SubscriberForm({ subscriber, packages, areas, splitters, onSave,
   const form = useForm<SubscriberFormValues>({
     resolver: zodResolver(subscriberSchema),
     defaultValues: subscriber || {
+      subscriber_identity: '',
       name: '',
       cnic: '',
       phone: '',
@@ -59,6 +60,19 @@ export function SubscriberForm({ subscriber, packages, areas, splitters, onSave,
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
             control={form.control}
+            name="subscriber_identity"
+            render={({ field }) => (
+                <FormItem>
+                <FormLabel>Subscriber ID</FormLabel>
+                <FormControl>
+                    <Input placeholder="e.g., SUB-001" {...field} />
+                </FormControl>
+                <FormMessage />
+                </FormItem>
+            )}
+            />
+            <FormField
+            control={form.control}
             name="name"
             render={({ field }) => (
                 <FormItem>
@@ -70,6 +84,9 @@ export function SubscriberForm({ subscriber, packages, areas, splitters, onSave,
                 </FormItem>
             )}
             />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
             control={form.control}
             name="phone"

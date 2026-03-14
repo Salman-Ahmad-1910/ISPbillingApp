@@ -15,6 +15,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SubscriberSelect } from '@/components/ui/subscriber-select';
 import type { CustomBill, Subscriber } from '@/lib/types';
 import { customBillSchema } from '@/lib/schemas';
 import { Loader2 } from 'lucide-react';
@@ -55,20 +56,15 @@ export function BillForm({ bill, subscribers, onSave, onCancel, isSaving }: Bill
           render={({ field }) => (
             <FormItem>
               <FormLabel>Subscriber</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!!bill}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a subscriber" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {subscribers.map((subscriber) => (
-                    <SelectItem key={subscriber.id} value={subscriber.id}>
-                      {subscriber.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <FormControl>
+                <SubscriberSelect
+                  subscribers={subscribers}
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  placeholder="Search by subscriber ID or name..."
+                  disabled={!!bill}
+                />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}

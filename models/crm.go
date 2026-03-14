@@ -31,6 +31,7 @@ type Product struct {
 	Category string  `gorm:"type:varchar(100);not null" json:"category"`
 	Price    float64 `gorm:"type:decimal(10,2);not null" json:"price"`
 	Stock    int     `gorm:"not null;default:0" json:"stock"`
+	UnitType string  `gorm:"type:unit_type_enum;not null;default:'piece'" json:"unitType"`
 }
 
 // InstallmentPlan - Defined schedule for physical goods

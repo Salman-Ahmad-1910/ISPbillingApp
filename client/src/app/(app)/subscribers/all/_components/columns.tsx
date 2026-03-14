@@ -23,6 +23,15 @@ interface SubscriberColumnsProps {
 
 export const getColumns = ({ onEdit, onDelete }: SubscriberColumnsProps): ColumnDef<Subscriber>[] => [
   {
+    accessorKey: 'subscriber_identity',
+    header: 'ID',
+    cell: ({ row }) => {
+      const identity = row.original.subscriber_identity || '-';
+      const name = row.original.name || '-';
+      return identity && name ? `${identity} | ${name}` : identity;
+    },
+  },
+  {
     accessorKey: 'name',
     header: 'Name',
     cell: ({ row }) => row.original.name || '-',

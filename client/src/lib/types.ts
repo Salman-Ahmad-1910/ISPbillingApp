@@ -124,6 +124,7 @@ export type POP = {
 // Subscriber Management
 export type Subscriber = {
   id: string;
+  subscriber_identity: string;
   name: string;
   cnic: string;
   phone: string;
@@ -367,7 +368,44 @@ export type Product = {
   category: string;
   price: number;
   stock: number;
+  unitType: 'piece' | 'meter';
   companyId: string;
+};
+
+export type Vendor = {
+  id: string;
+  name: string;
+  contactPerson?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  createdAt: string;
+  updatedAt: string;
+  companyId: string;
+};
+
+export type VendorInvoice = {
+  id: string;
+  vendorId: string;
+  vendorName: string;
+  invoiceNumber: string;
+  invoiceDate: string;
+  totalAmount: number;
+  items: VendorInvoiceItem[];
+  createdAt: string;
+  updatedAt: string;
+  companyId: string;
+};
+
+export type VendorInvoiceItem = {
+  id: string;
+  invoiceId: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  unitType: 'piece' | 'meter';
+  subtotal: number;
 };
 
 export type InstallmentPlan = {

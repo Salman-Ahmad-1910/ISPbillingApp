@@ -13,6 +13,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Product } from '@/lib/types';
 import { productSchema } from '@/lib/schemas';
 import { Loader2 } from 'lucide-react';
@@ -38,6 +39,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
       category: '',
       price: 0,
       stock: 0,
+      unitType: 'piece',
     },
   });
 
@@ -70,6 +72,27 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
               <FormControl>
                 <Input placeholder="e.g., Software" {...field} />
               </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="unitType"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Unit Type</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select unit type" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="piece">Per Piece</SelectItem>
+                  <SelectItem value="meter">Per Meter</SelectItem>
+                </SelectContent>
+              </Select>
               <FormMessage />
             </FormItem>
           )}
