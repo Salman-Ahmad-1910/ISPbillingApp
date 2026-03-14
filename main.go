@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"os"
 
@@ -13,6 +14,10 @@ import (
 )
 
 func main() {
+	// Parse command line flags
+	migrateOnly := flag.Bool("migrate-only", false, "Run database migration only and exit")
+	flag.Parse()
+
 	// Load ENV
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, relying on environment variables")
@@ -23,6 +28,12 @@ func main() {
 
 	// Run all migrations
 	config.RunMigrations()
+
+	// If migrate-only flag is set, exit after migration
+	if *migrateOnly {
+		log.Println("✅ Migration completed successfully. Exiting...")
+		os.Exit(0)
+	}
 
 	// Init Router
 	r := gin.Default()
