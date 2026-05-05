@@ -91,6 +91,12 @@ func SetupRoutes(r *gin.Engine) {
 			adminUsers.POST("", controllers.CreateSubUser)
 			adminUsers.PUT("/:id", controllers.UpdateSubUser)
 			adminUsers.DELETE("/:id", controllers.DeleteSubUser)
+
+			// Import/Export endpoints
+			userImportExport := controllers.UserImportExport{}
+			adminUsers.GET("/export", userImportExport.ExportUsers)
+			adminUsers.GET("/template", userImportExport.DownloadTemplate)
+			adminUsers.POST("/import", userImportExport.ImportUsers)
 		}
 
 		// Recovery Officers
@@ -253,34 +259,8 @@ func SetupRoutes(r *gin.Engine) {
 			reports.GET("/billing-reports/export", controllers.ExportReport)
 		}
 
-		// Subscribers routes (includes inquiries and corporate)
-		subscribers := api.Group("/subscribers")
-		subscribers.Use(func(c *gin.Context) {
-			// Get company ID from header first, then query parameter
-			companyIDHeader := c.GetHeader("x-company-id")
-			companyIDQuery := c.Query("companyId")
-
-			companyIDStr := companyIDHeader
-			if companyIDStr == "" {
-				companyIDStr = companyIDQuery
-			}
-
-			if companyIDStr != "" {
-				// Parse and set company ID
-				if companyID, err := uuid.Parse(companyIDStr); err == nil {
-					c.Set("companyID", companyID)
-				}
-			}
-
-			// Set db in context for generic CRUD
-			c.Set("db", config.DB)
-			c.Next()
-		})
-		{
-			controllers.RegisterGenericCRUD[models.Subscriber](subscribers, "")
-			controllers.RegisterGenericCRUD[models.Inquiry](subscribers, "/inquiries")
-			controllers.RegisterGenericCRUD[models.CorporateCustomer](subscribers, "/corporate")
-		}
+		// Subscribers routes (includes inquiries and corporate) - MOVED TO PROTECTED GROUP
+		// Note: This section has been moved to the protected group with proper authentication
 
 		// Dealers routes
 		dealers := api.Group("/dealers")
@@ -647,15 +627,12 @@ func SetupRoutes(r *gin.Engine) {
 
 			var companyID uuid.UUID
 			if companyIDStr != "" {
-				// Parse and set company ID
 				if parsedID, err := uuid.Parse(companyIDStr); err == nil {
 					companyID = parsedID
 				}
 			}
 
-			// Always set companyID in context (even if empty)
 			c.Set("companyID", companyID)
-			// Set db in context for generic CRUD
 			c.Set("db", config.DB)
 			c.Next()
 		})
@@ -668,10 +645,25 @@ func SetupRoutes(r *gin.Engine) {
 
 			controllers.RegisterGenericCRUD[models.Attendance](hr, "/attendance")
 			controllers.RegisterGenericCRUD[models.AdvanceLoan](hr, "/advance-loans")
-			controllers.RegisterGenericCRUD[models.AdvanceLoan](hr, "/advances") // Add alias for frontend
+			controllers.RegisterGenericCRUD[models.AdvanceLoan](hr, "/advances")
 			controllers.RegisterGenericCRUD[models.AlertTemplate](hr, "/alerts")
 		}
 
-		// Other routes can be added back later as needed...
+		subscribers := protected.Group("/subscribers")
+		{
+			subscribers.GET("", controllers.GetSubscribers)
+			subscribers.POST("", controllers.CreateSubscriber)
+			subscribers.PUT("/:id", controllers.UpdateSubscriber)
+			subscribers.DELETE("/:id", controllers.DeleteSubscriber)
+
+			subscriberImportExport := controllers.SubscriberImportExport{}
+			subscribers.GET("/export", subscriberImportExport.ExportSubscribers)
+			subscribers.GET("/template", subscriberImportExport.DownloadTemplate)
+			subscribers.POST("/import", subscriberImportExport.ImportSubscribers)
+
+			controllers.RegisterGenericCRUD[models.Inquiry](subscribers, "/inquiries")
+			controllers.RegisterGenericCRUD[models.CorporateCustomer](subscribers, "/corporate")
+		}
+
 	}
 }

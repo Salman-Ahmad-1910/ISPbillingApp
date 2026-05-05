@@ -22,7 +22,12 @@ interface ProductColumnsProps {
 export const columns = ({ onEdit, onDelete }: ProductColumnsProps): ColumnDef<Product>[] => [
   {
     accessorKey: 'id',
-    header: 'Product ID',
+    header: 'ID',
+    cell: ({ row }) => (
+      <div className="text-xs font-mono text-muted-foreground">
+        {row.original.id}
+      </div>
+    ),
   },
   {
     accessorKey: 'name',

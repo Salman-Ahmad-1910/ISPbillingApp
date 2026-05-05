@@ -253,11 +253,12 @@ func GetOutstandingReports(c *gin.Context) {
 		args = append(args, packageID)
 	}
 	if status != "" {
-		if status == "current" {
+		switch status {
+		case "current":
 			query += " AND i.status = 'paid'"
-		} else if status == "overdue" {
+		case "overdue":
 			query += " AND i.status = 'pending'"
-		} else if status == "critical" {
+		case "critical":
 			query += " AND i.status = 'pending'"
 		}
 	}
@@ -474,9 +475,10 @@ func GetCashFlowReports(c *gin.Context) {
 		summary.TotalInflow += data[i].Inflow
 		summary.TotalOutflow += data[i].Outflow
 
-		if data[i].Category == "revenue" {
+		switch data[i].Category {
+		case "revenue":
 			summary.RevenueBreakdown[data[i].Subcategory] += data[i].Inflow
-		} else if data[i].Category == "expense" {
+		case "expense":
 			summary.ExpenseBreakdown[data[i].Subcategory] += data[i].Outflow
 		}
 	}

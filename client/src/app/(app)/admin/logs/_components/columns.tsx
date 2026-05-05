@@ -6,6 +6,15 @@ import { Badge } from '@/components/ui/badge';
 
 export const columns: ColumnDef<SystemLog>[] = [
   {
+    accessorKey: 'id',
+    header: 'ID',
+    cell: ({ row }) => (
+      <div className="text-xs font-mono text-muted-foreground">
+        {row.original.id}
+      </div>
+    ),
+  },
+  {
     accessorKey: 'timestamp',
     header: 'Timestamp',
     cell: ({ row }) => new Date(row.original.timestamp).toLocaleString(),

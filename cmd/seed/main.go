@@ -1,10 +1,9 @@
-package main
+package seed
 
 import (
 	"log"
 	"os"
 
-	"awesomeProject/cmd/seed"
 	"awesomeProject/config"
 	"awesomeProject/models"
 
@@ -12,14 +11,14 @@ import (
 	"github.com/joho/godotenv"
 )
 
-func main() {
+func RunSeeder() {
 	// Load environment variables
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found")
 	}
 
 	// Initialize database
-	config.InitDB()
+	config.ConnectDatabase()
 
 	// Get company ID from command line argument or use a default one
 	companyIDStr := os.Getenv("SEED_COMPANY_ID")
@@ -42,11 +41,11 @@ func main() {
 	if err := config.DB.Where("id = ?", companyID).First(&company).Error; err != nil {
 		log.Printf("Company not found, creating new company with ID: %s", companyID)
 		company = models.Company{
-			TenantModel: models.TenantModel{ID: companyID},
-			Name:        "Test Company",
-			Email:       "test@example.com",
-			Phone:       "+1234567890",
-			Address:     "Test Address",
+			BaseModel: models.BaseModel{ID: companyID},
+			Name:      "Test Company",
+			Email:     "test@example.com",
+			Contact1:  "+1234567890",
+			Address:   "Test Address",
 		}
 		if err := config.DB.Create(&company).Error; err != nil {
 			log.Fatal("Failed to create company:", err)
@@ -54,7 +53,7 @@ func main() {
 	}
 
 	// Seed alert templates
-	seed.SeedAlertTemplates(companyID)
+	SeedAlertTemplates(companyID)
 
 	log.Println("Seeding completed successfully!")
 }

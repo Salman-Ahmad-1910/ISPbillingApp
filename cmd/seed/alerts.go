@@ -28,7 +28,6 @@ func SeedAlertTemplates(companyID uuid.UUID) {
 			SMSTemplate:      "Dear {customer_name}, your bill of PKR {amount} for {billing_period} is due on {due_date}. Thank you, {company_name}.",
 			WhatsAppEnabled:  true,
 			WhatsAppTemplate: "*Invoice Alert* 🧾 %0ADear {customer_name},%0A%0AYour new invoice for *{billing_period}* is now available.%0A*Amount Due:* PKR {amount}%0A*Due Date:* {due_date}%0A%0APay now to avoid service interruption.%0A%0AThank you,%0A*{company_name}*",
-			CompanyID:        companyID,
 		},
 		{
 			TemplateID:       "payment-received",
@@ -38,7 +37,6 @@ func SeedAlertTemplates(companyID uuid.UUID) {
 			SMSTemplate:      "Thank you for your payment of PKR {amount}. Your account is updated. Transaction ID: {payment_id}. {company_name}.",
 			WhatsAppEnabled:  false,
 			WhatsAppTemplate: "*Payment Confirmation* ✅ %0ADear {customer_name},%0A%0AWe have received your payment of *PKR {amount}*.%0AThank you for being a valued customer.%0A%0A*{company_name}*",
-			CompanyID:        companyID,
 		},
 		{
 			TemplateID:       "due-date-reminder",
@@ -48,7 +46,6 @@ func SeedAlertTemplates(companyID uuid.UUID) {
 			SMSTemplate:      "Gentle Reminder: Your payment of PKR {amount} is due on {due_date}. Please pay to avoid suspension. {company_name}.",
 			WhatsAppEnabled:  true,
 			WhatsAppTemplate: "*Payment Reminder* ❗ %0ADear {customer_name},%0A%0AThis is a friendly reminder that your payment of *PKR {amount}* is due on *{due_date}*.%0A%0APlease make the payment to ensure uninterrupted service.%0A%0AThank you,%0A*{company_name}*",
-			CompanyID:        companyID,
 		},
 		{
 			TemplateID:       "account-suspension",
@@ -58,7 +55,6 @@ func SeedAlertTemplates(companyID uuid.UUID) {
 			SMSTemplate:      "Your account has been suspended due to non-payment. Please clear your dues of PKR {balance} to restore services. {company_name}.",
 			WhatsAppEnabled:  false,
 			WhatsAppTemplate: "*Account Suspended* 🚫 %0ADear {customer_name},%0A%0AYour account has been temporarily suspended due to an outstanding balance of *PKR {balance}*.%0A%0APlease clear your dues at your earliest convenience to restore your services.%0A%0AThank you,%0A*{company_name}*",
-			CompanyID:        companyID,
 		},
 	}
 

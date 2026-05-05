@@ -26,6 +26,15 @@ interface ColumnsProps {
 
 export const getColumns = ({ recoveryOfficers, onEdit, onDelete, onAssignOfficer }: ColumnsProps): ColumnDef<Area>[] => [
   {
+    accessorKey: 'id',
+    header: 'ID',
+    cell: ({ row }) => (
+      <div className="text-xs font-mono text-muted-foreground">
+        {row.original.id}
+      </div>
+    ),
+  },
+  {
     accessorKey: 'city',
     header: 'City',
   },

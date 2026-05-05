@@ -17,7 +17,12 @@ import {
 export const columns: ColumnDef<DealerCollection>[] = [
   {
     accessorKey: 'id',
-    header: 'Collection ID',
+    header: 'ID',
+    cell: ({ row }) => (
+      <div className="text-xs font-mono text-muted-foreground">
+        {row.original.id}
+      </div>
+    ),
   },
   {
     accessorKey: 'dealerName',

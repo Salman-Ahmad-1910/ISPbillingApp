@@ -22,6 +22,15 @@ interface VendorInvoiceColumnsProps {
 
 export const columns = ({ onPrint, onEdit, onDelete }: VendorInvoiceColumnsProps): ColumnDef<VendorInvoice>[] => [
   {
+    accessorKey: 'id',
+    header: 'ID',
+    cell: ({ row }) => (
+      <div className="text-xs font-mono text-muted-foreground">
+        {row.original.id}
+      </div>
+    ),
+  },
+  {
     accessorKey: 'invoiceNumber',
     header: 'Invoice Number',
     cell: ({ row }) => {

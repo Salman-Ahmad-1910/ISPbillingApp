@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { DataTable } from './data-table';
 import { getColumns } from './columns';
 import { UserForm } from './user-form';
+import { UserImportExport } from './user-import-export';
 import {
     Dialog,
     DialogContent,
@@ -48,6 +49,7 @@ export function ClientPage({ data, roles, currentUser }: ClientPageProps) {
     
     // Advanced pagination state
     const [currentPage, setCurrentPage] = useState<number>(1);
+    const [showImportExport, setShowImportExport] = useState(false);
     const [pageSize, setPageSize] = useState<number>(10);
     const [pageInput, setPageInput] = useState<string>('');
 
@@ -55,7 +57,7 @@ export function ClientPage({ data, roles, currentUser }: ClientPageProps) {
     const assignableRoles = useMemo(() => {
         if (!currentUser) return [];
         
-        const roleHierarchy = {
+        const roleHierarchy: Record<string, string[]> = {
             'owner': ['admin', 'manager', 'recovery_officer', 'dealer', 'staff'],
             'admin': ['admin', 'manager', 'recovery_officer', 'dealer', 'staff'],
             'manager': ['recovery_officer', 'dealer', 'staff'],
@@ -64,7 +66,7 @@ export function ClientPage({ data, roles, currentUser }: ClientPageProps) {
             'staff': []
         };
 
-        const allowedRoleNames = roleHierarchy[currentUser.role as keyof typeof roleHierarchy] || [];
+        const allowedRoleNames = roleHierarchy[currentUser.role] || [];
         
         return roles.filter(role => allowedRoleNames.includes(role.name));
     }, [roles, currentUser]);
@@ -95,12 +97,84 @@ export function ClientPage({ data, roles, currentUser }: ClientPageProps) {
         });
     }, [data, currentUser]);
 
+    // Group users hierarchically
+    const hierarchicalData = useMemo(() => {
+        if (!currentUser) return [];
+        
+        // First, get all users that can be managed by current user (role-based filtering)
+        const manageableUsers = roleFilteredData.filter(user => {
+            // Don't show the current user in the list
+            if (user.id === currentUser.id) return false;
+            return true;
+        });
+
+        // Group users by their creator
+        const userGroups: { [key: string]: User[] } = {};
+        const topLevelUsers: User[] = [];
+
+        manageableUsers.forEach(user => {
+            if (user.createdBy) {
+                // This user has a creator, group them under the creator
+                if (!userGroups[user.createdBy]) {
+                    userGroups[user.createdBy] = [];
+                }
+                userGroups[user.createdBy].push(user);
+            } else {
+                // This is a top-level user (no creator)
+                topLevelUsers.push(user);
+            }
+        });
+
+        // Create hierarchical structure
+        const result: any[] = [];
+        
+        // Add top-level users and their sub-users
+        topLevelUsers.forEach(parentUser => {
+            result.push({
+                ...parentUser,
+                isParent: true,
+                level: 0,
+                subUsers: userGroups[parentUser.id] || []
+            });
+            
+            // Add sub-users
+            (userGroups[parentUser.id] || []).forEach(subUser => {
+                result.push({
+                    ...subUser,
+                    isParent: false,
+                    level: 1,
+                    parentId: parentUser.id,
+                    parent: parentUser // Include parent reference
+                });
+            });
+        });
+
+        // Also add users whose creators are not in the manageable list (orphaned users)
+        Object.keys(userGroups).forEach(creatorId => {
+            const creator = manageableUsers.find(u => u.id === creatorId);
+            if (!creator) {
+                // Creator is not in manageable list, but their sub-users are
+                userGroups[creatorId].forEach(orphanedUser => {
+                    result.push({
+                        ...orphanedUser,
+                        isParent: false,
+                        level: 1,
+                        parentId: creatorId,
+                        isOrphaned: true
+                    });
+                });
+            }
+        });
+
+        return result;
+    }, [roleFilteredData, currentUser]);
+
     const filteredData = useMemo(() => {
-        return roleFilteredData.filter(user => 
+        return hierarchicalData.filter(user => 
             (user.name?.toLowerCase() || '').includes(filter.toLowerCase()) || 
             (user.email?.toLowerCase() || '').includes(filter.toLowerCase())
         );
-    }, [roleFilteredData, filter]);
+    }, [hierarchicalData, filter]);
 
     // Pagination helpers
     const totalPages = Math.ceil(filteredData.length / pageSize);
@@ -221,6 +295,21 @@ export function ClientPage({ data, roles, currentUser }: ClientPageProps) {
         }
     }
 
+    // Add summary statistics
+    const userStats = useMemo(() => {
+        const parentUsers = hierarchicalData.filter(u => u.isParent);
+        const subUsers = hierarchicalData.filter(u => !u.isParent);
+        const orphanedUsers = hierarchicalData.filter(u => u.isOrphaned);
+        
+        return {
+            totalUsers: hierarchicalData.length,
+            parentUsers: parentUsers.length,
+            subUsers: subUsers.length,
+            orphanedUsers: orphanedUsers.length,
+            totalGroups: parentUsers.length
+        };
+    }, [hierarchicalData]);
+
     const columns = getColumns({
         onEdit: handleEdit,
         onDelete: openDeleteDialog,
@@ -231,39 +320,88 @@ export function ClientPage({ data, roles, currentUser }: ClientPageProps) {
 
     return (
         <>
-            <div className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                    <Input
-                        placeholder="Filter by name or email..."
-                        value={filter}
-                        onChange={(e) => setFilter(e.target.value)}
-                        className="max-w-sm"
-                    />
-                    {/* Show Add User button only for admins and owners */}
-                    {(currentUser?.role === 'admin' || currentUser?.role === 'owner') && (
-                        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-                            <DialogTrigger asChild>
-                                <Button onClick={() => setSelectedUser(null)}>
-                                    <PlusCircle className="mr-2 h-4 w-4" />
-                                    Add User
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>{selectedUser ? 'Edit' : 'Add'} User</DialogTitle>
-                                </DialogHeader>
-                                <UserForm
-                                    user={selectedUser}
-                                    roles={assignableRoles}
-                                    onSave={handleSave}
-                                    onCancel={() => setIsFormOpen(false)}
-                                    isSaving={isSaving}
-                                />
-                            </DialogContent>
-                        </Dialog>
-                    )}
+            {showImportExport ? (
+                <div className="p-6">
+                    <div className="mb-4">
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowImportExport(false)}
+                            className="mb-4"
+                        >
+                            ← Back to Users
+                        </Button>
+                    </div>
+                    <UserImportExport />
                 </div>
-                <DataTable columns={columns} data={getPaginatedData()} />
+            ) : (
+                <div className="p-6">
+                    {/* User Statistics */}
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                        <div className="p-4 bg-muted rounded-lg">
+                            <div className="text-2xl font-bold">{userStats.totalUsers}</div>
+                            <div className="text-sm text-muted-foreground">Total Users</div>
+                        </div>
+                        <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                            <div className="text-2xl font-bold text-blue-600">{userStats.parentUsers}</div>
+                            <div className="text-sm text-muted-foreground">Parent Users</div>
+                        </div>
+                        <div className="p-4 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
+                            <div className="text-2xl font-bold text-green-600">{userStats.subUsers}</div>
+                            <div className="text-sm text-muted-foreground">Sub Users</div>
+                        </div>
+                        <div className="p-4 bg-orange-50 dark:bg-orange-950 rounded-lg border border-orange-200 dark:border-orange-800">
+                            <div className="text-2xl font-bold text-orange-600">{userStats.orphanedUsers}</div>
+                            <div className="text-sm text-muted-foreground">Orphaned</div>
+                        </div>
+                        <div className="p-4 bg-purple-50 dark:bg-purple-950 rounded-lg border border-purple-200 dark:border-purple-800">
+                            <div className="text-2xl font-bold text-purple-600">{userStats.totalGroups}</div>
+                            <div className="text-sm text-muted-foreground">User Groups</div>
+                        </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between mb-4">
+                        <Input
+                            placeholder="Filter by name or email..."
+                            value={filter}
+                            onChange={(e) => setFilter(e.target.value)}
+                            className="max-w-sm"
+                        />
+                        <div className="flex gap-2">
+                            {/* Show Import/Export button only for admins and owners */}
+                            {(currentUser?.role === 'admin' || currentUser?.role === 'owner') && (
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setShowImportExport(true)}
+                                >
+                                    Import/Export
+                                </Button>
+                            )}
+                            {/* Show Add User button only for admins and owners */}
+                            {(currentUser?.role === 'admin' || currentUser?.role === 'owner') && (
+                                <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+                                    <DialogTrigger asChild>
+                                        <Button onClick={() => setSelectedUser(null)}>
+                                            <PlusCircle className="mr-2 h-4 w-4" />
+                                            Add User
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                        <DialogHeader>
+                                            <DialogTitle>{selectedUser ? 'Edit' : 'Add'} User</DialogTitle>
+                                        </DialogHeader>
+                                        <UserForm
+                                            user={selectedUser}
+                                            roles={assignableRoles}
+                                            onSave={handleSave}
+                                            onCancel={() => setIsFormOpen(false)}
+                                            isSaving={isSaving}
+                                        />
+                                    </DialogContent>
+                                </Dialog>
+                            )}
+                        </div>
+                    </div>
+                    <DataTable columns={columns} data={getPaginatedData()} />
                 
                 {/* Advanced Pagination */}
                 <div className="flex items-center justify-between mt-4">
@@ -355,7 +493,8 @@ export function ClientPage({ data, roles, currentUser }: ClientPageProps) {
                         </Button>
                     </div>
                 </div>
-            </div>
+                </div>
+            )}
 
             <DeleteAlertDialog
                 isOpen={isDeleteDialogOpen}

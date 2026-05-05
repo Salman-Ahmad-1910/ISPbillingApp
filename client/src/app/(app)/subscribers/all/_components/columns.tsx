@@ -25,11 +25,11 @@ export const getColumns = ({ onEdit, onDelete }: SubscriberColumnsProps): Column
   {
     accessorKey: 'subscriber_identity',
     header: 'ID',
-    cell: ({ row }) => {
-      const identity = row.original.subscriber_identity || '-';
-      const name = row.original.name || '-';
-      return identity && name ? `${identity} | ${name}` : identity;
-    },
+    cell: ({ row }) => (
+      <div className="text-xs font-mono text-muted-foreground">
+        {row.original.subscriber_identity || '-'}
+      </div>
+    ),
   },
   {
     accessorKey: 'name',
@@ -45,6 +45,17 @@ export const getColumns = ({ onEdit, onDelete }: SubscriberColumnsProps): Column
     accessorKey: 'packageName',
     header: 'Package',
     cell: ({ row }) => <Badge variant="outline">{row.original.packageName || '-'}</Badge>,
+  },
+  {
+    accessorKey: 'package.price',
+    header: 'Price (PKR)',
+    cell: ({ row }) => {
+      const price = row.original.package?.price || 0;
+      if (price > 0) {
+        return <div className="text-right font-medium">{price.toLocaleString()}</div>;
+      }
+      return <div className="text-right text-muted-foreground">-</div>;
+    },
   },
   {
     accessorKey: 'areaName',

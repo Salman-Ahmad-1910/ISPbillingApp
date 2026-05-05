@@ -46,6 +46,12 @@ export function CustomerForm({ customer, onSave, onCancel, isSaving }: CustomerF
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        {customer && (
+          <div className="p-3 bg-muted rounded-md">
+            <div className="text-sm font-medium">Customer ID</div>
+            <div className="text-xs font-mono text-muted-foreground mt-1">{customer.id}</div>
+          </div>
+        )}
         <FormField
           control={form.control}
           name="name"

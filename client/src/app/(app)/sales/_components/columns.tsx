@@ -36,6 +36,15 @@ interface SaleItem {
 
 export const columns: ColumnDef<Sale>[] = [
   {
+    accessorKey: 'id',
+    header: 'ID',
+    cell: ({ row }) => (
+      <div className="text-xs font-mono text-muted-foreground">
+        {row.original.id}
+      </div>
+    ),
+  },
+  {
     accessorKey: 'date',
     header: 'Date',
     cell: ({ row }) => {

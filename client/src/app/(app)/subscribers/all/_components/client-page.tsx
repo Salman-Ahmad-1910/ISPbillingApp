@@ -22,6 +22,7 @@ import { DataTable } from './data-table';
 import { getColumns } from './columns';
 import { SubscriberForm } from './subscriber-form';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
+import { SubscriberImportExport } from './subscriber-import-export';
 
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
@@ -48,6 +49,7 @@ export function ClientPage({ data }: ClientPageProps) {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedSubscriber, setSelectedSubscriber] = useState<Subscriber | null>(null);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [showImportExport, setShowImportExport] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
     // Advanced pagination state
@@ -209,10 +211,10 @@ export function ClientPage({ data }: ClientPageProps) {
                                 ))}
                             </DropdownMenuContent>
                         </DropdownMenu>
-                        {/* <Button variant="outline">
+                        <Button variant="outline" onClick={() => setShowImportExport(true)}>
                             <Download className="mr-2 h-4 w-4" />
-                            Export
-                        </Button> */}
+                            Import/Export
+                        </Button>
                         <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
                             <DialogTrigger asChild>
                                 <Button onClick={() => setSelectedSubscriber(null)}>
@@ -336,6 +338,16 @@ export function ClientPage({ data }: ClientPageProps) {
                 onDelete={handleDelete}
                 itemName={selectedSubscriber?.name}
             />
+            
+            {/* Import/Export Dialog */}
+            <Dialog open={showImportExport} onOpenChange={setShowImportExport}>
+                <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Subscriber Import/Export</DialogTitle>
+                    </DialogHeader>
+                    <SubscriberImportExport />
+                </DialogContent>
+            </Dialog>
         </>
     )
 }

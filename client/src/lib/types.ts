@@ -44,6 +44,15 @@ export type User = {
   contact1?: string;
   contact2?: string;
   companyId?: string;
+  createdBy?: string;
+  createdUsers?: User[];
+  // Hierarchy properties for display
+  level?: number;
+  isParent?: boolean;
+  isOrphaned?: boolean;
+  subUsers?: User[];
+  parentId?: string;
+  parent?: User;
 };
 
 export type Role = {

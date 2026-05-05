@@ -21,6 +21,15 @@ interface ExpenseColumnsProps {
 
 export const columns = ({ onEdit, onDelete }: ExpenseColumnsProps): ColumnDef<Expense>[] => [
   {
+    accessorKey: 'id',
+    header: 'ID',
+    cell: ({ row }) => (
+      <div className="text-xs font-mono text-muted-foreground">
+        {row.original.id}
+      </div>
+    ),
+  },
+  {
     accessorKey: 'date',
     header: 'Date',
   },

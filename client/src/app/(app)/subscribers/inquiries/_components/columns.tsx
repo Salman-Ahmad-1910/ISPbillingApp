@@ -21,6 +21,15 @@ interface ColumnsProps {
 
 export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<Inquiry>[] => [
   {
+    accessorKey: 'id',
+    header: 'ID',
+    cell: ({ row }) => (
+      <div className="text-xs font-mono text-muted-foreground">
+        {row.original.id}
+      </div>
+    ),
+  },
+  {
     accessorKey: 'createdAt',
     header: 'Date',
     cell: ({ row }) => new Date(row.original.createdAt).toLocaleDateString(),

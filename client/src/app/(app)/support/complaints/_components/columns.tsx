@@ -22,7 +22,12 @@ interface ColumnsProps {
 export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<Complaint>[] => [
   {
     accessorKey: 'id',
-    header: 'Ticket ID',
+    header: 'ID',
+    cell: ({ row }) => (
+      <div className="text-xs font-mono text-muted-foreground">
+        {row.original.id}
+      </div>
+    ),
   },
   {
     accessorKey: 'subscriberName',

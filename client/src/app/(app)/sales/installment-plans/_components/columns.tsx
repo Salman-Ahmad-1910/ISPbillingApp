@@ -20,6 +20,15 @@ interface InstallmentPlanColumnsProps {
 
 export const getColumns = ({ onEdit, onDelete }: InstallmentPlanColumnsProps): ColumnDef<InstallmentPlan>[] => [
   {
+    accessorKey: 'id',
+    header: 'ID',
+    cell: ({ row }) => (
+      <div className="text-xs font-mono text-muted-foreground">
+        {row.original.id}
+      </div>
+    ),
+  },
+  {
     accessorKey: 'name',
     header: 'Plan Name',
   },

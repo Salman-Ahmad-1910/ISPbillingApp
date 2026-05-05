@@ -20,6 +20,15 @@ interface ColumnsProps {
 
 export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<OLT>[] => [
   {
+    accessorKey: 'id',
+    header: 'ID',
+    cell: ({ row }) => (
+      <div className="text-xs font-mono text-muted-foreground">
+        {row.original.id}
+      </div>
+    ),
+  },
+  {
     accessorKey: 'name',
     header: 'Name',
   },

@@ -146,7 +146,7 @@ export function SubscriberForm({ subscriber, packages, areas, splitters, onSave,
                         <SelectContent>
                         {packages.map((pkg) => (
                             <SelectItem key={pkg.id} value={pkg.id}>
-                            {pkg.name} - {pkg.speed}
+                            {pkg.name} - {pkg.speed} (PKR {pkg.price.toLocaleString()})
                             </SelectItem>
                         ))}
                         </SelectContent>

@@ -20,6 +20,15 @@ interface PlanColumnsProps {
 
 export const getColumns = ({ onEdit, onDelete }: PlanColumnsProps): ColumnDef<Plan>[] => [
   {
+    accessorKey: 'id',
+    header: 'ID',
+    cell: ({ row }) => (
+      <div className="text-xs font-mono text-muted-foreground">
+        {row.original.id}
+      </div>
+    ),
+  },
+  {
     accessorKey: 'name',
     header: 'Plan Name',
   },

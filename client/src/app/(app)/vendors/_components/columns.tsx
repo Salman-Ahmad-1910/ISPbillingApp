@@ -22,11 +22,12 @@ interface VendorColumnsProps {
 export const columns = ({ onEdit, onDelete }: VendorColumnsProps): ColumnDef<Vendor>[] => [
   {
     accessorKey: 'id',
-    header: 'Vendor ID',
-    cell: ({ row }) => {
-      const id = row.getValue('id') as string;
-      return <span className="text-muted-foreground text-xs">{id.slice(0, 8)}...</span>;
-    },
+    header: 'ID',
+    cell: ({ row }) => (
+      <div className="text-xs font-mono text-muted-foreground">
+        {row.original.id}
+      </div>
+    ),
   },
   {
     accessorKey: 'name',

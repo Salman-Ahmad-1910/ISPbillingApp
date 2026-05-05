@@ -8,10 +8,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// CheckPermission checks if user has the required permission
 func CheckPermission(permission string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userID, exists := c.Get("userID")
+		_, exists := c.Get("userID")
 		if !exists {
 			utils.ErrorResponse(c, http.StatusUnauthorized, "Unauthorized", "User not authenticated")
 			c.Abort()

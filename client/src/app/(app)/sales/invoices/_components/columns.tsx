@@ -23,7 +23,12 @@ interface InvoiceColumnsProps {
 export const getColumns = ({ onPrint, onEdit, onDelete }: InvoiceColumnsProps): ColumnDef<Invoice>[] => [
   {
     accessorKey: 'id',
-    header: 'Invoice ID',
+    header: 'ID',
+    cell: ({ row }) => (
+      <div className="text-xs font-mono text-muted-foreground">
+        {row.original.id}
+      </div>
+    ),
   },
   {
     accessorKey: 'subscriberName',

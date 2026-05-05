@@ -22,6 +22,15 @@ interface ColumnsProps {
 
 export const getColumns = ({ onEdit, onDelete, onApprove }: ColumnsProps): ColumnDef<DealerFranchise>[] => [
   {
+    accessorKey: 'id',
+    header: 'ID',
+    cell: ({ row }) => (
+      <div className="text-xs font-mono text-muted-foreground">
+        {row.original.id}
+      </div>
+    ),
+  },
+  {
     accessorKey: 'name',
     header: 'Franchise Name',
   },

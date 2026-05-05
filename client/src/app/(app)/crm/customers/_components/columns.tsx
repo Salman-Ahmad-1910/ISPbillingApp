@@ -22,6 +22,15 @@ interface CustomerColumnsProps {
 
 export const getColumns = ({ onEdit, onDelete }: CustomerColumnsProps): ColumnDef<Customer>[] => [
   {
+    accessorKey: 'id',
+    header: 'ID',
+    cell: ({ row }) => (
+      <div className="text-xs font-mono text-muted-foreground">
+        {row.original.id}
+      </div>
+    ),
+  },
+  {
     accessorKey: 'name',
     header: 'Name',
   },
@@ -82,11 +91,8 @@ export const getColumns = ({ onEdit, onDelete }: CustomerColumnsProps): ColumnDe
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              {/* <Link href={`/crm/customers/${customer.id}`}>
-                <DropdownMenuItem>View details</DropdownMenuItem>
-              </Link> */}
               <DropdownMenuItem onClick={() => onEdit(customer)}>Edit customer</DropdownMenuItem>
-              {/* <DropdownMenuSeparator /> */}
+              <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive" onClick={() => onDelete(customer)}>
                 Delete customer
               </DropdownMenuItem>

@@ -22,6 +22,15 @@ interface RecoveryOfficerColumnsProps {
 
 export const getColumns = ({ onEdit, onDelete }: RecoveryOfficerColumnsProps): ColumnDef<RecoveryOfficer>[] => [
   {
+    accessorKey: 'id',
+    header: 'ID',
+    cell: ({ row }) => (
+      <div className="text-xs font-mono text-muted-foreground">
+        {row.original.id}
+      </div>
+    ),
+  },
+  {
     accessorKey: 'name',
     header: 'Name',
   },
@@ -37,7 +46,7 @@ export const getColumns = ({ onEdit, onDelete }: RecoveryOfficerColumnsProps): C
     accessorKey: 'secondaryPhone',
     header: 'Secondary Phone',
     cell: ({ row }) => {
-      const phone = row.getValue('secondaryPhone');
+      const phone = row.getValue('secondaryPhone') as string;
       return <div>{phone || '-'}</div>;
     },
   },
@@ -45,7 +54,7 @@ export const getColumns = ({ onEdit, onDelete }: RecoveryOfficerColumnsProps): C
     accessorKey: 'status',
     header: 'Status',
     cell: ({ row }) => {
-      const status = row.getValue('status');
+      const status = row.getValue('status') as string;
       return (
         <Badge variant={status === 'active' ? 'default' : 'secondary'}>
           {status}
