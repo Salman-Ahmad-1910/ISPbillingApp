@@ -49,6 +49,9 @@ func Login(c *gin.Context) {
 	// Load user companies and relationships - accept both active and offline users
 	if err := config.DB.Preload("UserCompanies.Company").Where("email = ? AND status IN ('active', 'offline')", req.Email).First(&user).Error; err != nil {
 		utils.ErrorResponse(c, 401, "Invalid credentials or inactive user", nil)
+		c.JSON(401, gin.H{
+			"error": err,
+		})
 		return
 	}
 

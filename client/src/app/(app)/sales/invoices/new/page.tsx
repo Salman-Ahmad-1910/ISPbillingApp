@@ -12,7 +12,7 @@ import { Loader2 } from 'lucide-react';
 
 import { RecommendationAssistant } from '../_components/recommendation-assistant';
 import { useCompany } from '@/context/company-context';
-import type { Product } from '@/lib/types';
+import type { Product, Subscriber } from '@/lib/types';
 import { Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
@@ -38,7 +38,8 @@ export default function NewInvoicePage() {
       setInvoiceDate(new Date().toISOString().substring(0, 10));
     }, []);
 
-    const { data: products = [], isLoading: isLoadingproducts } = useGenericQuery<any>('inventory/products', companyId ?? undefined); // (p => p.companyId === companyId);
+    const { data: products = [], isLoading: isLoadingproducts } = useGenericQuery<Product[]>('inventory/products', companyId ?? undefined);
+    const { data: subscribers = [], isLoading: isLoadingSubscribers } = useGenericQuery<Subscriber[]>('billing/subscribers', companyId ?? undefined);
 
     const handleAddItem = () => {
         setItems([...items, { productId: '', quantity: 1, price: 0, total: 0 }]);
@@ -93,15 +94,15 @@ export default function NewInvoicePage() {
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="customer">Customer</Label>
+                <Label htmlFor="customer">Subscriber</Label>
                 <Select value={customer} onValueChange={setCustomer}>
                   <SelectTrigger id="customer">
-                    <SelectValue placeholder="Select a customer" />
+                    <SelectValue placeholder="Select a subscriber" />
                   </SelectTrigger>
                   <SelectContent>
-                    {customers.filter(c=> c.companyId === companyId).map((customer) => (
-                      <SelectItem key={customer.id} value={customer.id}>
-                        {customer.name}
+                    {subscribers.filter(s=> s.companyId === companyId).map((subscriber) => (
+                      <SelectItem key={subscriber.id} value={subscriber.id}>
+                        {subscriber.subscriber_identity} | {subscriber.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

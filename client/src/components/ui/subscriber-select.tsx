@@ -39,7 +39,7 @@ export function SubscriberSelect({
   const filteredSubscribers = useMemo(() => {
     return subscribers.map(subscriber => ({
       ...subscriber,
-      displayName: `${subscriber.subscriber_identity || ''} | ${subscriber.name || ''}${subscriber.package?.price ? ` (PKR ${subscriber.package.price.toLocaleString()})` : ''}`.trim(),
+      displayName: `${subscriber.subscriber_identity || ''} | ${subscriber.name || ''}`.trim(),
     }));
   }, [subscribers]);
 

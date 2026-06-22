@@ -227,10 +227,19 @@ export const guarantorSchema = z.object({
 export const invoiceSchema = z.object({
   id: z.string().optional(),
   subscriberId: z.string().min(1, 'Subscriber is required'),
+  packageId: z.string().min(1, 'Package is required'),
+  packageName: z.string().optional(),
+  packagePrice: z.coerce.number().min(0, 'Package price must be a positive number').optional(),
   amount: z.coerce.number().min(0, 'Amount must be a positive number'),
   dueDate: z.string().min(1, 'Due date is required'),
+  invoiceDate: z.string().optional(),
   billingPeriod: z.string().min(1, 'Billing period is required, e.g., July 2024'),
+  billingPeriodStart: z.string().optional(),
+  billingPeriodEnd: z.string().optional(),
   status: z.enum(['pending', 'paid', 'overdue', 'draft']),
+  notes: z.string().optional(),
+  taxAmount: z.coerce.number().min(0, 'Tax amount must be a positive number').optional(),
+  totalAmount: z.coerce.number().min(0, 'Total amount must be a positive number').optional(),
 });
 
 export const installmentPlanSchema = z.object({

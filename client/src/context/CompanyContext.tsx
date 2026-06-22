@@ -10,6 +10,7 @@ export interface Company {
   contact2?: string;
   address: string;
   description?: string;
+  phone?: string;
 }
 
 interface CompanyContextType {

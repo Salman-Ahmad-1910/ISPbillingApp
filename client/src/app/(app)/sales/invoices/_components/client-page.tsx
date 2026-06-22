@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import type { Invoice, Subscriber } from '@/lib/types';
+import type { Invoice, Subscriber, Package } from '@/lib/types';
 import { getColumns } from './columns';
 import { DataTable } from './data-table';
 import { PrintDialog } from './print-dialog';
@@ -20,6 +20,7 @@ import { InvoiceForm } from './invoice-form';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 
 import { useQueryClient } from '@tanstack/react-query';
+import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import api from '@/lib/api';
 
 type InvoiceFormValues = z.infer<typeof invoiceSchema>;
@@ -27,12 +28,17 @@ type InvoiceFormValues = z.infer<typeof invoiceSchema>;
 interface ClientPageProps {
   invoices: Invoice[];
   subscribers: Subscriber[];
+  packages: Package[];
 }
 
-export function ClientPage({ invoices: data, subscribers }: ClientPageProps) {
+export function ClientPage({ invoices: data, subscribers, packages }: ClientPageProps) {
   const { companyId } = useCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  // Fetch packages if not provided
+  const { data: packagesData = [], isLoading: isLoadingPackages } = useGenericQuery<Package[]>('inventory/plans', companyId ?? undefined);
+  const finalPackages = packages && packages.length > 0 ? packages : packagesData;
   const [invoices, setInvoices] = useState<Invoice[]>(data);
   const [filter, setFilter] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
@@ -191,17 +197,20 @@ export function ClientPage({ invoices: data, subscribers }: ClientPageProps) {
                 Add Invoice
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{selectedInvoice ? 'Edit' : 'Create'} Invoice</DialogTitle>
               </DialogHeader>
-              <InvoiceForm
-                invoice={selectedInvoice}
-                subscribers={subscribers}
-                onSave={handleSave}
-                onCancel={() => setIsFormOpen(false)}
-                isSaving={isSaving}
-              />
+              <div className="max-h-[calc(90vh-8rem)] overflow-y-auto">
+                <InvoiceForm
+                  invoice={selectedInvoice}
+                  subscribers={subscribers}
+                  packages={finalPackages}
+                  onSave={handleSave}
+                  onCancel={() => setIsFormOpen(false)}
+                  isSaving={isSaving}
+                />
+              </div>
             </DialogContent>
           </Dialog>
         </div>
