@@ -116,8 +116,16 @@ export function UserImportExport() {
         toast.error(`Import completed with ${result.errors.length} errors`);
       }
     },
-    onError: (error) => {
-      toast.error('Failed to import users');
+    onError: (error: any) => {
+      const data = error.response?.data;
+      const message = data?.message || 'Failed to import users';
+
+      // If the server returned an ImportResult-shaped payload, surface its details
+      if (data && typeof data.success === 'boolean') {
+        setImportResult(data as ImportResult);
+      }
+
+      toast.error(message);
       console.error('Import error:', error);
     },
     onSettled: () => {
@@ -413,10 +421,11 @@ export function UserImportExport() {
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
                   <strong>Important:</strong> Make sure your Excel file follows the required format.
-                  Download the template to see the expected structure. Required fields: S.No, Name, 
-                  User Name (email format), Package ID, Contact, Address, Role. Role can be: 
-                  admin, recovery_officer, dealer, staff, sub_dealer, manager. Users will be created 
-                  with default password "default123" and "active" status.
+                  Download the template to see the expected structure. Required fields: S.No, Name,
+                  User Name (email format), Package ID, Contact, Address, Password, Role. Role can be:
+                  admin, recovery_officer, dealer, staff, sub_dealer, manager. <strong>User passwords
+                  are required</strong> — each user will be created with the password you provide so they
+                  can log in. Passwords must be at least 6 characters.
                 </AlertDescription>
               </Alert>
             </CardContent>

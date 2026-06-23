@@ -36,8 +36,8 @@ export function ClientPage({ invoices: data, subscribers, packages }: ClientPage
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
-  // Fetch packages if not provided
-  const { data: packagesData = [], isLoading: isLoadingPackages } = useGenericQuery<Package[]>('inventory/plans', companyId ?? undefined);
+  // Fetch packages (must match the Packages page endpoint: billing/packages)
+  const { data: packagesData = [], isLoading: isLoadingPackages } = useGenericQuery<Package[]>('billing/packages', companyId ?? undefined);
   const finalPackages = packages && packages.length > 0 ? packages : packagesData;
   const [invoices, setInvoices] = useState<Invoice[]>(data);
   const [filter, setFilter] = useState('');

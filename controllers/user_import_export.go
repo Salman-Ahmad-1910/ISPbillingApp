@@ -25,6 +25,7 @@ type UserImportRow struct {
 	PkgID    string `json:"pkg_id"`
 	Contact  string `json:"contact"`
 	Address  string `json:"address"`
+	Password string `json:"password"`
 	Role     string `json:"role"`
 }
 
@@ -94,7 +95,7 @@ func (uie *UserImportExport) ExportUsers(c *gin.Context) {
 
 	// Set headers
 	headers := []string{
-		"S.No", "Name", "User Name", "Package ID", "Contact", "Address", "Role",
+		"S.No", "Name", "User Name", "Package ID", "Contact", "Address", "Password", "Role",
 	}
 
 	for i, header := range headers {
@@ -112,6 +113,7 @@ func (uie *UserImportExport) ExportUsers(c *gin.Context) {
 			"",         // Package ID - not available in current model
 			"",         // Contact - not available in base User model
 			"",         // Address - not available in current model
+			"",         // Password - left blank on export; hashes cannot be reversed
 			user.Role,  // Include role
 		}
 
@@ -301,11 +303,27 @@ func (uie *UserImportExport) ImportUsers(c *gin.Context) {
 
 	// Validate headers
 	expectedHeaders := []string{
-		"S.No", "Name", "User Name", "Package ID", "Contact", "Address", "Role",
+		"S.No", "Name", "User Name", "Package ID", "Contact", "Address", "Password", "Role",
 	}
 
 	if len(rows[0]) < len(expectedHeaders) {
-		utils.ErrorResponse(c, 400, "Invalid headers", "Excel file doesn't have required columns")
+		utils.ErrorResponse(c, 400, "Invalid headers", "Excel file doesn't have required columns. Password column is required.")
+		return
+	}
+
+	// Ensure the Password column is present (at index 6)
+	if strings.TrimSpace(rows[0][6]) != "Password" {
+		c.JSON(400, ImportResult{
+			Success:      false,
+			TotalRows:    len(rows) - 1,
+			ImportedRows: 0,
+			Errors: []ImportValidationError{{
+				Row:    1,
+				Column: "Password",
+				Error:  "User passwords are required",
+			}},
+			Message: "User passwords are required",
+		})
 		return
 	}
 
@@ -413,10 +431,11 @@ func (uie *UserImportExport) parseAndValidateRow(row []string, rowNum int) (User
 	importRow.PkgID = strings.TrimSpace(row[3])
 	importRow.Contact = strings.TrimSpace(row[4])
 	importRow.Address = strings.TrimSpace(row[5])
-	importRow.Role = strings.TrimSpace(row[6])
+	importRow.Password = strings.TrimSpace(row[6])
+	importRow.Role = strings.TrimSpace(row[7])
 
-	fmt.Printf("DEBUG: Parsed - SerialNo: '%s', Name: '%s', UserName: '%s', PkgID: '%s', Contact: '%s', Address: '%s', Role: '%s'\n",
-		importRow.SerialNo, importRow.Name, importRow.UserName, importRow.PkgID, importRow.Contact, importRow.Address, importRow.Role)
+	fmt.Printf("DEBUG: Parsed - SerialNo: '%s', Name: '%s', UserName: '%s', PkgID: '%s', Contact: '%s', Address: '%s', Password: '%s', Role: '%s'\n",
+		importRow.SerialNo, importRow.Name, importRow.UserName, importRow.PkgID, importRow.Contact, importRow.Address, importRow.Password, importRow.Role)
 
 	// Validate required fields
 	if importRow.Name == "" {
@@ -424,6 +443,12 @@ func (uie *UserImportExport) parseAndValidateRow(row []string, rowNum int) (User
 	}
 	if importRow.UserName == "" {
 		errors = append(errors, ImportValidationError{Row: rowNum, Column: "User Name", Error: "User Name is required"})
+	}
+	// Password is required for every imported user (matches signup min length of 6)
+	if importRow.Password == "" {
+		errors = append(errors, ImportValidationError{Row: rowNum, Column: "Password", Error: "User passwords are required"})
+	} else if len(importRow.Password) < 6 {
+		errors = append(errors, ImportValidationError{Row: rowNum, Column: "Password", Error: "Password must be at least 6 characters"})
 	}
 	if importRow.Role == "" {
 		errors = append(errors, ImportValidationError{Row: rowNum, Column: "Role", Error: "Role is required"})
@@ -446,11 +471,8 @@ func (uie *UserImportExport) importUser(tx *gorm.DB, row UserImportRow, createdB
 		return fmt.Errorf("user with email %s already exists", row.UserName)
 	}
 
-	// Generate a default password (since not provided in new format)
-	defaultPassword := "default123"
-
-	// Hash password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(defaultPassword), bcrypt.DefaultCost)
+	// Hash the password provided in the import row
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(row.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return fmt.Errorf("failed to hash password: %w", err)
 	}
@@ -524,7 +546,7 @@ func (uie *UserImportExport) DownloadTemplate(c *gin.Context) {
 
 	// Set headers
 	headers := []string{
-		"S.No", "Name", "User Name", "Package ID", "Contact", "Address", "Role",
+		"S.No", "Name", "User Name", "Package ID", "Contact", "Address", "Password", "Role",
 	}
 
 	for i, header := range headers {
@@ -534,9 +556,9 @@ func (uie *UserImportExport) DownloadTemplate(c *gin.Context) {
 
 	// Add sample data
 	sampleData := [][]interface{}{
-		{1, "John Doe", "john@example.com", "PKG001", "+1234567890", "123 Main St", "admin"},
-		{2, "Jane Smith", "jane@example.com", "PKG002", "+0987654321", "456 Oak Ave", "dealer"},
-		{3, "Mike Wilson", "mike@example.com", "PKG003", "+1122334455", "789 Pine Rd", "staff"},
+		{1, "John Doe", "john@example.com", "PKG001", "+1234567890", "123 Main St", "password123", "admin"},
+		{2, "Jane Smith", "jane@example.com", "PKG002", "+0987654321", "456 Oak Ave", "password123", "dealer"},
+		{3, "Mike Wilson", "mike@example.com", "PKG003", "+1122334455", "789 Pine Rd", "password123", "staff"},
 	}
 
 	for i, rowData := range sampleData {
