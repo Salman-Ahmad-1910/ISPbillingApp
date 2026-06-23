@@ -232,6 +232,18 @@ export type Invoice = {
   status: 'paid' | 'pending' | 'overdue' | 'draft';
   billingPeriod: string;
   companyId: string;
+  // The fields below are not persisted by the backend but are used by the
+  // invoice form. They are optional so editing a server-fetched invoice
+  // (which omits them) type-checks.
+  packageId?: string;
+  packageName?: string;
+  packagePrice?: number;
+  taxAmount?: number;
+  totalAmount?: number;
+  notes?: string;
+  invoiceDate?: string;
+  billingPeriodStart?: string;
+  billingPeriodEnd?: string;
 };
 
 export type Payment = {

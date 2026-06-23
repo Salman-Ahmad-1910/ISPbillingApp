@@ -133,27 +133,33 @@ export default function PackagesPage() {
 
   const handleDelete = async () => {
     if (selectedPackage) {
+      const inUseCount = getPackageSubscribers(selectedPackage.id).length;
       try {
         await api.delete(`/billing/packages/${selectedPackage.id}?companyId=${companyId}`);
-        toast({ title: "Success", description: "Package deleted successfully." });
+        toast({
+          title: "Success",
+          description: inUseCount > 0
+            ? `Package deleted. ${inUseCount} subscriber(s) keep their stored package name.`
+            : "Package deleted successfully.",
+        });
         queryClient.invalidateQueries({ queryKey: ['billing/packages', companyId] });
         setIsDeleteDialogOpen(false);
         setSelectedPackage(null);
       } catch (error: any) {
         console.error('Delete error:', error);
         let errorMessage = "Failed to delete package";
-        
+
         if (error.response?.data?.message) {
           errorMessage = error.response.data.message;
         } else if (error.response?.data?.error) {
           errorMessage = error.response.data.error;
         }
-        
+
         // Check for foreign key constraint error
         if (errorMessage.includes("foreign key constraint") || errorMessage.includes("violates foreign key")) {
           errorMessage = "Cannot delete package: It is being used by one or more subscribers. Please reassign or delete those subscribers first.";
         }
-        
+
         toast({
           variant: 'destructive',
           title: "Error",
@@ -242,7 +248,6 @@ export default function PackagesPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          console.log('Edit button clicked for package:', pkg);
                           setSelectedPackage(pkg);
                           setIsFormOpen(true);
                         }}
@@ -250,17 +255,13 @@ export default function PackagesPage() {
                         <Edit2 className="h-4 w-4" />
                       </Button>
                       <Button
-                        variant={getPackageSubscribers(pkg.id).length > 0 ? "secondary" : "destructive"}
+                        variant="destructive"
                         size="sm"
                         onClick={() => {
-                          console.log('Delete button clicked for package:', pkg);
                           setSelectedPackage(pkg);
                           setIsDeleteDialogOpen(true);
                         }}
-                        disabled={getPackageSubscribers(pkg.id).length > 0}
-                        title={getPackageSubscribers(pkg.id).length > 0 ? 
-                          `${getPackageSubscribers(pkg.id).length} subscriber(s) using this package` : 
-                          'Delete package'}
+                        title="Delete package"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -369,6 +370,11 @@ export default function PackagesPage() {
         onClose={() => setIsDeleteDialogOpen(false)}
         onDelete={handleDelete}
         itemName={selectedPackage?.name}
+        warning={
+          selectedPackage && getPackageSubscribers(selectedPackage.id).length > 0
+            ? `${getPackageSubscribers(selectedPackage.id).length} subscriber(s) are currently on this package. They will keep their stored package name, but will no longer be linked to this package.`
+            : undefined
+        }
       />
     </>
   );

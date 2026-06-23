@@ -1,6 +1,6 @@
 'use client';
 
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -50,6 +50,12 @@ export function PaymentForm({ payment, subscribers, invoices, onSave, onCancel, 
     },
   });
 
+  // Reactive subscriber id so the invoice list and disabled state update on selection.
+  const selectedSubscriberId = useWatch({ control: form.control, name: 'subscriberId' });
+  const subscriberInvoices = invoices.filter(
+    (inv) => !selectedSubscriberId || inv.subscriberId === selectedSubscriberId
+  );
+
   function onSubmit(values: PaymentFormValues) {
     onSave(values);
   }
@@ -82,14 +88,24 @@ export function PaymentForm({ payment, subscribers, invoices, onSave, onCancel, 
           render={({ field }) => (
             <FormItem>
               <FormLabel>Invoice</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!form.watch('subscriberId')}>
+              <Select
+                value={field.value}
+                onValueChange={field.onChange}
+                disabled={!selectedSubscriberId || subscriberInvoices.length === 0}
+              >
                 <FormControl>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select an invoice" />
+                    <SelectValue placeholder={
+                      !selectedSubscriberId
+                        ? 'Select a subscriber first'
+                        : subscriberInvoices.length === 0
+                          ? 'No invoices for this subscriber'
+                          : 'Select an invoice'
+                    } />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {invoices.filter(inv => inv.subscriberId === form.watch('subscriberId')).map((invoice) => (
+                  {subscriberInvoices.map((invoice) => (
                     <SelectItem key={invoice.id} value={invoice.id}>
                       {invoice.id} - {invoice.billingPeriod} - PKR {invoice.amount}
                     </SelectItem>

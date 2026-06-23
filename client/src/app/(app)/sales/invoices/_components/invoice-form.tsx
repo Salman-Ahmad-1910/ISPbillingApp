@@ -31,63 +31,99 @@ interface InvoiceFormProps {
   isSaving?: boolean;
 }
 
+// Build form defaults for a given invoice (or null for a new invoice).
+// Provides an explicit value for EVERY schema field so no input starts
+// undefined (which would trigger an uncontrolled->controlled warning).
+function getInvoiceDefaults(invoice: Invoice | null): InvoiceFormValues {
+  if (invoice) {
+    return {
+      id: invoice.id,
+      subscriberId: invoice.subscriberId ?? '',
+      packageId: invoice.packageId ?? '',
+      packageName: invoice.packageName ?? '',
+      packagePrice: invoice.packagePrice ?? 0,
+      amount: Number(invoice.amount) || 0,
+      taxAmount: invoice.taxAmount ?? 0,
+      totalAmount: invoice.totalAmount ?? 0,
+      notes: invoice.notes ?? '',
+      status: invoice.status ?? 'pending',
+      billingPeriod: invoice.billingPeriod ?? '',
+      billingPeriodStart: invoice.billingPeriodStart ?? '',
+      billingPeriodEnd: invoice.billingPeriodEnd ?? '',
+      invoiceDate: invoice.invoiceDate ?? '',
+      dueDate: invoice.dueDate ?? '',
+    };
+  }
+  return {
+    subscriberId: '',
+    packageId: '',
+    packageName: '',
+    amount: 0,
+    dueDate: new Date().toISOString().split('T')[0],
+    invoiceDate: new Date().toISOString().split('T')[0],
+    billingPeriod: `${new Date().toLocaleString('default', { month: 'long' })} ${new Date().getFullYear()}`,
+    billingPeriodStart: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+    billingPeriodEnd: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0],
+    status: 'pending',
+    notes: '',
+    taxAmount: 0,
+    totalAmount: 0,
+  };
+}
+
 export function InvoiceForm({ invoice, subscribers, packages, onSave, onCancel, isSaving }: InvoiceFormProps) {
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceSchema),
-    defaultValues: invoice ? {
-        ...invoice,
-        amount: Number(invoice.amount),
-    } : {
-      subscriberId: '',
-      packageId: '',
-      packageName: '',
-      amount: 0,
-      dueDate: new Date().toISOString().split('T')[0],
-      invoiceDate: new Date().toISOString().split('T')[0],
-      billingPeriod: `${new Date().toLocaleString('default', { month: 'long' })} ${new Date().getFullYear()}`,
-      billingPeriodStart: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-      billingPeriodEnd: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0],
-      status: 'pending',
-      notes: '',
-      taxAmount: 0,
-      totalAmount: 0,
-    },
+    defaultValues: getInvoiceDefaults(invoice),
   });
+
+  // defaultValues only apply on first mount. When the dialog reuses this
+  // component for a different invoice (null -> invoice, or invoice A -> B),
+  // re-seed the form so subscriber/package/etc. reflect the new invoice.
+  useEffect(() => {
+    form.reset(getInvoiceDefaults(invoice));
+  }, [invoice]);
 
   const selectedSubscriberId = useWatch({ control: form.control, name: 'subscriberId' });
   const selectedPackageId = useWatch({ control: form.control, name: 'packageId' });
   const amount = useWatch({ control: form.control, name: 'amount' });
 
+  // Normalize props to arrays so .length/.find/.map never throw.
+  const safeSubscribers = Array.isArray(subscribers) ? subscribers : [];
+  const safePackages = Array.isArray(packages) ? packages : [];
+
   // Auto-calculate tax and total when amount changes
   useEffect(() => {
-    const taxAmount = Math.round(amount * 0.195); // 19.5% GST
-    const totalAmount = amount + taxAmount;
+    const taxAmount = Math.round(Number(amount || 0) * 0.195); // 19.5% GST
+    const totalAmount = Number(amount || 0) + taxAmount;
     form.setValue('taxAmount', taxAmount);
     form.setValue('totalAmount', totalAmount);
   }, [amount]);
 
-  // Auto-fill package details when package is selected
+  // Auto-fill package details when package is manually selected (new invoices only)
   useEffect(() => {
-    if (selectedPackageId && packages.length > 0) {
-      const selectedPackage = packages.find(pkg => pkg.id === selectedPackageId);
+    if (invoice) return;
+    if (selectedPackageId && safePackages.length > 0) {
+      const selectedPackage = safePackages.find(pkg => pkg.id === selectedPackageId);
       if (selectedPackage) {
         form.setValue('packageName', selectedPackage.name);
         form.setValue('packagePrice', selectedPackage.price);
         form.setValue('amount', selectedPackage.price);
       }
     }
-  }, [selectedPackageId, packages]);
+  }, [selectedPackageId, safePackages, invoice]);
 
-  // Auto-fill package details when subscriber is selected
+  // Sync package details from the selected subscriber. Runs for both new and
+  // edit modes: on edit the backend invoice doesn't store packageId, so we
+  // resolve it from the subscriber so the package dropdown pre-selects.
   useEffect(() => {
-    if (selectedSubscriberId && subscribers.length > 0) {
-      const selectedSubscriber = subscribers.find(sub => sub.id === selectedSubscriberId);
-      if (selectedSubscriber) {
-        form.setValue('packageId', selectedSubscriber.packageId);
-        form.setValue('packageName', selectedSubscriber.packageName);
-      }
+    if (!selectedSubscriberId || safeSubscribers.length === 0) return;
+    const selectedSubscriber = safeSubscribers.find(sub => sub.id === selectedSubscriberId);
+    if (selectedSubscriber) {
+      form.setValue('packageId', selectedSubscriber.packageId ?? '');
+      form.setValue('packageName', selectedSubscriber.packageName ?? '');
     }
-  }, [selectedSubscriberId, subscribers]);
+  }, [selectedSubscriberId, safeSubscribers]);
 
   function onSubmit(values: InvoiceFormValues) {
     onSave(values);
@@ -104,11 +140,11 @@ export function InvoiceForm({ invoice, subscribers, packages, onSave, onCancel, 
               <FormLabel>Subscriber</FormLabel>
               <FormControl>
                 <SubscriberSelect
-                  subscribers={subscribers}
+                  subscribers={safeSubscribers}
                   value={field.value}
                   onValueChange={field.onChange}
                   placeholder="Search by subscriber ID or name..."
-                  disabled={!!invoice}
+                  // disabled={!!invoice}
                 />
               </FormControl>
               <FormMessage />
@@ -128,7 +164,7 @@ export function InvoiceForm({ invoice, subscribers, packages, onSave, onCancel, 
                     <SelectValue placeholder="Select a package" />
                   </SelectTrigger>
                   <SelectContent>
-                    {packages.map((pkg) => (
+                    {safePackages.map((pkg) => (
                       <SelectItem key={pkg.id} value={pkg.id}>
                         {pkg.name} - PKR {pkg.price.toLocaleString()}
                       </SelectItem>

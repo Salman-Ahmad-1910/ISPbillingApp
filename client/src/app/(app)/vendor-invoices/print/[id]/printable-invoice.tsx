@@ -160,11 +160,11 @@ export function PrintableVendorInvoice({ invoice, company, vendor, size }: Print
                 {company.address}
               </p>
             )}
-            {company.phone && (
+            {(company.contact1 || company.contact2) && (
               <p style={{ margin: 0, fontSize: size === 'thermal' ? '10px' : '12px', color: '#666' }}>
-                Tel: {company.phone}
-              </p>
-            )}
+               Tel: {[company.contact1, company.contact2].filter(Boolean).join(' / ')}
+               </p>
+              )}
           </div>
           {company.logo && (
             <Image

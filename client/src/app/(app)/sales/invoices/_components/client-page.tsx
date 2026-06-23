@@ -197,11 +197,11 @@ export function ClientPage({ invoices: data, subscribers, packages }: ClientPage
                 Add Invoice
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
               <DialogHeader>
                 <DialogTitle>{selectedInvoice ? 'Edit' : 'Create'} Invoice</DialogTitle>
               </DialogHeader>
-              <div className="max-h-[calc(90vh-8rem)] overflow-y-auto">
+              <div className="overflow-y-auto pr-1">
                 <InvoiceForm
                   invoice={selectedInvoice}
                   subscribers={subscribers}

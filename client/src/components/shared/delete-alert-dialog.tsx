@@ -16,9 +16,10 @@ interface DeleteAlertDialogProps {
   onClose: () => void;
   onDelete: () => void;
   itemName?: string;
+  warning?: string;
 }
 
-export function DeleteAlertDialog({ isOpen, onClose, onDelete, itemName }: DeleteAlertDialogProps) {
+export function DeleteAlertDialog({ isOpen, onClose, onDelete, itemName, warning }: DeleteAlertDialogProps) {
   return (
     <AlertDialog open={isOpen} onOpenChange={onClose}>
       <AlertDialogContent>
@@ -27,6 +28,11 @@ export function DeleteAlertDialog({ isOpen, onClose, onDelete, itemName }: Delet
           <AlertDialogDescription>
             This action cannot be undone. This will permanently delete the item
             {itemName && <span className="font-semibold"> &quot;{itemName}&quot;</span>}.
+            {warning && (
+              <span className="mt-2 block rounded-md bg-destructive/10 p-2 text-destructive">
+                {warning}
+              </span>
+            )}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
