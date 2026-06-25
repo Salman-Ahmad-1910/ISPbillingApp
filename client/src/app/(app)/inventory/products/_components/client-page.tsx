@@ -180,17 +180,17 @@ export function ClientPage({ data }: ClientPageProps) {
                 Add Product
               </Button>
             </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{selectedProduct ? 'Edit' : 'Add'} Product</DialogTitle>
-              </DialogHeader>
-              <ProductForm
-                product={selectedProduct}
-                onSave={handleSave}
-                onCancel={() => setIsFormOpen(false)}
-                isSaving={isSaving}
-              />
-            </DialogContent>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
+  <DialogHeader>
+    <DialogTitle>{selectedProduct ? 'Edit' : 'Add'} Product</DialogTitle>
+  </DialogHeader>
+  <ProductForm
+    product={selectedProduct}
+    onSave={handleSave}
+    onCancel={() => setIsFormOpen(false)}
+    isSaving={isSaving}
+  />
+</DialogContent>
           </Dialog>
         </div>
         <DataTable columns={columns} data={getPaginatedData()} />

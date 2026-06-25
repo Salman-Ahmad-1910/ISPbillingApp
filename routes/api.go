@@ -134,10 +134,13 @@ func SetupRoutes(r *gin.Engine) {
 		{
 			upload.POST("/company-image", controllers.UploadCompanyImage)
 			upload.DELETE("/company-image", controllers.DeleteCompanyImage)
+			upload.POST("/product-image/:id", controllers.UploadProductImage)
 		}
 
 		// Static file serving for company images
 		api.GET("/uploads/company_images/:companyId", controllers.GetCompanyImage)
+		// Static file serving for product images
+		api.GET("/uploads/product_images/:filename", controllers.GetProductImage)
 
 		// Network routes (with RBAC)
 		network := protected.Group("/network")
@@ -578,7 +581,11 @@ func SetupRoutes(r *gin.Engine) {
 		})
 		{
 			controllers.RegisterGenericCRUD[models.InventoryItem](pos, "")
-			controllers.RegisterGenericCRUD[models.Sale](pos, "/sales")
+			// Dedicated POS sales routes: persist nested line items, preload
+			// them on read, and decrement product stock on sale.
+			pos.POST("/sales", controllers.CreatePOSSale)
+			pos.GET("/sales", controllers.GetPOSSales)
+			pos.GET("/sales/:id", controllers.GetPOSSale)
 		}
 
 		// Support routes

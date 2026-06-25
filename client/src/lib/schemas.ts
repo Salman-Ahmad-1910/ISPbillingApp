@@ -61,6 +61,8 @@ export const productSchema = z.object({
   price: z.coerce.number().min(0, 'Price must be a positive number'),
   stock: z.coerce.number().min(0, 'Stock must be a positive number'),
   unitType: z.enum(['piece', 'meter']).default('piece'),
+  taxPercent: z.coerce.number().min(0, 'Tax must be a positive number').default(0),
+  image: z.string().optional(),
 });
 
 export const vendorSchema = z.object({

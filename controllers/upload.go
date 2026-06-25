@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"awesomeProject/config"
+	"awesomeProject/models"
 	"awesomeProject/utils"
 
 	"github.com/gin-gonic/gin"
@@ -189,4 +190,83 @@ func DeleteCompanyImage(c *gin.Context) {
 	}
 
 	utils.SuccessResponse(c, "Image deleted successfully", nil)
+}
+
+// UploadProductImage handles product image uploads. The product id is passed
+// as a URL param; the image is stored under uploads/product_images and the
+// Product.image column is updated with the served path.
+func UploadProductImage(c *gin.Context) {
+	productID := c.Param("id")
+	if productID == "" {
+		utils.ErrorResponse(c, 400, "Product id is required", "")
+		return
+	}
+	productUUID, err := uuid.Parse(productID)
+	if err != nil {
+		utils.ErrorResponse(c, 400, "Invalid product id format", "")
+		return
+	}
+
+	file, header, err := c.Request.FormFile("image")
+	if err != nil {
+		utils.ErrorResponse(c, 400, "No image file provided", err.Error())
+		return
+	}
+	defer file.Close()
+
+	if !isValidImageType(header.Filename) {
+		utils.ErrorResponse(c, 400, "Invalid file type. Only JPG, JPEG, PNG files are allowed", "")
+		return
+	}
+	if header.Size > 5*1024*1024 {
+		utils.ErrorResponse(c, 400, "File too large. Maximum size is 5MB", "")
+		return
+	}
+
+	uploadDir := "uploads/product_images"
+	if err := os.MkdirAll(uploadDir, 0755); err != nil {
+		utils.ErrorResponse(c, 500, "Failed to create upload directory", err.Error())
+		return
+	}
+
+	ext := strings.ToLower(filepath.Ext(header.Filename))
+	if ext == "" {
+		ext = ".png"
+	}
+	// Unique filename per product (overwrite on re-upload).
+	filename := fmt.Sprintf("%s%s", productUUID.String(), ext)
+	dst := filepath.Join(uploadDir, filename)
+
+	if err := saveUploadedFile(file, dst); err != nil {
+		utils.ErrorResponse(c, 500, "Failed to save image", err.Error())
+		return
+	}
+
+	// Store the served path on the product.
+	imagePath := fmt.Sprintf("/uploads/product_images/%s", filename)
+	if err := config.DB.Model(&models.Product{}).
+		Where("id = ?", productUUID).
+		Update("image", imagePath).Error; err != nil {
+		utils.ErrorResponse(c, 500, "Failed to update product image", err.Error())
+		return
+	}
+
+	utils.SuccessResponse(c, "Image uploaded successfully", gin.H{
+		"image": imagePath,
+	})
+}
+
+// GetProductImage serves a product image file by filename.
+func GetProductImage(c *gin.Context) {
+	filename := c.Param("filename")
+	if filename == "" || strings.Contains(filename, "..") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid filename"})
+		return
+	}
+	imagePath := filepath.Join("uploads/product_images", filename)
+	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Image file not found"})
+		return
+	}
+	c.File(imagePath)
 }

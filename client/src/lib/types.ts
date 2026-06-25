@@ -390,6 +390,8 @@ export type Product = {
   price: number;
   stock: number;
   unitType: 'piece' | 'meter';
+  taxPercent?: number; // per-item tax %, default 0
+  image?: string; // optional product image path
   companyId: string;
 };
 

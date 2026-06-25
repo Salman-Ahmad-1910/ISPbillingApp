@@ -14,7 +14,7 @@ import Image from 'next/image';
 import { useMemo, useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import type { Product, Subscriber } from '@/lib/types';
-import { cn } from '@/lib/utils';
+import { cn, backendImageUrl } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
 
@@ -98,7 +98,11 @@ export default function POSPage() {
     }
 
     const subtotal = cart.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
-    const tax = subtotal * 0.17; // Example 17% tax
+    // Per-item tax: each product carries its own tax % (default 0%).
+    const tax = cart.reduce(
+      (acc, item) => acc + (item.product.price * item.quantity) * ((Number(item.product.taxPercent) || 0) / 100),
+      0
+    );
     const total = subtotal + tax;
 
     const handleCompletePayment = async () => {
@@ -136,6 +140,7 @@ export default function POSPage() {
                     productName: item.product.name,
                     quantity: item.quantity,
                     price: item.product.price,
+                    taxPercent: Number(item.product.taxPercent) || 0,
                 }))
             };
 
@@ -176,21 +181,27 @@ export default function POSPage() {
                             <Input placeholder="Search products..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                         </CardHeader>
                         <CardContent className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                            {filteredProducts.map(product => (
+                            {filteredProducts.map(product => {
+                                const imgSrc = backendImageUrl(product.image) || `https://picsum.photos/seed/${product.id}/200/200`;
+                                return (
                                 <Card key={product.id} className="overflow-hidden cursor-pointer group/product" onClick={() => addToCart(product.id)}>
                                     <div className="aspect-square bg-muted flex items-center justify-center relative">
-                                        <Image src={`https://picsum.photos/seed/${product.id}/200/200`} width={200} height={200} alt={product.name} />
+                                        <Image src={imgSrc} width={200} height={200} alt={product.name} className="object-cover" unoptimized />
                                         {product.stock === 0 && <div className="absolute inset-0 bg-black/50 flex items-center justify-center"><Badge variant="destructive">Out of Stock</Badge></div>}
                                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/product:opacity-100 flex items-center justify-center transition-opacity">
                                             <PlusCircle className="h-8 w-8 text-white" />
                                         </div>
+                                        {product.stock > 0 && (
+                                            <Badge variant="secondary" className="absolute top-1 right-1 text-xs">Stock: {product.stock}</Badge>
+                                        )}
                                     </div>
                                     <div className="p-2 text-center">
                                         <h4 className="font-medium text-sm truncate">{product.name}</h4>
-                                        <p className="text-xs text-muted-foreground">PKR {product.price.toLocaleString()}</p>
+                                        <p className="text-xs font-semibold">PKR {product.price.toLocaleString()}</p>
                                     </div>
                                 </Card>
-                            ))}
+                                );
+                            })}
                             {filteredProducts.length === 0 && <p className="text-muted-foreground col-span-full text-center py-8">No products found.</p>}
                         </CardContent>
                     </Card>
@@ -220,7 +231,7 @@ export default function POSPage() {
                                 {cart.length > 0 ? (
                                     cart.map(item => (
                                         <div key={item.product.id} className="flex items-start justify-between">
-                                            <Image src={`https://picsum.photos/seed/${item.product.id}/50/50`} width={50} height={50} alt={item.product.name} className="rounded-md" />
+                                            <Image src={backendImageUrl(item.product.image) || `https://picsum.photos/seed/${item.product.id}/50/50`} width={50} height={50} alt={item.product.name} className="rounded-md object-cover" unoptimized />
                                             <div className="flex-1 mx-3">
                                                 <p className="font-medium">{item.product.name}</p>
                                                 <p className="text-sm text-muted-foreground">PKR {item.product.price.toLocaleString()}</p>
@@ -253,7 +264,7 @@ export default function POSPage() {
                                     <span>PKR {subtotal.toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between text-muted-foreground">
-                                    <span>Tax (17%)</span>
+                                    <span>Tax (per item)</span>
                                     <span>PKR {tax.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                 </div>
                                 <div className="flex justify-between font-bold text-lg">

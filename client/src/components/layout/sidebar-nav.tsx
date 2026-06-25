@@ -119,6 +119,7 @@ const navItems: NavItemGroup[] = [
   {
     title: 'Sales',
     items: [
+      { title: 'Sales', href: '/sales', icon: ShoppingCart, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
       { title: 'Invoices', href: '/sales/invoices', icon: Receipt, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
       { title: 'Payments', href: '/sales/payments', icon: HandCoins, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
       { title: 'Installment Plans', href: '/sales/installment-plans', icon: FileCog, allowedRoles: ['admin', 'manager'] },
