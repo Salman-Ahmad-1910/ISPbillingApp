@@ -1,15 +1,14 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Loader2 } from 'lucide-react';
 import type { Product } from '@/lib/types';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
-import { Loader2 } from 'lucide-react';
 
 import { z } from 'zod';
 import { productSchema } from '@/lib/schemas';
@@ -46,6 +45,9 @@ export function ClientPage({ data }: ClientPageProps) {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProduct, setUploadProduct] = useState<Product | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   // Advanced pagination state
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -161,7 +163,33 @@ export function ClientPage({ data }: ClientPageProps) {
     setIsDeleteDialogOpen(true);
   };
 
-  const columns = getColumns({ onEdit: handleEdit, onDelete: openDeleteDialog });
+  const handleUploadImage = (product: Product) => {
+    setUploadProduct(product);
+    fileRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !uploadProduct) return;
+    setIsUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('image', file);
+      await api.post(`/upload/product-image/${uploadProduct.id}?companyId=${companyId}`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      toast({ title: 'Success', description: 'Image uploaded successfully.' });
+      queryClient.invalidateQueries({ queryKey: ['inventory/products', companyId] });
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Error', description: err.response?.data?.message || 'Failed to upload image' });
+    } finally {
+      setIsUploading(false);
+      setUploadProduct(null);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  const columns = getColumns({ onEdit: handleEdit, onDelete: openDeleteDialog, onUploadImage: handleUploadImage });
 
   return (
     <>
@@ -287,12 +315,21 @@ export function ClientPage({ data }: ClientPageProps) {
                 </div>
             </div>
 
+      <input ref={fileRef} type="file" accept="image/png,image/jpeg" onChange={handleFileChange} className="hidden" />
+
       <DeleteAlertDialog
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         onDelete={handleDelete}
         itemName={selectedProduct?.name}
       />
+
+      {isUploading && (
+        <div className="fixed bottom-4 right-4 flex items-center gap-2 rounded-md bg-background border px-4 py-2 shadow-lg">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span className="text-sm">Uploading image...</span>
+        </div>
+      )}
     </>
   );
 }

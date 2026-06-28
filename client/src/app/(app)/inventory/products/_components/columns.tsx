@@ -3,7 +3,7 @@
 import { type ColumnDef } from '@tanstack/react-table';
 import type { Product } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -17,9 +17,10 @@ import {
 interface ProductColumnsProps {
   onEdit: (product: Product) => void;
   onDelete: (product: Product) => void;
+  onUploadImage: (product: Product) => void;
 }
 
-export const columns = ({ onEdit, onDelete }: ProductColumnsProps): ColumnDef<Product>[] => [
+export const columns = ({ onEdit, onDelete, onUploadImage }: ProductColumnsProps): ColumnDef<Product>[] => [
   {
     accessorKey: 'id',
     header: 'ID',
@@ -87,6 +88,10 @@ export const columns = ({ onEdit, onDelete }: ProductColumnsProps): ColumnDef<Pr
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuItem onClick={() => onEdit(product)}>Edit product</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onUploadImage(product)}>
+                <ImageIcon className="mr-2 h-4 w-4" />
+                Upload image
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive" onClick={() => onDelete(product)}>
                 Delete product

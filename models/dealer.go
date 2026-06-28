@@ -21,12 +21,23 @@ type Dealer struct {
 	Name           string     `gorm:"type:varchar(255);not null" json:"name"`
 	Phone          string     `gorm:"type:varchar(20);not null" json:"phone"`
 	Email          string     `gorm:"type:varchar(255);not null" json:"email"`
-	Password       string     `gorm:"type:varchar(255);not null" json:"-"` // Hidden in JSON
+	Password       string     `gorm:"type:varchar(255);not null" json:"password,omitempty"` // Hidden in JSON output via MarshalJSON
 	Cnic           string     `gorm:"type:varchar(20);not null" json:"cnic"`
 	CommissionRate float64    `gorm:"type:decimal(5,2);not null" json:"commissionRate"`
 	WalletBalance  float64    `gorm:"type:decimal(10,2);default:0" json:"walletBalance"`
 	FranchiseID    *uuid.UUID `gorm:"type:uuid" json:"franchiseId"`
 	ParentDealerID *uuid.UUID `gorm:"type:uuid" json:"parentDealerId"`
+}
+
+// MarshalJSON hides the password in JSON output
+func (d Dealer) MarshalJSON() ([]byte, error) {
+	type Alias Dealer
+	return json.Marshal(&struct {
+		Password string `json:"-"`
+		*Alias
+	}{
+		Alias: (*Alias)(&d),
+	})
 }
 
 // UnmarshalJSON custom unmarshaling for Dealer to handle "none" parentDealerId

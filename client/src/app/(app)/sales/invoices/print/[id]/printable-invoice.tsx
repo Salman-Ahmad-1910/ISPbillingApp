@@ -272,14 +272,14 @@ export function PrintableInvoice({ invoice, company, subscriber, size }: Printab
               <td className="border border-gray-300 p-3 text-right">PKR {subtotal.toLocaleString()}</td>
               <td className="border border-gray-300 p-3 text-right">PKR {subtotal.toLocaleString()}</td>
             </tr>
-            {enhancedInvoice.invoice.itemizedCharges?.installationCharges && (
+            {enhancedInvoice.invoice.itemizedCharges?.installationCharges ? (
               <tr>
                 <td className="border border-gray-300 p-3">Installation Charges (One-time)</td>
                 <td className="border border-gray-300 p-3 text-center">1</td>
                 <td className="border border-gray-300 p-3 text-right">PKR {enhancedInvoice.invoice.itemizedCharges.installationCharges.toLocaleString()}</td>
                 <td className="border border-gray-300 p-3 text-right">PKR {enhancedInvoice.invoice.itemizedCharges.installationCharges.toLocaleString()}</td>
               </tr>
-            )}
+            ) : null}
             {enhancedInvoice.invoice.itemizedCharges?.addOnServices?.map((service, index) => (
               <tr key={index}>
                 <td className="border border-gray-300 p-3">{service.name}</td>
@@ -288,14 +288,14 @@ export function PrintableInvoice({ invoice, company, subscriber, size }: Printab
                 <td className="border border-gray-300 p-3 text-right">PKR {service.amount.toLocaleString()}</td>
               </tr>
             ))}
-            {enhancedInvoice.invoice.itemizedCharges?.discounts && enhancedInvoice.invoice.itemizedCharges.discounts > 0 && (
+            {enhancedInvoice.invoice.itemizedCharges?.discounts && enhancedInvoice.invoice.itemizedCharges.discounts > 0 ? (
               <tr>
                 <td className="border border-gray-300 p-3">Discount/Credit</td>
                 <td className="border border-gray-300 p-3 text-center">1</td>
                 <td className="border border-gray-300 p-3 text-right">-PKR {enhancedInvoice.invoice.itemizedCharges.discounts.toLocaleString()}</td>
                 <td className="border border-gray-300 p-3 text-right">-PKR {enhancedInvoice.invoice.itemizedCharges.discounts.toLocaleString()}</td>
               </tr>
-            )}
+            ) : null}
           </tbody>
         </table>
       </section>
@@ -486,12 +486,12 @@ export function PrintableInvoice({ invoice, company, subscriber, size }: Printab
           <span>{enhancedInvoice.subscriber.packageName} ({new Date().toLocaleDateString('en-GB', { month: 'short' }).toUpperCase()})</span>
           <span>{subtotal.toLocaleString()}</span>
         </div>
-        {enhancedInvoice.invoice.itemizedCharges?.installationCharges && (
+        {enhancedInvoice.invoice.itemizedCharges?.installationCharges ? (
           <div className="flex justify-between">
             <span>Installation</span>
             <span>{enhancedInvoice.invoice.itemizedCharges.installationCharges.toLocaleString()}</span>
           </div>
-        )}
+        ) : null}
         {enhancedInvoice.invoice.itemizedCharges?.addOnServices?.map((service, index) => (
           <div key={index} className="flex justify-between">
             <span>{service.name}</span>

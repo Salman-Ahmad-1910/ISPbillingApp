@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -13,6 +14,12 @@ import {
   SidebarGroupLabel,
   SidebarFooter,
 } from '@/components/ui/sidebar';
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from '@/components/ui/collapsible';
+import { ChevronRight } from 'lucide-react';
 import {
   LayoutDashboard,
   Users,
@@ -220,10 +227,62 @@ function filterNavItems(items: NavItem[], hasPermission: (perm: string) => boole
   });
 }
 
+function NavCollapsibleGroup({
+  group,
+  pathname,
+}: {
+  group: NavItemGroup;
+  pathname: string;
+}) {
+  // Auto-expand if the active route is one of the group's items, so the
+  // current page is never hidden. State lets the user collapse it afterwards.
+  const groupContainsActiveRoute = group.items.some(
+    (item) => pathname === item.href,
+  );
+  const [open, setOpen] = useState(groupContainsActiveRoute);
+
+  return (
+    <SidebarGroup>
+      <Collapsible open={open} onOpenChange={setOpen} className="group/collapsible">
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="flex w-full items-center justify-between px-2 py-1.5 text-xs font-medium uppercase text-sidebar-foreground/70 outline-none transition-colors hover:text-sidebar-foreground"
+            aria-expanded={open}
+          >
+            <span>{group.title}</span>
+            <ChevronRight
+              className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
+            />
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <SidebarMenu>
+            {group.items.map((item) => (
+              <SidebarMenuItem key={item.title}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname === item.href}
+                  tooltip={{ children: item.title }}
+                >
+                  <Link href={item.href}>
+                    <item.icon />
+                    <span>{item.title}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        </CollapsibleContent>
+      </Collapsible>
+    </SidebarGroup>
+  );
+}
+
 export function SidebarNav() {
   const pathname = usePathname();
   const { hasPermission, hasMinimumRole, userRole, user } = useUserPermissions();
-
+  
   // Show loading state while user data is being fetched
   if (!user) {
     return (
@@ -272,27 +331,39 @@ export function SidebarNav() {
         </div>
       </SidebarHeader>
       <SidebarContent>
-        {filteredNavItems.map((group) => (
-          <SidebarGroup key={group.title}>
-            <SidebarGroupLabel>{group.title}</SidebarGroupLabel>
-            <SidebarMenu>
-              {group.items.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={pathname === item.href}
-                    tooltip={{ children: item.title }}
-                  >
-                    <Link href={item.href}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroup>
-        ))}
+        {filteredNavItems.map((group) => {
+          // If the group is 'Main', render it as a standard static group instead of a collapsible dropdown
+          if (group.title === 'Main') {
+            return (
+              <SidebarGroup key={group.title}>
+                <div className="px-2 py-1.5 text-xs font-medium uppercase text-sidebar-foreground/70">
+                  {group.title}
+                </div>
+                <SidebarMenu>
+                  {group.items.map((item) => (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={pathname === item.href}
+                        tooltip={{ children: item.title }}
+                      >
+                        <Link href={item.href}>
+                          <item.icon />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroup>
+            );
+          }
+
+          // Render all other groups with the collapsible dropdown functionality
+          return (
+            <NavCollapsibleGroup key={group.title} group={group} pathname={pathname} />
+          );
+        })}
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
