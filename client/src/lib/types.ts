@@ -19,7 +19,7 @@ export type Company = {
 // Basic Nav
 export type NavItem = {
   title: string;
-  href: string;
+  href?: string;
   icon: LucideIcon;
   label?: string;
   items?: NavItem[]; // For nested menus

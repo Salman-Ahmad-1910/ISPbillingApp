@@ -10,8 +10,10 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarFooter,
 } from '@/components/ui/sidebar';
 import {
@@ -57,12 +59,13 @@ import {
   UserSearch,
   Map,
   ClipboardPen,
+  FolderClosed,
+  TriangleAlert,
 } from 'lucide-react';
 import type { NavItem, NavItemGroup } from '@/lib/types';
 import { CircleDollarSign as AppIcon } from 'lucide-react';
 import { LogoutButton } from '@/components/shared/logout-button';
 import { useUserPermissions } from '@/hooks/usePermissions';
-import { PERMISSIONS } from '@/lib/permissions';
 
 const navItems: NavItemGroup[] = [
   {
@@ -89,14 +92,30 @@ const navItems: NavItemGroup[] = [
     ],
   },
   {
-    title: 'Franchise & Dealer',
+    title: 'Franchise',
     items: [
       { title: 'Franchise Dashboard', href: '/franchise/dashboard', icon: LayoutDashboard, allowedRoles: ['admin', 'manager'] },
       { title: 'My Dealers', href: '/franchise/my-dealers', icon: Users, allowedRoles: ['admin', 'manager'] },
-      { title: 'Dealer Dashboard', href: '/dealer/dashboard', icon: LayoutDashboard, allowedRoles: ['admin', 'manager', 'dealer'] },
-      { title: 'Sub-Dealers', href: '/dealer/sub-dealers', icon: Users, allowedRoles: ['admin', 'manager', 'dealer'] },
       { title: 'Bill Creator', href: '/dealer/bill-creator', icon: ClipboardPen, allowedRoles: ['admin', 'manager', 'dealer'] },
       { title: 'Collections Today', href: '/dealer/collections-today', icon: Wallet, allowedRoles: ['admin', 'manager', 'dealer'] },
+    ]
+  },
+  {
+    title: 'Dealer',
+    items: [
+      { title: 'Dealer Dashboard', href: '/dealer/dashboard', icon: LayoutDashboard, allowedRoles: ['admin', 'manager', 'dealer'] },
+      { title: 'Sub-Dealers', href: '/dealer/sub-dealers', icon: Users, allowedRoles: ['admin', 'manager', 'dealer'] },
+      {
+        title: 'Reports',
+        icon: FolderClosed,
+        allowedRoles: ['admin', 'manager', 'dealer'],
+        items: [
+          { title: 'Dealers Collections', href: '/dealer/reports/collections', icon: Wallet, allowedRoles: ['admin', 'manager', 'dealer'] },
+          { title: 'Dealers Defaulters', href: '/dealer/reports/defaulters', icon: TriangleAlert, allowedRoles: ['admin', 'manager', 'dealer'] },
+          { title: 'New Dealers List', href: '/dealer/reports/new-dealers', icon: UserPlus, allowedRoles: ['admin', 'manager', 'dealer'] },
+          { title: 'Dealers Invoice List', href: '/dealer/reports/invoices', icon: FileText, allowedRoles: ['admin', 'manager', 'dealer'] },
+        ]
+      },
     ]
   },
   {
@@ -194,61 +213,126 @@ const navItems: NavItemGroup[] = [
 ];
 
 function filterNavItems(items: NavItem[], hasPermission: (perm: string) => boolean, hasMinimumRole: (role: string) => boolean, userRole: string): NavItem[] {
-  return items.filter(item => {
-    // Hide items marked as hidden
-    if (item.hidden) {
-      return false;
-    }
-    
-    // Check if user has allowed role for this item
-    if (item.allowedRoles && !item.allowedRoles.includes(userRole)) {
-      return false;
-    }
-    
-    // Legacy support for minimumRole
-    if (item.minimumRole) {
-      if (item.minimumRole === 'admin') {
-        if (!hasMinimumRole('admin')) {
-          return false;
-        }
-      } else {
-        if (!hasMinimumRole(item.minimumRole)) {
-          return false;
+  return items
+    .filter(item => {
+      if (item.hidden) {
+        return false;
+      }
+      if (item.allowedRoles && !item.allowedRoles.includes(userRole)) {
+        return false;
+      }
+      if (item.minimumRole) {
+        if (item.minimumRole === 'admin') {
+          if (!hasMinimumRole('admin')) {
+            return false;
+          }
+        } else {
+          if (!hasMinimumRole(item.minimumRole)) {
+            return false;
+          }
         }
       }
-    }
-    
-    // Legacy support for permission
-    if (item.permission && !hasPermission(item.permission)) {
-      return false;
-    }
-    
-    return true;
-  });
+      if (item.permission && !hasPermission(item.permission)) {
+        return false;
+      }
+      return true;
+    })
+    .map(item => {
+      if (item.items) {
+        return {
+          ...item,
+          items: filterNavItems(item.items, hasPermission, hasMinimumRole, userRole),
+        };
+      }
+      return item;
+    })
+    .filter(item => {
+      if (item.items && item.items.length === 0 && !item.href) {
+        return false;
+      }
+      return true;
+    });
+}
+
+function NavTreeItem({
+  item,
+  pathname,
+}: {
+  item: NavItem;
+  pathname: string;
+}) {
+  const hasSubItems = item.items && item.items.length > 0;
+
+  if (hasSubItems) {
+    const [open, setOpen] = useState(false);
+
+    return (
+      <SidebarMenuItem>
+        <Collapsible open={open} onOpenChange={setOpen} className="group/tree">
+          <CollapsibleTrigger asChild>
+            <SidebarMenuButton className="w-full justify-start gap-2">
+              <item.icon className="h-4 w-4 shrink-0" />
+              <span className="flex-1 text-left">{item.title}</span>
+              <ChevronRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 group-data-[state=open]/tree:rotate-90" />
+            </SidebarMenuButton>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <SidebarMenuSub>
+              {item.items!.map((child) => (
+                <SidebarMenuSubItem key={child.title}>
+                  <SidebarMenuSubButton
+                    asChild
+                    isActive={pathname === child.href}
+                  >
+                    <Link href={child.href!}>
+                      <child.icon />
+                      <span>{child.title}</span>
+                    </Link>
+                  </SidebarMenuSubButton>
+                </SidebarMenuSubItem>
+              ))}
+            </SidebarMenuSub>
+          </CollapsibleContent>
+        </Collapsible>
+      </SidebarMenuItem>
+    );
+  }
+
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        asChild
+        isActive={pathname === item.href}
+        tooltip={{ children: item.title }}
+      >
+        <Link href={item.href!}>
+          <item.icon />
+          <span>{item.title}</span>
+        </Link>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
 }
 
 function NavCollapsibleGroup({
   group,
   pathname,
+  openGroup,
+  onOpenChange,
 }: {
   group: NavItemGroup;
   pathname: string;
+  openGroup: string | null;
+  onOpenChange: (title: string | null) => void;
 }) {
-  // Auto-expand if the active route is one of the group's items, so the
-  // current page is never hidden. State lets the user collapse it afterwards.
-  const groupContainsActiveRoute = group.items.some(
-    (item) => pathname === item.href,
-  );
-  const [open, setOpen] = useState(groupContainsActiveRoute);
-
   return (
     <SidebarGroup>
-      <Collapsible open={open} onOpenChange={setOpen} className="group/collapsible">
+      <Collapsible open={openGroup === group.title} onOpenChange={(val) => onOpenChange(val ? group.title : null)} className="group/collapsible">
         <CollapsibleTrigger asChild>
           <button
             type="button"
             className="flex w-full items-center justify-between px-2 py-1.5 text-xs font-medium uppercase text-sidebar-foreground/70 outline-none transition-colors hover:text-sidebar-foreground"
-            aria-expanded={open}
+            aria-expanded={openGroup === group.title}
           >
             <span>{group.title}</span>
             <ChevronRight
@@ -259,18 +343,7 @@ function NavCollapsibleGroup({
         <CollapsibleContent>
           <SidebarMenu>
             {group.items.map((item) => (
-              <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname === item.href}
-                  tooltip={{ children: item.title }}
-                >
-                  <Link href={item.href}>
-                    <item.icon />
-                    <span>{item.title}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              <NavTreeItem key={item.title + String(openGroup === group.title)} item={item} pathname={pathname} />
             ))}
           </SidebarMenu>
         </CollapsibleContent>
@@ -282,8 +355,10 @@ function NavCollapsibleGroup({
 export function SidebarNav() {
   const pathname = usePathname();
   const { hasPermission, hasMinimumRole, userRole, user } = useUserPermissions();
-  
-  // Show loading state while user data is being fetched
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
+
+
+
   if (!user) {
     return (
       <Sidebar>
@@ -304,21 +379,10 @@ export function SidebarNav() {
     );
   }
 
-  // Debug logs to see current user and role
-  console.log('=== DEBUG INFO ===');
-  console.log('Current user:', user);
-  console.log('User role:', userRole);
-  console.log('Is admin?', hasMinimumRole('admin'));
-  console.log('Has dashboard permission?', hasPermission('dashboard.view'));
-  console.log('==================');
-
   const filteredNavItems = navItems.map(group => ({
     ...group,
     items: filterNavItems(group.items, hasPermission, hasMinimumRole, userRole)
   })).filter(group => group.items.length > 0);
-
-  // Debug: Show what navigation items are being filtered
-  console.log('Filtered navigation items:', JSON.stringify(filteredNavItems, null, 2));
 
   return (
     <Sidebar>
@@ -332,7 +396,6 @@ export function SidebarNav() {
       </SidebarHeader>
       <SidebarContent>
         {filteredNavItems.map((group) => {
-          // If the group is 'Main', render it as a standard static group instead of a collapsible dropdown
           if (group.title === 'Main') {
             return (
               <SidebarGroup key={group.title}>
@@ -344,10 +407,10 @@ export function SidebarNav() {
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton
                         asChild
-                        isActive={pathname === item.href}
+                        isActive={!!item.href && pathname === item.href}
                         tooltip={{ children: item.title }}
                       >
-                        <Link href={item.href}>
+                        <Link href={item.href!}>
                           <item.icon />
                           <span>{item.title}</span>
                         </Link>
@@ -359,9 +422,8 @@ export function SidebarNav() {
             );
           }
 
-          // Render all other groups with the collapsible dropdown functionality
           return (
-            <NavCollapsibleGroup key={group.title} group={group} pathname={pathname} />
+            <NavCollapsibleGroup key={group.title} group={group} pathname={pathname} openGroup={openGroup} onOpenChange={setOpenGroup} />
           );
         })}
       </SidebarContent>

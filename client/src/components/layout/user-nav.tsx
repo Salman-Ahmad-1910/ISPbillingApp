@@ -13,14 +13,17 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useTheme } from 'next-themes';
 import { LogoutButton } from '@/components/shared/logout-button';
 import { useUser } from '@/hooks/use-user';
 import { useCompany } from '@/context/company-context';
 import api from '@/lib/api';
+import { Sun, Moon } from 'lucide-react';
 
 export function UserNav() {
   const { user } = useUser();
   const { companyId, companyName } = useCompany(); // Get current selected company from context
+  const { theme, setTheme } = useTheme();
 
 
   const imageUrl = companyId ? `${api?.defaults?.baseURL}/uploads/company_images/${companyId}` : null;
@@ -57,7 +60,7 @@ export function UserNav() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-9 w-9">
-            <AvatarImage src={imageUrl} alt={user?.name || 'user'} data-ai-hint="profile picture" />
+            <AvatarImage src={imageUrl || undefined} alt={user?.name || 'user'} data-ai-hint="profile picture" />
             <AvatarFallback>{user?.name?.charAt(0) || 'U'}</AvatarFallback>
           </Avatar>
         </Button>
@@ -89,6 +92,14 @@ export function UserNav() {
               Settings
             </DropdownMenuItem>
           </Link> */}
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+            <Sun className="mr-2 h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+            <Moon className="mr-2 h-4 w-4 absolute rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+          </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <LogoutButton>

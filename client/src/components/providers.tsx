@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
+import { ThemeProvider } from 'next-themes';
 import { CompanyProvider } from '@/context/CompanyContext';
 
 export default function Providers({ children }: { children: React.ReactNode }) {
@@ -20,9 +21,11 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 
     return (
         <QueryClientProvider client={queryClient}>
-            <CompanyProvider>
-                {children}
-            </CompanyProvider>
+            <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
+                <CompanyProvider>
+                    {children}
+                </CompanyProvider>
+            </ThemeProvider>
         </QueryClientProvider>
     );
 }
