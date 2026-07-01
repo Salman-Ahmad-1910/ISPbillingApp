@@ -46,6 +46,6 @@ type VendorInvoiceItem struct {
 	ProductName string    `gorm:"type:varchar(255)" json:"productName"`
 	Quantity    int       `gorm:"not null" json:"quantity"`
 	UnitPrice   float64   `gorm:"type:decimal(10,2);not null" json:"unitPrice"`
-	UnitType    string    `gorm:"type:unit_type_enum;not null" json:"unitType"`
+	UnitType    string    `gorm:"type:varchar(50);not null" json:"unitType"`
 	Subtotal    float64   `gorm:"type:decimal(10,2);not null" json:"subtotal"`
 }

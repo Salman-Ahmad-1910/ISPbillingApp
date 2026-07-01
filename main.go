@@ -38,6 +38,10 @@ func main() {
 	// Init Router
 	r := gin.Default()
 
+	// Serve uploaded files (images) at /uploads/ so the stored DB paths
+	// (e.g. "/uploads/product_images/uuid.png") resolve without the /api/v1 prefix.
+	r.Static("/uploads", "./uploads")
+
 	routes.SetupRoutes(r)
 
 	r.GET("/health", func(c *gin.Context) {

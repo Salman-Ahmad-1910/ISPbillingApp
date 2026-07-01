@@ -41,6 +41,12 @@ func RunMigrations() {
 	// Create custom enum types manually before auto-migration
 	createEnumTypes()
 
+	// Convert unit_type columns from enum to varchar
+	log.Println("Converting unit_type columns from enum to varchar...")
+	DB.Exec(`ALTER TABLE products ALTER COLUMN unit_type TYPE varchar(50)`)
+	DB.Exec(`ALTER TABLE vendor_invoice_items ALTER COLUMN unit_type TYPE varchar(50)`)
+	log.Println("unit_type columns converted")
+
 	err := DB.AutoMigrate(
 		&models.Company{},
 		&models.User{},
@@ -91,6 +97,12 @@ func RunMigrations() {
 		&models.AlertTemplate{},
 		&models.SystemConfig{},
 		&models.SupportTicket{},
+		&models.Brand{},
+		&models.UnitType{},
+		&models.ProductType{},
+		&models.InventoryStatus{},
+		&models.Purchase{},
+		&models.PurchaseItem{},
 	)
 
 	if err != nil {
@@ -98,6 +110,47 @@ func RunMigrations() {
 	}
 
 	log.Println("Migration completed successfully")
+
+	// Seed initial data
+	seedInitialData()
+}
+
+func seedInitialData() {
+	log.Println("Seeding initial data...")
+
+	// Seed unit types
+	var unitTypeCount int64
+	DB.Model(&models.UnitType{}).Count(&unitTypeCount)
+	if unitTypeCount == 0 {
+		unitTypes := []models.UnitType{
+			{Name: "piece", Label: "Per Piece"},
+			{Name: "meter", Label: "Per Meter"},
+			{Name: "kilogram", Label: "Per Kilogram"},
+			{Name: "liter", Label: "Per Liter"},
+		}
+		for _, ut := range unitTypes {
+			DB.Where("name = ?", ut.Name).FirstOrCreate(&ut)
+		}
+		log.Println("✓ Unit types seeded")
+	}
+
+	// Seed inventory statuses
+	var statusCount int64
+	DB.Model(&models.InventoryStatus{}).Count(&statusCount)
+	if statusCount == 0 {
+		statuses := []models.InventoryStatus{
+			{Name: "in_stock", Label: "In Stock", Color: "#22c55e", Description: "Item is available in stock"},
+			{Name: "assigned", Label: "Assigned", Color: "#3b82f6", Description: "Item assigned to a subscriber"},
+			{Name: "damaged", Label: "Damaged", Color: "#ef4444", Description: "Item is damaged or defective"},
+			{Name: "returned", Label: "Returned", Color: "#f59e0b", Description: "Item has been returned"},
+		}
+		for _, s := range statuses {
+			DB.Where("name = ?", s.Name).FirstOrCreate(&s)
+		}
+		log.Println("✓ Inventory statuses seeded")
+	}
+
+	log.Println("Initial data seeding completed")
 }
 
 func createEnumTypes() {

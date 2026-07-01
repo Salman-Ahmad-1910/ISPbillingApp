@@ -389,10 +389,18 @@ export type Product = {
   category: string;
   price: number;
   stock: number;
-  unitType: 'piece' | 'meter';
+  unitType: string;
   taxPercent?: number; // per-item tax %, default 0
   image?: string; // optional product image path
   companyId: string;
+  barcode?: string;
+  brandId?: string;
+  brandName?: string;
+  productTypeId?: string;
+  productTypeName?: string;
+  purchasePrice?: number;
+  salePrice?: number;
+  discount?: number;
 };
 
 export type Vendor = {
@@ -491,6 +499,78 @@ export type SystemConfig = {
   enable2fa: boolean;
   sessionTimeout: number;
   companyId: string;
+};
+
+// Inventory sub-types
+export type Brand = {
+  id: string;
+  name: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+  companyId: string;
+};
+
+export type UnitType = {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  companyId: string;
+};
+
+export type ProductType = {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  companyId: string;
+};
+
+export type InventoryStatus = {
+  id: string;
+  name: string;
+  label?: string;
+  color?: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+  companyId: string;
+};
+
+export type Purchase = {
+  id: string;
+  vendorId: string;
+  vendorName: string;
+  purchaseNumber: string;
+  purchaseDate: string;
+  billId: string;
+  batch: string;
+  totalAmount: number;
+  remainingAmount: number;
+  discount: number;
+  salesTax: number;
+  wthTax: number;
+  status: 'paid' | 'unpaid' | 'partial';
+  items: PurchaseItem[];
+  createdAt: string;
+  updatedAt: string;
+  companyId: string;
+};
+
+export type PurchaseItem = {
+  id: string;
+  purchaseId: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  purchasePrice: number;
+  sellingPrice: number;
+  unitType: string;
+  focNormal: string;
+  subtotal: number;
+  expiryDate?: string;
+  serialNumber?: string;
 };
 
 export type SupportTicket = {

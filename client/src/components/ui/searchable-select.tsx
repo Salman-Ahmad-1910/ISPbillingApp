@@ -19,6 +19,7 @@ interface SearchableSelectProps {
   searchPlaceholder?: string;
   label?: string;
   className?: string;
+  allowClear?: boolean;
 }
 
 export function SearchableSelect({
@@ -29,6 +30,7 @@ export function SearchableSelect({
   searchPlaceholder = "Type to search...",
   label,
   className,
+  allowClear = true,
 }: SearchableSelectProps) {
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -83,7 +85,7 @@ export function SearchableSelect({
           )}
         </SelectContent>
       </Select>
-      {value && (
+      {allowClear && value && (
         <Button
           variant="outline"
           size="sm"

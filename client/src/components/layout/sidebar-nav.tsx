@@ -61,6 +61,11 @@ import {
   ClipboardPen,
   FolderClosed,
   TriangleAlert,
+  Tag,
+  Ruler,
+  Shapes,
+  Activity,
+  ArrowLeftRight,
 } from 'lucide-react';
 import type { NavItem, NavItemGroup } from '@/lib/types';
 import { CircleDollarSign as AppIcon } from 'lucide-react';
@@ -69,13 +74,13 @@ import { useUserPermissions } from '@/hooks/usePermissions';
 
 const navItems: NavItemGroup[] = [
   {
-    title: 'Main',
+    title: 'Dashboard',
     items: [
       { title: 'Dashboard', href: '/', icon: LayoutDashboard },
     ],
   },
   {
-    title: 'Network Operations',
+    title: 'Network',
     items: [
       { title: 'Areas', href: '/network/areas', icon: Network, allowedRoles: ['admin', 'manager'] },
       { title: 'POPs', href: '/network/pop', icon: TowerControl, allowedRoles: ['admin', 'manager'] },
@@ -84,62 +89,13 @@ const navItems: NavItemGroup[] = [
     ],
   },
   {
-    title: 'Subscriber Management',
+    title: 'Customer Management',
     items: [
       { title: 'All Subscribers', href: '/subscribers/all', icon: Users, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
       { title: 'New Inquiries', href: '/subscribers/inquiries', icon: UserPlus, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
       { title: 'Corporate Clients', href: '/subscribers/corporate', icon: Building, allowedRoles: ['admin', 'manager'] },
-    ],
-  },
-  {
-    title: 'Franchise',
-    items: [
-      { title: 'Franchise Dashboard', href: '/franchise/dashboard', icon: LayoutDashboard, allowedRoles: ['admin', 'manager'] },
-      { title: 'My Dealers', href: '/franchise/my-dealers', icon: Users, allowedRoles: ['admin', 'manager'] },
-      { title: 'Bill Creator', href: '/dealer/bill-creator', icon: ClipboardPen, allowedRoles: ['admin', 'manager', 'dealer'] },
-      { title: 'Collections Today', href: '/dealer/collections-today', icon: Wallet, allowedRoles: ['admin', 'manager', 'dealer'] },
-    ]
-  },
-  {
-    title: 'Dealer',
-    items: [
-      { title: 'Dealer Dashboard', href: '/dealer/dashboard', icon: LayoutDashboard, allowedRoles: ['admin', 'manager', 'dealer'] },
-      { title: 'Sub-Dealers', href: '/dealer/sub-dealers', icon: Users, allowedRoles: ['admin', 'manager', 'dealer'] },
-      {
-        title: 'Reports',
-        icon: FolderClosed,
-        allowedRoles: ['admin', 'manager', 'dealer'],
-        items: [
-          { title: 'Dealers Collections', href: '/dealer/reports/collections', icon: Wallet, allowedRoles: ['admin', 'manager', 'dealer'] },
-          { title: 'Dealers Defaulters', href: '/dealer/reports/defaulters', icon: TriangleAlert, allowedRoles: ['admin', 'manager', 'dealer'] },
-          { title: 'New Dealers List', href: '/dealer/reports/new-dealers', icon: UserPlus, allowedRoles: ['admin', 'manager', 'dealer'] },
-          { title: 'Dealers Invoice List', href: '/dealer/reports/invoices', icon: FileText, allowedRoles: ['admin', 'manager', 'dealer'] },
-        ]
-      },
-    ]
-  },
-  {
-    title: 'Recovery',
-    items: [
-      { title: 'Recovery Dashboard', href: '/recovery/dashboard', icon: LayoutDashboard, allowedRoles: ['admin', 'manager', 'recovery_officer'] },
-      { title: 'My Collections', href: '/recovery/my-collections', icon: HandCoins, allowedRoles: ['admin', 'manager', 'recovery_officer'] },
-      { title: 'Assigned Area', href: '/recovery/assigned-area', icon: Map, allowedRoles: ['admin', 'manager', 'recovery_officer'] },
-      { title: 'Transactions', href: '/recovery/transactions', icon: FileClock, allowedRoles: ['admin', 'manager', 'recovery_officer'] },
-    ]
-  },
-  {
-    title: 'Billing & Recharge',
-    items: [
-      { title: 'Packages', href: '/billing/packages', icon: Receipt, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
-    ],
-  },
-  {
-    title: 'CRM',
-    items: [
-      { title: 'Customers', href: '/crm/customers', icon: Users, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
-      { title: 'Guarantors', href: '/crm/guarantors', icon: UserRound, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
-      { title: 'Vendors', href: '/vendors', icon: Building2, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
-      { title: 'Vendor Invoices', href: '/vendor-invoices', icon: FileText, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
+      { title: 'Customers', href: '/crm/customers', icon: UserRound, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
+      { title: 'Guarantors', href: '/crm/guarantors', icon: UserCheck, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
     ],
   },
   {
@@ -149,6 +105,39 @@ const navItems: NavItemGroup[] = [
       { title: 'Invoices', href: '/sales/invoices', icon: Receipt, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
       { title: 'Payments', href: '/sales/payments', icon: HandCoins, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
       { title: 'Installment Plans', href: '/sales/installment-plans', icon: FileCog, allowedRoles: ['admin', 'manager'] },
+      { title: 'Point of Sale', href: '/inventory/pos', icon: ShoppingCart, allowedRoles: ['admin', 'manager', 'dealer'] },
+    ],
+  },
+  {
+    title: 'Collections',
+    items: [
+      { title: 'Recovery Dashboard', href: '/recovery/dashboard', icon: LayoutDashboard, allowedRoles: ['admin', 'manager', 'recovery_officer'] },
+      { title: 'My Collections', href: '/recovery/my-collections', icon: HandCoins, allowedRoles: ['admin', 'manager', 'recovery_officer'] },
+      { title: 'Assigned Area', href: '/recovery/assigned-area', icon: Map, allowedRoles: ['admin', 'manager', 'recovery_officer'] },
+      { title: 'Transactions', href: '/recovery/transactions', icon: FileClock, allowedRoles: ['admin', 'manager', 'recovery_officer'] },
+      { title: 'Packages', href: '/billing/packages', icon: Receipt, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
+      { title: 'Bill Creator', href: '/dealer/bill-creator', icon: ClipboardPen, allowedRoles: ['admin', 'manager', 'dealer'] },
+      { title: 'Collections Today', href: '/dealer/collections-today', icon: Wallet, allowedRoles: ['admin', 'manager', 'dealer'] },
+    ],
+  },
+  {
+    title: 'Partners',
+    items: [
+      { title: 'Franchise Dashboard', href: '/franchise/dashboard', icon: LayoutDashboard, allowedRoles: ['admin', 'manager'] },
+      { title: 'My Dealers', href: '/franchise/my-dealers', icon: Users, allowedRoles: ['admin', 'manager'] },
+      { title: 'Dealer Dashboard', href: '/dealer/dashboard', icon: LayoutDashboard, allowedRoles: ['admin', 'manager', 'dealer'] },
+      { title: 'Sub-Dealers', href: '/dealer/sub-dealers', icon: Users, allowedRoles: ['admin', 'manager', 'dealer'] },
+      {
+        title: 'Reports',
+        icon: FolderClosed,
+        allowedRoles: ['admin', 'manager', 'dealer'],
+        items: [
+          { title: 'Collections', href: '/dealer/reports/collections', icon: Wallet, allowedRoles: ['admin', 'manager', 'dealer'] },
+          { title: 'Defaulters', href: '/dealer/reports/defaulters', icon: TriangleAlert, allowedRoles: ['admin', 'manager', 'dealer'] },
+          { title: 'New Dealers', href: '/dealer/reports/new-dealers', icon: UserPlus, allowedRoles: ['admin', 'manager', 'dealer'] },
+          { title: 'Invoices', href: '/dealer/reports/invoices', icon: FileText, allowedRoles: ['admin', 'manager', 'dealer'] },
+        ],
+      },
     ],
   },
   {
@@ -157,26 +146,33 @@ const navItems: NavItemGroup[] = [
       { title: 'Products', href: '/inventory/products', icon: Box, allowedRoles: ['admin', 'manager'] },
       { title: 'Plans', href: '/inventory/plans', icon: Receipt, allowedRoles: ['admin', 'manager'] },
       { title: 'Stock', href: '/inventory/stock', icon: Warehouse, allowedRoles: ['admin', 'manager'] },
-      { title: 'Point of Sale', href: '/inventory/pos', icon: ShoppingCart, allowedRoles: ['admin', 'manager', 'dealer'] },
-    ]
+      { title: 'Brands', href: '/inventory/brands', icon: Tag, allowedRoles: ['admin', 'manager'] },
+      { title: 'Unit Type', href: '/inventory/unit-types', icon: Ruler, allowedRoles: ['admin', 'manager'] },
+      { title: 'Product Type', href: '/inventory/product-types', icon: Shapes, allowedRoles: ['admin', 'manager'] },
+      { title: 'Inventory Status', href: '/inventory/statuses', icon: Activity, allowedRoles: ['admin', 'manager'] },
+      { title: 'Purchase', href: '/inventory/purchases', icon: ArrowLeftRight, allowedRoles: ['admin', 'manager'] },
+      { title: 'Vendors', href: '/inventory/vendors', icon: Building2, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
+      { title: 'Vendor Invoices', href: '/inventory/vendor-invoices', icon: FileText, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
+    ],
   },
   {
-    title: 'Accounts',
+    title: 'Finance',
     items: [
       { title: 'Customer Ledger', href: '/accounts/customer-ledger', icon: UserSearch, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
       { title: 'Cash/Bank Ledger', href: '/accounts/cash-bank-ledger', icon: Wallet, allowedRoles: ['admin', 'manager'] },
       { title: 'Expenses', href: '/accounts/expenses', icon: CircleDollarSign, allowedRoles: ['admin', 'manager'] },
-    ]
-  },
-  {
-    title: 'Support',
-    items: [
-      { title: 'Complaints', href: '/support/complaints', icon: Ticket, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
-      { title: 'Alerts', href: '/support/alerts', icon: BellRing, allowedRoles: ['admin', 'manager', 'staff'] },
     ],
   },
   {
-    title: 'HR & Staff',
+    title: 'Service Desk',
+    items: [
+      { title: 'Complaints', href: '/support/complaints', icon: Ticket, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
+      { title: 'Alerts', href: '/support/alerts', icon: BellRing, allowedRoles: ['admin', 'manager', 'staff'] },
+      { title: 'Support Tickets', href: '/admin/support-tickets', icon: Headphones, allowedRoles: ['admin', 'manager'] },
+    ],
+  },
+  {
+    title: 'Human Resources',
     items: [
       { title: 'Staff', href: '/hr/staff', icon: Briefcase, allowedRoles: ['admin', 'manager'] },
       { title: 'Attendance', href: '/hr/attendance', icon: Fingerprint, allowedRoles: ['admin', 'manager'] },
@@ -192,16 +188,30 @@ const navItems: NavItemGroup[] = [
       { title: 'Dealers', href: '/admin/dealers', icon: Handshake, allowedRoles: ['admin', 'manager'] },
       { title: 'Recovery Officers', href: '/admin/recovery-officers', icon: UserCheck, allowedRoles: ['admin', 'manager'] },
       { title: 'Users', href: '/admin/users', icon: Users, allowedRoles: ['admin', 'manager'] },
-      { title: 'Support Tickets', href: '/admin/support-tickets', icon: Headphones, allowedRoles: ['admin', 'manager'] },
-    ],
-  },
-  {
-    title: 'System',
-    items: [
       { title: 'Companies', href: '/admin/companies', icon: Building2, allowedRoles: ['admin'] },
       { title: 'Roles & Permissions', href: '/admin/roles', icon: ShieldCheck, allowedRoles: ['admin'] },
       { title: 'System Config', href: '/admin/settings', icon: Settings, allowedRoles: ['admin'] },
       { title: 'System Logs', href: '/admin/logs', icon: FileClock, allowedRoles: ['admin'] },
+    ],
+  },
+  {
+    title: 'Analytics',
+    items: [
+      { title: 'Reports', href: '/admin/reports', icon: AreaChart, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
+    ],
+  },
+  {
+    title: 'User Reports',
+    items: [
+      { title: 'User Collection', href: '/user-reports/collections', icon: Wallet, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
+      { title: 'Deactivate Users List', href: '/user-reports/deactivated-users', icon: UserSearch, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
+      { title: 'Package Wise List', href: '/user-reports/package-wise', icon: Box, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
+      { title: 'Promise Date Reports', href: '/user-reports/promise-dates', icon: FileClock, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
+      { title: 'Allocated Defaulters', href: '/user-reports/allocated-defaulters', icon: TriangleAlert, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
+      { title: 'Expiry Wise Defaulters', href: '/user-reports/expiry-defaulters', icon: BarChartBig, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
+      { title: 'Month Wise Defaulters', href: '/user-reports/month-defaulters', icon: FileText, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
+      { title: 'Monthly Collections', href: '/user-reports/monthly-collections', icon: HandCoins, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
+      { title: 'User Creator Summary', href: '/user-reports/creator-summary', icon: UserPlus, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
     ],
   },
   {
@@ -396,7 +406,7 @@ export function SidebarNav() {
       </SidebarHeader>
       <SidebarContent>
         {filteredNavItems.map((group) => {
-          if (group.title === 'Main') {
+          if (group.title === 'Dashboard') {
             return (
               <SidebarGroup key={group.title}>
                 <div className="px-2 py-1.5 text-xs font-medium uppercase text-sidebar-foreground/70">

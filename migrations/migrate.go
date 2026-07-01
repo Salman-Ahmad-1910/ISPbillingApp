@@ -57,6 +57,8 @@ func RunMigrations() {
 		&models.AlertTemplate{},
 		&models.SystemConfig{},
 		&models.SupportTicket{},
+		&models.Purchase{},
+		&models.PurchaseItem{},
 	)
 
 	if err != nil {

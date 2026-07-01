@@ -554,6 +554,22 @@ func SetupRoutes(r *gin.Engine) {
 			controllers.RegisterGenericCRUD[models.InventoryItem](inventory, "/items")
 			controllers.RegisterGenericCRUD[models.Product](inventory, "/products")
 			controllers.RegisterGenericCRUD[models.PricingPlan](inventory, "/plans")
+			controllers.RegisterGenericCRUD[models.Brand](inventory, "/brands")
+			controllers.RegisterGenericCRUD[models.UnitType](inventory, "/unit-types")
+			controllers.RegisterGenericCRUD[models.ProductType](inventory, "/product-types")
+			controllers.RegisterGenericCRUD[models.InventoryStatus](inventory, "/statuses")
+			controllers.RegisterGenericCRUD[models.Vendor](inventory, "/vendors")
+			inventory.GET("/vendor-invoices", controllers.GetVendorInvoices)
+			inventory.GET("/vendor-invoices/:id", controllers.GetVendorInvoiceByID)
+			inventory.POST("/vendor-invoices", controllers.CreateVendorInvoice)
+			inventory.PUT("/vendor-invoices/:id", controllers.UpdateVendorInvoice)
+			inventory.DELETE("/vendor-invoices/:id", controllers.DeleteVendorInvoice)
+			inventory.GET("/purchases", controllers.GetPurchases)
+			inventory.GET("/purchases/:id", controllers.GetPurchaseByID)
+			inventory.POST("/purchases", controllers.CreatePurchase)
+			inventory.PUT("/purchases/:id", controllers.UpdatePurchase)
+			inventory.DELETE("/purchases/:id", controllers.DeletePurchase)
+			inventory.GET("/purchased-products", controllers.GetPurchasedProducts)
 		}
 
 		// POS routes

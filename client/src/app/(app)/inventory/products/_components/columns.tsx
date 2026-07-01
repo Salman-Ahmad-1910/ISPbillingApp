@@ -2,8 +2,7 @@
 
 import { type ColumnDef } from '@tanstack/react-table';
 import type { Product } from '@/lib/types';
-import { Badge } from '@/components/ui/badge';
-import { MoreHorizontal, Image as ImageIcon } from 'lucide-react';
+import { MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -17,59 +16,54 @@ import {
 interface ProductColumnsProps {
   onEdit: (product: Product) => void;
   onDelete: (product: Product) => void;
-  onUploadImage: (product: Product) => void;
 }
 
-export const columns = ({ onEdit, onDelete, onUploadImage }: ProductColumnsProps): ColumnDef<Product>[] => [
+export const columns = ({ onEdit, onDelete }: ProductColumnsProps): ColumnDef<Product>[] => [
   {
-    accessorKey: 'id',
-    header: 'ID',
+    accessorKey: 'barcode',
+    header: 'Barcode',
     cell: ({ row }) => (
       <div className="text-xs font-mono text-muted-foreground">
-        {row.original.id}
+        {row.original.barcode || '-'}
       </div>
     ),
   },
   {
     accessorKey: 'name',
-    header: 'Name',
+    header: 'Product Name',
   },
   {
-    accessorKey: 'category',
-    header: 'Category',
-    cell: ({ row }) => <Badge variant="outline">{row.original.category}</Badge>,
+    accessorKey: 'productTypeName',
+    header: 'Product Type',
+    cell: ({ row }) => (
+      <div>{row.original.productTypeName || row.original.category || '-'}</div>
+    ),
   },
   {
-    accessorKey: 'unitType',
-    header: 'Unit Type',
+    accessorKey: 'purchasePrice',
+    header: () => <div className="text-right">Purchase Price</div>,
     cell: ({ row }) => {
-      const unitType = row.original.unitType;
-      return (
-        <Badge variant={unitType === 'piece' ? 'default' : 'secondary'}>
-          {unitType === 'piece' ? 'Per Piece' : 'Per Meter'}
-        </Badge>
-      );
-    },
-  },
-  {
-    accessorKey: 'price',
-    header: 'Price (PKR)',
-    cell: ({ row }) => {
-      const amount = parseFloat(row.getValue('price'));
+      const amount = row.original.purchasePrice || 0;
       const formatted = new Intl.NumberFormat('en-US').format(amount);
       return <div className="text-right font-medium">{formatted}</div>;
     },
   },
   {
-    accessorKey: 'stock',
-    header: 'Stock',
-     cell: ({ row }) => {
-      const stock = row.original.stock;
-      return (
-        <div className="text-center">
-            <Badge variant={stock > 10 ? 'default' : stock > 0 ? 'secondary' : 'destructive'} className={stock > 10 ? 'bg-green-600' : ''}>{stock > 0 ? `${stock} in stock` : 'Out of stock'}</Badge>
-        </div>
-      )
+    accessorKey: 'salePrice',
+    header: () => <div className="text-right">Sale Price</div>,
+    cell: ({ row }) => {
+      const amount = row.original.salePrice ?? row.original.price ?? 0;
+      const formatted = new Intl.NumberFormat('en-US').format(amount);
+      return <div className="text-right font-medium">{formatted}</div>;
+    },
+  },
+  {
+    accessorKey: 'discount',
+    header: () => <div className="text-right">Discount</div>,
+    cell: ({ row }) => {
+      const amount = row.original.discount || 0;
+      const formatted = new Intl.NumberFormat('en-US').format(amount);
+      return <div className="text-right font-medium">{formatted}</div>;
     },
   },
   {
@@ -88,10 +82,6 @@ export const columns = ({ onEdit, onDelete, onUploadImage }: ProductColumnsProps
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuItem onClick={() => onEdit(product)}>Edit product</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onUploadImage(product)}>
-                <ImageIcon className="mr-2 h-4 w-4" />
-                Upload image
-              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive" onClick={() => onDelete(product)}>
                 Delete product

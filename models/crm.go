@@ -27,13 +27,17 @@ type Guarantor struct {
 // Product - Point of Sale items / General Items
 type Product struct {
 	TenantModel
-	Name       string  `gorm:"type:varchar(255);not null" json:"name"`
-	Category   string  `gorm:"type:varchar(100);not null" json:"category"`
-	Price      float64 `gorm:"type:decimal(10,2);not null" json:"price"`
-	Stock      int     `gorm:"not null;default:0" json:"stock"`
-	UnitType   string  `gorm:"type:unit_type_enum;not null;default:'piece'" json:"unitType"`
-	TaxPercent float64 `gorm:"type:decimal(5,2);not null;default:0" json:"taxPercent"` // per-item tax %, default 0
-	Image      string  `gorm:"type:varchar(255)" json:"image"`                         // optional product image path/URL
+	Name          string  `gorm:"type:varchar(255);not null" json:"name"`
+	Category      string  `gorm:"type:varchar(100);not null" json:"category"`
+	Price         float64 `gorm:"type:decimal(10,2);not null" json:"price"`
+	Stock         int     `gorm:"not null;default:0" json:"stock"`
+	UnitType      string  `gorm:"type:varchar(50);not null;default:'piece'" json:"unitType"`
+	TaxPercent    float64 `gorm:"type:decimal(5,2);not null;default:0" json:"taxPercent"` // per-item tax %, default 0
+	Image         string  `gorm:"type:varchar(255)" json:"image"`                         // optional product image path/URL
+	Barcode       string  `gorm:"type:varchar(100)" json:"barcode"`
+	SalePrice     float64 `gorm:"type:decimal(10,2);not null;default:0" json:"salePrice"`
+	PurchasePrice float64 `gorm:"type:decimal(10,2);not null;default:0" json:"purchasePrice"`
+	Discount      float64 `gorm:"type:decimal(10,2);not null;default:0" json:"discount"`
 }
 
 // InstallmentPlan - Defined schedule for physical goods

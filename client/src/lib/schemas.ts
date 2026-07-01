@@ -57,12 +57,18 @@ export const expenseSchema = z.object({
 export const productSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1, 'Name is required'),
-  category: z.string().min(1, 'Category is required'),
+  category: z.string().optional().default(''),
   price: z.coerce.number().min(0, 'Price must be a positive number'),
   stock: z.coerce.number().min(0, 'Stock must be a positive number'),
-  unitType: z.enum(['piece', 'meter']).default('piece'),
+  unitType: z.string().default('piece'),
   taxPercent: z.coerce.number().min(0, 'Tax must be a positive number').default(0),
   image: z.string().optional(),
+  barcode: z.string().optional(),
+  brandId: z.string().optional(),
+  productTypeId: z.string().optional(),
+  purchasePrice: z.coerce.number().min(0).optional().default(0),
+  salePrice: z.coerce.number().min(0).optional().default(0),
+  discount: z.coerce.number().min(0).optional().default(0),
 });
 
 export const vendorSchema = z.object({
@@ -395,6 +401,60 @@ export const roleSchema = z.object({
   permissions: z.string().min(1, "Enter permissions, comma-separated"),
   companyId: z.string().optional(),
 });
+export const brandSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1, 'Brand name is required'),
+});
+
+export const unitTypeSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1, 'Unit type name is required'),
+});
+
+export const productTypeSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1, 'Product type name is required'),
+});
+
+export const inventoryStatusSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1, 'Status name is required'),
+  label: z.string().optional(),
+  color: z.string().optional(),
+  description: z.string().optional(),
+});
+
+export const purchaseItemSchema = z.object({
+  id: z.string().optional(),
+  productId: z.string().min(1, 'Product is required'),
+  productName: z.string().min(1, 'Product name is required'),
+  quantity: z.coerce.number().min(1, 'Quantity must be at least 1'),
+  purchasePrice: z.coerce.number().min(0, 'Purchase price must be positive'),
+  sellingPrice: z.coerce.number().min(0, 'Selling price must be positive'),
+  unitType: z.string().optional(),
+  focNormal: z.string().optional().default('normal'),
+  subtotal: z.coerce.number().min(0, 'Subtotal must be positive'),
+  expiryDate: z.string().optional(),
+  serialNumber: z.string().optional(),
+});
+
+export const purchaseSchema = z.object({
+  id: z.string().optional(),
+  vendorId: z.string().min(1, 'Vendor is required'),
+  vendorName: z.string().min(1, 'Vendor name is required'),
+  purchaseNumber: z.string().optional(),
+  purchaseDate: z.string().min(1, 'Purchase date is required'),
+  billId: z.string().optional(),
+  batch: z.string().optional(),
+  totalAmount: z.coerce.number().min(0, 'Total amount must be positive'),
+  remainingAmount: z.coerce.number().min(0).optional().default(0),
+  discount: z.coerce.number().min(0).optional().default(0),
+  salesTax: z.coerce.number().min(0).optional().default(0),
+  wthTax: z.coerce.number().min(0).optional().default(0),
+  status: z.enum(['paid', 'unpaid', 'partial']).optional().default('unpaid'),
+  items: z.array(purchaseItemSchema).min(1, 'At least one item is required'),
+});
+
 export const supportTicketSchema = z.object({
   id: z.string().optional(),
   subject: z.string().min(1, 'Subject is required'),
