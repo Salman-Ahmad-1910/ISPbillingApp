@@ -47,7 +47,11 @@ cd ..
 
 echo ""
 echo "Building Go binary..."
-go build -ldflags="$LDFLAGS" -o fintrack-erp .
+GO_CMD="go"
+if [ -x "/snap/go/current/bin/go" ]; then
+  GO_CMD="/snap/go/current/bin/go"
+fi
+$GO_CMD build -ldflags="$LDFLAGS" -o fintrack-erp .
 
 echo ""
 echo "========================================"
