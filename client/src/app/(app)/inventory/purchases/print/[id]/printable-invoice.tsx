@@ -1,7 +1,9 @@
 'use client';
 
 import type { Purchase, Company } from '@/lib/types';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { Button } from '@/components/ui/button';
+import { Printer, X } from 'lucide-react';
 
 interface PrintablePurchaseInvoiceProps {
   purchase: Purchase;
@@ -9,6 +11,8 @@ interface PrintablePurchaseInvoiceProps {
 }
 
 export function PrintablePurchaseInvoice({ purchase, company }: PrintablePurchaseInvoiceProps) {
+  const printContainerRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const printStyles = `
       @media print {
@@ -21,6 +25,7 @@ export function PrintablePurchaseInvoice({ purchase, company }: PrintablePurchas
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #ddd; }
         th { font-weight: bold; background-color: #f8f9fa; }
+        .no-print { display: none !important; }
       }
     `;
 
@@ -28,21 +33,20 @@ export function PrintablePurchaseInvoice({ purchase, company }: PrintablePurchas
     styleElement.textContent = printStyles;
     document.head.appendChild(styleElement);
 
-    const timer = setTimeout(() => {
-      window.print();
-      setTimeout(() => {
-        document.head.removeChild(styleElement);
-        window.close();
-      }, 100);
-    }, 500);
-
     return () => {
-      clearTimeout(timer);
       if (document.head.contains(styleElement)) {
         document.head.removeChild(styleElement);
       }
     };
   }, []);
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleClose = () => {
+    window.close();
+  };
 
   const subtotal = (purchase.items || []).reduce((sum, item) => sum + ((item.quantity || 0) * (item.purchasePrice || 0)), 0);
   const discount = purchase.discount || 0;
@@ -52,7 +56,21 @@ export function PrintablePurchaseInvoice({ purchase, company }: PrintablePurchas
   const remaining = purchase.remainingAmount ?? total;
 
   return (
-    <div className="print-container" style={{ fontFamily: 'Arial, sans-serif', fontSize: '14px', lineHeight: '1.4', color: '#333', padding: '20px' }}>
+    <>
+      <div className="no-print" style={{ position: 'sticky', top: 0, zIndex: 50, background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#111' }}>Purchase Invoice</h2>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <Button variant="default" onClick={handlePrint}>
+            <Printer className="mr-2 h-4 w-4" />
+            Print
+          </Button>
+          <Button variant="outline" onClick={handleClose}>
+            <X className="mr-2 h-4 w-4" />
+            Close
+          </Button>
+        </div>
+      </div>
+      <div ref={printContainerRef} className="print-container" style={{ fontFamily: 'Arial, sans-serif', fontSize: '14px', lineHeight: '1.4', color: '#333', padding: '20px' }}>
       {/* Header */}
       <div style={{ borderBottom: '2px solid #000', paddingBottom: '20px', marginBottom: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -216,5 +234,6 @@ export function PrintablePurchaseInvoice({ purchase, company }: PrintablePurchas
         </p>
       </div>
     </div>
+    </>
   );
 }

@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { Loader2 } from 'lucide-react';
 
-import { ClientPage } from './_components/client-page';
+import ClientPage from './_components/client-page';
 import { useCompany } from '@/context/company-context';
 
 

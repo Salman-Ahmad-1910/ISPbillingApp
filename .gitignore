@@ -1,3 +1,11 @@
 client/node_modules
 .env
 client/.env
+client/out
+
+frontend/
+
+certs/
+
+fintrack-erp
+fintrack-erp.exe
