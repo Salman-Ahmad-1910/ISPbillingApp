@@ -422,10 +422,8 @@ func DeletePurchase(c *gin.Context) {
 	})
 }
 
-// GetPurchasedProducts returns products that appear in purchase items (LEFT
-// JOIN so purchase-only products still appear even when the product record
-// is missing or soft-deleted). Used by the POS page so it only shows products
-// actually bought from vendors.
+// GetPurchasedProducts returns each purchase item as a separate product for POS.
+// No GROUP BY on product_id — every purchased line item appears individually.
 func GetPurchasedProducts(c *gin.Context) {
 	db := config.DB
 	companyID := c.MustGet("companyID").(uuid.UUID)
@@ -433,36 +431,22 @@ func GetPurchasedProducts(c *gin.Context) {
 	var products []models.PurchasedProduct
 	if err := db.Raw(`
 		SELECT
-			p.id,
-			p.name,
-			COALESCE(p.category, '')                        AS category,
-			COALESCE(p.price, 0)                            AS price,
-			COALESCE(p.stock, 0)                            AS stock,
-			COALESCE(p.unit_type, 'piece')                  AS unit_type,
-			COALESCE(p.tax_percent, 0)                      AS tax_percent,
-			p.image,
-			p.barcode,
-			COALESCE(p.sale_price, 0)                       AS sale_price,
-			COALESCE(p.purchase_price, 0)                   AS purchase_price,
-			COALESCE(p.discount, 0)                         AS discount,
-			p.company_id,
-			COALESCE(pi_sub.purchased_qty, 0)               AS purchased_qty
-		FROM products p
-		LEFT JOIN (
-			SELECT
-				product_id,
-				company_id,
-				SUM(quantity) AS purchased_qty
-			FROM purchase_items
-			WHERE company_id = ?
-			GROUP BY product_id, company_id
-		) pi_sub
-			ON pi_sub.product_id = p.id
-			AND pi_sub.company_id = p.company_id
-		WHERE p.company_id = ?
-			AND p.deleted_at IS NULL
-		ORDER BY p.name
-	`, companyID, companyID).Scan(&products).Error; err != nil {
+			pi.product_id                                 AS id,
+			pi.product_name                               AS name,
+			pi.selling_price                              AS price,
+			pi.quantity                                   AS stock,
+			pi.unit_type                                  AS unit_type,
+			CASE
+				WHEN pi.quantity * pi.selling_price > 0
+				THEN ROUND(pi.sale_tax / (pi.quantity * pi.selling_price) * 100, 2)
+				ELSE 0
+			END                                            AS tax_percent,
+			pi.purchase_price                             AS purchase_price
+		FROM purchase_items pi
+		WHERE pi.company_id = ?
+			AND pi.deleted_at IS NULL
+		ORDER BY pi.product_name
+	`, companyID).Scan(&products).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch purchased products", "details": err.Error()})
 		return
 	}

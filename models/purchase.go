@@ -64,10 +64,14 @@ type PurchaseItem struct {
 	SerialNumber  string    `gorm:"type:text" json:"serialNumber"`
 }
 
-// PurchasedProduct - Product enriched with total purchased quantity for POS display.
-// Returned by the purchased-products endpoint so the POS page only shows products
-// that have actually been bought from vendors.
+// PurchasedProduct - Product info derived entirely from purchase_items.
+// POS page reads from this so it only shows products that were actually purchased.
 type PurchasedProduct struct {
-	Product
-	PurchasedQty int `json:"purchasedQty"`
+	ID           string  `json:"id"`
+	Name         string  `json:"name"`
+	Price        float64 `json:"price"`
+	Stock        int     `json:"stock"`
+	UnitType     string  `json:"unitType"`
+	TaxPercent   float64 `json:"taxPercent"`
+	PurchasePrice float64 `json:"purchasePrice"`
 }

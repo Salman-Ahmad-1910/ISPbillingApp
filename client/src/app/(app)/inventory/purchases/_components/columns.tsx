@@ -3,8 +3,14 @@
 import { type ColumnDef } from '@tanstack/react-table';
 import type { Purchase } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
-import { Pencil, Printer, DollarSign, Trash2 } from 'lucide-react';
+import { Pencil, Printer, DollarSign, Trash2, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface PurchaseColumnsProps {
   onEdit: (purchase: Purchase) => void;
@@ -37,19 +43,17 @@ export const columns = ({ onEdit, onPay, onPrint, onDelete, companyName }: Purch
     },
   },
   {
-    id: 'sn',
-    header: 'SN',
+    id: 'products',
+    header: 'Products',
     cell: ({ row }) => {
       const items = row.original.items || [];
-      const firstSn = items.find(item => item.serialNumber)?.serialNumber || '-';
-      const display = firstSn.length > 10 ? firstSn.substring(0, 10) + '...' : firstSn;
-      return <span className="text-xs font-mono" title={firstSn}>{display}</span>;
+      const names = items.map(i => i.productName).filter(Boolean);
+      if (names.length === 0) return <span className="text-muted-foreground">-</span>;
+      const display = names.length > 2
+        ? `${names.slice(0, 2).join(', ')} +${names.length - 2} more`
+        : names.join(', ');
+      return <span className="text-sm" title={names.join(', ')}>{display}</span>;
     },
-  },
-  {
-    id: 'company',
-    header: 'Company',
-    cell: () => <span className="text-muted-foreground">{companyName || '-'}</span>,
   },
   {
     accessorKey: 'purchaseDate',
@@ -87,24 +91,35 @@ export const columns = ({ onEdit, onPay, onPrint, onDelete, companyName }: Purch
   },
   {
     id: 'actions',
-    header: 'Actions',
+    header: '',
     cell: ({ row }) => {
       const purchase = row.original;
       return (
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" onClick={() => onPay(purchase)} title="Pay">
-            <DollarSign className="h-4 w-4 text-green-600" />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => onEdit(purchase)} title="Edit">
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => onPrint(purchase)} title="Print Invoice">
-            <Printer className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => onDelete(purchase)} title="Delete">
-            <Trash2 className="h-4 w-4 text-destructive" />
-          </Button>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => onPay(purchase)}>
+              <DollarSign className="mr-2 h-4 w-4 text-green-600" />
+              Pay
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onEdit(purchase)}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onPrint(purchase)}>
+              <Printer className="mr-2 h-4 w-4" />
+              Print
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onDelete(purchase)} className="text-destructive">
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       );
     },
   },

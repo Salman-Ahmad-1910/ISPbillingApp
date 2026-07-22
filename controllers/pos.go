@@ -77,17 +77,26 @@ func CreatePOSSale(c *gin.Context) {
 			return err
 		}
 
-		// Decrement stock for each sold Product (guarded so stock never goes negative).
+		// Decrement stock from purchase_items for each sold product.
+		// Finds the purchase_items row with the most stock for this product
+		// and reduces its quantity (FIFO-style).
 		for _, it := range req.Items {
 			qty := it.Quantity
 			if qty <= 0 {
 				continue
 			}
-			if err := tx.Model(&models.Product{}).
-				Where("id = ? AND company_id = ?", it.ProductID, companyID).
-				Update("stock", gorm.Expr("GREATEST(stock - ?, 0)", qty)).
-				Error; err != nil {
-				return err
+			result := tx.Exec(`
+				UPDATE purchase_items
+				SET quantity = GREATEST(quantity - ?, 0)
+				WHERE id = (
+					SELECT id FROM purchase_items
+					WHERE product_id = ? AND company_id = ? AND deleted_at IS NULL
+					ORDER BY quantity DESC
+					LIMIT 1
+				)
+			`, qty, it.ProductID, companyID)
+			if result.Error != nil {
+				return result.Error
 			}
 		}
 		return nil

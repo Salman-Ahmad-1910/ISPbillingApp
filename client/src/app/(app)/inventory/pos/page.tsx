@@ -211,7 +211,9 @@ export default function POSPage() {
         if (!purchasedProducts) return [];
         return (purchasedProducts as any[]).map(p => ({
             ...p,
-            stock: p.stock ?? p.purchasedQty ?? 0,
+            stock: Number(p.stock) || 0,
+            price: Number(p.price) || 0,
+            taxPercent: Number(p.taxPercent) || 0,
         }));
     }, [purchasedProducts]);
 
@@ -407,8 +409,8 @@ export default function POSPage() {
                             {/* Customer Type Checkboxes */}
                             <div className="flex flex-col gap-2.5 p-3 rounded-lg border bg-muted/30">
                                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sell To</p>
-                                <div className="grid grid-cols-3 gap-2">
-                                    <label className="flex items-center gap-1.5 cursor-pointer">
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                                    <label className="flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
                                         <Checkbox
                                             checked={showSubscriber}
                                             onCheckedChange={(checked) => handleCheckboxChange('subscriber', !!checked)}
@@ -416,7 +418,7 @@ export default function POSPage() {
                                         <Users className="h-3.5 w-3.5 text-blue-500 shrink-0" />
                                         <span className="text-xs font-medium">Subscriber</span>
                                     </label>
-                                    <label className="flex items-center gap-1.5 cursor-pointer">
+                                    <label className="flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
                                         <Checkbox
                                             checked={showCustomer}
                                             onCheckedChange={(checked) => handleCheckboxChange('customer', !!checked)}
@@ -424,7 +426,7 @@ export default function POSPage() {
                                         <UserRound className="h-3.5 w-3.5 text-violet-500 shrink-0" />
                                         <span className="text-xs font-medium">Customer</span>
                                     </label>
-                                    <label className="flex items-center gap-1.5 cursor-pointer">
+                                    <label className="flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
                                         <Checkbox
                                             checked={showDealer}
                                             onCheckedChange={(checked) => handleCheckboxChange('dealer', !!checked)}
