@@ -368,7 +368,7 @@ export default function POSPage() {
                             {filteredProducts.map(product => {
                                 const imgSrc = backendImageUrl(product.image) || `https://picsum.photos/seed/${product.id}/200/200`;
                                 return (
-                                <Card key={product.id} className="overflow-hidden cursor-pointer group/product transition-all duration-300 hover:-translate-y-1 hover:shadow-lg" onClick={() => addToCart(product.id)}>
+                                <Card key={product.purchaseItemId || product.id} className="overflow-hidden cursor-pointer group/product transition-all duration-300 hover:-translate-y-1 hover:shadow-lg" onClick={() => addToCart(product.id)}>
                                     <div className="aspect-square bg-muted relative">
                                         <Image src={imgSrc} width={200} height={200} alt={product.name} className="object-cover w-full h-full" unoptimized />
                                         {product.stock > 0 && (

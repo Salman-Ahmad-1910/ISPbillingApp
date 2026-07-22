@@ -67,11 +67,12 @@ type PurchaseItem struct {
 // PurchasedProduct - Product info derived entirely from purchase_items.
 // POS page reads from this so it only shows products that were actually purchased.
 type PurchasedProduct struct {
-	ID           string  `json:"id"`
-	Name         string  `json:"name"`
-	Price        float64 `json:"price"`
-	Stock        int     `json:"stock"`
-	UnitType     string  `json:"unitType"`
-	TaxPercent   float64 `json:"taxPercent"`
-	PurchasePrice float64 `json:"purchasePrice"`
+	PurchaseItemID string  `json:"purchaseItemId"`
+	ID             string  `json:"id"`
+	Name           string  `json:"name"`
+	Price          float64 `json:"price"`
+	Stock          int     `json:"stock"`
+	UnitType       string  `json:"unitType"`
+	TaxPercent     float64 `json:"taxPercent"`
+	PurchasePrice  float64 `json:"purchasePrice"`
 }

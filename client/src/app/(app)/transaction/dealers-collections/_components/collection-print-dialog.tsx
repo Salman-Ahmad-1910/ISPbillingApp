@@ -156,15 +156,6 @@ function A4Invoice({ collection, company, logoUrl, stampUrl, receivedByName, onP
           </div>
         </header>
 
-        {/* Dealer Info */}
-        <div className="mb-8">
-          <h3 className="font-bold text-gray-700 mb-2 text-sm uppercase tracking-wider">Dealer Information</h3>
-          <div className="text-sm text-gray-700">
-            <p className="font-semibold">{collection.dealerName}</p>
-            {collection.dealerAddress && <p className="text-gray-500">{collection.dealerAddress}</p>}
-          </div>
-        </div>
-
         {/* Details Table */}
         <table className="w-full text-left border-collapse text-sm mb-8">
           <thead>
@@ -174,6 +165,18 @@ function A4Invoice({ collection, company, logoUrl, stampUrl, receivedByName, onP
             </tr>
           </thead>
           <tbody>
+            <tr className="hover:bg-emerald-50/50">
+              <td className="border border-gray-300 p-3 font-medium">Dealer ID</td>
+              <td className="border border-gray-300 p-3 text-right font-semibold font-mono">{collection.dealerId?.slice(0, 8) || '---'}</td>
+            </tr>
+            <tr className="hover:bg-emerald-50/50">
+              <td className="border border-gray-300 p-3 font-medium">Dealer Name</td>
+              <td className="border border-gray-300 p-3 text-right font-semibold">{collection.dealerName}</td>
+            </tr>
+            <tr className="hover:bg-emerald-50/50">
+              <td className="border border-gray-300 p-3 font-medium">Address</td>
+              <td className="border border-gray-300 p-3 text-right font-semibold">{collection.dealerAddress || '---'}</td>
+            </tr>
             <tr className="hover:bg-emerald-50/50">
               <td className="border border-gray-300 p-3 font-medium">Payment Type</td>
               <td className="border border-gray-300 p-3 text-right font-semibold capitalize">{collection.transactionType || 'Cash'}</td>
@@ -280,6 +283,10 @@ function ThermalInvoice({ collection, company, logoUrl, receivedByName, onPrint 
 
           {/* Details */}
           <div className="mb-3 pb-2 border-b border-dashed border-gray-400">
+            <div className="flex justify-between mb-1">
+              <span className="text-gray-500">Dealer ID:</span>
+              <span className="font-bold font-mono">{collection.dealerId?.slice(0, 8) || '---'}</span>
+            </div>
             <div className="flex justify-between mb-1">
               <span className="text-gray-500">Dealer:</span>
               <span className="font-bold">{collection.dealerName}</span>

@@ -32,7 +32,20 @@ func GetDashboardData(c *gin.Context) {
 	config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL AND payment_date = CURRENT_DATE::text`, companyID).Scan(&totalCollectionToday)
 
 	var overdueCount int64
-	config.DB.Raw(`SELECT COUNT(DISTINCT i.subscriber_id) FROM invoices i WHERE i.company_id = ? AND i.deleted_at IS NULL AND i.status = 'pending' AND i.due_date < CURRENT_DATE::text`, companyID).Scan(&overdueCount)
+	config.DB.Raw(`
+		SELECT COUNT(*)
+		FROM connections
+		WHERE company_id = ? AND deleted_at IS NULL
+		AND COALESCE(last_payment_date, recharge_date, created_at::text) < (CURRENT_DATE - INTERVAL '30 days')::text
+	`, companyID).Scan(&overdueCount)
+
+	var overdueAmount float64
+	config.DB.Raw(`
+		SELECT COALESCE(SUM(amount), 0)
+		FROM connections
+		WHERE company_id = ? AND deleted_at IS NULL
+		AND COALESCE(last_payment_date, recharge_date, created_at::text) < (CURRENT_DATE - INTERVAL '30 days')::text
+	`, companyID).Scan(&overdueAmount)
 
 	var payments []models.Payment
 	config.DB.Scopes(models.TenantScope(companyID)).Order("payment_date desc").Limit(5).Find(&payments)
@@ -68,6 +81,7 @@ func GetDashboardData(c *gin.Context) {
 		},
 		"totalCollectionToday": totalCollectionToday,
 		"overdueCount":         overdueCount,
+		"overdueAmount":        overdueAmount,
 		"payments":             payments,
 		"complaintsCount":      complaintCount,
 		"complaints":           recentComplaints,

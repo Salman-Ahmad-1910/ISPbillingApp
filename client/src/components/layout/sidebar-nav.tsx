@@ -71,6 +71,9 @@ import {
   MailQuestion,
   FileEdit,
   Send,
+  Inbox,
+  Clock,
+  MessageCircle,
   BookOpen,
 } from 'lucide-react';
 import type { NavItem, NavItemGroup } from '@/lib/types';
@@ -98,9 +101,12 @@ const navItems: NavItemGroup[] = [
   {
     title: 'Messages',
     items: [
+      { title: 'New Messages', href: '/messages/new', icon: Inbox, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
       { title: 'Other Messages', href: '/messages/other', icon: MailQuestion, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
       { title: 'Draft Messages', href: '/messages/draft', icon: FileEdit, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
       { title: 'Sent Messages', href: '/messages/sent', icon: Send, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
+      { title: 'Expired Messages', href: '/messages/expired', icon: Clock, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
+      { title: 'WhatsApp Drafts', href: '/messages/whatsapp-draft', icon: MessageCircle, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
     ],
   },
   {
@@ -119,7 +125,6 @@ const navItems: NavItemGroup[] = [
     items: [
       { title: 'Sales', href: '/sales', icon: ShoppingCart, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
       { title: 'Customers', href: '/sales/customers', icon: UserRound, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
-      { title: 'Payments', href: '/sales/payments', icon: HandCoins, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
       { title: 'Installment Plans', href: '/sales/installment-plans', icon: FileCog, allowedRoles: ['admin', 'manager'] },
       { title: 'Point of Sale', href: '/inventory/pos', icon: ShoppingCart, allowedRoles: ['admin', 'manager', 'dealer'] },
     ],
@@ -133,16 +138,6 @@ const navItems: NavItemGroup[] = [
       { title: 'Transaction Type', href: '/transaction/transaction-type', icon: FileCog, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
       { title: 'Bad Debt Collections', href: '/transaction/bad-debt-collections', icon: TriangleAlert, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
       { title: 'Bill Creator', href: '/transaction/bill-creator', icon: ClipboardPen, allowedRoles: ['admin', 'manager', 'dealer'] },
-    ],
-  },
-  {
-    title: 'Collections',
-    items: [
-      { title: 'Recovery Dashboard', href: '/recovery/dashboard', icon: LayoutDashboard, allowedRoles: ['admin', 'manager', 'recovery_officer'] },
-      { title: 'My Collections', href: '/recovery/my-collections', icon: HandCoins, allowedRoles: ['admin', 'manager', 'recovery_officer'] },
-      { title: 'Assigned Area', href: '/recovery/assigned-area', icon: Map, allowedRoles: ['admin', 'manager', 'recovery_officer'] },
-      { title: 'Transactions', href: '/recovery/transactions', icon: FileClock, allowedRoles: ['admin', 'manager', 'recovery_officer'] },
-      { title: 'Collections Today', href: '/dealer/collections-today', icon: Wallet, allowedRoles: ['admin', 'manager', 'dealer'] },
     ],
   },
   {
@@ -229,8 +224,6 @@ const navItems: NavItemGroup[] = [
     title: 'Administration',
     items: [
       { title: 'My Company Profile', href: '/admin/company-profile', icon: Building, allowedRoles: ['admin', 'manager'] },
-      { title: 'Dealers', href: '/admin/dealers', icon: Handshake, allowedRoles: ['admin', 'manager'] },
-      { title: 'Users', href: '/admin/users', icon: Users, allowedRoles: ['admin', 'manager'] },
       { title: 'Companies', href: '/admin/companies', icon: Building2, allowedRoles: ['admin'] },
       { title: 'Roles & Permissions', href: '/admin/roles', icon: ShieldCheck, allowedRoles: ['admin'] },
       { title: 'System Config', href: '/admin/settings', icon: Settings, allowedRoles: ['admin'] },

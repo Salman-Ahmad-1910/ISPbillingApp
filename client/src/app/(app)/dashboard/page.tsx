@@ -1,18 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { CircleDollarSign, Users, Wallet, Clock, CheckCircle2, XCircle, ArrowUpRight, LayoutDashboard } from 'lucide-react';
 import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Ticket, AlertCircle } from 'lucide-react';
+import { AlertCircle, Ticket } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
 import api from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
 import dynamic from 'next/dynamic';
 import { PageHeader } from '@/components/shared/page-header';
+import { GaugeMeter } from './_components/gauge-meter';
 
 const DailyCollectionChart = dynamic(
   () => import('@/app/(app)/dashboard/_components/daily-collection-chart').then(mod => mod.DailyCollectionChart),
@@ -30,9 +31,21 @@ const SubscriberGrowthChart = dynamic(
 );
 
 export default function DashboardPage() {
-  const { companyId, companyName } = useCompany();
+  const { companyId, companyName, companies } = useCompany();
+  const currentCompany = companies.find(c => c.id === companyId);
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [targetAmount, setTargetAmount] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(`collection_target_${companyId}`);
+      return stored ? parseFloat(stored) : 0;
+    }
+    return 0;
+  });
+
+  const logoUrl = currentCompany?.logo
+    ? `${api?.defaults?.baseURL}/uploads/company_images/${currentCompany.id}`
+    : null;
 
   useEffect(() => {
     if (companyId) {
@@ -49,11 +62,21 @@ export default function DashboardPage() {
     }
   }, [companyId]);
 
+  const handleTargetSave = useCallback((target: number) => {
+    setTargetAmount(target);
+    localStorage.setItem(`collection_target_${companyId}`, target.toString());
+  }, [companyId]);
+
+  const totalCollection = data?.totalCollectionToday || 0;
+
   const kpiConfig = [
     { title: 'Active Subscribers', value: data?.subscribersStats?.active || 0, icon: Users, change: `in ${companyName}`, gradient: 'from-blue-500 to-cyan-500', bgLight: 'bg-blue-50 dark:bg-blue-950/30' },
     { title: 'Total Collection (Today)', value: `PKR ${(data?.totalCollectionToday || 0).toLocaleString()}`, icon: Wallet, change: 'real-time total', gradient: 'from-emerald-500 to-green-500', bgLight: 'bg-emerald-50 dark:bg-emerald-950/30' },
-    { title: 'Open Complaints', value: data?.complaintsCount || 0, icon: Ticket, change: `in ${companyName}`, gradient: 'from-orange-500 to-amber-500', bgLight: 'bg-orange-50 dark:bg-orange-950/30' },
+  ];
+
+  const kpiConfigRight = [
     { title: 'Overdue Subscribers', value: data?.overdueCount || 0, icon: AlertCircle, change: 'unpaid accounts', gradient: 'from-rose-500 to-pink-500', bgLight: 'bg-rose-50 dark:bg-rose-950/30' },
+    { title: 'Total Overdue', value: `PKR ${(data?.overdueAmount || 0).toLocaleString()}`, icon: AlertCircle, change: 'past due amount', gradient: 'from-red-600 to-rose-500', bgLight: 'bg-red-50 dark:bg-red-950/30' },
   ];
 
   if (loading) {
@@ -63,8 +86,10 @@ export default function DashboardPage() {
           title="Dashboard"
           description="Loading real-time overview..."
         />
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-28" />)}
+        <div className="grid gap-4 lg:grid-cols-5 items-center">
+          {[...Array(2)].map((_, i) => <Skeleton key={`l${i}`} className="h-28" />)}
+          <Skeleton className="h-36 rounded-xl" />
+          {[...Array(2)].map((_, i) => <Skeleton key={`r${i}`} className="h-28" />)}
         </div>
         <div className="mt-8 grid gap-8 md:grid-cols-2 lg:grid-cols-7">
           <Skeleton className="lg:col-span-4 h-80" />
@@ -96,38 +121,56 @@ export default function DashboardPage() {
 
   return (
     <>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 p-2 text-white shadow-sm">
-            <LayoutDashboard className="h-5 w-5" />
+      <div className="mb-6 flex flex-wrap items-stretch gap-6">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-4 mb-4">
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt="Logo"
+                className="h-[60px] w-[60px] rounded-lg object-contain shadow-sm flex-shrink-0"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            ) : (
+              <div className="rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 p-2.5 text-white shadow-sm flex-shrink-0">
+                <LayoutDashboard className="h-6 w-6" />
+              </div>
+            )}
+            <div className="min-w-0">
+              <h1 className="text-3xl font-extrabold tracking-tight md:text-4xl lg:text-5xl">{`${companyName || ''} Dashboard`}</h1>
+              <p className="mt-1 text-muted-foreground text-sm md:text-base">Here&apos;s a real-time overview of your network and business operations.</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight md:text-3xl">{`${companyName || ''} Dashboard`}</h1>
-            <p className="mt-1 text-muted-foreground">Here&apos;s a real-time overview of your network and business operations.</p>
+
+          <div className="flex flex-wrap items-stretch gap-3">
+            {[...kpiConfig, ...kpiConfigRight].map((kpi) => (
+              <Card
+                key={kpi.title}
+                className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 flex-1 min-w-[180px] max-w-[280px] min-h-[160px]"
+              >
+                <div className={`absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br ${kpi.gradient}`} />
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
+                  <CardTitle className="text-[11px] font-medium leading-tight">{kpi.title}</CardTitle>
+                  <div className={`rounded-lg p-1.5 bg-gradient-to-br ${kpi.gradient} text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md`}>
+                    <kpi.icon className="h-3 w-3" />
+                  </div>
+                </CardHeader>
+                <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
+                  <div className="text-2xl font-bold tracking-tight">{kpi.value}</div>
+                  <p className="text-xs text-muted-foreground mt-1">{kpi.change}</p>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
-      </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {kpiConfig.map((kpi, idx) => (
-          <Card
-            key={kpi.title}
-            className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5"
-            style={{ animationDelay: `${idx * 100}ms` }}
-          >
-            <div className={`absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br ${kpi.gradient}`} />
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative">
-              <CardTitle className="text-sm font-medium">{kpi.title}</CardTitle>
-              <div className={`rounded-xl p-2.5 bg-gradient-to-br ${kpi.gradient} text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md`}>
-                <kpi.icon className="h-4 w-4" />
-              </div>
-            </CardHeader>
-            <CardContent className="relative">
-              <div className="text-2xl font-bold tracking-tight">{kpi.value}</div>
-              <p className="text-xs text-muted-foreground mt-0.5">{kpi.change}</p>
-            </CardContent>
-          </Card>
-        ))}
+        <div className="flex-shrink-0">
+          <GaugeMeter
+            currentAmount={totalCollection}
+            targetAmount={targetAmount}
+            onTargetSave={handleTargetSave}
+          />
+        </div>
       </div>
 
       <div className="mt-8 grid gap-8 md:grid-cols-2 lg:grid-cols-7">

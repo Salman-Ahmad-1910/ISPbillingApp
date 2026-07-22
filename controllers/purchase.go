@@ -431,6 +431,7 @@ func GetPurchasedProducts(c *gin.Context) {
 	var products []models.PurchasedProduct
 	if err := db.Raw(`
 		SELECT
+			pi.id                                        AS purchase_item_id,
 			pi.product_id                                 AS id,
 			pi.product_name                               AS name,
 			pi.selling_price                              AS price,

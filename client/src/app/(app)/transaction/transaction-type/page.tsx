@@ -268,23 +268,19 @@ export default function TransactionTypePage() {
               {search ? 'No matching transaction types found.' : 'No transaction types yet. Click "Add Transaction" to create one.'}
             </div>
           ) : (
-            <Table>
+            <Table className="w-full table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Transaction</TableHead>
-                  <TableHead>Transaction Title</TableHead>
-                  <TableHead>Opening Balance</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="w-1/3">ID</TableHead>
+                  <TableHead className="w-1/3">Payment Channel</TableHead>
+                  <TableHead className="w-1/3 text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginated.map((record) => (
                   <TableRow key={record.id}>
                     <TableCell className="font-mono text-xs">{record.id.slice(0, 8)}</TableCell>
-                    <TableCell className="font-medium">{record.paymentChannel || record.transaction}</TableCell>
-                    <TableCell>{record.title || '---'}</TableCell>
-                    <TableCell>Rs. {record.openingBalance.toLocaleString()}</TableCell>
+                    <TableCell className="font-medium">{record.paymentChannel || '---'}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
                         <Button variant="ghost" size="icon" className="h-8 w-8 transition-all duration-300 hover:scale-110" onClick={() => openEditDialog(record)}>

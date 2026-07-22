@@ -648,7 +648,7 @@ export type PurchaseItem = {
 
 export type Message = {
   id: string;
-  status: 'draft' | 'sent' | 'outbox';
+  status: 'draft' | 'sent' | 'outbox' | 'new' | 'expired' | 'whatsapp_draft';
   entityId?: string;
   internetId?: string;
   name: string;

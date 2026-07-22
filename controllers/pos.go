@@ -88,7 +88,7 @@ func CreatePOSSale(c *gin.Context) {
 			result := tx.Exec(`
 				UPDATE purchase_items
 				SET quantity = GREATEST(quantity - ?, 0)
-				WHERE id = (
+				WHERE id IN (
 					SELECT id FROM purchase_items
 					WHERE product_id = ? AND company_id = ? AND deleted_at IS NULL
 					ORDER BY quantity DESC

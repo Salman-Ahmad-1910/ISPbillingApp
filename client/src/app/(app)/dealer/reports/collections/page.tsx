@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { CalendarIcon, Download, Printer, Wallet, Loader2 } from 'lucide-react';
+import { CalendarIcon, Download, Printer, Wallet, Loader2, MoreHorizontal, Pencil, Trash2, FileText, Copy, Receipt } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
@@ -16,7 +18,24 @@ import api from '@/lib/api';
 import { useCompany } from '@/context/company-context';
 import { useToast } from '@/hooks/use-toast';
 import type { Company } from '@/lib/types';
-import Image from 'next/image';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  SearchableSelect,
+} from '@/components/ui/searchable-select';
+import { CollectionPrintDialog } from '@/app/(app)/transaction/dealers-collections/_components/collection-print-dialog';
+import type { DealerCollection } from '@/lib/types';
 
 interface CollectionRecord {
   id: string;
@@ -36,6 +55,11 @@ interface AreaItem {
   id: string;
   name: string;
 }
+
+const STATUS_OPTIONS = [
+  { id: 'pending', name: 'Unpaid' },
+  { id: 'settled', name: 'Paid' },
+];
 
 export default function DealersCollectionsPage() {
   const { companyId, companies } = useCompany();
@@ -60,6 +84,19 @@ export default function DealersCollectionsPage() {
   const [selectedTransactionType, setSelectedTransactionType] = useState<string>('all');
 
   const currentCompany = companies.find((c: any) => c.id === companyId) as Company | undefined;
+
+  // Edit state
+  const [editCollection, setEditCollection] = useState<CollectionRecord | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editAmount, setEditAmount] = useState(0);
+  const [editComment, setEditComment] = useState('');
+  const [editStatus, setEditStatus] = useState<'pending' | 'settled'>('pending');
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Print state
+  const [printCollection, setPrintCollection] = useState<DealerCollection | null>(null);
+  const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
+  const [printFormatChoice, setPrintFormatChoice] = useState<'a4' | 'thermal'>('a4');
 
   const fetchData = async () => {
     if (!companyId) return;
@@ -106,114 +143,66 @@ export default function DealersCollectionsPage() {
   const totalConnection = filteredData.length;
   const totalAmount = filteredData.reduce((sum, item) => sum + item.amount, 0);
 
-  const handlePrintBill = () => {
-    if (filteredData.length === 0) {
-      toast({ title: 'No data', description: 'No records to print.' });
-      return;
+  // CRUD handlers
+  const handleDelete = useCallback(async (id: string) => {
+    if (!confirm('Are you sure you want to delete this entry?')) return;
+    try {
+      await api.delete(`/dealers/collections/${id}`);
+      toast({ title: 'Deleted', description: 'Collection entry deleted.' });
+      fetchData();
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete entry.' });
     }
+  }, [toast]);
 
-    const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
-      .map(el => el.outerHTML)
-      .join('\n');
+  const handleEditOpen = useCallback((col: CollectionRecord) => {
+    setEditCollection(col);
+    setEditAmount(col.amount);
+    setEditComment(col.comment || '');
+    setEditStatus(col.settlementStatus as 'pending' | 'settled');
+    setShowEditDialog(true);
+  }, []);
 
-    const rows = filteredData.map((item, i) => `
-      <tr>
-        <td style="padding:8px;border-bottom:1px solid #e5e7eb;color:#6b7280;text-align:center;">${i + 1}</td>
-        <td style="padding:8px;border-bottom:1px solid #e5e7eb;font-weight:600;">${item.dealerName}</td>
-        <td style="padding:8px;border-bottom:1px solid #e5e7eb;font-size:12px;color:#6b7280;">${item.dealerAddress || '---'}</td>
-        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;">PKR ${item.amount.toLocaleString()}</td>
-        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;">${item.transactionType || 'cash'}</td>
-        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;">${item.collectionDate}</td>
-        <td style="padding:8px;border-bottom:1px solid #e5e7eb;font-size:12px;">${item.receivedByName || '---'}</td>
-        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center;">
-          <span style="padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;${item.settlementStatus === 'settled' ? 'background:#d1fae5;color:#065f46;' : 'background:#fef3c7;color:#92400e;'}">${item.settlementStatus === 'settled' ? 'Paid' : 'Unpaid'}</span>
-        </td>
-      </tr>
-    `).join('');
+  const handleEditSave = useCallback(async () => {
+    if (!editCollection) return;
+    setIsSaving(true);
+    try {
+      await api.put(`/dealers/collections/${editCollection.id}`, {
+        ...editCollection,
+        amount: editAmount,
+        comment: editComment,
+        settlementStatus: editStatus,
+      });
+      toast({ title: 'Updated', description: 'Collection entry updated.' });
+      setShowEditDialog(false);
+      setEditCollection(null);
+      fetchData();
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to update entry.' });
+    } finally {
+      setIsSaving(false);
+    }
+  }, [editCollection, editAmount, editComment, editStatus, toast]);
 
-    const logoHTML = currentCompany?.logo
-      ? `<img src="${currentCompany.logo}" style="height:50px;width:50px;object-fit:contain;" />`
-      : '';
+  const handleToggleStatus = useCallback(async (col: CollectionRecord) => {
+    const newStatus = col.settlementStatus === 'settled' ? 'pending' : 'settled';
+    try {
+      await api.put(`/dealers/collections/${col.id}`, {
+        ...col,
+        settlementStatus: newStatus,
+      });
+      toast({ title: 'Updated', description: `Status changed to ${newStatus}.` });
+      fetchData();
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to update status.' });
+    }
+  }, [toast]);
 
-    const printWindow = window.open('', '_blank', 'width=800,height=600');
-    if (!printWindow) return;
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Dealer Collection Bill</title>
-          ${styles}
-          <style>
-            body { margin: 0; padding: 0; background: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-            @page { size: A4; margin: 10mm; }
-            @media print { body { margin: 0; } }
-          </style>
-        </head>
-        <body>
-          <div style="max-width:100%;padding:20px;">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:2px solid #111;">
-              <div style="display:flex;align-items:center;gap:16px;">
-                ${logoHTML}
-                <div>
-                  <h1 style="font-size:22px;font-weight:700;margin:0;color:#111;">${currentCompany?.name || 'Company Name'}</h1>
-                  <p style="font-size:13px;color:#6b7280;margin:4px 0 0;">${currentCompany?.address || ''}</p>
-                  ${currentCompany?.email ? `<p style="font-size:13px;color:#9ca3af;margin:2px 0 0;">${currentCompany.email}</p>` : ''}
-                  ${currentCompany?.contact1 ? `<p style="font-size:13px;color:#9ca3af;margin:2px 0 0;">${currentCompany.contact1}</p>` : ''}
-                </div>
-              </div>
-              <div style="text-align:right;">
-                <h2 style="font-size:18px;font-weight:700;margin:0;color:#059669;">DEALER COLLECTION BILL</h2>
-                <p style="font-size:13px;color:#6b7280;margin:4px 0 0;">From: ${fromDate ? format(fromDate, 'dd MMM yyyy') : '...'}</p>
-                <p style="font-size:13px;color:#6b7280;margin:2px 0 0;">To: ${toDate ? format(toDate, 'dd MMM yyyy') : '...'}</p>
-              </div>
-            </div>
-
-            <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:24px;">
-              <thead>
-                <tr style="background:#f9fafb;">
-                  <th style="padding:10px 8px;border-bottom:2px solid #e5e7eb;text-align:center;font-weight:600;color:#374151;">#</th>
-                  <th style="padding:10px 8px;border-bottom:2px solid #e5e7eb;text-align:left;font-weight:600;color:#374151;">Dealer Name</th>
-                  <th style="padding:10px 8px;border-bottom:2px solid #e5e7eb;text-align:left;font-weight:600;color:#374151;">Address</th>
-                  <th style="padding:10px 8px;border-bottom:2px solid #e5e7eb;text-align:right;font-weight:600;color:#374151;">Amount</th>
-                  <th style="padding:10px 8px;border-bottom:2px solid #e5e7eb;text-align:center;font-weight:600;color:#374151;">Type</th>
-                  <th style="padding:10px 8px;border-bottom:2px solid #e5e7eb;text-align:center;font-weight:600;color:#374151;">Date</th>
-                  <th style="padding:10px 8px;border-bottom:2px solid #e5e7eb;text-align:left;font-weight:600;color:#374151;">Received By</th>
-                  <th style="padding:10px 8px;border-bottom:2px solid #e5e7eb;text-align:center;font-weight:600;color:#374151;">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${rows}
-              </tbody>
-            </table>
-
-            <div style="display:flex;justify-content:space-between;padding:16px;background:#f9fafb;border-radius:8px;margin-bottom:24px;">
-              <div style="text-align:center;padding:12px 24px;background:#fff;border-radius:6px;border:1px solid #e5e7eb;">
-                <p style="font-size:12px;color:#6b7280;margin:0 0 4px;">Total Records</p>
-                <p style="font-size:20px;font-weight:700;margin:0;">${totalConnection}</p>
-              </div>
-              <div style="text-align:center;padding:12px 24px;background:#fff;border-radius:6px;border:1px solid #e5e7eb;">
-                <p style="font-size:12px;color:#6b7280;margin:0 0 4px;">Total Amount</p>
-                <p style="font-size:20px;font-weight:700;margin:0;color:#059669;">PKR ${totalAmount.toLocaleString()}</p>
-              </div>
-            </div>
-
-            <div style="border-top:1px solid #d1d5db;padding-top:16px;text-align:center;">
-              <p style="font-size:13px;font-weight:600;color:#374151;margin:0;">${currentCompany?.name || 'Company Name'}</p>
-              <p style="font-size:12px;color:#6b7280;margin:4px 0 0;">${currentCompany?.address || ''}</p>
-              <p style="font-size:11px;color:#9ca3af;margin:8px 0 0;">This is a computer-generated bill. No signature required.</p>
-            </div>
-          </div>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
-    }, 300);
-  };
+  const handlePrint = useCallback((col: CollectionRecord, format: 'a4' | 'thermal') => {
+    setPrintCollection(col as DealerCollection);
+    setPrintFormatChoice(format);
+    setIsPrintDialogOpen(true);
+  }, []);
 
   const exportExcel = () => {
     if (filteredData.length === 0) {
@@ -446,10 +435,6 @@ export default function DealersCollectionsPage() {
                 </p>
               </div>
               <div className="flex gap-2 no-print">
-                <Button variant="outline" onClick={handlePrintBill}>
-                  <Printer className="mr-2 h-4 w-4" />
-                  Print Bill
-                </Button>
                 <Button variant="outline" onClick={exportExcel}>
                   <Download className="mr-2 h-4 w-4" />
                   Excel
@@ -480,6 +465,7 @@ export default function DealersCollectionsPage() {
                     <TableHead>Collection Date</TableHead>
                     <TableHead>Received By</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="w-[40px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -505,6 +491,39 @@ export default function DealersCollectionsPage() {
                           {item.settlementStatus === 'settled' ? 'Paid' : 'Unpaid'}
                         </Badge>
                       </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEditOpen(item)}>
+                              <Pencil className="mr-2 h-4 w-4" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleToggleStatus(item)}>
+                              <Receipt className="mr-2 h-4 w-4" />
+                              {item.settlementStatus === 'settled' ? 'Mark Unpaid' : 'Mark Paid'}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handlePrint(item, 'a4')}>
+                              <FileText className="mr-2 h-4 w-4" />
+                              Print Bill
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handlePrint(item, 'thermal')}>
+                              <Copy className="mr-2 h-4 w-4" />
+                              Duplicate Print
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleDelete(item.id)} className="text-red-600">
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -513,6 +532,72 @@ export default function DealersCollectionsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={(open) => { setShowEditDialog(open); if (!open) setEditCollection(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Collection Entry</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label>Bill #</Label>
+                <Input value={editCollection?.id?.slice(0, 8).toUpperCase() || ''} readOnly />
+              </div>
+              <div className="space-y-1">
+                <Label>Dealer</Label>
+                <Input value={editCollection?.dealerName || ''} readOnly />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Amount (PKR)</Label>
+              <Input
+                type="number"
+                value={editAmount}
+                onChange={(e) => setEditAmount(parseFloat(e.target.value) || 0)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Status</Label>
+              <SearchableSelect
+                value={editStatus}
+                onValueChange={(v) => { if (v) setEditStatus(v as 'pending' | 'settled'); }}
+                options={STATUS_OPTIONS}
+                placeholder="Select status..."
+                searchPlaceholder="Search status..."
+                allowClear={false}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Comment</Label>
+              <Textarea
+                value={editComment}
+                onChange={(e) => setEditComment(e.target.value)}
+                placeholder="Add a comment..."
+                rows={2}
+              />
+            </div>
+            <Button
+              onClick={handleEditSave}
+              disabled={isSaving || !editAmount}
+              className="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md"
+            >
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Changes
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Print Dialog */}
+      <CollectionPrintDialog
+        isOpen={isPrintDialogOpen}
+        onClose={() => { setIsPrintDialogOpen(false); setPrintCollection(null); }}
+        collection={printCollection}
+        company={currentCompany}
+        initialTab={printFormatChoice}
+      />
     </div>
   );
 }

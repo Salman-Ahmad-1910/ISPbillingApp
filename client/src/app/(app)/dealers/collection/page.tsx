@@ -12,8 +12,15 @@ import { useCompany } from '@/context/company-context';
 export default function DealerCollectionPage() {
   const { companyId } = useCompany();
 
-  const { data: collections = [], isLoading: isLoadingcollections } = useGenericQuery<any>('dealers/collections', companyId ?? undefined);
-  if (Object.keys({useGenericQuery}).length && typeof isLoading !== 'undefined' && isLoading) { return <div className="flex h-[50vh] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>; }
+  const { data: collections = [], isLoading, refetch } = useGenericQuery<any>('dealers/collections', companyId ?? undefined);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <>
@@ -21,10 +28,10 @@ export default function DealerCollectionPage() {
         title="Dealer Collection"
         description="Track payments collected by dealers and manage settlements."
       />
-      
+
       <Card>
         <CardContent className="p-0">
-          <ClientPage data={collections} />
+          <ClientPage data={collections} onRefetch={refetch} />
         </CardContent>
       </Card>
     </>
