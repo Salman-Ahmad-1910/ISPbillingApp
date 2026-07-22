@@ -1,0 +1,6 @@
+{
+  "scripts": {
+    "dev:https": "next dev --experimental-https",
+    "dev:https-local": "next dev --experimental-https --hostname localhost"
+  }
+}

@@ -1,0 +1,146 @@
+'use client';
+
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Button } from '@/components/ui/button';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { Customer } from '@/lib/types';
+import { customerSchema } from '@/lib/schemas';
+import { Loader2 } from 'lucide-react';
+
+type CustomerFormValues = z.infer<typeof customerSchema>;
+
+interface CustomerFormProps {
+  customer: Customer | null;
+  onSave: (data: CustomerFormValues) => void;
+  onCancel: () => void;
+  isSaving?: boolean;
+}
+
+export function CustomerForm({ customer, onSave, onCancel, isSaving }: CustomerFormProps) {
+  const form = useForm<CustomerFormValues>({
+    resolver: zodResolver(customerSchema),
+    defaultValues: customer || {
+      name: '',
+      cnic: '',
+      phone: '',
+      city: '',
+      status: 'active',
+    },
+  });
+
+  function onSubmit(values: CustomerFormValues) {
+    onSave(values);
+  }
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        {customer && (
+          <div className="p-3 bg-muted rounded-md">
+            <div className="text-sm font-medium">Customer ID</div>
+            <div className="text-xs font-mono text-muted-foreground mt-1">{customer.id}</div>
+          </div>
+        )}
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Name</FormLabel>
+              <FormControl>
+                <Input className="border-muted-foreground/20" placeholder="e.g., John Doe" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <div className="grid grid-cols-2 gap-4">
+            <FormField
+            control={form.control}
+            name="cnic"
+            render={({ field }) => (
+                <FormItem>
+                <FormLabel>CNIC</FormLabel>
+                <FormControl>
+                    <Input className="border-muted-foreground/20" placeholder="e.g., 42201-1234567-8" {...field} />
+                </FormControl>
+                <FormMessage />
+                </FormItem>
+            )}
+            />
+            <FormField
+            control={form.control}
+            name="phone"
+            render={({ field }) => (
+                <FormItem>
+                <FormLabel>Phone</FormLabel>
+                <FormControl>
+                    <Input className="border-muted-foreground/20" placeholder="e.g., 0300-1234567" {...field} />
+                </FormControl>
+                <FormMessage />
+                </FormItem>
+            )}
+            />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+            <FormField
+            control={form.control}
+            name="city"
+            render={({ field }) => (
+                <FormItem>
+                <FormLabel>City</FormLabel>
+                <FormControl>
+                    <Input className="border-muted-foreground/20" placeholder="e.g., Karachi" {...field} />
+                </FormControl>
+                <FormMessage />
+                </FormItem>
+            )}
+            />
+            <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Status</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                            <SelectTrigger className="border-muted-foreground/20">
+                                <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                                <SelectItem value="active">Active</SelectItem>
+                                <SelectItem value="inactive">Inactive</SelectItem>
+                                <SelectItem value="blacklisted">Blacklisted</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    <FormMessage />
+                    </FormItem>
+                )}
+            />
+        </div>
+        
+        <div className="flex justify-end gap-2 pt-4">
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isSaving} className="border-rose-200 text-rose-600 hover:bg-rose-50">
+            Cancel
+          </Button>
+          <Button type="submit" disabled={isSaving} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105 disabled:hover:scale-100">
+            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isSaving ? 'Saving...' : 'Save Customer'}
+          </Button>
+        </div>
+      </form>
+    </Form>
+  );
+}

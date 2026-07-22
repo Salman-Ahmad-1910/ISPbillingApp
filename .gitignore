@@ -1,0 +1,16 @@
+client/node_modules
+client/.env
+client/out
+client/.next
+
+node_modules
+.env
+
+uploads/
+certs/
+
+fintrack-erp
+fintrack-erp.exe
+.fuse_hidden00019f3400000017
+
+frontend/
