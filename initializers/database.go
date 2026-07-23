@@ -236,4 +236,13 @@ func ConnectDB() {
 	}
 	log.Println("SupportTicket table migrated successfully!")
 
+	// Account Head, Sub Head, and Entry tables
+	log.Println("Attempting to migrate AccountHead, AccountSubHead, AccountEntry tables...")
+	err = DB.AutoMigrate(&models.AccountHead{}, &models.AccountSubHead{}, &models.AccountEntry{})
+	if err != nil {
+		log.Fatal("Failed to migrate Account tables:", err)
+		return
+	}
+	log.Println("Account tables migrated successfully!")
+
 }

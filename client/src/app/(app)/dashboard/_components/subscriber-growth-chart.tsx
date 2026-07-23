@@ -168,7 +168,35 @@ export function SubscriberGrowthChart({ liveActiveCount }: SubscriberGrowthChart
     const windowIncludesNow = period !== 'monthly' || isCurrentMonth;
 
     let points: ChartPoint[];
-    if (period === 'daily') {
+
+    if (rawData.length === 0 && hasValidLiveCount && liveActiveCount! > 0) {
+      const now = new Date();
+      if (period === 'daily') {
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        points = Array.from({ length: 24 }, (_, i) => {
+          const ts = startOfDay + i * 3600000;
+          return { hour: i, value: liveActiveCount!, timestamp: ts };
+        });
+      } else if (period === 'weekly') {
+        points = Array.from({ length: 8 }, (_, i) => {
+          const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7 + i);
+          return { label: d.toISOString().slice(0, 10), value: liveActiveCount!, timestamp: d.getTime() };
+        });
+      } else if (period === 'monthly') {
+        const year = now.getFullYear();
+        const month = now.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        points = Array.from({ length: daysInMonth }, (_, i) => {
+          const d = new Date(year, month, i + 1);
+          return { label: d.toISOString().slice(0, 10), value: liveActiveCount!, timestamp: d.getTime() };
+        });
+      } else {
+        points = Array.from({ length: 12 }, (_, i) => {
+          const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1);
+          return { label: d.toISOString().slice(0, 7), value: liveActiveCount!, timestamp: d.getTime() };
+        });
+      }
+    } else if (period === 'daily') {
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
       points = rawData.map((p) => {
         const d = parseServerDate(p.label);
@@ -182,7 +210,7 @@ export function SubscriberGrowthChart({ liveActiveCount }: SubscriberGrowthChart
       points[points.length - 1] = { ...points[points.length - 1], value: effectiveLiveCount };
     }
     return points;
-  }, [rawData, period, isCurrentMonth, effectiveLiveCount, today]);
+  }, [rawData, period, isCurrentMonth, effectiveLiveCount, today, hasValidLiveCount, liveActiveCount]);
 
   // Google-style summary line: current value + absolute/percent change over the visible window.
   const { startValue, endValue, changeAbs, changePct, isUp } = useMemo(() => {

@@ -26,29 +26,46 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
-import { BookOpen, PlusCircle, MoreHorizontal, Edit3, Trash2, Search, CalendarIcon, Layers, DollarSign, FileText, Loader2 } from 'lucide-react';
+import { BookOpen, PlusCircle, MoreHorizontal, Edit3, Trash2, Search, CalendarIcon, DollarSign, FileText, Loader2 } from 'lucide-react';
 import type { Staff } from '@/lib/types';
 
-const accountHeads = ['Asset', 'Liability', 'Income', 'Expense', 'Equity'];
-const accountSubHeads: Record<string, string[]> = {
-  Asset: ['Cash', 'Bank', 'Accounts Receivable', 'Inventory', 'Fixed Assets'],
-  Liability: ['Accounts Payable', 'Loans', 'Taxes Payable'],
-  Income: ['Service Revenue', 'Interest Income', 'Other Income'],
-  Expense: ['Salaries', 'Rent', 'Utilities', 'Office Expenses', 'Travel'],
-  Equity: ['Capital', 'Retained Earnings', 'Drawings'],
-};
-const transactionTypes = ['Debit', 'Credit'];
 const filterByOptions = ['All', 'Add By', 'Edit By'];
+
+interface AccountHead {
+  id: string;
+  masterAccount: string;
+  accountType: string;
+  description: string;
+}
+
+interface SubHead {
+  id: string;
+  subMasterAccount: string;
+  masterAccountId: string;
+  masterAccount: string;
+  accountType: string;
+  budget: string;
+  description: string;
+}
+
+interface TransactionType {
+  id: string;
+  paymentChannel: string;
+  transaction: string;
+  title: string;
+  openingBalance: number;
+}
 
 interface AccountEntry {
   id: string;
   head: string;
   subHead: string;
-  comments: string;
+  description: string;
   date: string;
   addBy: string;
   editBy: string;
   amount: number;
+  transactionType: string;
 }
 
 export default function AccountEntryPage() {
@@ -56,7 +73,15 @@ export default function AccountEntryPage() {
 
   const { data: apiEntries = [], isLoading } = useGenericQuery<any>('accounts/entries', companyId ?? undefined);
   const { data: staff = [] } = useGenericQuery<Staff>('hr/staff', companyId ?? undefined);
+  const { data: apiHeads = [] } = useGenericQuery<any>('accounts/heads', companyId ?? undefined);
+  const { data: apiSubHeads = [] } = useGenericQuery<any>('accounts/sub-heads', companyId ?? undefined);
+  const { data: apiTxnTypes = [] } = useGenericQuery<any>('billing/transaction-types', companyId ?? undefined);
+
   const [entriesList, setEntriesList] = useState<AccountEntry[]>([]);
+  const [headsList, setHeadsList] = useState<AccountHead[]>([]);
+  const [subHeadsList, setSubHeadsList] = useState<SubHead[]>([]);
+  const [txnTypesList, setTxnTypesList] = useState<TransactionType[]>([]);
+
   const usersList = useMemo(() => {
     if (!Array.isArray(staff)) return [];
     return staff.map((s: any) => s.name).filter(Boolean);
@@ -67,17 +92,38 @@ export default function AccountEntryPage() {
       setEntriesList(apiEntries);
     }
   }, [apiEntries]);
+
+  useEffect(() => {
+    if (Array.isArray(apiHeads) && apiHeads.length > 0) {
+      setHeadsList(apiHeads);
+    }
+  }, [apiHeads]);
+
+  useEffect(() => {
+    if (Array.isArray(apiSubHeads) && apiSubHeads.length > 0) {
+      setSubHeadsList(apiSubHeads);
+    }
+  }, [apiSubHeads]);
+
+  useEffect(() => {
+    if (Array.isArray(apiTxnTypes) && apiTxnTypes.length > 0) {
+      setTxnTypesList(apiTxnTypes);
+    }
+  }, [apiTxnTypes]);
+
+  // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<AccountEntry | null>(null);
 
-  const [formHead, setFormHead] = useState('');
-  const [formSubHead, setFormSubHead] = useState('');
+  const [formHeadId, setFormHeadId] = useState('');
+  const [formSubHeadId, setFormSubHeadId] = useState('');
   const [formDate, setFormDate] = useState<Date | undefined>(undefined);
   const [formDateOpen, setFormDateOpen] = useState(false);
   const [formDescription, setFormDescription] = useState('');
   const [formAmount, setFormAmount] = useState('');
-  const [formTxnType, setFormTxnType] = useState('Debit');
+  const [formTxnTypeId, setFormTxnTypeId] = useState('');
 
+  // Filter state
   const [filterHead, setFilterHead] = useState('All');
   const [filterSubHead, setFilterSubHead] = useState('All');
   const [filterUser, setFilterUser] = useState('All');
@@ -91,8 +137,29 @@ export default function AccountEntryPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [search, setSearch] = useState('');
 
-  const subHeadOptions = formHead ? accountSubHeads[formHead] || [] : [];
+  // Derived sub head options based on selected head
+  const subHeadOptions = useMemo(() => {
+    if (!formHeadId) return [];
+    return subHeadsList.filter((s) => s.masterAccountId === formHeadId);
+  }, [formHeadId, subHeadsList]);
 
+  // Get display names for entries
+  const getHeadName = (headId: string) => {
+    const head = headsList.find((h) => h.id === headId);
+    return head?.masterAccount || headId;
+  };
+
+  const getSubHeadName = (subHeadId: string) => {
+    const sub = subHeadsList.find((s) => s.id === subHeadId);
+    return sub?.subMasterAccount || subHeadId;
+  };
+
+  const getTxnTypeName = (txnTypeId: string) => {
+    const txn = txnTypesList.find((t) => t.id === txnTypeId);
+    return txn?.paymentChannel || txnTypeId;
+  };
+
+  // Filtering
   const filteredData = useMemo(() => {
     return entriesList.filter((e) => {
       if (filterHead !== 'All' && e.head !== filterHead) return false;
@@ -100,15 +167,25 @@ export default function AccountEntryPage() {
       if (filterUser !== 'All' && e.addBy !== filterUser && e.editBy !== filterUser) return false;
       if (filterBy === 'Add By' && filterUser !== 'All' && e.addBy !== filterUser) return false;
       if (filterBy === 'Edit By' && filterUser !== 'All' && e.editBy !== filterUser) return false;
+      if (filterFromDate) {
+        const from = format(filterFromDate, 'yyyy-MM-dd');
+        if (e.date < from) return false;
+      }
+      if (filterToDate) {
+        const to = format(filterToDate, 'yyyy-MM-dd');
+        if (e.date > to) return false;
+      }
       if (search) {
         const q = search.toLowerCase();
-        if (!e.head.toLowerCase().includes(q) && !e.subHead.toLowerCase().includes(q) && !e.comments.toLowerCase().includes(q)) {
+        const headName = getHeadName(e.head).toLowerCase();
+        const subHeadName = getSubHeadName(e.subHead).toLowerCase();
+        if (!headName.includes(q) && !subHeadName.includes(q) && !e.description.toLowerCase().includes(q)) {
           return false;
         }
       }
       return true;
     });
-  }, [entriesList, filterHead, filterSubHead, filterUser, filterBy, search]);
+  }, [entriesList, filterHead, filterSubHead, filterUser, filterBy, filterFromDate, filterToDate, search, headsList, subHeadsList]);
 
   const totalPages = Math.ceil(filteredData.length / parseInt(pageSize));
   const paginatedData = filteredData.slice(
@@ -116,39 +193,41 @@ export default function AccountEntryPage() {
     currentPage * parseInt(pageSize)
   );
 
+  // Dialog handlers
   const openAddDialog = () => {
     setEditingItem(null);
-    setFormHead('');
-    setFormSubHead('');
+    setFormHeadId('');
+    setFormSubHeadId('');
     setFormDate(undefined);
     setFormDescription('');
     setFormAmount('');
-    setFormTxnType('Debit');
+    setFormTxnTypeId('');
     setDialogOpen(true);
   };
 
   const openEditDialog = (item: AccountEntry) => {
     setEditingItem(item);
-    setFormHead(item.head);
-    setFormSubHead(item.subHead);
+    setFormHeadId(item.head);
+    setFormSubHeadId(item.subHead);
     setFormDate(new Date(item.date));
-    setFormDescription(item.comments);
+    setFormDescription(item.description);
     setFormAmount(String(item.amount));
-    setFormTxnType('Debit');
+    setFormTxnTypeId(item.transactionType);
     setDialogOpen(true);
   };
 
   const handleSave = () => {
-    if (!formHead || !formSubHead || !formAmount) return;
+    if (!formHeadId || !formSubHeadId || !formAmount) return;
     const newEntry: AccountEntry = {
       id: editingItem ? editingItem.id : String(Date.now()),
-      head: formHead,
-      subHead: formSubHead,
-      comments: formDescription,
+      head: formHeadId,
+      subHead: formSubHeadId,
+      description: formDescription,
       date: formDate ? format(formDate, 'yyyy-MM-dd') : new Date().toISOString().split('T')[0],
       addBy: editingItem ? editingItem.addBy : 'Admin',
       editBy: editingItem ? 'Admin' : '-',
       amount: parseFloat(formAmount),
+      transactionType: formTxnTypeId,
     };
     if (editingItem) {
       setEntriesList(entriesList.map((e) => e.id === editingItem.id ? newEntry : e));
@@ -187,12 +266,13 @@ export default function AccountEntryPage() {
         </div>
         <Button onClick={openAddDialog} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700">
           <PlusCircle className="mr-2 h-4 w-4" />
-          Add Account
+          Add Entry
         </Button>
       </div>
 
       <div className="h-0.5 bg-gradient-to-r from-blue-500/50 via-indigo-500/30 to-transparent" />
 
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center gap-3">
@@ -219,16 +299,17 @@ export default function AccountEntryPage() {
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
-              <Layers className="h-5 w-5" />
+              <FileText className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-xs font-medium text-muted-foreground">Account Heads</p>
-              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{new Set(entriesList.map(e => e.head)).size}</p>
+              <p className="text-xs font-medium text-muted-foreground">Transaction Types</p>
+              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{new Set(entriesList.map(e => e.transactionType)).size}</p>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Filters */}
       <Card className="transition-all duration-300 hover:shadow-md">
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -240,23 +321,23 @@ export default function AccountEntryPage() {
                 </SelectTrigger>
                 <SelectContent portal={false}>
                   <SelectItem value="All">All</SelectItem>
-                  {accountHeads.map((h) => (
-                    <SelectItem key={h} value={h}>{h}</SelectItem>
+                  {headsList.map((h) => (
+                    <SelectItem key={h.id} value={h.id}>{h.masterAccount}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label>Account SubHead</Label>
+              <Label>Sub Head</Label>
               <Select value={filterSubHead} onValueChange={setFilterSubHead}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent portal={false}>
                   <SelectItem value="All">All</SelectItem>
-                  {Object.values(accountSubHeads).flat().map((sh) => (
-                    <SelectItem key={sh} value={sh}>{sh}</SelectItem>
+                  {subHeadsList.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.subMasterAccount}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -324,6 +405,7 @@ export default function AccountEntryPage() {
         </CardContent>
       </Card>
 
+      {/* Table */}
       <Card>
         <CardContent className="pt-6">
           <div className="flex items-center justify-between mb-4">
@@ -346,7 +428,7 @@ export default function AccountEntryPage() {
             <div className="relative max-w-sm">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by head, subhead or comments..."
+                placeholder="Search by head, sub head or description..."
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
                 className="pl-8"
@@ -359,20 +441,19 @@ export default function AccountEntryPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[60px]">ID</TableHead>
-                  <TableHead className="w-[100px]">Head</TableHead>
-                  <TableHead className="w-[120px]">SubHead</TableHead>
-                  <TableHead className="w-[160px]">Comments</TableHead>
+                  <TableHead className="w-[120px]">Head</TableHead>
+                  <TableHead className="w-[120px]">Sub Head</TableHead>
+                  <TableHead className="w-[200px]">Description</TableHead>
                   <TableHead className="w-[100px]">Date</TableHead>
                   <TableHead className="w-[80px]">Add By</TableHead>
                   <TableHead className="w-[80px]">Edit By</TableHead>
-                  <TableHead className="w-[100px]">Amount</TableHead>
-                  <TableHead className="w-[60px]">Action</TableHead>
+                  <TableHead className="w-[80px]">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginatedData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       No account entries found.
                     </TableCell>
                   </TableRow>
@@ -380,13 +461,12 @@ export default function AccountEntryPage() {
                   paginatedData.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell className="text-muted-foreground truncate">{item.id}</TableCell>
-                      <TableCell className="font-medium truncate">{item.head}</TableCell>
-                      <TableCell className="truncate">{item.subHead}</TableCell>
-                      <TableCell className="truncate">{item.comments}</TableCell>
+                      <TableCell className="font-medium truncate">{getHeadName(item.head)}</TableCell>
+                      <TableCell className="truncate">{getSubHeadName(item.subHead)}</TableCell>
+                      <TableCell className="truncate">{item.description}</TableCell>
                       <TableCell className="truncate">{item.date}</TableCell>
                       <TableCell className="truncate">{item.addBy}</TableCell>
                       <TableCell className="truncate">{item.editBy}</TableCell>
-                      <TableCell className="font-mono truncate">Rs. {item.amount.toLocaleString()}</TableCell>
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -430,6 +510,7 @@ export default function AccountEntryPage() {
         </CardContent>
       </Card>
 
+      {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg rounded-xl shadow-lg">
           <DialogHeader>
@@ -444,26 +525,30 @@ export default function AccountEntryPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Account Head</Label>
-                <Select value={formHead} onValueChange={(v) => { setFormHead(v); setFormSubHead(''); }}>
+                <Select value={formHeadId} onValueChange={(v) => {
+                  setFormHeadId(v);
+                  const matching = subHeadsList.filter((s) => s.masterAccountId === v);
+                  setFormSubHeadId(matching.length > 0 ? matching[0].id : '');
+                }}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select head" />
                   </SelectTrigger>
                   <SelectContent portal={false}>
-                    {accountHeads.map((h) => (
-                      <SelectItem key={h} value={h}>{h}</SelectItem>
+                    {headsList.map((h) => (
+                      <SelectItem key={h.id} value={h.id}>{h.masterAccount}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Account SubHead</Label>
-                <Select value={formSubHead} onValueChange={setFormSubHead} disabled={!formHead}>
+                <Label>Sub Account Head</Label>
+                <Select value={formSubHeadId} onValueChange={setFormSubHeadId} disabled={!formHeadId}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select subhead" />
+                    <SelectValue placeholder="Select sub head" />
                   </SelectTrigger>
                   <SelectContent portal={false}>
-                    {subHeadOptions.map((sh) => (
-                      <SelectItem key={sh} value={sh}>{sh}</SelectItem>
+                    {subHeadOptions.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>{s.subMasterAccount}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -491,7 +576,7 @@ export default function AccountEntryPage() {
                 placeholder="Enter description..."
                 value={formDescription}
                 onChange={(e) => setFormDescription(e.target.value)}
-                rows={4}
+                rows={5}
               />
             </div>
 
@@ -507,13 +592,13 @@ export default function AccountEntryPage() {
               </div>
               <div className="space-y-2">
                 <Label>Transaction Type</Label>
-                <Select value={formTxnType} onValueChange={setFormTxnType}>
+                <Select value={formTxnTypeId} onValueChange={setFormTxnTypeId}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent portal={false}>
-                    {transactionTypes.map((t) => (
-                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    {txnTypesList.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.paymentChannel}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -522,7 +607,7 @@ export default function AccountEntryPage() {
 
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleSave} disabled={!formHead || !formSubHead || !formAmount} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700">
+              <Button onClick={handleSave} disabled={!formHeadId || !formSubHeadId || !formAmount} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700">
                 {editingItem ? 'Update' : 'Add'}
               </Button>
             </div>

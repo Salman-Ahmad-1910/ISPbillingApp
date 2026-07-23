@@ -75,6 +75,7 @@ import {
   Clock,
   MessageCircle,
   BookOpen,
+  Layers,
 } from 'lucide-react';
 import type { NavItem, NavItemGroup } from '@/lib/types';
 import { CircleDollarSign as AppIcon } from 'lucide-react';
@@ -184,6 +185,7 @@ const navItems: NavItemGroup[] = [
   {
     title: 'Accounts',
     items: [
+      { title: 'Account Head', href: '/accounts/account-head', icon: Layers, allowedRoles: ['admin', 'manager'] },
       { title: 'Account Entry', href: '/accounts/account-entry', icon: ClipboardPen, allowedRoles: ['admin', 'manager'] },
       { title: 'Account Reports', href: '/accounts/account-reports', icon: FileText, allowedRoles: ['admin', 'manager'] },
       { title: 'One Day Balance Sheet', href: '/accounts/one-day-balance-sheet', icon: BarChartBig, allowedRoles: ['admin', 'manager'] },

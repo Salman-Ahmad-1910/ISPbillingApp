@@ -31,6 +31,9 @@ func GetDashboardData(c *gin.Context) {
 	var totalCollectionToday float64
 	config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL AND payment_date = CURRENT_DATE::text`, companyID).Scan(&totalCollectionToday)
 
+	var totalCollectionMonth float64
+	config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL AND payment_date >= (DATE_TRUNC('month', CURRENT_DATE))::text`, companyID).Scan(&totalCollectionMonth)
+
 	var overdueCount int64
 	config.DB.Raw(`
 		SELECT COUNT(*)
@@ -80,6 +83,7 @@ func GetDashboardData(c *gin.Context) {
 			"suspended": suspendedCount,
 		},
 		"totalCollectionToday": totalCollectionToday,
+		"totalCollectionMonth": totalCollectionMonth,
 		"overdueCount":         overdueCount,
 		"overdueAmount":        overdueAmount,
 		"payments":             payments,

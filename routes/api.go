@@ -58,6 +58,9 @@ func SetupRoutes(r *gin.Engine) {
 		accounts.PUT("/ledger/:id", controllers.UpdateLedgerEntry)
 		accounts.DELETE("/ledger/:id", controllers.DeleteLedgerEntry)
 		controllers.RegisterGenericCRUD[models.Expense](accounts, "/expenses")
+		controllers.RegisterGenericCRUD[models.AccountHead](accounts, "/heads")
+		controllers.RegisterGenericCRUD[models.AccountSubHead](accounts, "/sub-heads")
+		controllers.RegisterGenericCRUD[models.AccountEntry](accounts, "/entries")
 	}
 
 	// Public routes

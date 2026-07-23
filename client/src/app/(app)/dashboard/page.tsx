@@ -67,11 +67,11 @@ export default function DashboardPage() {
     localStorage.setItem(`collection_target_${companyId}`, target.toString());
   }, [companyId]);
 
-  const totalCollection = data?.totalCollectionToday || 0;
+  const totalCollection = data?.totalCollectionMonth || 0;
 
   const kpiConfig = [
     { title: 'Active Subscribers', value: data?.subscribersStats?.active || 0, icon: Users, change: `in ${companyName}`, gradient: 'from-blue-500 to-cyan-500', bgLight: 'bg-blue-50 dark:bg-blue-950/30' },
-    { title: 'Total Collection (Today)', value: `PKR ${(data?.totalCollectionToday || 0).toLocaleString()}`, icon: Wallet, change: 'real-time total', gradient: 'from-emerald-500 to-green-500', bgLight: 'bg-emerald-50 dark:bg-emerald-950/30' },
+    { title: 'Total Collection (Month)', value: `PKR ${(data?.totalCollectionMonth || 0).toLocaleString()}`, icon: Wallet, change: 'this month total', gradient: 'from-emerald-500 to-green-500', bgLight: 'bg-emerald-50 dark:bg-emerald-950/30' },
   ];
 
   const kpiConfigRight = [
@@ -121,7 +121,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      <div className="mb-6 flex flex-wrap items-stretch gap-6">
+      <div className="mb-4 flex flex-wrap items-stretch gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-4 mb-4">
             {logoUrl ? (
@@ -178,7 +178,7 @@ export default function DashboardPage() {
           <DailyCollectionChart />
         </div>
         <div className="lg:col-span-3 transition-all duration-300 rounded-xl">
-          <SubscriberGrowthChart />
+          <SubscriberGrowthChart liveActiveCount={data?.subscribersStats?.active || 0} />
         </div>
       </div>
 

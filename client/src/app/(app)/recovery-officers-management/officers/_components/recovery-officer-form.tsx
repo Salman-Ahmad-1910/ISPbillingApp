@@ -141,13 +141,9 @@ export function RecoveryOfficerForm({ recoveryOfficer, onSave, onCancel, isSavin
                         value={formData.email}
                         onChange={(e) => handleInputChange('email', e.target.value)}
                         placeholder="Enter email address"
-                        disabled={isEditMode} // Disable email in edit mode
-                        className={`${errors.email ? 'border-red-500' : ''} ${isEditMode ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                        className={errors.email ? 'border-red-500' : ''}
                     />
                     {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
-                    {isEditMode && (
-                        <p className="text-xs text-gray-500">Email cannot be changed in edit mode</p>
-                    )}
                 </div>
 
                 <div className="space-y-2">
@@ -174,35 +170,33 @@ export function RecoveryOfficerForm({ recoveryOfficer, onSave, onCancel, isSavin
                     {errors.secondaryPhone && <p className="text-sm text-red-500">{errors.secondaryPhone}</p>}
                 </div>
 
-                {!isEditMode && (
-                    <div className="space-y-2">
-                        <Label htmlFor="password">Password *</Label>
-                        <div className="relative">
-                            <Input
-                                id="password"
-                                type={showPassword ? 'text' : 'password'}
-                                value={formData.password}
-                                onChange={(e) => handleInputChange('password', e.target.value)}
-                                placeholder="Enter password"
-                                className={errors.password ? 'border-red-500' : ''}
-                            />
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                                onClick={() => setShowPassword(!showPassword)}
-                            >
-                                {showPassword ? (
-                                    <EyeOff className="h-4 w-4 text-gray-500" />
-                                ) : (
-                                    <Eye className="h-4 w-4 text-gray-500" />
-                                )}
-                            </Button>
-                        </div>
-                        {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
+                <div className="space-y-2">
+                    <Label htmlFor="password">Password {!isEditMode ? '*' : ''}</Label>
+                    <div className="relative">
+                        <Input
+                            id="password"
+                            type={showPassword ? 'text' : 'password'}
+                            value={formData.password}
+                            onChange={(e) => handleInputChange('password', e.target.value)}
+                            placeholder={isEditMode ? 'Leave blank to keep current' : 'Enter password'}
+                            className={errors.password ? 'border-red-500' : ''}
+                        />
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            onClick={() => setShowPassword(!showPassword)}
+                        >
+                            {showPassword ? (
+                                <EyeOff className="h-4 w-4 text-gray-500" />
+                            ) : (
+                                <Eye className="h-4 w-4 text-gray-500" />
+                            )}
+                        </Button>
                     </div>
-                )}
+                    {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
+                </div>
 
                 <div className="space-y-2">
                     <Label htmlFor="areaId">Area</Label>

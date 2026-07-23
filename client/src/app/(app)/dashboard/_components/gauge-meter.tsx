@@ -155,8 +155,8 @@ export function GaugeMeter({ currentAmount, targetAmount, onTargetSave }: GaugeM
 
   return (
     <>
-      <div className="flex flex-col items-center gap-1 relative">
-        <svg width={size} height={size * 0.65} viewBox={`0 0 ${size} ${size * 0.65}`} className="drop-shadow-sm">
+      <div className="flex flex-col items-center gap-0 relative rounded-xl border bg-card shadow-sm p-0 pt-0 overflow-hidden">
+        <svg width={size} height={size * 0.75} viewBox={`0 0 ${size} ${size * 0.75}`} className="drop-shadow-sm">
           <defs>
             <filter id="needleShadow">
               <feDropShadow dx="0" dy="1" stdDeviation="1.5" floodOpacity="0.3" />
@@ -224,14 +224,14 @@ export function GaugeMeter({ currentAmount, targetAmount, onTargetSave }: GaugeM
         </svg>
 
         {/* Digital display */}
-        <div className="text-center -mt-2 relative z-10">
-          <div className="text-2xl font-extrabold tracking-tight" style={{ color: getColor(animatedPercent) }}>
+        <div className="text-center -mt-4 relative z-10 px-2">
+          <div className="text-xl font-extrabold tracking-tight" style={{ color: getColor(animatedPercent) }}>
             {animatedPercent.toFixed(1)}%
           </div>
-          <p className="text-[10px] font-medium" style={{ color: getColor(animatedPercent) }}>
+          <p className="text-[9px] font-medium leading-tight" style={{ color: getColor(animatedPercent) }}>
             {getStatusLabel(animatedPercent)}
           </p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">
+          <p className="text-[9px] text-muted-foreground leading-tight">
             PKR {formatCurrency(currentAmount)} / {formatCurrency(targetAmount)}
           </p>
         </div>
@@ -239,7 +239,7 @@ export function GaugeMeter({ currentAmount, targetAmount, onTargetSave }: GaugeM
         <Button
           variant="outline"
           size="sm"
-          className="h-7 text-xs gap-1 mt-1 border-dashed hover:border-solid transition-all"
+          className="h-6 text-[10px] gap-1 mt-0.5 mb-2 border-dashed hover:border-solid transition-all"
           onClick={() => { setTargetInput(targetAmount > 0 ? targetAmount.toString() : ''); setShowTargetDialog(true); }}
         >
           <Target className="h-3 w-3" />
