@@ -26,6 +26,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
+import api from '@/lib/api';
 import { BookOpen, PlusCircle, MoreHorizontal, Edit3, Trash2, Search, CalendarIcon, DollarSign, FileText, Loader2 } from 'lucide-react';
 import type { Staff } from '@/lib/types';
 
@@ -70,6 +73,8 @@ interface AccountEntry {
 
 export default function AccountEntryPage() {
   const { companyId } = useCompany();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data: apiEntries = [], isLoading } = useGenericQuery<any>('accounts/entries', companyId ?? undefined);
   const { data: staff = [] } = useGenericQuery<Staff>('hr/staff', companyId ?? undefined);
@@ -216,10 +221,9 @@ export default function AccountEntryPage() {
     setDialogOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formHeadId || !formSubHeadId || !formAmount) return;
-    const newEntry: AccountEntry = {
-      id: editingItem ? editingItem.id : String(Date.now()),
+    const payload = {
       head: formHeadId,
       subHead: formSubHeadId,
       description: formDescription,
@@ -228,17 +232,30 @@ export default function AccountEntryPage() {
       editBy: editingItem ? 'Admin' : '-',
       amount: parseFloat(formAmount),
       transactionType: formTxnTypeId,
+      companyId: companyId,
     };
-    if (editingItem) {
-      setEntriesList(entriesList.map((e) => e.id === editingItem.id ? newEntry : e));
-    } else {
-      setEntriesList([newEntry, ...entriesList]);
+    try {
+      if (editingItem) {
+        await api.put(`/accounts/entries/${editingItem.id}`, payload);
+      } else {
+        await api.post('/accounts/entries', payload);
+      }
+      queryClient.invalidateQueries({ queryKey: ['accounts/entries', companyId] });
+      toast({ title: 'Success', description: editingItem ? 'Entry updated.' : 'Entry added.' });
+      setDialogOpen(false);
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.response?.data?.message || 'Failed to save' });
     }
-    setDialogOpen(false);
   };
 
-  const handleDelete = (id: string) => {
-    setEntriesList(entriesList.filter((e) => e.id !== id));
+  const handleDelete = async (id: string) => {
+    try {
+      await api.delete(`/accounts/entries/${id}`);
+      queryClient.invalidateQueries({ queryKey: ['accounts/entries', companyId] });
+      toast({ title: 'Success', description: 'Entry deleted.' });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.response?.data?.message || 'Failed to delete' });
+    }
   };
 
   if (isLoading) {

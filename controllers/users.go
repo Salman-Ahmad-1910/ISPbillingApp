@@ -24,33 +24,33 @@ type CreateUserRequest struct {
 
 type CreateSubUserRequest struct {
 	CreateUserRequest
-	Phone          string     `json:"phone,omitempty"`          // For recovery officers
-	AreaID         *uuid.UUID `json:"areaId,omitempty"`         // For recovery officers
-	FranchiseID    *uuid.UUID `json:"franchiseId,omitempty"`    // For dealers
-	ParentDealerID *uuid.UUID `json:"parentDealerId,omitempty"` // For sub-dealers
-	Department     string     `json:"department,omitempty"`     // For staff
-	Designation    string     `json:"designation,omitempty"`    // For staff
-	Salary         float64    `json:"salary,omitempty"`         // For staff
-	CommissionRate float64    `json:"commissionRate,omitempty"` // For dealers
+	Phone          string  `json:"phone,omitempty"`          // For recovery officers
+	AreaID         *string `json:"areaId,omitempty"`         // For recovery officers
+	FranchiseID    *string `json:"franchiseId,omitempty"`    // For dealers
+	ParentDealerID *string `json:"parentDealerId,omitempty"` // For sub-dealers
+	Department     string  `json:"department,omitempty"`     // For staff
+	Designation    string  `json:"designation,omitempty"`    // For staff
+	Salary         float64 `json:"salary,omitempty"`         // For staff
+	CommissionRate float64 `json:"commissionRate,omitempty"` // For dealers
 
 	// Recovery Officer specific fields
 	SecondaryPhone string `json:"secondaryPhone,omitempty"` // For recovery officers
 }
 
 type UpdateSubUserRequest struct {
-	Name           string     `json:"name" binding:"required"`
-	Email          string     `json:"email" binding:"required,email"`
-	Password       string     `json:"password" binding:"omitempty,min=6"`
-	Role           string     `json:"role" binding:"required"`
-	Phone          string     `json:"phone,omitempty"`
-	AreaID         *uuid.UUID `json:"areaId,omitempty"`
-	FranchiseID    *uuid.UUID `json:"franchiseId,omitempty"`
-	ParentDealerID *uuid.UUID `json:"parentDealerId,omitempty"`
-	Department     string     `json:"department,omitempty"`
-	Designation    string     `json:"designation,omitempty"`
-	Salary         float64    `json:"salary,omitempty"`
-	CommissionRate float64    `json:"commissionRate,omitempty"`
-	SecondaryPhone string     `json:"secondaryPhone,omitempty"`
+	Name           string  `json:"name" binding:"required"`
+	Email          string  `json:"email" binding:"required,email"`
+	Password       string  `json:"password" binding:"omitempty,min=6"`
+	Role           string  `json:"role" binding:"required"`
+	Phone          string  `json:"phone,omitempty"`
+	AreaID         *string `json:"areaId,omitempty"`
+	FranchiseID    *string `json:"franchiseId,omitempty"`
+	ParentDealerID *string `json:"parentDealerId,omitempty"`
+	Department     string  `json:"department,omitempty"`
+	Designation    string  `json:"designation,omitempty"`
+	Salary         float64 `json:"salary,omitempty"`
+	CommissionRate float64 `json:"commissionRate,omitempty"`
+	SecondaryPhone string  `json:"secondaryPhone,omitempty"`
 }
 
 // GetRecoveryOfficers retrieves all recovery officers for a company
@@ -92,6 +92,26 @@ func UpdateSubUser(c *gin.Context) {
 
 	// Normalize role to lowercase
 	req.Role = strings.ToLower(req.Role)
+
+	// Parse optional UUID fields from strings
+	var areaID *uuid.UUID
+	if req.AreaID != nil && *req.AreaID != "" {
+		if parsed, err := uuid.Parse(*req.AreaID); err == nil {
+			areaID = &parsed
+		}
+	}
+	var franchiseID *uuid.UUID
+	if req.FranchiseID != nil && *req.FranchiseID != "" {
+		if parsed, err := uuid.Parse(*req.FranchiseID); err == nil {
+			franchiseID = &parsed
+		}
+	}
+	var parentDealerID *uuid.UUID
+	if req.ParentDealerID != nil && *req.ParentDealerID != "" {
+		if parsed, err := uuid.Parse(*req.ParentDealerID); err == nil {
+			parentDealerID = &parsed
+		}
+	}
 
 	// Validate role
 	validRoles := map[string]bool{
@@ -146,18 +166,15 @@ func UpdateSubUser(c *gin.Context) {
 	// Update role-specific records
 	switch req.Role {
 	case "recovery_officer":
-		if req.AreaID == nil {
-			tx.Rollback()
-			utils.ErrorResponse(c, 400, "Area ID is required for recovery officers", nil)
-			return
-		}
 		// Update recovery officer record
 		updates := map[string]interface{}{
 			"name":            req.Name,
 			"email":           req.Email,
 			"phone":           req.Phone,
 			"secondary_phone": req.SecondaryPhone,
-			"area_id":         req.AreaID,
+		}
+		if areaID != nil {
+			updates["area_id"] = areaID
 		}
 		if req.Password != "" {
 			updates["password"] = string(hashedPassword)
@@ -173,8 +190,8 @@ func UpdateSubUser(c *gin.Context) {
 			"name":             req.Name,
 			"phone":            req.Phone,
 			"commission_rate":  req.CommissionRate,
-			"franchise_id":     req.FranchiseID,
-			"parent_dealer_id": req.ParentDealerID,
+			"franchise_id":     franchiseID,
+			"parent_dealer_id": parentDealerID,
 		}
 		if err := tx.Model(&models.Dealer{}).Where("id = ? AND company_id = ?", id, companyID).Updates(updates).Error; err != nil {
 			tx.Rollback()
@@ -191,7 +208,7 @@ func UpdateSubUser(c *gin.Context) {
 			"designation":     req.Designation,
 			"department":      req.Department,
 			"salary":          req.Salary,
-			"area_id":         req.AreaID,
+			"area_id":         areaID,
 		}
 		if err := tx.Model(&models.Staff{}).Where("id = ? AND company_id = ?", id, companyID).Updates(updates).Error; err != nil {
 			tx.Rollback()
@@ -319,6 +336,26 @@ func CreateSubUser(c *gin.Context) {
 		return
 	}
 
+	// Parse optional UUID fields from strings
+	var areaID *uuid.UUID
+	if req.AreaID != nil && *req.AreaID != "" {
+		if parsed, err := uuid.Parse(*req.AreaID); err == nil {
+			areaID = &parsed
+		}
+	}
+	var franchiseID *uuid.UUID
+	if req.FranchiseID != nil && *req.FranchiseID != "" {
+		if parsed, err := uuid.Parse(*req.FranchiseID); err == nil {
+			franchiseID = &parsed
+		}
+	}
+	var parentDealerID *uuid.UUID
+	if req.ParentDealerID != nil && *req.ParentDealerID != "" {
+		if parsed, err := uuid.Parse(*req.ParentDealerID); err == nil {
+			parentDealerID = &parsed
+		}
+	}
+
 	// Hash password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -379,7 +416,7 @@ func CreateSubUser(c *gin.Context) {
 			Password:       string(hashedPassword),
 			Phone:          req.Phone, // Use phone from request
 			SecondaryPhone: req.SecondaryPhone,
-			AreaID:         req.AreaID, // Make AreaID optional
+			AreaID:         areaID,
 			Status:         "active",
 		}
 		recoveryOfficer.ID = user.ID // Set ID after struct creation
@@ -400,8 +437,8 @@ func CreateSubUser(c *gin.Context) {
 			Cnic:           "", // Will be updated separately
 			CommissionRate: req.CommissionRate,
 			WalletBalance:  0,
-			FranchiseID:    req.FranchiseID,
-			ParentDealerID: req.ParentDealerID,
+			FranchiseID:    franchiseID,
+			ParentDealerID: parentDealerID,
 		}
 		if err := tx.Create(&dealer).Error; err != nil {
 			tx.Rollback()
@@ -422,7 +459,7 @@ func CreateSubUser(c *gin.Context) {
 			Designation:    req.Designation,
 			Department:     req.Department,
 			Salary:         req.Salary,
-			AreaID:         req.AreaID,
+			AreaID:         areaID,
 		}
 		staff.ID = user.ID // Set ID after struct creation
 		fmt.Printf("DEBUG: Creating staff with ID: %s, Name: %s, Email: %s\n", staff.ID, staff.Name, staff.Email)

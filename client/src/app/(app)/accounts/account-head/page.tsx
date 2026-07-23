@@ -22,6 +22,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
+import api from '@/lib/api';
 import { Layers, PlusCircle, MoreHorizontal, Edit3, Trash2, Search, Loader2 } from 'lucide-react';
 
 const accountTypes = [
@@ -51,6 +54,8 @@ interface SubHead {
 
 export default function AccountHeadPage() {
   const { companyId } = useCompany();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const { data: apiHeads = [], isLoading } = useGenericQuery<any>('accounts/heads', companyId ?? undefined);
   const { data: apiSubHeads = [] } = useGenericQuery<any>('accounts/sub-heads', companyId ?? undefined);
 
@@ -158,24 +163,36 @@ export default function AccountHeadPage() {
     setHeadDialogOpen(true);
   };
 
-  const handleSaveHead = () => {
+  const handleSaveHead = async () => {
     if (!formMasterAccount || !formAccountType) return;
-    const newItem: AccountHead = {
-      id: editingHead ? editingHead.id : String(Date.now()),
+    const payload = {
       masterAccount: formMasterAccount,
       accountType: formAccountType,
       description: formDescription,
+      companyId: companyId,
     };
-    if (editingHead) {
-      setHeadsList(headsList.map((h) => (h.id === editingHead.id ? newItem : h)));
-    } else {
-      setHeadsList([newItem, ...headsList]);
+    try {
+      if (editingHead) {
+        await api.put(`/accounts/heads/${editingHead.id}`, payload);
+      } else {
+        await api.post('/accounts/heads', payload);
+      }
+      queryClient.invalidateQueries({ queryKey: ['accounts/heads', companyId] });
+      toast({ title: 'Success', description: editingHead ? 'Account head updated.' : 'Account head added.' });
+      setHeadDialogOpen(false);
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.response?.data?.message || 'Failed to save' });
     }
-    setHeadDialogOpen(false);
   };
 
-  const handleDeleteHead = (id: string) => {
-    setHeadsList(headsList.filter((h) => h.id !== id));
+  const handleDeleteHead = async (id: string) => {
+    try {
+      await api.delete(`/accounts/heads/${id}`);
+      queryClient.invalidateQueries({ queryKey: ['accounts/heads', companyId] });
+      toast({ title: 'Success', description: 'Account head deleted.' });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.response?.data?.message || 'Failed to delete' });
+    }
   };
 
   // Sub Head CRUD
@@ -199,28 +216,40 @@ export default function AccountHeadPage() {
     setSubDialogOpen(true);
   };
 
-  const handleSaveSubHead = () => {
+  const handleSaveSubHead = async () => {
     if (!formSubMasterAccount || !formSelectedHeadId) return;
     const head = headsList.find((h) => h.id === formSelectedHeadId);
-    const newItem: SubHead = {
-      id: editingSubHead ? editingSubHead.id : String(Date.now()),
+    const payload = {
       subMasterAccount: formSubMasterAccount,
       masterAccountId: formSelectedHeadId,
       masterAccount: head?.masterAccount || '',
       accountType: head?.accountType || '',
       budget: formBudget,
       description: formSubDescription,
+      companyId: companyId,
     };
-    if (editingSubHead) {
-      setSubHeadsList(subHeadsList.map((s) => (s.id === editingSubHead.id ? newItem : s)));
-    } else {
-      setSubHeadsList([newItem, ...subHeadsList]);
+    try {
+      if (editingSubHead) {
+        await api.put(`/accounts/sub-heads/${editingSubHead.id}`, payload);
+      } else {
+        await api.post('/accounts/sub-heads', payload);
+      }
+      queryClient.invalidateQueries({ queryKey: ['accounts/sub-heads', companyId] });
+      toast({ title: 'Success', description: editingSubHead ? 'Sub head updated.' : 'Sub head added.' });
+      setSubDialogOpen(false);
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.response?.data?.message || 'Failed to save' });
     }
-    setSubDialogOpen(false);
   };
 
-  const handleDeleteSubHead = (id: string) => {
-    setSubHeadsList(subHeadsList.filter((s) => s.id !== id));
+  const handleDeleteSubHead = async (id: string) => {
+    try {
+      await api.delete(`/accounts/sub-heads/${id}`);
+      queryClient.invalidateQueries({ queryKey: ['accounts/sub-heads', companyId] });
+      toast({ title: 'Success', description: 'Sub head deleted.' });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.response?.data?.message || 'Failed to delete' });
+    }
   };
 
   if (isLoading) {
