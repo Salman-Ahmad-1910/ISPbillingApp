@@ -5,16 +5,16 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 
-import { PlusCircle, Trash2, CreditCard, Landmark, CircleDollarSign, Loader2, ShoppingCart, Search, Users, UserRound, Handshake } from 'lucide-react';
+import { PlusCircle, Trash2, CreditCard, Landmark, CircleDollarSign, Loader2, ShoppingCart, Search, Users, UserRound, Handshake, CalendarDays, Receipt } from 'lucide-react';
 import Image from 'next/image';
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import type { Product } from '@/lib/types';
+import type { Product, InstallmentPlan, SubscriberInstallment } from '@/lib/types';
 import { backendImageUrl } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
 
 import api from '@/lib/api';
 import { useQueryClient } from '@tanstack/react-query';
@@ -144,6 +144,10 @@ export default function POSPage() {
     const { data: customersData = [] } = useGenericQuery<any>('crm/customers', companyId ?? undefined);
     const { data: dealersData = [] } = useGenericQuery<any>('dealers', companyId ?? undefined);
     const { data: subscribersData = [] } = useGenericQuery<any>('admin/connections', companyId ?? undefined);
+    const { data: installmentPlans = [] } = useGenericQuery<InstallmentPlan>(
+        'sales/installment-plans',
+        companyId ?? undefined,
+    );
 
     const [cart, setCart] = useState<CartItem[]>([]);
     const [customerId, setCustomerId] = useState<string>('');
@@ -151,10 +155,17 @@ export default function POSPage() {
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'bank' | null>('cash');
     const [isProcessing, setIsProcessing] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [discount, setDiscount] = useState(0);
 
     const [showSubscriber, setShowSubscriber] = useState(false);
     const [showCustomer, setShowCustomer] = useState(false);
     const [showDealer, setShowDealer] = useState(false);
+
+    const [isInstallment, setIsInstallment] = useState(false);
+    const [selectedPlanId, setSelectedPlanId] = useState<string>('');
+    const [existingInstallment, setExistingInstallment] = useState<SubscriberInstallment | null>(null);
+    const [fetchingInstallment, setFetchingInstallment] = useState(false);
+    const [pendingSaleItems, setPendingSaleItems] = useState<any[]>([]);
 
     const customerList = useMemo(() => {
         if (!Array.isArray(customersData)) return [];
@@ -170,6 +181,50 @@ export default function POSPage() {
         if (!Array.isArray(dealersData)) return [];
         return dealersData.map((d: any): DropdownItem => ({ id: d.id, name: d.name }));
     }, [dealersData]);
+
+    const planList = useMemo(() => {
+        if (!Array.isArray(installmentPlans)) return [];
+        return installmentPlans.map((p: InstallmentPlan): DropdownItem => ({
+            id: p.id,
+            name: `${p.name} (${p.installments} installments, +${p.percentageIncrease}%)`,
+        }));
+    }, [installmentPlans]);
+
+    const selectedPlan = useMemo(() => {
+        if (!selectedPlanId || !Array.isArray(installmentPlans)) return null;
+        return installmentPlans.find((p: InstallmentPlan) => p.id === selectedPlanId) || null;
+    }, [selectedPlanId, installmentPlans]);
+
+    useEffect(() => {
+        if (customerId && companyId) {
+            setFetchingInstallment(true);
+            api.get(`/pos/installment/${customerId}?companyId=${companyId}`)
+                .then(res => {
+                    const payload = res.data?.data || res.data;
+                    const inst = payload?.installment || payload;
+                    if (inst && inst.id) {
+                        if (!inst.installmentAmount || Number(inst.installmentAmount) === 0) {
+                            inst.installmentAmount = (Number(inst.totalAmount) || 0) / (Number(inst.totalInstallments) || 1);
+                        }
+                        setExistingInstallment(inst);
+                        setIsInstallment(true);
+                        setSelectedPlanId(inst.installmentPlanId);
+                        setPendingSaleItems(payload?.saleItems || []);
+                    } else {
+                        setExistingInstallment(null);
+                        setPendingSaleItems([]);
+                    }
+                })
+                .catch(() => {
+                    setExistingInstallment(null);
+                    setPendingSaleItems([]);
+                })
+                .finally(() => setFetchingInstallment(false));
+        } else {
+            setExistingInstallment(null);
+            setPendingSaleItems([]);
+        }
+    }, [customerId, companyId]);
 
     const handleCheckboxChange = (type: 'subscriber' | 'customer' | 'dealer', checked: boolean) => {
         if (checked) {
@@ -191,6 +246,9 @@ export default function POSPage() {
 
     const handleSelectCustomer = (id: string) => {
         setCustomerId(id);
+        setIsInstallment(false);
+        setSelectedPlanId('');
+        setExistingInstallment(null);
         if (!id) {
             setCustomerType('');
             if (customerType === 'subscriber') setShowSubscriber(false);
@@ -220,6 +278,29 @@ export default function POSPage() {
     const filteredProducts = useMemo(() => {
         return posProducts.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
     }, [posProducts, searchTerm]);
+
+    // Populate cart with original sale items when existing installment is found and products load
+    useEffect(() => {
+        if (existingInstallment && pendingSaleItems.length > 0 && posProducts.length > 0) {
+            const items: CartItem[] = pendingSaleItems.map((si: any) => {
+                const product = posProducts.find(p => p.id === si.productId);
+                return {
+                    product: product || {
+                        id: si.productId,
+                        purchaseItemId: si.productId,
+                        name: si.productName,
+                        price: si.price,
+                        stock: 0,
+                        image: '',
+                        taxPercent: si.taxPercent || 0,
+                    },
+                    quantity: si.quantity,
+                };
+            }).filter((ci: CartItem) => ci.product);
+            setCart(items);
+            setPendingSaleItems([]);
+        }
+    }, [existingInstallment?.id, pendingSaleItems.length, posProducts.length]);
 
     const addToCart = (productId: string) => {
         const product = posProducts.find(p => p.id === productId);
@@ -279,52 +360,128 @@ export default function POSPage() {
       (acc, item) => acc + (item.product.price * item.quantity) * ((Number(item.product.taxPercent) || 0) / 100),
       0
     );
-    const total = subtotal + tax;
+
+    const percentageIncrease = useMemo(() => {
+        if (!isInstallment) return 0;
+        const plan = existingInstallment
+            ? installmentPlans.find((p: InstallmentPlan) => p.id === existingInstallment.installmentPlanId)
+            : selectedPlan;
+        return plan ? (Number(plan.percentageIncrease) || 0) : 0;
+    }, [isInstallment, existingInstallment, selectedPlan, installmentPlans]);
+
+    const increaseAmount = subtotal * (percentageIncrease / 100);
+    const adjustedSubtotal = subtotal + increaseAmount;
+    const total = adjustedSubtotal + tax - discount;
+
+    const handleInstallmentToggle = (checked: boolean) => {
+        setIsInstallment(!!checked);
+        if (!checked) {
+            setSelectedPlanId('');
+            setExistingInstallment(null);
+        }
+    };
+
+    const installmentDetails = useMemo(() => {
+        if (!isInstallment) return null;
+
+        // For existing installments, use stored data directly (plan may not be in list)
+        if (existingInstallment) {
+            const paid = existingInstallment.paidInstallments || 0;
+            const total = existingInstallment.totalInstallments || 0;
+            const remaining = total - paid;
+            const totalAmount = Number(existingInstallment.totalAmount) || 0;
+            const instAmount = Number(existingInstallment.installmentAmount) || (totalAmount / (total || 1));
+            return {
+                planName: existingInstallment.planName || 'Installment Plan',
+                amountPerInstallment: instAmount,
+                totalInstallments: total,
+                paidInstallments: paid,
+                remainingInstallments: remaining,
+                paidMoney: paid * instAmount,
+                remainingMoney: remaining * instAmount,
+                totalWithIncrease: totalAmount,
+            };
+        }
+
+        if (selectedPlan) {
+            const pct = Number(selectedPlan.percentageIncrease) || 0;
+            const totalWithIncrease = subtotal * (1 + pct / 100);
+            const amountPerInstallment = selectedPlan.installments > 0 ? totalWithIncrease / selectedPlan.installments : 0;
+            return {
+                planName: selectedPlan.name,
+                amountPerInstallment,
+                totalInstallments: selectedPlan.installments || 0,
+                paidInstallments: 0,
+                remainingInstallments: selectedPlan.installments || 0,
+                paidMoney: 0,
+                remainingMoney: totalWithIncrease,
+                totalWithIncrease,
+            };
+        }
+
+        return null;
+    }, [isInstallment, existingInstallment, selectedPlan, subtotal, installmentPlans]);
 
     const handleCompletePayment = async () => {
         if (!customerId) {
-            toast({
-                variant: 'destructive',
-                title: 'Customer not selected',
-                description: 'Please select a customer to proceed.',
-            });
+            toast({ variant: 'destructive', title: 'Customer not selected', description: 'Please select a customer to proceed.' });
             return;
         }
         if (!paymentMethod) {
-            toast({
-                variant: 'destructive',
-                title: 'Payment method not selected',
-                description: 'Please select a payment method.',
-            });
+            toast({ variant: 'destructive', title: 'Payment method not selected', description: 'Please select a payment method.' });
             return;
         }
 
         setIsProcessing(true);
         try {
-            const saleData = {
-                subscriberId: customerId,
-                subscriberName: selectedName || 'Unknown',
-                totalAmount: total,
-                taxAmount: tax,
-                paymentMethod: paymentMethod,
-                date: new Date().toISOString(),
-                companyId: companyId!,
-                items: cart.map(item => ({
-                    productId: item.product.id,
-                    productName: item.product.name,
-                    quantity: item.quantity,
-                    price: item.product.price,
-                    taxPercent: Number(item.product.taxPercent) || 0,
-                }))
-            };
+            if (isInstallment && selectedPlanId && !existingInstallment) {
+                await api.post(`/pos/installment-sales?companyId=${companyId}`, {
+                    subscriberId: customerId,
+                    subscriberName: selectedName || 'Unknown',
+                    installmentPlanId: selectedPlanId,
+                    subtotal,
+                    taxAmount: tax,
+                    paymentMethod: paymentMethod,
+                    date: new Date().toISOString(),
+                    companyId: companyId!,
+                    items: cart.map(item => ({
+                        productId: item.product.id,
+                        productName: item.product.name,
+                        quantity: item.quantity,
+                        price: item.product.price,
+                        taxPercent: Number(item.product.taxPercent) || 0,
+                    }))
+                });
+            } else if (isInstallment && existingInstallment) {
+                await handlePayNextInstallment();
+                return;
+            } else {
+                await api.post(`/pos/sales?companyId=${companyId}`, {
+                    subscriberId: customerId,
+                    subscriberName: selectedName || 'Unknown',
+                    totalAmount: total,
+                    taxAmount: tax,
+                    paymentMethod: paymentMethod,
+                    date: new Date().toISOString(),
+                    companyId: companyId!,
+                    items: cart.map(item => ({
+                        productId: item.product.id,
+                        productName: item.product.name,
+                        quantity: item.quantity,
+                        price: item.product.price,
+                        taxPercent: Number(item.product.taxPercent) || 0,
+                    }))
+                });
+            }
 
-            await api.post(`/pos/sales?companyId=${companyId}`, saleData);
-
+            queryClient.invalidateQueries({ queryKey: ['pos/sales'] });
             queryClient.invalidateQueries({ queryKey: ['inventory/purchased-products', companyId] });
+            queryClient.invalidateQueries({ queryKey: ['billing/payments'] });
+            queryClient.invalidateQueries({ queryKey: ['dashboard'] });
 
             toast({
-                title: 'Sale Completed!',
-                description: 'The transaction has been recorded successfully.',
+                title: isInstallment ? 'Installment Sale Created!' : 'Sale Completed!',
+                description: isInstallment ? 'First installment has been paid.' : 'The transaction has been recorded successfully.',
             });
 
             setCart([]);
@@ -333,11 +490,121 @@ export default function POSPage() {
             setShowSubscriber(false);
             setShowCustomer(false);
             setShowDealer(false);
+            setIsInstallment(false);
+            setSelectedPlanId('');
+            setExistingInstallment(null);
+            setDiscount(0);
         } catch (error: any) {
             toast({
                 variant: 'destructive',
                 title: 'Error',
-                description: error.response?.data?.message || 'Failed to process sale',
+                description: error.response?.data?.message || error.response?.data?.error || 'Failed to process sale',
+            });
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleHoldBill = async () => {
+        if (!customerId) {
+            toast({
+                variant: 'destructive',
+                title: 'Customer not selected',
+                description: 'Please select a customer to hold a bill.',
+            });
+            return;
+        }
+
+        setIsProcessing(true);
+        try {
+            await api.post(`/pos/sales?companyId=${companyId}`, {
+                subscriberId: customerId,
+                subscriberName: selectedName || 'Unknown',
+                totalAmount: total,
+                taxAmount: tax,
+                paymentMethod: 'hold',
+                date: new Date().toISOString(),
+                companyId: companyId!,
+                status: 'hold',
+                discount,
+                items: cart.map(item => ({
+                    productId: item.product.id,
+                    productName: item.product.name,
+                    quantity: item.quantity,
+                    price: item.product.price,
+                    taxPercent: Number(item.product.taxPercent) || 0,
+                }))
+            });
+
+            queryClient.invalidateQueries({ queryKey: ['pos/sales'] });
+            queryClient.invalidateQueries({ queryKey: ['inventory/purchased-products', companyId] });
+
+            toast({
+                title: 'Bill On Hold',
+                description: 'This bill has been held and can be paid later.',
+            });
+
+            setCart([]);
+            setCustomerId('');
+            setCustomerType('');
+            setShowSubscriber(false);
+            setShowCustomer(false);
+            setShowDealer(false);
+            setIsInstallment(false);
+            setSelectedPlanId('');
+            setExistingInstallment(null);
+            setDiscount(0);
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: error.response?.data?.message || error.response?.data?.error || 'Failed to hold bill',
+            });
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handlePayNextInstallment = async () => {
+        if (!existingInstallment || !customerId) return;
+        const payAmount = Number(existingInstallment.installmentAmount) || (Number(existingInstallment.totalAmount) / Number(existingInstallment.totalInstallments)) || 0;
+        if (payAmount <= 0) {
+            toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Installment amount is zero.' });
+            return;
+        }
+
+        setIsProcessing(true);
+        try {
+            await api.put(`/pos/installment/${existingInstallment.id}/pay?companyId=${companyId}`, {
+                amount: payAmount,
+                date: new Date().toISOString(),
+                method: paymentMethod || 'cash',
+            });
+
+            // Refresh installment data
+            const res = await api.get(`/pos/installment/${customerId}?companyId=${companyId}`);
+            const payload = res.data?.data || res.data;
+            const inst = payload?.installment || payload;
+            if (inst && inst.id) {
+                setExistingInstallment(inst);
+            } else {
+                setExistingInstallment(null);
+                setIsInstallment(false);
+            }
+
+            queryClient.invalidateQueries({ queryKey: ['pos/sales'] });
+            queryClient.invalidateQueries({ queryKey: ['billing/payments'] });
+            queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+
+            toast({
+                title: 'Installment Paid!',
+                description: `PKR ${payAmount.toLocaleString()} paid. Next installment: #${(existingInstallment.paidInstallments || 0) + 1}`,
+            });
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Payment Failed',
+                description: error.response?.data?.message || error.response?.data?.error || 'Failed to record installment payment',
             });
         } finally {
             setIsProcessing(false);
@@ -397,7 +664,6 @@ export default function POSPage() {
                     </Card>
                 </div>
                 <div className="lg:col-span-1 flex flex-col gap-4">
-                    {/* Order Details */}
                     <Card className="sticky top-20 transition-all duration-300 hover:shadow-md">
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
@@ -424,7 +690,7 @@ export default function POSPage() {
                                             onCheckedChange={(checked) => handleCheckboxChange('customer', !!checked)}
                                         />
                                         <UserRound className="h-3.5 w-3.5 text-violet-500 shrink-0" />
-                                        <span className="text-xs font-medium">Customer</span>
+                                        <span className="text-xs font-medium">Others</span>
                                     </label>
                                     <label className="flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
                                         <Checkbox
@@ -451,7 +717,7 @@ export default function POSPage() {
                             )}
                             {showCustomer && (
                                 <SearchableDropdown
-                                    label="Customer"
+                                    label="Others"
                                     icon={UserRound}
                                     items={customerList}
                                     selectedId={customerType === 'customer' ? customerId : undefined}
@@ -487,10 +753,54 @@ export default function POSPage() {
                                             setShowSubscriber(false);
                                             setShowCustomer(false);
                                             setShowDealer(false);
+                                            setIsInstallment(false);
+                                            setSelectedPlanId('');
+                                            setExistingInstallment(null);
                                         }}
                                     >
                                         Clear
                                     </button>
+                                </div>
+                            )}
+
+                            {/* Installment Section - for all customer types */}
+                            {customerType && customerId && (
+                                <div className="flex flex-col gap-3 p-3 rounded-lg border bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800">
+                                    <div className="flex items-center gap-2">
+                                        <Checkbox
+                                            checked={isInstallment}
+                                            onCheckedChange={(checked) => handleInstallmentToggle(!!checked)}
+                                        />
+                                        <Label className="text-xs font-medium flex items-center gap-1.5 cursor-pointer">
+                                            <Receipt className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                                            Installment Sale
+                                        </Label>
+                                    </div>
+
+                                    {isInstallment && !existingInstallment && (
+                                        <SearchableDropdown
+                                            label="Installment Plan"
+                                            icon={CalendarDays}
+                                            items={planList}
+                                            selectedId={selectedPlanId}
+                                            onSelect={(id) => setSelectedPlanId(id)}
+                                            placeholder="Select installment plan..."
+                                            color="text-emerald-600 dark:text-emerald-400"
+                                        />
+                                    )}
+
+                                    {fetchingInstallment && (
+                                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                            Checking installment status...
+                                        </div>
+                                    )}
+
+                                    {isInstallment && !selectedPlanId && !existingInstallment && !fetchingInstallment && (
+                                        <p className="text-xs text-muted-foreground text-center py-1">
+                                            Select an installment plan to continue
+                                        </p>
+                                    )}
                                 </div>
                             )}
 
@@ -528,28 +838,146 @@ export default function POSPage() {
                             </div>
                         </CardContent>
                         {cart.length > 0 && (
-                            <CardFooter className="flex-col items-stretch gap-4 border-t pt-4">
-                                <div className="flex justify-between text-muted-foreground">
-                                    <span>Subtotal</span>
-                                    <span>PKR {subtotal.toLocaleString()}</span>
+                            <CardFooter className="flex-col items-stretch gap-3 border-t pt-4">
+                                {/* Installment Info Card */}
+                                {isInstallment && installmentDetails && (
+                                    <div className="flex flex-col gap-2.5 text-xs p-3.5 rounded-lg border bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800">
+                                        <div className="flex items-center justify-between pb-2 border-b border-emerald-200 dark:border-emerald-700">
+                                            <div className="flex items-center gap-1.5">
+                                                <Receipt className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                                                <span className="font-semibold text-emerald-700 dark:text-emerald-400">{installmentDetails.planName}</span>
+                                            </div>
+                                            <Badge variant="outline" className="text-[9px] border-emerald-300 dark:border-emerald-700 text-emerald-600 dark:text-emerald-400">Installment</Badge>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="flex flex-col">
+                                                <span className="text-muted-foreground">Each Installment</span>
+                                                <span className="font-semibold">PKR {installmentDetails.amountPerInstallment.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="text-muted-foreground">Total Installments</span>
+                                                <span className="font-semibold">{installmentDetails.totalInstallments}</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3 pt-1">
+                                            <div className="flex flex-col rounded-md bg-emerald-100/50 dark:bg-emerald-900/30 p-2">
+                                                <span className="text-emerald-600 dark:text-emerald-400 font-medium">Paid</span>
+                                                <span className="font-bold text-emerald-700 dark:text-emerald-300">{installmentDetails.paidInstallments}/{installmentDetails.totalInstallments}</span>
+                                                <span className="text-emerald-600 dark:text-emerald-400 text-[11px]">PKR {installmentDetails.paidMoney.toLocaleString()}</span>
+                                            </div>
+                                            <div className="flex flex-col rounded-md bg-orange-100/50 dark:bg-orange-900/30 p-2">
+                                                <span className="text-orange-600 dark:text-orange-400 font-medium">Remaining</span>
+                                                <span className="font-bold text-orange-700 dark:text-orange-300">{installmentDetails.remainingInstallments}/{installmentDetails.totalInstallments}</span>
+                                                <span className="text-orange-600 dark:text-orange-400 text-[11px]">PKR {installmentDetails.remainingMoney.toLocaleString()}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Discount */}
+                                {!isInstallment && (
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm text-muted-foreground whitespace-nowrap">Discount</span>
+                                        <Input
+                                            type="number"
+                                            value={discount || ''}
+                                            onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+                                            placeholder="0"
+                                            className="h-8 text-right"
+                                            min="0"
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Totals */}
+                                <div className="flex flex-col gap-1.5 text-sm">
+                                    <div className="flex justify-between text-muted-foreground">
+                                        <span>Subtotal</span>
+                                        <span>PKR {subtotal.toLocaleString()}</span>
+                                    </div>
+                                    {isInstallment && percentageIncrease > 0 && (
+                                        <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                                            <span>+ {percentageIncrease}% Increase</span>
+                                            <span>PKR {increaseAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                                        </div>
+                                    )}
+                                    {!isInstallment && discount > 0 && (
+                                        <div className="flex justify-between text-emerald-500">
+                                            <span>Discount</span>
+                                            <span>- PKR {discount.toLocaleString()}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between text-muted-foreground">
+                                        <span>Tax</span>
+                                        <span>PKR {tax.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                    </div>
+                                    <div className="flex justify-between font-bold text-lg border-t pt-1.5">
+                                        <span>Total</span>
+                                        <span>PKR {isInstallment
+                                            ? (subtotal * (1 + percentageIncrease / 100)).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+                                            : total.toLocaleString(undefined, { minimumFractionDigits: 2 })
+                                        }</span>
+                                    </div>
                                 </div>
-                                <div className="flex justify-between text-muted-foreground">
-                                    <span>Tax (per item)</span>
-                                    <span>PKR {tax.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                </div>
-                                <div className="flex justify-between font-bold text-lg">
-                                    <span>Total</span>
-                                    <span>PKR {total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                </div>
-                                <div className="grid grid-cols-3 gap-2">
-                                    <Button variant={paymentMethod === 'card' ? 'default' : 'outline'} onClick={() => setPaymentMethod('card')} className="transition-all duration-300 hover:scale-105"><CreditCard className="mr-2 h-4 w-4" /> Card</Button>
-                                    <Button variant={paymentMethod === 'bank' ? 'default' : 'outline'} onClick={() => setPaymentMethod('bank')} className="transition-all duration-300 hover:scale-105"><Landmark className="mr-2 h-4 w-4" /> Bank</Button>
-                                    <Button variant={paymentMethod === 'cash' ? 'default' : 'outline'} onClick={() => setPaymentMethod('cash')} className="transition-all duration-300 hover:scale-105"><CircleDollarSign className="mr-2 h-4 w-4" /> Cash</Button>
-                                </div>
-                                <Button size="lg" disabled={cart.length === 0 || isProcessing} onClick={handleCompletePayment} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-[1.02] disabled:hover:scale-100">
-                                    {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    {isProcessing ? 'Processing...' : 'Complete Payment'}
-                                </Button>
+
+                                {/* Payment Methods + Action Buttons */}
+                                {isInstallment ? (
+                                    <>
+                                        {/* Payment Methods for installment */}
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <Button variant={paymentMethod === 'card' ? 'default' : 'outline'} onClick={() => setPaymentMethod('card')} className="transition-all duration-300 hover:scale-105"><CreditCard className="mr-2 h-4 w-4" /> Card</Button>
+                                            <Button variant={paymentMethod === 'bank' ? 'default' : 'outline'} onClick={() => setPaymentMethod('bank')} className="transition-all duration-300 hover:scale-105"><Landmark className="mr-2 h-4 w-4" /> Bank</Button>
+                                            <Button variant={paymentMethod === 'cash' ? 'default' : 'outline'} onClick={() => setPaymentMethod('cash')} className="transition-all duration-300 hover:scale-105"><CircleDollarSign className="mr-2 h-4 w-4" /> Cash</Button>
+                                        </div>
+                                        <Button
+                                            size="lg"
+                                            disabled={isProcessing || (!existingInstallment && (cart.length === 0 || !selectedPlanId)) || (!!existingInstallment && (!installmentDetails || installmentDetails.remainingInstallments <= 0))}
+                                            onClick={handleCompletePayment}
+                                            className="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-[1.02] disabled:hover:scale-100"
+                                        >
+                                            {isProcessing ? (
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            ) : (
+                                                <Receipt className="mr-2 h-4 w-4" />
+                                            )}
+                                            {isProcessing ? 'Processing...' : existingInstallment
+                                                ? `Pay Installment - PKR ${installmentDetails?.amountPerInstallment.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                                                : `Pay Installment - PKR ${installmentDetails?.amountPerInstallment.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                                            }
+                                        </Button>
+                                    </>
+                                ) : (
+                                    <>
+                                        {/* Payment Methods for regular sale */}
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <Button variant={paymentMethod === 'card' ? 'default' : 'outline'} onClick={() => setPaymentMethod('card')} className="transition-all duration-300 hover:scale-105"><CreditCard className="mr-2 h-4 w-4" /> Card</Button>
+                                            <Button variant={paymentMethod === 'bank' ? 'default' : 'outline'} onClick={() => setPaymentMethod('bank')} className="transition-all duration-300 hover:scale-105"><Landmark className="mr-2 h-4 w-4" /> Bank</Button>
+                                            <Button variant={paymentMethod === 'cash' ? 'default' : 'outline'} onClick={() => setPaymentMethod('cash')} className="transition-all duration-300 hover:scale-105"><CircleDollarSign className="mr-2 h-4 w-4" /> Cash</Button>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <Button
+                                                variant="outline"
+                                                size="lg"
+                                                disabled={cart.length === 0 || isProcessing}
+                                                onClick={handleHoldBill}
+                                                className="transition-all duration-300 hover:scale-[1.02]"
+                                            >
+                                                Hold Bill
+                                            </Button>
+                                            <Button
+                                                size="lg"
+                                                disabled={cart.length === 0 || isProcessing}
+                                                onClick={handleCompletePayment}
+                                                className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-[1.02] disabled:hover:scale-100"
+                                            >
+                                                {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                                {isProcessing ? 'Processing...' : 'Complete Payment'}
+                                            </Button>
+                                        </div>
+                                    </>
+                                )}
                             </CardFooter>
                         )}
                     </Card>

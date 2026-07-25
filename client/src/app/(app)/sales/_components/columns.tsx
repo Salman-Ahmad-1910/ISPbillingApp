@@ -12,6 +12,7 @@ interface Sale {
   paymentMethod: string;
   date: string;
   companyId: string;
+  isInstallment?: boolean;
   items: SaleItem[];
 }
 
@@ -54,10 +55,18 @@ export function getColumns(): ColumnDef<Sale>[] {
       header: 'Payment Method',
       cell: ({ row }) => {
         const method = row.original.paymentMethod;
+        const isInstallment = row.original.isInstallment;
         return (
-          <Badge variant="outline">
-            {method}
-          </Badge>
+          <div className="flex items-center gap-1.5">
+            <Badge variant="outline">
+              {method}
+            </Badge>
+            {isInstallment && (
+              <Badge variant="secondary" className="text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                Installment
+              </Badge>
+            )}
+          </div>
         );
       },
     },
@@ -82,9 +91,28 @@ export function getColumns(): ColumnDef<Sale>[] {
       accessorKey: 'totalAmount',
       header: 'Total Amount',
       cell: ({ row }) => {
-        const amount = parseFloat(row.getValue('totalAmount'));
-        const formatted = new Intl.NumberFormat('en-US').format(amount);
-        return <div className="text-right font-medium">PKR {formatted}</div>;
+        const sale = row.original;
+        const totalAmount = parseFloat(row.getValue('totalAmount'));
+        const taxAmount = Number(sale.taxAmount) || 0;
+        const itemsSubtotal = (sale.items || []).reduce((sum: number, item: SaleItem) => {
+          const qty = Number(item.quantity) || 0;
+          const price = Number(item.price) || 0;
+          return sum + price * qty;
+        }, 0);
+        const displayAmount = totalAmount || (itemsSubtotal + taxAmount);
+        const formatted = new Intl.NumberFormat('en-US').format(displayAmount);
+        let increasePercent = 0;
+        if (sale.isInstallment && itemsSubtotal > 0) {
+          increasePercent = Math.round(((displayAmount - taxAmount) / itemsSubtotal - 1) * 100);
+        }
+        return (
+          <div className="text-right">
+            <div className="font-medium">PKR {formatted}</div>
+            {sale.isInstallment && increasePercent > 0 && (
+              <div className="text-[10px] text-muted-foreground">+{increasePercent}% increase</div>
+            )}
+          </div>
+        );
       },
     },
     {

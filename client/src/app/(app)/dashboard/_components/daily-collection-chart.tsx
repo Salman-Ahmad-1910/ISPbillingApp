@@ -116,6 +116,7 @@ export function DailyCollectionChart() {
   const [period, setPeriod] = useState('daily');
   const [selectedMonth, setSelectedMonth] = useState('');
   const [rawData, setRawData] = useState<ApiPoint[]>([]);
+  const [periodTotal, setPeriodTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const today = new Date();
@@ -134,6 +135,7 @@ export function DailyCollectionChart() {
     api.get(url)
       .then((response) => {
         setRawData(response.data.data.data || []);
+        setPeriodTotal(response.data.data.periodTotal || 0);
         setLoading(false);
       })
       .catch(() => {
@@ -309,6 +311,17 @@ export function DailyCollectionChart() {
               {tab.label}
             </button>
           ))}
+        </div>
+
+        {/* Period collection summary */}
+        <div className="mt-2 flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2">
+          <span className="text-xs font-medium text-muted-foreground">
+            {period === 'daily' && 'Today\'s Collection'}
+            {period === 'weekly' && 'This Week\'s Collection'}
+            {period === 'monthly' && (selectedMonth ? `${new Date(selectedMonth + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} Collection` : 'This Month\'s Collection')}
+            {period === 'yearly' && 'This Year\'s Collection'}
+          </span>
+          <span className="text-sm font-bold tabular-nums">{formatCurrency(periodTotal)}</span>
         </div>
       </CardContent>
     </Card>

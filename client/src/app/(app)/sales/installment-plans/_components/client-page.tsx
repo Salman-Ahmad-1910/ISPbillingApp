@@ -3,15 +3,14 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PlusCircle, Download } from 'lucide-react';
+import { PlusCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useCompany } from '@/context/company-context';
 import { z } from 'zod';
 
-import type { InstallmentPlan, Product } from '@/lib/types';
+import type { InstallmentPlan } from '@/lib/types';
 import { installmentPlanSchema } from '@/lib/schemas';
 
 import { DataTable } from './data-table';
@@ -26,10 +25,9 @@ type PlanFormValues = z.infer<typeof installmentPlanSchema>;
 
 interface ClientPageProps {
     data: InstallmentPlan[];
-    products: Product[];
 }
 
-export function ClientPage({ data, products }: ClientPageProps) {
+export function ClientPage({ data }: ClientPageProps) {
     const { companyId } = useCompany();
     const { toast } = useToast();
     const queryClient = useQueryClient();
@@ -40,7 +38,6 @@ export function ClientPage({ data, products }: ClientPageProps) {
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
-    // Advanced pagination state
     const [currentPage, setCurrentPage] = useState<number>(1);
     const [pageSize, setPageSize] = useState<number>(10);
     const [pageInput, setPageInput] = useState<string>('');
@@ -50,11 +47,9 @@ export function ClientPage({ data, products }: ClientPageProps) {
     }, [data]);
 
     const filteredData = useMemo(() => plans.filter(plan =>
-        plan.name.toLowerCase().includes(filter.toLowerCase()) ||
-        plan.productName.toLowerCase().includes(filter.toLowerCase())
+        plan.name.toLowerCase().includes(filter.toLowerCase())
     ), [plans, filter]);
 
-    // Pagination helpers
     const totalPages = Math.ceil(filteredData.length / pageSize);
 
     const getPaginatedData = () => {
@@ -67,11 +62,9 @@ export function ClientPage({ data, products }: ClientPageProps) {
         const pages = [];
         const startPage = Math.max(1, currentPage - 3);
         const endPage = Math.min(totalPages, currentPage + 3);
-
         for (let i = startPage; i <= endPage; i++) {
             pages.push(i);
         }
-
         return pages;
     };
 
@@ -96,7 +89,6 @@ export function ClientPage({ data, products }: ClientPageProps) {
         }
     };
 
-    // Reset pagination when filter changes
     useEffect(() => {
         setCurrentPage(1);
     }, [filter]);
@@ -104,15 +96,6 @@ export function ClientPage({ data, products }: ClientPageProps) {
     const handleSave = async (formData: PlanFormValues) => {
         setIsSaving(true);
         try {
-            const product = products.find(p => p.id === formData.productId);
-            if (!product) {
-                toast({ variant: 'destructive', title: "Error", description: "Selected product not found." });
-                setIsSaving(false);
-                return;
-            }
-
-            const totalAmount = formData.downPayment + (formData.installments * formData.installmentAmount);
-
             if (selectedPlan) {
                 await api.put(`/sales/installment-plans/${selectedPlan.id}?companyId=${companyId}`, formData);
                 toast({ title: "Success", description: "Plan updated successfully." });
@@ -120,8 +103,6 @@ export function ClientPage({ data, products }: ClientPageProps) {
                 await api.post(`/sales/installment-plans?companyId=${companyId}`, {
                     ...formData,
                     companyId: companyId!,
-                    productName: product.name,
-                    totalAmount,
                 });
                 toast({ title: "Success", description: "Plan added successfully." });
             }
@@ -177,16 +158,12 @@ export function ClientPage({ data, products }: ClientPageProps) {
             <div className="p-6">
                 <div className="flex items-center justify-between mb-4">
                     <Input
-                        placeholder="Filter by plan or product name..."
+                        placeholder="Filter by plan name..."
                         value={filter}
                         onChange={(e) => setFilter(e.target.value)}
                         className="max-w-sm"
                     />
                     <div className="flex items-center gap-2">
-                        {/* <Button variant="outline">
-                            <Download className="mr-2 h-4 w-4" />
-                            Export
-                        </Button> */}
                         <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
                             <DialogTrigger asChild>
                                 <Button onClick={() => setSelectedPlan(null)} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700">
@@ -205,7 +182,6 @@ export function ClientPage({ data, products }: ClientPageProps) {
                                 </DialogHeader>
                                 <InstallmentPlanForm
                                     plan={selectedPlan}
-                                    products={products}
                                     onSave={handleSave}
                                     onCancel={() => setIsFormOpen(false)}
                                     isSaving={isSaving}
@@ -243,7 +219,6 @@ export function ClientPage({ data, products }: ClientPageProps) {
                             Previous
                         </Button>
 
-                        {/* Page numbers - show current page ± 3 */}
                         <div className="flex items-center gap-1">
                             {getVisiblePages().map(page => (
                                 <Button
@@ -257,7 +232,6 @@ export function ClientPage({ data, products }: ClientPageProps) {
                                 </Button>
                             ))}
 
-                            {/* Show ellipsis if there are more pages */}
                             {currentPage + 3 < totalPages && (
                                 <>
                                     <span className="px-2 text-muted-foreground">...</span>
@@ -273,7 +247,6 @@ export function ClientPage({ data, products }: ClientPageProps) {
                             )}
                         </div>
 
-                        {/* Page input */}
                         <div className="flex items-center gap-1">
                             <Input
                                 type="text"

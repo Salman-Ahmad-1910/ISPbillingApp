@@ -20,30 +20,8 @@ interface InstallmentPlanColumnsProps {
 
 export const getColumns = ({ onEdit, onDelete }: InstallmentPlanColumnsProps): ColumnDef<InstallmentPlan>[] => [
   {
-    accessorKey: 'id',
-    header: 'ID',
-    cell: ({ row }) => (
-      <div className="text-xs font-mono text-muted-foreground">
-        {row.original.id}
-      </div>
-    ),
-  },
-  {
     accessorKey: 'name',
     header: 'Plan Name',
-  },
-  {
-    accessorKey: 'productName',
-    header: 'Product',
-  },
-  {
-    accessorKey: 'downPayment',
-    header: 'Down Payment (PKR)',
-    cell: ({ row }) => {
-      const amount = parseFloat(row.getValue('downPayment'));
-      const formatted = new Intl.NumberFormat('en-US').format(amount);
-      return <div className="text-right">{formatted}</div>;
-    },
   },
   {
     accessorKey: 'installments',
@@ -51,22 +29,12 @@ export const getColumns = ({ onEdit, onDelete }: InstallmentPlanColumnsProps): C
     cell: ({ row }) => <div className="text-center">{row.getValue('installments')}</div>
   },
   {
-    accessorKey: 'installmentAmount',
-    header: 'Installment Amount (PKR)',
+    accessorKey: 'percentageIncrease',
+    header: 'Percentage Increase',
     cell: ({ row }) => {
-      const amount = parseFloat(row.getValue('installmentAmount'));
-      const formatted = new Intl.NumberFormat('en-US').format(amount);
-      return <div className="text-right">{formatted}</div>;
-    },
-  },
-  {
-    accessorKey: 'totalAmount',
-    header: 'Total Amount (PKR)',
-    cell: ({ row }) => {
-      const amount = parseFloat(row.getValue('totalAmount'));
-      const formatted = new Intl.NumberFormat('en-US').format(amount);
-      return <div className="text-right font-medium">{formatted}</div>;
-    },
+      const val = Number(row.getValue('percentageIncrease')) || 0;
+      return <div className="text-center">{val}%</div>;
+    }
   },
   {
     id: 'actions',

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useRef, useMemo } from 'react';
+import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -45,7 +46,6 @@ const months = [
 
 export default function MonthDefaultersPage() {
   const { companyId } = useCompany();
-  const reportRef = useRef<HTMLDivElement>(null);
 
   const { data: subscribers = [], isLoading: loading } = useGenericQuery<any>('subscribers', companyId ?? undefined);
 
@@ -63,11 +63,9 @@ export default function MonthDefaultersPage() {
   const [historyToDate, setHistoryToDate] = useState<Date>(new Date());
   const [historyToDateOpen, setHistoryToDateOpen] = useState(false);
 
-  const sublocalities = useMemo(() => {
+  const allSublocalities = useMemo(() => {
     const set = new Set<string>();
-    subscribers.forEach((s: any) => {
-      if (s.areaName) set.add(s.areaName);
-    });
+    subscribers.forEach((s: any) => { if (s.areaName) set.add(s.areaName); });
     return Array.from(set);
   }, [subscribers]);
 
@@ -92,20 +90,14 @@ export default function MonthDefaultersPage() {
       });
   }, [subscribers]);
 
-  const filteredData = allRecords.filter((item) => {
+  const filteredData = useMemo(() => allRecords.filter((item) => {
     const monthMatch = !month || item.month === month;
     const sublocalityMatch = sublocality === 'all' || item.sublocality === sublocality;
     const typeMatch = reportType === 'all' || item.status === reportType;
     const connectionMatch = connectionType === 'both' || item.connectionType === connectionType;
 
-    const itemDate = new Date(item.month ? `2024-${item.month}-01` : '');
-    const from = new Date(historyFromDate);
-    from.setHours(0, 0, 0, 0);
-    const to = new Date(historyToDate);
-    to.setHours(23, 59, 59, 999);
-
     return monthMatch && sublocalityMatch && typeMatch && connectionMatch;
-  });
+  }), [allRecords, month, sublocality, reportType, connectionType]);
 
   const totalConnections = filteredData.length;
   const totalAmount = filteredData.reduce((sum, item) => sum + item.amount, 0);
@@ -115,15 +107,9 @@ export default function MonthDefaultersPage() {
 
     const headers = ['Subscriber Name', 'Subscriber ID', 'Phone', 'Address', 'Sublocality', 'Connection Type', 'Month', 'Amount', 'Status'];
     const rows = filteredData.map((item) => [
-      item.subscriberName,
-      item.subscriberId,
-      item.phone,
-      item.address,
-      item.sublocality,
-      item.connectionType,
-      months.find((m) => m.value === item.month)?.label || item.month,
-      item.amount.toFixed(2),
-      item.status,
+      item.subscriberName, item.subscriberId, item.phone, item.address, item.sublocality,
+      item.connectionType, months.find((m) => m.value === item.month)?.label || item.month,
+      item.amount.toFixed(2), item.status,
     ]);
 
     const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
@@ -153,26 +139,82 @@ export default function MonthDefaultersPage() {
         }
       `}</style>
 
+      {/* Header */}
       <div className="flex items-center gap-3 no-print">
         <div className="rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 p-2.5 shadow-sm">
           <FileText className="h-5 w-5 text-white" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-indigo-600 to-blue-600 bg-clip-text text-transparent">Month Wise Defaulters</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Month Wise Defaulters</h1>
           <p className="text-sm text-muted-foreground">View and manage month wise defaulters</p>
         </div>
       </div>
-      <div className="h-px bg-gradient-to-r from-indigo-500/30 via-blue-500/30 to-transparent" />
+      <div className="h-0.5 bg-gradient-to-r from-indigo-500/50 via-blue-500/30 to-transparent no-print" />
 
-      <Card className="no-print">
+      {/* Summary */}
+      <div className="grid gap-4 md:grid-cols-2 no-print">
+        <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Total Connections</p>
+              <p className="text-2xl font-bold mt-1">{totalConnections}</p>
+            </div>
+            <div className="rounded-lg bg-gradient-to-br from-indigo-500 to-blue-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
+              <FileText className="h-5 w-5" />
+            </div>
+          </div>
+        </div>
+        <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Total Amount</p>
+              <p className="text-2xl font-bold mt-1">PKR {totalAmount.toLocaleString()}</p>
+            </div>
+            <div className="rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
+              <FileText className="h-5 w-5" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter Card */}
+      <Card className="no-print transition-all duration-300 hover:shadow-md">
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+            <div className="space-y-2">
+              <Label>From Date</Label>
+              <Popover open={historyFromDateOpen} onOpenChange={setHistoryFromDateOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn('w-full justify-start text-left font-normal', !historyFromDate && 'text-muted-foreground')}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {historyFromDate ? format(historyFromDate, 'PPP') : 'Pick a date'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar mode="single" selected={historyFromDate} onSelect={(date) => { if (date) { setHistoryFromDate(date); setHistoryFromDateOpen(false); } }} initialFocus />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="space-y-2">
+              <Label>To Date</Label>
+              <Popover open={historyToDateOpen} onOpenChange={setHistoryToDateOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn('w-full justify-start text-left font-normal', !historyToDate && 'text-muted-foreground')}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {historyToDate ? format(historyToDate, 'PPP') : 'Pick a date'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar mode="single" selected={historyToDate} onSelect={(date) => { if (date) { setHistoryToDate(date); setHistoryToDateOpen(false); } }} initialFocus />
+                </PopoverContent>
+              </Popover>
+            </div>
+
             <div className="space-y-2">
               <Label>Month</Label>
               <Select value={month} onValueChange={setMonth}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select month" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select month" /></SelectTrigger>
                 <SelectContent portal={false}>
                   {months.map((m) => (
                     <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
@@ -184,12 +226,10 @@ export default function MonthDefaultersPage() {
             <div className="space-y-2">
               <Label>Sublocality</Label>
               <Select value={sublocality} onValueChange={setSublocality}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select sublocality" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select sublocality" /></SelectTrigger>
                 <SelectContent portal={false}>
                   <SelectItem value="all">All</SelectItem>
-                  {sublocalities.map((loc) => (
+                  {allSublocalities.map((loc) => (
                     <SelectItem key={loc} value={loc}>{loc}</SelectItem>
                   ))}
                 </SelectContent>
@@ -199,9 +239,7 @@ export default function MonthDefaultersPage() {
             <div className="space-y-2">
               <Label>Report Type</Label>
               <Select value={reportType} onValueChange={setReportType}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                 <SelectContent portal={false}>
                   <SelectItem value="all">All</SelectItem>
                   <SelectItem value="active">Active</SelectItem>
@@ -214,9 +252,7 @@ export default function MonthDefaultersPage() {
             <div className="space-y-2">
               <Label>Connection Type</Label>
               <Select value={connectionType} onValueChange={setConnectionType}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                 <SelectContent portal={false}>
                   <SelectItem value="both">Both</SelectItem>
                   <SelectItem value="internet">Internet</SelectItem>
@@ -224,102 +260,22 @@ export default function MonthDefaultersPage() {
                 </SelectContent>
               </Select>
             </div>
-
-              <div className="flex items-end">
-              <Button disabled={loading} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700 w-40">
-                {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Show
-              </Button>
-            </div>
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">Total Connection</p>
-            <FileText className="h-4 w-4 text-muted-foreground transition-all duration-300 group-hover:scale-110" />
-          </div>
-          <p className="text-2xl font-bold mt-2">{totalConnections}</p>
-        </div>
-        <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">Total Amount</p>
-            <FileText className="h-4 w-4 text-muted-foreground transition-all duration-300 group-hover:scale-110" />
-          </div>
-          <p className="text-2xl font-bold mt-2">Pkr {totalAmount.toLocaleString('en-IN')}</p>
-        </div>
-      </div>
-
-      <div ref={reportRef} className="print-report">
+      {/* Printable Report Section */}
+      <div className="print-report">
         <Card>
           <CardContent className="pt-6">
-            <h2 className="text-xl font-bold mb-4">Month Wise Defaulters History</h2>
-
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-36">
-                <Popover open={historyFromDateOpen} onOpenChange={setHistoryFromDateOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={cn(
-                        'w-full justify-start text-left font-normal text-xs',
-                        !historyFromDate && 'text-muted-foreground',
-                      )}
-                    >
-                      <CalendarIcon className="mr-1 h-3 w-3" />
-                      {historyFromDate ? format(historyFromDate, 'dd MMM yyyy') : 'From'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={historyFromDate}
-                      onSelect={(date) => {
-                        if (date) {
-                          setHistoryFromDate(date);
-                          setHistoryFromDateOpen(false);
-                        }
-                      }}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-bold">Month Wise Defaulters History</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  From: {format(historyFromDate, 'dd MMM yyyy')} — To: {format(historyToDate, 'dd MMM yyyy')}
+                </p>
               </div>
-              <span className="text-muted-foreground text-xs">to</span>
-              <div className="w-36">
-                <Popover open={historyToDateOpen} onOpenChange={setHistoryToDateOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={cn(
-                        'w-full justify-start text-left font-normal text-xs',
-                        !historyToDate && 'text-muted-foreground',
-                      )}
-                    >
-                      <CalendarIcon className="mr-1 h-3 w-3" />
-                      {historyToDate ? format(historyToDate, 'dd MMM yyyy') : 'To'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={historyToDate}
-                      onSelect={(date) => {
-                        if (date) {
-                          setHistoryToDate(date);
-                          setHistoryToDateOpen(false);
-                        }
-                      }}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="flex gap-2 no-print ml-auto">
+              <div className="flex gap-2 no-print">
                 <Button variant="outline" size="sm" onClick={handlePrint}>
                   <Printer className="mr-2 h-4 w-4" />
                   Print
@@ -360,16 +316,23 @@ export default function MonthDefaultersPage() {
                     {filteredData.map((item, i) => (
                       <TableRow key={item.id}>
                         <TableCell className="text-muted-foreground">{i + 1}</TableCell>
-                        <TableCell className="font-medium">{item.subscriberName}</TableCell>
+                        <TableCell className="font-medium">
+                          <Link
+                            href={`/crm/subscriber-detail?connectionId=${item.id}`}
+                            className="text-blue-600 hover:underline dark:text-blue-400"
+                          >
+                            {item.subscriberName}
+                          </Link>
+                        </TableCell>
                         <TableCell>{item.subscriberId}</TableCell>
                         <TableCell>{item.phone}</TableCell>
-                        <TableCell>{item.address}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground max-w-[120px] truncate">{item.address || '---'}</TableCell>
                         <TableCell>{item.sublocality}</TableCell>
                         <TableCell>
                           <Badge variant="outline">{item.connectionType}</Badge>
                         </TableCell>
                         <TableCell>{months.find((m) => m.value === item.month)?.label || '-'}</TableCell>
-                        <TableCell>Pkr {item.amount.toLocaleString('en-IN')}</TableCell>
+                        <TableCell>PKR {item.amount.toLocaleString()}</TableCell>
                         <TableCell>
                           <Badge variant={item.status === 'overdue' || item.status === 'deactivated' ? 'destructive' : 'default'}>
                             {item.status}

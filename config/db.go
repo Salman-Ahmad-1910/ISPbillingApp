@@ -118,6 +118,10 @@ func RunMigrations() {
 		&models.ConnectionStatusChange{},
 		&models.TransactionType{},
 		&models.BillRecord{},
+		&models.AccountHead{},
+		&models.AccountSubHead{},
+		&models.AccountEntry{},
+		&models.SubscriberInstallment{},
 	)
 
 	if err != nil {
@@ -125,6 +129,22 @@ func RunMigrations() {
 	}
 
 	log.Println("Migration completed successfully")
+
+	// Backfill installment_plans: set percentage_increase to 0 for existing rows
+	DB.Exec("UPDATE installment_plans SET percentage_increase = 0 WHERE percentage_increase IS NULL")
+	// Drop old columns from installment_plans that no longer exist in the model
+	DB.Exec("ALTER TABLE installment_plans DROP COLUMN IF EXISTS product_id")
+	DB.Exec("ALTER TABLE installment_plans DROP COLUMN IF EXISTS product_name")
+	DB.Exec("ALTER TABLE installment_plans DROP COLUMN IF EXISTS down_payment")
+	DB.Exec("ALTER TABLE installment_plans DROP COLUMN IF EXISTS installment_amount")
+	DB.Exec("ALTER TABLE installment_plans DROP COLUMN IF EXISTS total_amount")
+
+	// Add status and discount columns to sales if they don't exist
+	DB.Exec("ALTER TABLE sales ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'completed'")
+	DB.Exec("ALTER TABLE sales ADD COLUMN IF NOT EXISTS discount DECIMAL(10,2) DEFAULT 0")
+
+	// Drop old down_payment column from subscriber_installments
+	DB.Exec("ALTER TABLE subscriber_installments DROP COLUMN IF EXISTS down_payment")
 
 	// Fix unique indexes: drop global unique indexes on purchase_number and
 	// invoice_number, then create composite (company_id, ...) unique indexes.

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,10 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { UserPlus, Download, Loader2, Search } from 'lucide-react';
-import { format } from 'date-fns';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import type { User } from '@/lib/types';
+import { format } from 'date-fns';
 
 interface CreatorSummary {
   creatorId: string;
@@ -26,7 +27,6 @@ interface CreatorSummary {
 
 export default function CreatorSummaryPage() {
   const { companyId } = useCompany();
-  const reportRef = useRef<HTMLDivElement>(null);
 
   const { data: users = [], isLoading: loading } = useGenericQuery<User>('admin/users', companyId ?? undefined);
 
@@ -72,9 +72,7 @@ export default function CreatorSummaryPage() {
 
   const uniqueRoles = useMemo(() => {
     const set = new Set<string>();
-    creatorSummaries.forEach((s) => {
-      if (s.creatorRole) set.add(s.creatorRole);
-    });
+    creatorSummaries.forEach((s) => { if (s.creatorRole) set.add(s.creatorRole); });
     return Array.from(set);
   }, [creatorSummaries]);
 
@@ -87,11 +85,7 @@ export default function CreatorSummaryPage() {
 
     const headers = ['Creator Name', 'Email', 'Role', 'Status', 'Total Created Users'];
     const rows = creatorSummaries.map((item) => [
-      item.creatorName,
-      item.creatorEmail,
-      item.creatorRole,
-      item.creatorStatus,
-      item.totalCreated.toString(),
+      item.creatorName, item.creatorEmail, item.creatorRole, item.creatorStatus, item.totalCreated.toString(),
     ]);
 
     const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
@@ -114,39 +108,51 @@ export default function CreatorSummaryPage() {
           <UserPlus className="h-5 w-5 text-white" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">User Creator Summary</h1>
+          <h1 className="text-2xl font-bold tracking-tight">User Creator Summary</h1>
           <p className="text-sm text-muted-foreground">Overview of users grouped by their creator</p>
         </div>
       </div>
-      <div className="h-px bg-gradient-to-r from-purple-500/30 via-pink-500/30 to-transparent" />
+      <div className="h-0.5 bg-gradient-to-r from-purple-500/50 via-pink-500/30 to-transparent no-print" />
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Summary Cards */}
+      <div className="grid gap-4 md:grid-cols-3 no-print">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">Total Creators</p>
-            <UserPlus className="h-4 w-4 text-muted-foreground transition-all duration-300 group-hover:scale-110" />
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Total Creators</p>
+              <p className="text-2xl font-bold mt-1">{totalCreators}</p>
+            </div>
+            <div className="rounded-lg bg-gradient-to-br from-purple-500 to-pink-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
+              <UserPlus className="h-5 w-5" />
+            </div>
           </div>
-          <p className="text-2xl font-bold mt-2">{totalCreators}</p>
         </div>
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">Total Created Users</p>
-            <UserPlus className="h-4 w-4 text-muted-foreground transition-all duration-300 group-hover:scale-110" />
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Total Created Users</p>
+              <p className="text-2xl font-bold mt-1">{totalCreatedUsers}</p>
+            </div>
+            <div className="rounded-lg bg-gradient-to-br from-purple-500 to-pink-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
+              <UserPlus className="h-5 w-5" />
+            </div>
           </div>
-          <p className="text-2xl font-bold mt-2">{totalCreatedUsers}</p>
         </div>
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">Avg Users / Creator</p>
-            <UserPlus className="h-4 w-4 text-muted-foreground transition-all duration-300 group-hover:scale-110" />
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Avg Users / Creator</p>
+              <p className="text-2xl font-bold mt-1">{avgUsersPerCreator}</p>
+            </div>
+            <div className="rounded-lg bg-gradient-to-br from-purple-500 to-pink-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
+              <UserPlus className="h-5 w-5" />
+            </div>
           </div>
-          <p className="text-2xl font-bold mt-2">{avgUsersPerCreator}</p>
         </div>
       </div>
 
-      {/* Filter Row */}
-      <Card className="no-print">
+      {/* Filter Card */}
+      <Card className="no-print transition-all duration-300 hover:shadow-md">
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
@@ -164,9 +170,7 @@ export default function CreatorSummaryPage() {
             <div className="space-y-2">
               <Label>Role</Label>
               <Select value={roleFilter} onValueChange={setRoleFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select role" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
                 <SelectContent portal={false}>
                   <SelectItem value="all">All Roles</SelectItem>
                   {uniqueRoles.map((role) => (
@@ -176,7 +180,7 @@ export default function CreatorSummaryPage() {
               </Select>
             </div>
             <div className="flex items-end">
-              <Button variant="outline" size="sm" onClick={exportExcel} className="gap-2">
+              <Button variant="outline" onClick={exportExcel} className="gap-2">
                 <Download className="h-4 w-4" />
                 Export CSV
               </Button>
@@ -185,58 +189,72 @@ export default function CreatorSummaryPage() {
         </CardContent>
       </Card>
 
-      {/* Table */}
-      <Card>
-        <CardContent className="pt-6">
-          <h2 className="text-xl font-bold mb-4">Creator Summary</h2>
+      {/* Printable Report Section */}
+      <div className="print-report">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-bold">Creator Summary</h2>
+                <p className="text-sm text-muted-foreground mt-1">All creator records</p>
+              </div>
+            </div>
 
-          {loading ? (
-            <div className="flex items-center justify-center h-32">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : creatorSummaries.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No creator summaries found.
-            </div>
-          ) : (
-            <div className="min-w-0 overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>#</TableHead>
-                    <TableHead>Creator Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Users Created</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {creatorSummaries.map((item, i) => (
-                    <TableRow key={item.creatorId}>
-                      <TableCell className="text-muted-foreground">{i + 1}</TableCell>
-                      <TableCell className="font-medium">{item.creatorName}</TableCell>
-                      <TableCell>{item.creatorEmail}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{item.creatorRole}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={item.creatorStatus === 'active' ? 'default' : 'secondary'}
-                          className={item.creatorStatus === 'active' ? 'bg-green-600' : ''}>
-                          {item.creatorStatus}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-bold text-lg">{item.totalCreated}</span>
-                      </TableCell>
+            {loading ? (
+              <div className="flex items-center justify-center h-32">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : creatorSummaries.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No creator summaries found.
+              </div>
+            ) : (
+              <div className="min-w-0 overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>#</TableHead>
+                      <TableHead>Creator Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Users Created</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {creatorSummaries.map((item, i) => (
+                      <TableRow key={item.creatorId}>
+                        <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                        <TableCell className="font-medium">
+                          <Link
+                            href={`/admin/users?search=${encodeURIComponent(item.creatorName)}`}
+                            className="text-blue-600 hover:underline dark:text-blue-400"
+                          >
+                            {item.creatorName}
+                          </Link>
+                        </TableCell>
+                        <TableCell>{item.creatorEmail}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{item.creatorRole}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={item.creatorStatus === 'active' ? 'default' : 'secondary'}
+                            className={item.creatorStatus === 'active' ? 'bg-green-600' : ''}>
+                            {item.creatorStatus}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-bold text-lg">{item.totalCreated}</span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

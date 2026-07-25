@@ -38,6 +38,7 @@ func DefaultRolesAndPermissions() {
 				"network_olts_add", "network_olts_edit", "network_olts_delete",
 				"network_splitters_add", "network_splitters_edit", "network_splitters_delete",
 				"network_pops_add", "network_pops_edit", "network_pops_delete",
+				"network_boxes_view",
 
 				// Billing Management
 				"billing_view", "billing_packages_add", "billing_packages_edit", "billing_packages_delete",
@@ -46,21 +47,61 @@ func DefaultRolesAndPermissions() {
 
 				// Subscribers Management
 				"subscribers_view", "subscribers_add", "subscribers_edit", "subscribers_delete",
+				"subscribers_packages_view", "subscribers_inquiries_view", "subscribers_location_view",
 
 				// Dealers Management
 				"dealers_view", "dealers_add", "dealers_edit", "dealers_delete",
 				"dealers_franchises_add", "dealers_franchises_edit", "dealers_franchises_delete",
 
+				// Recovery Officers
+				"hr_recovery_officers_allocate",
+
+				// Transactions
+				"transactions_user_collections_view", "transactions_dealers_collections_view",
+				"transactions_allocated_view", "transactions_reprint", "transactions_bills_create",
+				"transactions_types_view", "transactions_new_collection", "transactions_bad_debt_view",
+
+				// Complaints
+				"complaints_users_view", "complaints_allocated_view", "complaints_subjects_view",
+				"complaints_types_view", "complaints_report_view",
+
+				// Messages
+				"messages_new_view", "messages_other_view", "messages_draft_view",
+				"messages_sent_view", "messages_expired_view", "messages_whatsapp_view",
+
+				// Accounts
+				"accounts_heads_view", "accounts_entry_view", "accounts_one_day_view", "accounts_reports_view",
+
+				// Inventory
+				"inventory_products_view", "inventory_purchase_view", "inventory_status_view",
+				"inventory_product_types_view", "inventory_vendors_view", "inventory_brands_view",
+				"inventory_unit_types_view",
+
+				// Point of Sale
+				"pos_sales_view",
+
 				// HR Management
 				"hr_view", "hr_staff_add", "hr_staff_edit", "hr_staff_delete",
 				"hr_recovery_officers_add", "hr_recovery_officers_edit", "hr_recovery_officers_delete",
+				"hr_salary_view", "hr_advances_view", "hr_attendance_day_view", "hr_attendance_user_view",
+
+				// Logs
+				"logs_connections_view", "logs_deleted_collection_view", "logs_deleted_users_view",
 
 				// Reports
 				"reports_view", "reports_sales_view", "reports_stock_movement_view", "reports_outstanding_payments_view",
-				"reports_collections_view",
+				"reports_collections_view", "reports_users_defaulter", "reports_allocated_defaulters",
+				"reports_new_users", "reports_monthly_collection_month_wise", "reports_month_wise_collection",
+				"reports_unpaid_collection", "reports_allocated_collections", "reports_promise_date",
+				"reports_user_collections", "reports_expiry_defaulters", "reports_month_defaulters",
+				"reports_collection_not_generated", "reports_creator_summary", "reports_package_wise",
+				"reports_deactivated_users", "reports_dealer_invoices", "reports_new_dealers",
+				"reports_dealers_collection", "reports_dealers_defaulter", "reports_abstract_stock",
+				"reports_abstract_sales",
 
 				// System Administration
 				"system_view", "system_config", "system_logs", "system_backup",
+				"system_user_rights", "system_change_password",
 
 				// Profile & Account
 				"profile_manage", "password_change", "notifications_manage",
@@ -84,6 +125,7 @@ func DefaultRolesAndPermissions() {
 				"network_olts_add", "network_olts_edit",
 				"network_splitters_add", "network_splitters_edit",
 				"network_pops_add", "network_pops_edit",
+				"network_boxes_view",
 
 				// Billing Management
 				"billing_view", "billing_packages_add", "billing_packages_edit",
@@ -91,18 +133,52 @@ func DefaultRolesAndPermissions() {
 
 				// Subscribers Management
 				"subscribers_view", "subscribers_add", "subscribers_edit", "subscribers_delete",
+				"subscribers_packages_view", "subscribers_inquiries_view",
 
 				// Dealers Management
 				"dealers_view", "dealers_add", "dealers_edit",
 				"dealers_franchises_add", "dealers_franchises_edit",
 
+				// Recovery Officers
+				"hr_recovery_officers_allocate",
+
+				// Transactions
+				"transactions_user_collections_view", "transactions_dealers_collections_view",
+				"transactions_allocated_view", "transactions_bills_create",
+				"transactions_types_view", "transactions_bad_debt_view",
+
+				// Complaints
+				"complaints_users_view", "complaints_allocated_view", "complaints_subjects_view",
+				"complaints_report_view",
+
+				// Messages
+				"messages_new_view", "messages_other_view", "messages_draft_view",
+				"messages_sent_view", "messages_expired_view", "messages_whatsapp_view",
+
+				// Accounts
+				"accounts_heads_view", "accounts_entry_view", "accounts_one_day_view",
+
+				// Inventory
+				"inventory_products_view", "inventory_purchase_view", "inventory_status_view",
+				"inventory_product_types_view", "inventory_vendors_view", "inventory_brands_view",
+				"inventory_unit_types_view",
+
+				// Point of Sale
+				"pos_sales_view",
+
 				// HR Management
 				"hr_view", "hr_staff_add", "hr_staff_edit",
 				"hr_recovery_officers_add", "hr_recovery_officers_edit",
+				"hr_salary_view", "hr_advances_view", "hr_attendance_day_view", "hr_attendance_user_view",
 
 				// Reports
 				"reports_view", "reports_sales_view", "reports_outstanding_payments_view",
-				"reports_collections_view",
+				"reports_collections_view", "reports_users_defaulter", "reports_allocated_defaulters",
+				"reports_new_users", "reports_monthly_collection_month_wise", "reports_month_wise_collection",
+				"reports_unpaid_collection", "reports_allocated_collections", "reports_promise_date",
+				"reports_user_collections", "reports_expiry_defaulters", "reports_month_defaulters",
+				"reports_creator_summary", "reports_package_wise", "reports_deactivated_users",
+				"reports_dealers_collection", "reports_dealers_defaulter",
 
 				// Profile & Account
 				"profile_manage", "password_change",
@@ -130,8 +206,12 @@ func DefaultRolesAndPermissions() {
 				// HR Management (view only)
 				"hr_view",
 
+				// Transactions
+				"transactions_user_collections_view", "transactions_dealers_collections_view",
+				"transactions_allocated_view",
+
 				// Reports
-				"reports_view", "reports_collections_view",
+				"reports_view", "reports_collections_view", "reports_user_collections",
 
 				// Profile & Account
 				"profile_manage", "password_change",
@@ -155,6 +235,9 @@ func DefaultRolesAndPermissions() {
 
 				// Dealers Management (self and sub-dealers)
 				"dealers_view", "dealers_franchises_add", "dealers_franchises_edit",
+
+				// Transactions
+				"transactions_user_collections_view",
 
 				// Reports
 				"reports_view", "reports_sales_view",
@@ -236,6 +319,7 @@ func GetDefaultRoles() []struct {
 				"network_olts_add", "network_olts_edit", "network_olts_delete",
 				"network_splitters_add", "network_splitters_edit", "network_splitters_delete",
 				"network_pops_add", "network_pops_edit", "network_pops_delete",
+				"network_boxes_view",
 
 				// Billing Management
 				"billing_view", "billing_packages_add", "billing_packages_edit", "billing_packages_delete",
@@ -244,21 +328,61 @@ func GetDefaultRoles() []struct {
 
 				// Subscribers Management
 				"subscribers_view", "subscribers_add", "subscribers_edit", "subscribers_delete",
+				"subscribers_packages_view", "subscribers_inquiries_view", "subscribers_location_view",
 
 				// Dealers Management
 				"dealers_view", "dealers_add", "dealers_edit", "dealers_delete",
 				"dealers_franchises_add", "dealers_franchises_edit", "dealers_franchises_delete",
 
+				// Recovery Officers
+				"hr_recovery_officers_allocate",
+
+				// Transactions
+				"transactions_user_collections_view", "transactions_dealers_collections_view",
+				"transactions_allocated_view", "transactions_reprint", "transactions_bills_create",
+				"transactions_types_view", "transactions_new_collection", "transactions_bad_debt_view",
+
+				// Complaints
+				"complaints_users_view", "complaints_allocated_view", "complaints_subjects_view",
+				"complaints_types_view", "complaints_report_view",
+
+				// Messages
+				"messages_new_view", "messages_other_view", "messages_draft_view",
+				"messages_sent_view", "messages_expired_view", "messages_whatsapp_view",
+
+				// Accounts
+				"accounts_heads_view", "accounts_entry_view", "accounts_one_day_view", "accounts_reports_view",
+
+				// Inventory
+				"inventory_products_view", "inventory_purchase_view", "inventory_status_view",
+				"inventory_product_types_view", "inventory_vendors_view", "inventory_brands_view",
+				"inventory_unit_types_view",
+
+				// Point of Sale
+				"pos_sales_view",
+
 				// HR Management
 				"hr_view", "hr_staff_add", "hr_staff_edit", "hr_staff_delete",
 				"hr_recovery_officers_add", "hr_recovery_officers_edit", "hr_recovery_officers_delete",
+				"hr_salary_view", "hr_advances_view", "hr_attendance_day_view", "hr_attendance_user_view",
+
+				// Logs
+				"logs_connections_view", "logs_deleted_collection_view", "logs_deleted_users_view",
 
 				// Reports
 				"reports_view", "reports_sales_view", "reports_stock_movement_view", "reports_outstanding_payments_view",
-				"reports_collections_view",
+				"reports_collections_view", "reports_users_defaulter", "reports_allocated_defaulters",
+				"reports_new_users", "reports_monthly_collection_month_wise", "reports_month_wise_collection",
+				"reports_unpaid_collection", "reports_allocated_collections", "reports_promise_date",
+				"reports_user_collections", "reports_expiry_defaulters", "reports_month_defaulters",
+				"reports_collection_not_generated", "reports_creator_summary", "reports_package_wise",
+				"reports_deactivated_users", "reports_dealer_invoices", "reports_new_dealers",
+				"reports_dealers_collection", "reports_dealers_defaulter", "reports_abstract_stock",
+				"reports_abstract_sales",
 
 				// System Administration
 				"system_view", "system_config", "system_logs", "system_backup",
+				"system_user_rights", "system_change_password",
 
 				// Profile & Account
 				"profile_manage", "password_change", "notifications_manage",
@@ -282,6 +406,7 @@ func GetDefaultRoles() []struct {
 				"network_olts_add", "network_olts_edit",
 				"network_splitters_add", "network_splitters_edit",
 				"network_pops_add", "network_pops_edit",
+				"network_boxes_view",
 
 				// Billing Management
 				"billing_view", "billing_packages_add", "billing_packages_edit",
@@ -289,18 +414,52 @@ func GetDefaultRoles() []struct {
 
 				// Subscribers Management
 				"subscribers_view", "subscribers_add", "subscribers_edit", "subscribers_delete",
+				"subscribers_packages_view", "subscribers_inquiries_view",
 
 				// Dealers Management
 				"dealers_view", "dealers_add", "dealers_edit",
 				"dealers_franchises_add", "dealers_franchises_edit",
 
+				// Recovery Officers
+				"hr_recovery_officers_allocate",
+
+				// Transactions
+				"transactions_user_collections_view", "transactions_dealers_collections_view",
+				"transactions_allocated_view", "transactions_bills_create",
+				"transactions_types_view", "transactions_bad_debt_view",
+
+				// Complaints
+				"complaints_users_view", "complaints_allocated_view", "complaints_subjects_view",
+				"complaints_report_view",
+
+				// Messages
+				"messages_new_view", "messages_other_view", "messages_draft_view",
+				"messages_sent_view", "messages_expired_view", "messages_whatsapp_view",
+
+				// Accounts
+				"accounts_heads_view", "accounts_entry_view", "accounts_one_day_view",
+
+				// Inventory
+				"inventory_products_view", "inventory_purchase_view", "inventory_status_view",
+				"inventory_product_types_view", "inventory_vendors_view", "inventory_brands_view",
+				"inventory_unit_types_view",
+
+				// Point of Sale
+				"pos_sales_view",
+
 				// HR Management
 				"hr_view", "hr_staff_add", "hr_staff_edit",
 				"hr_recovery_officers_add", "hr_recovery_officers_edit",
+				"hr_salary_view", "hr_advances_view", "hr_attendance_day_view", "hr_attendance_user_view",
 
 				// Reports
 				"reports_view", "reports_sales_view", "reports_outstanding_payments_view",
-				"reports_collections_view",
+				"reports_collections_view", "reports_users_defaulter", "reports_allocated_defaulters",
+				"reports_new_users", "reports_monthly_collection_month_wise", "reports_month_wise_collection",
+				"reports_unpaid_collection", "reports_allocated_collections", "reports_promise_date",
+				"reports_user_collections", "reports_expiry_defaulters", "reports_month_defaulters",
+				"reports_creator_summary", "reports_package_wise", "reports_deactivated_users",
+				"reports_dealers_collection", "reports_dealers_defaulter",
 
 				// Profile & Account
 				"profile_manage", "password_change",
@@ -328,8 +487,12 @@ func GetDefaultRoles() []struct {
 				// HR Management (view only)
 				"hr_view",
 
+				// Transactions
+				"transactions_user_collections_view", "transactions_dealers_collections_view",
+				"transactions_allocated_view",
+
 				// Reports
-				"reports_view", "reports_collections_view",
+				"reports_view", "reports_collections_view", "reports_user_collections",
 
 				// Profile & Account
 				"profile_manage", "password_change",
@@ -353,6 +516,9 @@ func GetDefaultRoles() []struct {
 
 				// Dealers Management (self and sub-dealers)
 				"dealers_view", "dealers_franchises_add", "dealers_franchises_edit",
+
+				// Transactions
+				"transactions_user_collections_view",
 
 				// Reports
 				"reports_view", "reports_sales_view",

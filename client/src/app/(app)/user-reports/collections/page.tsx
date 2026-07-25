@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,10 +20,10 @@ interface CollectionRecord {
   id: string;
   subscriberName: string;
   subscriberId: string;
+  connectionId: string;
   billId: string;
   amount: number;
   collectionDate: string;
-  receivingDate: string;
   address: string;
   sublocality: string;
   connectionType: string;
@@ -31,17 +32,12 @@ interface CollectionRecord {
 
 export default function UserCollectionPage() {
   const { companyId } = useCompany();
-  const reportRef = useRef<HTMLDivElement>(null);
 
   const { data: payments = [], isLoading: loading } = useGenericQuery<any>('billing/payments', companyId ?? undefined);
 
-  // Filter state
   const [billId, setBillId] = useState('');
-  const [receivingDate, setReceivingDate] = useState<Date | undefined>();
-  const [receivingDateOpen, setReceivingDateOpen] = useState(false);
   const [address, setAddress] = useState('');
 
-  // Date range
   const [filterFromDate, setFilterFromDate] = useState<Date>(() => {
     const d = new Date();
     d.setDate(1);
@@ -51,42 +47,48 @@ export default function UserCollectionPage() {
   const [filterToDate, setFilterToDate] = useState<Date>(new Date());
   const [filterToDateOpen, setFilterToDateOpen] = useState(false);
 
-  // Dropdowns
   const [reportType, setReportType] = useState('all');
   const [sublocality, setSublocality] = useState('all');
   const [connectionType, setConnectionType] = useState('both');
   const [selectedUser, setSelectedUser] = useState('all');
 
-  // Collection History date range
-  const [historyFromDate, setHistoryFromDate] = useState<Date>(() => {
-    const d = new Date();
-    d.setDate(1);
-    return d;
-  });
-  const [historyFromDateOpen, setHistoryFromDateOpen] = useState(false);
-  const [historyToDate, setHistoryToDate] = useState<Date>(new Date());
-  const [historyToDateOpen, setHistoryToDateOpen] = useState(false);
+  const allSublocalities = useMemo(() => {
+    const set = new Set<string>();
+    payments.forEach((p: any) => {
+      const loc = p.subscriber?.areaName;
+      if (loc) set.add(loc);
+    });
+    return Array.from(set);
+  }, [payments]);
 
-  // Map API payments to collection records
-  const data: CollectionRecord[] = payments.map((p: any) => ({
+  const allUsers = useMemo(() => {
+    const set = new Set<string>();
+    payments.forEach((p: any) => {
+      const user = p.collectorId || p.method;
+      if (user) set.add(user);
+    });
+    return Array.from(set);
+  }, [payments]);
+
+  const data: CollectionRecord[] = useMemo(() => payments.map((p: any) => ({
     id: p.id,
     subscriberName: p.subscriberName || p.subscriber?.name || '',
     subscriberId: p.subscriberId || '',
+    connectionId: p.connectionId || p.subscriberId || '',
     billId: p.invoiceId || p.id?.slice(0, 8) || '',
     amount: Number(p.amount) || 0,
     collectionDate: p.paymentDate || p.createdAt || '',
-    receivingDate: p.paymentDate || p.createdAt || '',
     address: p.subscriber?.installationAddress || '',
     sublocality: p.subscriber?.areaName || '',
     connectionType: p.subscriber?.connectionType || 'internet',
     collectedBy: p.collectorId || p.method || '',
-  }));
+  })), [payments]);
 
-  const filteredData = data.filter((item) => {
+  const filteredData = useMemo(() => data.filter((item) => {
     const itemDate = new Date(item.collectionDate);
-    const from = new Date(historyFromDate);
+    const from = new Date(filterFromDate);
     from.setHours(0, 0, 0, 0);
-    const to = new Date(historyToDate);
+    const to = new Date(filterToDate);
     to.setHours(23, 59, 59, 999);
 
     const afterFrom = itemDate >= from;
@@ -97,12 +99,10 @@ export default function UserCollectionPage() {
     const userMatch = selectedUser === 'all' || item.collectedBy === selectedUser;
     const billMatch = !billId || item.billId.toLowerCase().includes(billId.toLowerCase());
     const addressMatch = !address || item.address.toLowerCase().includes(address.toLowerCase());
-    const receivingDateMatch = !receivingDate ||
-      format(new Date(item.receivingDate), 'yyyy-MM-dd') === format(receivingDate, 'yyyy-MM-dd');
 
     return afterFrom && beforeTo && typeMatch && connectionMatch &&
-      sublocalityMatch && userMatch && billMatch && addressMatch && receivingDateMatch;
-  });
+      sublocalityMatch && userMatch && billMatch && addressMatch;
+  }), [data, filterFromDate, filterToDate, reportType, connectionType, sublocality, selectedUser, billId, address]);
 
   const totalAmount = filteredData.reduce((sum, item) => sum + item.amount, 0);
   const totalRecords = filteredData.length;
@@ -110,13 +110,12 @@ export default function UserCollectionPage() {
   const exportExcel = () => {
     if (filteredData.length === 0) return;
 
-    const headers = ['Subscriber Name', 'Bill ID', 'Amount', 'Collection Date', 'Receiving Date', 'Address', 'Connection Type', 'Collected By'];
+    const headers = ['Subscriber Name', 'Bill ID', 'Amount', 'Collection Date', 'Address', 'Connection Type', 'Collected By'];
     const rows = filteredData.map((item) => [
       item.subscriberName,
       item.billId,
       item.amount.toFixed(2),
       item.collectionDate,
-      item.receivingDate,
       item.address,
       item.connectionType,
       item.collectedBy,
@@ -150,168 +149,106 @@ export default function UserCollectionPage() {
       `}</style>
 
       {/* Header */}
-      <div className="flex items-center justify-between no-print">
-        <div className="flex items-center gap-3">
-          <div className="rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 p-2.5 shadow-sm">
-            <Wallet className="h-5 w-5 text-white" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">User Collection Reports</h1>
-            <p className="text-sm text-muted-foreground">View and manage user collections</p>
+      <div className="flex items-center gap-3 no-print">
+        <div className="rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 p-2.5 shadow-sm">
+          <Wallet className="h-5 w-5 text-white" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">User Collection Reports</h1>
+          <p className="text-sm text-muted-foreground">View and manage user collections</p>
+        </div>
+      </div>
+      <div className="h-0.5 bg-gradient-to-r from-blue-500/50 via-cyan-500/30 to-transparent no-print" />
+
+      {/* Summary Cards */}
+      <div className="grid gap-4 md:grid-cols-2 no-print">
+        <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Total Records</p>
+              <p className="text-2xl font-bold mt-1">{totalRecords}</p>
+            </div>
+            <div className="rounded-lg bg-gradient-to-br from-blue-500 to-cyan-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
+              <Wallet className="h-5 w-5" />
+            </div>
           </div>
         </div>
-
-        {/* Right side filters */}
-        <div className="flex items-center gap-4">
-          <div className="w-48">
-            <Input
-              placeholder="By Bill ID"
-              value={billId}
-              onChange={(e) => setBillId(e.target.value)}
-            />
-          </div>
-          <div className="w-48">
-            <Popover open={receivingDateOpen} onOpenChange={setReceivingDateOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    'w-full justify-start text-left font-normal',
-                    !receivingDate && 'text-muted-foreground',
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {receivingDate ? format(receivingDate, 'PPP') : 'By Receiving Date'}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={receivingDate}
-                  onSelect={(date) => {
-                    setReceivingDate(date);
-                    setReceivingDateOpen(false);
-                  }}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-          <div className="w-48">
-            <Input
-              placeholder="By Address"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-            />
+        <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Total Amount</p>
+              <p className="text-2xl font-bold mt-1">PKR {totalAmount.toLocaleString()}</p>
+            </div>
+            <div className="rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
+              <Wallet className="h-5 w-5" />
+            </div>
           </div>
         </div>
       </div>
-      <div className="h-px bg-gradient-to-r from-blue-500/30 via-cyan-500/30 to-transparent" />
 
-      {/* Filter Row */}
-      <Card className="no-print">
+      {/* Filter Card */}
+      <Card className="no-print transition-all duration-300 hover:shadow-md">
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-            {/* From Date */}
             <div className="space-y-2">
-              <Label>From</Label>
+              <Label>From Date</Label>
               <Popover open={filterFromDateOpen} onOpenChange={setFilterFromDateOpen}>
                 <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      'w-full justify-start text-left font-normal',
-                      !filterFromDate && 'text-muted-foreground',
-                    )}
-                  >
+                  <Button variant="outline" className={cn('w-full justify-start text-left font-normal', !filterFromDate && 'text-muted-foreground')}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {filterFromDate ? format(filterFromDate, 'PPP') : 'Pick date'}
+                    {filterFromDate ? format(filterFromDate, 'PPP') : 'Pick a date'}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={filterFromDate}
-                    onSelect={(date) => {
-                      if (date) {
-                        setFilterFromDate(date);
-                        setFilterFromDateOpen(false);
-                      }
-                    }}
-                    initialFocus
-                  />
+                  <Calendar mode="single" selected={filterFromDate} onSelect={(date) => { if (date) { setFilterFromDate(date); setFilterFromDateOpen(false); } }} initialFocus />
                 </PopoverContent>
               </Popover>
             </div>
 
-            {/* To Date */}
             <div className="space-y-2">
-              <Label>To</Label>
+              <Label>To Date</Label>
               <Popover open={filterToDateOpen} onOpenChange={setFilterToDateOpen}>
                 <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      'w-full justify-start text-left font-normal',
-                      !filterToDate && 'text-muted-foreground',
-                    )}
-                  >
+                  <Button variant="outline" className={cn('w-full justify-start text-left font-normal', !filterToDate && 'text-muted-foreground')}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {filterToDate ? format(filterToDate, 'PPP') : 'Pick date'}
+                    {filterToDate ? format(filterToDate, 'PPP') : 'Pick a date'}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={filterToDate}
-                    onSelect={(date) => {
-                      if (date) {
-                        setFilterToDate(date);
-                        setFilterToDateOpen(false);
-                      }
-                    }}
-                    initialFocus
-                  />
+                  <Calendar mode="single" selected={filterToDate} onSelect={(date) => { if (date) { setFilterToDate(date); setFilterToDateOpen(false); } }} initialFocus />
                 </PopoverContent>
               </Popover>
             </div>
 
-            {/* Report Type */}
             <div className="space-y-2">
               <Label>Report Type</Label>
               <Select value={reportType} onValueChange={setReportType}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                 <SelectContent portal={false}>
                   <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="paid">Paid</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="overdue">Overdue</SelectItem>
+                  <SelectItem value="internet">Internet</SelectItem>
+                  <SelectItem value="tv_cable">TV Cable</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Sublocality */}
             <div className="space-y-2">
               <Label>Sublocality</Label>
               <Select value={sublocality} onValueChange={setSublocality}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select sublocality" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select sublocality" /></SelectTrigger>
                 <SelectContent portal={false}>
                   <SelectItem value="all">All</SelectItem>
+                  {allSublocalities.map((loc) => (
+                    <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Connection Type */}
             <div className="space-y-2">
               <Label>Connection Type</Label>
               <Select value={connectionType} onValueChange={setConnectionType}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                 <SelectContent portal={false}>
                   <SelectItem value="both">Both</SelectItem>
                   <SelectItem value="internet">Internet</SelectItem>
@@ -320,130 +257,53 @@ export default function UserCollectionPage() {
               </Select>
             </div>
 
-            {/* Users */}
             <div className="space-y-2">
               <Label>Users</Label>
               <Select value={selectedUser} onValueChange={setSelectedUser}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select user" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select user" /></SelectTrigger>
                 <SelectContent portal={false}>
                   <SelectItem value="all">All</SelectItem>
+                  {allUsers.map((user) => (
+                    <SelectItem key={user} value={user}>{user}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
-          <div className="flex gap-2 mt-4">
-            <Button onClick={() => {}} disabled={loading} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700">
-              {loading ? 'Loading...' : 'Apply Filters'}
-            </Button>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            <div className="space-y-2">
+              <Label>Bill ID</Label>
+              <Input placeholder="Search by Bill ID" value={billId} onChange={(e) => setBillId(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Address</Label>
+              <Input placeholder="Search by Address" value={address} onChange={(e) => setAddress(e.target.value)} />
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Collection History */}
-      <div ref={reportRef} className="print-report">
+      {/* Printable Report Section */}
+      <div className="print-report">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="text-xl font-bold">Collection History</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  All user collections records
+                  From: {format(filterFromDate, 'dd MMM yyyy')} — To: {format(filterToDate, 'dd MMM yyyy')}
                 </p>
               </div>
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-36">
-                    <Popover open={historyFromDateOpen} onOpenChange={setHistoryFromDateOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className={cn(
-                            'w-full justify-start text-left font-normal text-xs',
-                            !historyFromDate && 'text-muted-foreground',
-                          )}
-                        >
-                          <CalendarIcon className="mr-1 h-3 w-3" />
-                          {historyFromDate ? format(historyFromDate, 'dd MMM yyyy') : 'From'}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={historyFromDate}
-                          onSelect={(date) => {
-                            if (date) {
-                              setHistoryFromDate(date);
-                              setHistoryFromDateOpen(false);
-                            }
-                          }}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  <span className="text-muted-foreground text-xs">to</span>
-                  <div className="w-36">
-                    <Popover open={historyToDateOpen} onOpenChange={setHistoryToDateOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className={cn(
-                            'w-full justify-start text-left font-normal text-xs',
-                            !historyToDate && 'text-muted-foreground',
-                          )}
-                        >
-                          <CalendarIcon className="mr-1 h-3 w-3" />
-                          {historyToDate ? format(historyToDate, 'dd MMM yyyy') : 'To'}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={historyToDate}
-                          onSelect={(date) => {
-                            if (date) {
-                              setHistoryToDate(date);
-                              setHistoryToDateOpen(false);
-                            }
-                          }}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </div>
-                <div className="flex gap-2 no-print">
-                  <Button variant="outline" size="sm" onClick={handlePrint}>
-                    <Printer className="mr-2 h-4 w-4" />
-                    Print
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={exportExcel}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Excel
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Summary */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">Total Records</p>
-                  <Wallet className="h-4 w-4 text-muted-foreground transition-all duration-300 group-hover:scale-110" />
-                </div>
-                <p className="text-2xl font-bold mt-2">{totalRecords}</p>
-              </div>
-              <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">Total Amount</p>
-                  <Wallet className="h-4 w-4 text-muted-foreground transition-all duration-300 group-hover:scale-110" />
-                </div>
-                <p className="text-2xl font-bold mt-2">Pkr {totalAmount.toLocaleString('en-IN')}</p>
+              <div className="flex gap-2 no-print">
+                <Button variant="outline" size="sm" onClick={handlePrint}>
+                  <Printer className="mr-2 h-4 w-4" />
+                  Print
+                </Button>
+                <Button variant="outline" size="sm" onClick={exportExcel}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Excel
+                </Button>
               </div>
             </div>
 
@@ -465,7 +325,6 @@ export default function UserCollectionPage() {
                       <TableHead>Bill ID</TableHead>
                       <TableHead>Amount</TableHead>
                       <TableHead>Collection Date</TableHead>
-                      <TableHead>Receiving Date</TableHead>
                       <TableHead>Address</TableHead>
                       <TableHead>Connection Type</TableHead>
                       <TableHead>Collected By</TableHead>
@@ -475,12 +334,18 @@ export default function UserCollectionPage() {
                     {filteredData.map((item, i) => (
                       <TableRow key={item.id}>
                         <TableCell className="text-muted-foreground">{i + 1}</TableCell>
-                        <TableCell className="font-medium">{item.subscriberName}</TableCell>
+                        <TableCell className="font-medium">
+                          <Link
+                            href={`/crm/subscriber-detail?connectionId=${item.connectionId}`}
+                            className="text-blue-600 hover:underline dark:text-blue-400"
+                          >
+                            {item.subscriberName}
+                          </Link>
+                        </TableCell>
                         <TableCell>{item.billId}</TableCell>
-                        <TableCell>Pkr {item.amount.toLocaleString('en-IN')}</TableCell>
-                        <TableCell>{item.collectionDate}</TableCell>
-                        <TableCell>{item.receivingDate}</TableCell>
-                        <TableCell>{item.address}</TableCell>
+                        <TableCell>PKR {item.amount.toLocaleString()}</TableCell>
+                        <TableCell>{item.collectionDate ? format(new Date(item.collectionDate), 'dd MMM yyyy') : '-'}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground max-w-[120px] truncate">{item.address || '---'}</TableCell>
                         <TableCell>{item.connectionType}</TableCell>
                         <TableCell>{item.collectedBy}</TableCell>
                       </TableRow>

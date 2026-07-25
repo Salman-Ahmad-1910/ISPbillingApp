@@ -13,40 +13,36 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { InstallmentPlan, Product } from '@/lib/types';
+import type { InstallmentPlan } from '@/lib/types';
 import { installmentPlanSchema } from '@/lib/schemas';
 import { Loader2 } from 'lucide-react';
-import { useEffect } from 'react';
 
 type PlanFormValues = z.infer<typeof installmentPlanSchema>;
 
 interface InstallmentPlanFormProps {
   plan: InstallmentPlan | null;
-  products: Product[];
   onSave: (data: PlanFormValues) => void;
   onCancel: () => void;
   isSaving?: boolean;
 }
 
-export function InstallmentPlanForm({ plan, products, onSave, onCancel, isSaving }: InstallmentPlanFormProps) {
+export function InstallmentPlanForm({ plan, onSave, onCancel, isSaving }: InstallmentPlanFormProps) {
+  const defaultValues = plan
+    ? {
+        name: plan.name || '',
+        installments: plan.installments || 1,
+        percentageIncrease: Number(plan.percentageIncrease) || 0,
+      }
+    : {
+        name: '',
+        installments: 1,
+        percentageIncrease: 0,
+      };
+
   const form = useForm<PlanFormValues>({
     resolver: zodResolver(installmentPlanSchema),
-    defaultValues: plan || {
-      name: '',
-      productId: '',
-      downPayment: 0,
-      installments: 1,
-      installmentAmount: 0,
-    },
+    defaultValues,
   });
-
-  const { watch, setValue } = form;
-  const downPayment = watch('downPayment');
-  const installments = watch('installments');
-  const installmentAmount = watch('installmentAmount');
-
-  const totalAmount = (downPayment || 0) + (installments || 0) * (installmentAmount || 0);
 
   function onSubmit(values: PlanFormValues) {
     onSave(values);
@@ -70,75 +66,30 @@ export function InstallmentPlanForm({ plan, products, onSave, onCancel, isSaving
         />
         <FormField
           control={form.control}
-          name="productId"
+          name="installments"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Product</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a product" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {products.map((product) => (
-                    <SelectItem key={product.id} value={product.id}>
-                      {product.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="downPayment"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Down Payment (PKR)</FormLabel>
-                <FormControl>
-                  <Input type="number" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="installments"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Number of Installments</FormLabel>
-                <FormControl>
-                  <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-        
-        <FormField
-          control={form.control}
-          name="installmentAmount"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Installment Amount (PKR)</FormLabel>
+              <FormLabel>Number of Installments</FormLabel>
               <FormControl>
-                <Input type="number" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
+                <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-        
-        <div>
-            <FormLabel>Total Amount</FormLabel>
-            <Input value={totalAmount.toLocaleString()} readOnly className="mt-2 bg-muted font-medium" />
-        </div>
+        <FormField
+          control={form.control}
+          name="percentageIncrease"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Percentage Increase (%)</FormLabel>
+              <FormControl>
+                <Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <div className="flex justify-end gap-2 pt-4 border-t">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSaving}>

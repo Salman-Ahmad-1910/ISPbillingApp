@@ -20,6 +20,18 @@ export interface SaleReceiptData {
   paymentMethod: string;
   date: string;
   items: SaleReceiptItem[];
+  isInstallment?: boolean;
+  installmentInfo?: {
+    planName: string;
+    totalInstallments: number;
+    paidInstallments: number;
+    nextInstallment: number;
+    installmentAmount: number;
+    totalAmount: number;
+    remainingInstallments: number;
+    percentage: number;
+    status?: string;
+  } | null;
 }
 
 type ReceiptSize = 'a4' | 'thermal';
@@ -77,7 +89,7 @@ async function buildReceiptHtml(
     : null;
 
   return size === 'thermal'
-    ? buildThermalReceipt(sale, companyName, companyAddress, companyPhone)
+    ? buildThermalReceipt(sale, companyName, companyAddress, companyPhone, logoUrl)
     : buildA4Receipt(sale, companyName, companyAddress, companyPhone, companyEmail, logoUrl, stampUrl);
 }
 
@@ -98,6 +110,159 @@ function buildA4Receipt(
   const subtotal = (sale.items || []).reduce((sum, i) => sum + ((Number(i.price) || 0) * (Number(i.quantity) || 0)), 0);
   const total = subtotal + totalSaleTax + totalWthTax;
 
+  const inst = sale.installmentInfo;
+  const isInst = sale.isInstallment && inst;
+
+  const totalQty = (sale.items || []).reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
+  const productNames = (sale.items || []).map(i => escapeHtml(i.productName)).join(', ');
+
+  const paidAmount = isInst ? inst!.installmentAmount * inst!.paidInstallments : 0;
+  const remainingAmount = isInst ? inst!.installmentAmount * inst!.remainingInstallments : 0;
+
+  if (isInst) {
+    const instStatus = inst!.status === 'completed' ? 'COMPLETED' : 'ACTIVE';
+    const instStatusClass = inst!.status === 'completed' ? 'status-paid' : 'status-pending';
+
+    return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"/>
+<title>Installment Invoice ${escapeHtml(sale.id)}</title>
+<style>
+  @page { size: A4; margin: 15mm; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:'Segoe UI',system-ui,-apple-system,sans-serif; color:#111827; background:#fff; padding:0; }
+  .container { max-width:800px; margin:0 auto; padding:32px; }
+  header { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:3px solid #111827; padding-bottom:24px; margin-bottom:32px; }
+  .brand { display:flex; gap:16px; align-items:flex-start; }
+  .brand img { width:60px; height:60px; object-fit:contain; }
+  .brand .name { font-size:24px; font-weight:700; color:#111827; }
+  .brand .meta { font-size:13px; color:#6b7280; margin-top:4px; line-height:1.5; }
+  .doc { text-align:right; }
+  .doc .title { font-size:36px; font-weight:800; letter-spacing:2px; color:#059669; }
+  .doc .rid { font-size:13px; color:#6b7280; margin-top:8px; line-height:1.8; }
+  .doc .rid span { color:#111827; font-weight:600; }
+  .status-pill { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700; text-transform:uppercase; }
+  .status-paid { background:#dcfce7; color:#166534; }
+  .status-pending { background:#fef9c3; color:#854d0e; }
+  .amounts-box { border:2px solid #059669; border-radius:10px; overflow:hidden; margin-bottom:32px; }
+  .amounts-box .box-header { background:#059669; color:#fff; padding:10px 16px; font-size:14px; font-weight:700; text-transform:uppercase; letter-spacing:1px; }
+  .amounts-box .box-row { display:flex; justify-content:space-between; padding:10px 16px; font-size:13px; border-bottom:1px solid #e5e7eb; }
+  .amounts-box .box-row:last-child { border-bottom:none; }
+  .amounts-box .box-row .label { color:#6b7280; }
+  .amounts-box .box-row .value { font-weight:600; }
+  .amounts-box .box-row.info .value { font-weight:700; color:#111827; }
+  .amounts-box .box-row.total { background:#f0fdf4; font-weight:700; font-size:15px; }
+  .amounts-box .box-row.total .value { color:#059669; }
+  .amounts-box .box-row.paid .value { color:#16a34a; }
+  .amounts-box .box-row.remaining .value { color:#d97706; }
+  .amounts-box .box-row.per-inst .value { color:#1d4ed8; }
+  .amounts-box .divider { border-top:2px solid #059669; margin:0; }
+  footer { margin-top:48px; border-top:1px solid #d1d5db; padding-top:24px; }
+  .sigs { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:24px; }
+  .sig { text-align:center; }
+  .sig img { max-height:80px; max-width:180px; object-fit:contain; margin-bottom:4px; }
+  .sig .line { border-bottom:1px solid #000; width:200px; margin-bottom:4px; }
+  .sig .lbl { font-size:11px; color:#9ca3af; }
+  .foot-text { text-align:center; color:#6b7280; margin-top:24px; }
+  .foot-text .co { font-size:18px; font-weight:700; color:#111827; }
+  .foot-text .sub { font-size:13px; margin-top:4px; }
+  .foot-text .thanks { font-size:12px; color:#9ca3af; margin-top:8px; }
+  @media print { body { background:#fff; } .container { padding:0; } .no-print { display:none; } }
+</style></head>
+<body>
+<div class="container">
+  <header>
+    <div class="brand">
+      ${logoUrl ? `<img src="${escapeHtml(logoUrl)}" alt="Logo" />` : ''}
+      <div>
+        <div class="name">${escapeHtml(companyName)}</div>
+        ${address ? `<div class="meta">${escapeHtml(address)}</div>` : ''}
+        ${phone ? `<div class="meta">Phone: ${escapeHtml(phone)}</div>` : ''}
+        ${email ? `<div class="meta">Email: ${escapeHtml(email)}</div>` : ''}
+      </div>
+    </div>
+    <div class="doc">
+      <div class="title">INSTALLMENT INVOICE</div>
+      <div class="rid">
+        Sale ID: <span>${escapeHtml(sale.id)}</span><br/>
+        Date: <span>${escapeHtml(fmtDate(sale.date))}</span><br/>
+        Plan: <span>${escapeHtml(inst!.planName)}</span><br/>
+        Status: <span class="status-pill ${instStatusClass}">${instStatus}</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="amounts-box">
+    <div class="box-header">Invoice Details</div>
+    <div class="box-row info">
+      <span class="label">Customer Name</span>
+      <span class="value">${escapeHtml(sale.subscriberName || 'Walk-in')}</span>
+    </div>
+    <div class="box-row info">
+      <span class="label">Payment Method</span>
+      <span class="value">${escapeHtml((sale.paymentMethod || '').toUpperCase())}</span>
+    </div>
+    <div class="box-row info">
+      <span class="label">Products</span>
+      <span class="value" style="max-width:450px;text-align:right">${productNames || '---'}</span>
+    </div>
+    <div class="box-row info">
+      <span class="label">Total Items</span>
+      <span class="value">${totalQty}</span>
+    </div>
+    <div class="divider"></div>
+    <div class="box-row per-inst">
+      <span class="label">Amount per Installment</span>
+      <span class="value">PKR ${formatPKR(inst!.installmentAmount)}</span>
+    </div>
+    <div class="box-row paid">
+      <span class="label">Paid Installments</span>
+      <span class="value">${inst!.paidInstallments} / ${inst!.totalInstallments}</span>
+    </div>
+    <div class="box-row remaining">
+      <span class="label">Remaining Installments</span>
+      <span class="value">${inst!.remainingInstallments} / ${inst!.totalInstallments}</span>
+    </div>
+    <div class="box-row paid">
+      <span class="label">Paid Amount</span>
+      <span class="value">PKR ${formatPKR(paidAmount)}</span>
+    </div>
+    <div class="box-row remaining">
+      <span class="label">Remaining Amount</span>
+      <span class="value">PKR ${formatPKR(remainingAmount)}</span>
+    </div>
+    <div class="box-row total">
+      <span class="label">Total Amount (incl. increase)</span>
+      <span class="value">PKR ${formatPKR(inst!.totalAmount)}</span>
+    </div>
+  </div>
+
+  <footer>
+    <div class="sigs">
+      <div class="sig">
+        ${stampUrl
+          ? `<img src="${escapeHtml(stampUrl)}" alt="Company Stamp" onerror="this.style.display='none'" />`
+          : `<div class="line"></div>`}
+        <div class="lbl">Company Stamp</div>
+      </div>
+      <div class="sig">
+        <div class="line"></div>
+        <div class="lbl">Authorized Signature</div>
+      </div>
+    </div>
+    <div class="foot-text">
+      <div class="co">${escapeHtml(companyName)}</div>
+      ${phone || email ? `<div class="sub">Phone: ${escapeHtml(phone)} | Email: ${escapeHtml(email)}</div>` : ''}
+      <div class="thanks">Thank you for your business!</div>
+    </div>
+  </footer>
+</div>
+<div class="no-print" style="text-align:center;margin:16px 0">
+  <button onclick="window.print()" style="padding:10px 22px;background:#111827;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px">Print Receipt</button>
+</div>
+</body></html>`;
+  }
+
+  // ── REGULAR A4 — product table ──
   const itemRows = (sale.items || [])
     .map(
       (item) => {
@@ -246,7 +411,8 @@ async function buildThermalReceipt(
   sale: SaleReceiptData,
   companyName: string,
   address: string,
-  phone: string
+  phone: string,
+  logoUrl: string | null
 ): Promise<string> {
   const subtotal = (sale.totalAmount || 0) - (sale.taxAmount || 0);
   const totalItems = (sale.items || []).reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
@@ -262,6 +428,75 @@ async function buildThermalReceipt(
     qrSvg = '';
   }
 
+  const inst = sale.installmentInfo;
+  const isInst = sale.isInstallment && inst;
+
+  const paidAmount = isInst ? inst!.installmentAmount * inst!.paidInstallments : 0;
+  const remainingAmount = isInst ? inst!.installmentAmount * inst!.remainingInstallments : 0;
+  const productNames = (sale.items || []).map(i => escapeHtml(i.productName)).join(', ');
+  const totalQty = (sale.items || []).reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
+
+  if (isInst) {
+    return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"/>
+<title>Installment Receipt ${escapeHtml(sale.id)}</title>
+<style>
+  @page { size: 80mm auto; margin: 3mm; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: 'Courier New', monospace; color:#000; background:#fff; }
+  .receipt { width:74mm; margin:0 auto; padding:4px 2px; font-size:12px; }
+  .center { text-align:center; }
+  .logo { text-align:center; margin-bottom:4px; }
+  .logo img { max-width:40mm; max-height:15mm; object-fit:contain; }
+  .name { font-size:16px; font-weight:700; }
+  .muted { font-size:10px; color:#444; }
+  .sep { border-top:1px dashed #000; margin:6px 0; }
+  .row { display:flex; justify-content:space-between; margin:2px 0; font-size:11px; }
+  .row .lbl { color:#555; }
+  .row .val { font-weight:700; }
+  .amounts { margin-top:6px; padding-top:6px; border-top:2px solid #000; }
+  .amounts .row { margin:3px 0; font-size:12px; }
+  .amounts .row.total { border-top:1px dashed #000; margin-top:4px; padding-top:4px; font-weight:700; font-size:14px; }
+  .no-print { text-align:center; margin-top:10px; }
+  .no-print button { padding:8px 16px; font-size:13px; cursor:pointer; }
+  @media print { .no-print { display:none; } }
+</style></head>
+<body>
+<div class="receipt">
+  <div class="center">
+    ${logoUrl ? `<div class="logo"><img src="${escapeHtml(logoUrl)}" alt="Logo" onerror="this.style.display='none'" /></div>` : ''}
+    <div class="name">${escapeHtml(companyName)}</div>
+    ${address ? `<div class="muted">${escapeHtml(address)}</div>` : ''}
+    ${phone ? `<div class="muted">Tel: ${escapeHtml(phone)}</div>` : ''}
+  </div>
+  <div class="sep"></div>
+  <div class="center muted">INSTALLMENT RECEIPT</div>
+  <div class="sep"></div>
+
+  <div class="row"><span class="lbl">No:</span><span class="val">${escapeHtml(sale.id.slice(0, 12))}</span></div>
+  <div class="row"><span class="lbl">Date:</span><span class="val">${escapeHtml(fmtDate(sale.date))}</span></div>
+  <div class="row"><span class="lbl">Customer:</span><span class="val">${escapeHtml(sale.subscriberName || 'Walk-in')}</span></div>
+  <div class="row"><span class="lbl">Plan:</span><span class="val">${escapeHtml(inst!.planName)}</span></div>
+  <div class="row"><span class="lbl">Pay Method:</span><span class="val" style="text-transform:uppercase">${escapeHtml(sale.paymentMethod || '')}</span></div>
+  <div class="row"><span class="lbl">Products:</span><span class="val" style="max-width:55mm;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${productNames || '---'}</span></div>
+  <div class="row"><span class="lbl">Total Items:</span><span class="val">${totalQty}</span></div>
+
+  <div class="amounts">
+    <div class="row"><span class="lbl">Per Installment:</span><span class="val">PKR ${formatPKR(inst!.installmentAmount)}</span></div>
+    <div class="row"><span class="lbl">Total Installments:</span><span class="val">${inst!.totalInstallments}</span></div>
+    <div class="row"><span class="lbl">Paid:</span><span class="val">${inst!.paidInstallments} / ${inst!.totalInstallments} (PKR ${formatPKR(paidAmount)})</span></div>
+    <div class="row"><span class="lbl">Remaining:</span><span class="val">${inst!.remainingInstallments} / ${inst!.totalInstallments} (PKR ${formatPKR(remainingAmount)})</span></div>
+    <div class="row total"><span>TOTAL AMOUNT:</span><span>PKR ${formatPKR(sale.totalAmount)}</span></div>
+  </div>
+
+  <div class="sep"></div>
+  <div class="center muted">Thank you for your purchase!</div>
+  <div class="no-print"><button onclick="window.print()">Print</button></div>
+</div>
+</body></html>`;
+  }
+
+  // ── REGULAR THERMAL ──
   const itemRows = (sale.items || [])
     .map(
       (item) => `
@@ -286,6 +521,8 @@ async function buildThermalReceipt(
   body { margin:0; font-family: 'Courier New', monospace; color:#000; background:#fff; }
   .receipt { width:74mm; margin:0 auto; padding:4px 2px; font-size:12px; }
   .center { text-align:center; }
+  .logo { text-align:center; margin-bottom:4px; }
+  .logo img { max-width:40mm; max-height:15mm; object-fit:contain; }
   .name { font-size:16px; font-weight:700; }
   .muted { font-size:10px; color:#444; }
   .sep { border-top:1px dashed #000; margin:6px 0; }
@@ -303,6 +540,7 @@ async function buildThermalReceipt(
 <body>
 <div class="receipt">
   <div class="center">
+    ${logoUrl ? `<div class="logo"><img src="${escapeHtml(logoUrl)}" alt="Logo" onerror="this.style.display='none'" /></div>` : ''}
     <div class="name">${escapeHtml(companyName)}</div>
     ${address ? `<div class="muted">${escapeHtml(address)}</div>` : ''}
     ${phone ? `<div class="muted">Tel: ${escapeHtml(phone)}</div>` : ''}

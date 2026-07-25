@@ -144,6 +144,15 @@ func createConnection(c *gin.Context) {
 		SplitterID:          input.SplitterID,
 		SplitterPort:        input.SplitterPort,
 	}
+
+	switch input.ConnectionType {
+	case "tv_cable":
+		conn.RemainingAmount = input.Amount
+	case "internet":
+		conn.RemainingAmount = input.SameAmount
+	default:
+		conn.RemainingAmount = input.Amount + input.SameAmount
+	}
 	conn.CompanyID = companyID
 
 	if err := tx.Create(&conn).Error; err != nil {

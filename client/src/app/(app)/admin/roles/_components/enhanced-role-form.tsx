@@ -46,6 +46,7 @@ const AVAILABLE_PERMISSIONS = [
   { id: 'network_olts_add', label: 'Add OLTs', category: 'Network' },
   { id: 'network_olts_edit', label: 'Edit OLTs', category: 'Network' },
   { id: 'network_olts_delete', label: 'Delete OLTs', category: 'Network' },
+  { id: 'network_boxes_view', label: 'Box / Media', category: 'Network' },
   
   // Billing Management
   { id: 'billing_view', label: 'View Billing', category: 'Billing' },
@@ -62,6 +63,9 @@ const AVAILABLE_PERMISSIONS = [
   { id: 'subscribers_add', label: 'Add Subscribers', category: 'Subscribers' },
   { id: 'subscribers_edit', label: 'Edit Subscribers', category: 'Subscribers' },
   { id: 'subscribers_delete', label: 'Delete Subscribers', category: 'Subscribers' },
+  { id: 'subscribers_packages_view', label: 'Packages', category: 'Subscribers' },
+  { id: 'subscribers_inquiries_view', label: 'New Inquiries', category: 'Subscribers' },
+  { id: 'subscribers_location_view', label: 'User Location', category: 'Subscribers' },
   
   // Dealers Management
   { id: 'dealers_view', label: 'View Dealers', category: 'Dealers' },
@@ -72,6 +76,52 @@ const AVAILABLE_PERMISSIONS = [
   { id: 'dealers_franchises_edit', label: 'Edit Franchises', category: 'Dealers' },
   { id: 'dealers_franchises_delete', label: 'Delete Franchises', category: 'Dealers' },
   
+  // Recovery Officers
+  { id: 'hr_recovery_officers_allocate', label: 'Area Allocation', category: 'Recovery Officers' },
+  
+  // Transactions
+  { id: 'transactions_user_collections_view', label: 'User Collections', category: 'Transactions' },
+  { id: 'transactions_dealers_collections_view', label: 'Dealers Collections', category: 'Transactions' },
+  { id: 'transactions_allocated_view', label: 'Allocated Collection', category: 'Transactions' },
+  { id: 'transactions_reprint', label: 'Reprint Slip', category: 'Transactions' },
+  { id: 'transactions_bills_create', label: 'Bills Creator', category: 'Transactions' },
+  { id: 'transactions_types_view', label: 'Transaction Type', category: 'Transactions' },
+  { id: 'transactions_new_collection', label: 'New Collection', category: 'Transactions' },
+  { id: 'transactions_bad_debt_view', label: 'Bad Debt Collection', category: 'Transactions' },
+  
+  // Complaints
+  { id: 'complaints_users_view', label: 'Users Complain', category: 'Complaints' },
+  { id: 'complaints_allocated_view', label: 'Allocated Complains', category: 'Complaints' },
+  { id: 'complaints_subjects_view', label: 'Subject Type', category: 'Complaints' },
+  { id: 'complaints_types_view', label: 'Complain Type', category: 'Complaints' },
+  { id: 'complaints_report_view', label: 'Complain Report', category: 'Complaints' },
+  
+  // Messages
+  { id: 'messages_new_view', label: 'New Messages', category: 'Messages' },
+  { id: 'messages_other_view', label: 'Other Messages', category: 'Messages' },
+  { id: 'messages_draft_view', label: 'Draft Messages', category: 'Messages' },
+  { id: 'messages_sent_view', label: 'Sent Messages', category: 'Messages' },
+  { id: 'messages_expired_view', label: 'Expired Messages', category: 'Messages' },
+  { id: 'messages_whatsapp_view', label: 'WhatsApp Drafts', category: 'Messages' },
+  
+  // Accounts
+  { id: 'accounts_heads_view', label: 'Account Heads', category: 'Accounts' },
+  { id: 'accounts_entry_view', label: 'Account Entry', category: 'Accounts' },
+  { id: 'accounts_one_day_view', label: 'One Day Balance Sheet', category: 'Accounts' },
+  { id: 'accounts_reports_view', label: 'Accounts Report', category: 'Accounts' },
+  
+  // Inventory
+  { id: 'inventory_products_view', label: 'Products', category: 'Inventory' },
+  { id: 'inventory_purchase_view', label: 'Purchase', category: 'Inventory' },
+  { id: 'inventory_status_view', label: 'Inventory Status', category: 'Inventory' },
+  { id: 'inventory_product_types_view', label: 'Product Type', category: 'Inventory' },
+  { id: 'inventory_vendors_view', label: 'Vendor', category: 'Inventory' },
+  { id: 'inventory_brands_view', label: 'Brand', category: 'Inventory' },
+  { id: 'inventory_unit_types_view', label: 'Unit Type', category: 'Inventory' },
+  
+  // Point of Sale
+  { id: 'pos_sales_view', label: 'Sales (POS)', category: 'Point of Sale' },
+  
   // HR Management
   { id: 'hr_view', label: 'View HR', category: 'HR' },
   { id: 'hr_staff_add', label: 'Add Staff', category: 'HR' },
@@ -80,18 +130,50 @@ const AVAILABLE_PERMISSIONS = [
   { id: 'hr_recovery_officers_add', label: 'Add Recovery Officers', category: 'HR' },
   { id: 'hr_recovery_officers_edit', label: 'Edit Recovery Officers', category: 'HR' },
   { id: 'hr_recovery_officers_delete', label: 'Delete Recovery Officers', category: 'HR' },
+  { id: 'hr_salary_view', label: 'Employee Salary', category: 'HR' },
+  { id: 'hr_advances_view', label: 'Advances & Loans', category: 'HR' },
+  { id: 'hr_attendance_day_view', label: 'Day Wise Attendance', category: 'HR' },
+  { id: 'hr_attendance_user_view', label: 'User Wise Attendance', category: 'HR' },
+  
+  // Logs
+  { id: 'logs_connections_view', label: 'Update Connections Log', category: 'Logs' },
+  { id: 'logs_deleted_collection_view', label: 'Deleted Collection', category: 'Logs' },
+  { id: 'logs_deleted_users_view', label: 'Deleted Users', category: 'Logs' },
   
   // Reports & Analytics
   { id: 'reports_view', label: 'View Reports', category: 'Reports' },
   { id: 'reports_financial', label: 'Financial Reports', category: 'Reports' },
   { id: 'reports_usage', label: 'Usage Reports', category: 'Reports' },
   { id: 'reports_collections', label: 'Collections Reports', category: 'Reports' },
+  { id: 'reports_users_defaulter', label: 'Users Defaulter', category: 'Reports' },
+  { id: 'reports_allocated_defaulters', label: 'Allocated Defaulters', category: 'Reports' },
+  { id: 'reports_new_users', label: 'New Users List', category: 'Reports' },
+  { id: 'reports_monthly_collection_month_wise', label: 'Monthly Collection Month Wise', category: 'Reports' },
+  { id: 'reports_month_wise_collection', label: 'Month Wise Collection', category: 'Reports' },
+  { id: 'reports_unpaid_collection', label: 'Unpaid Collection', category: 'Reports' },
+  { id: 'reports_allocated_collections', label: 'Allocated Collections', category: 'Reports' },
+  { id: 'reports_promise_date', label: 'Promise Date Report', category: 'Reports' },
+  { id: 'reports_user_collections', label: 'User Collections Report', category: 'Reports' },
+  { id: 'reports_expiry_defaulters', label: 'Expiry Wise Defaulter', category: 'Reports' },
+  { id: 'reports_month_defaulters', label: 'Month Wise Defaulter', category: 'Reports' },
+  { id: 'reports_collection_not_generated', label: 'Collection Not Generated', category: 'Reports' },
+  { id: 'reports_creator_summary', label: 'User Creator Summary', category: 'Reports' },
+  { id: 'reports_package_wise', label: 'Package Wise List', category: 'Reports' },
+  { id: 'reports_deactivated_users', label: 'Deactivate User List', category: 'Reports' },
+  { id: 'reports_dealer_invoices', label: 'Dealer Invoice List', category: 'Reports' },
+  { id: 'reports_new_dealers', label: 'New Dealers List', category: 'Reports' },
+  { id: 'reports_dealers_collection', label: 'Dealers Collection', category: 'Reports' },
+  { id: 'reports_dealers_defaulter', label: 'Dealers Defaulter', category: 'Reports' },
+  { id: 'reports_abstract_stock', label: 'Abstract Stock', category: 'Reports' },
+  { id: 'reports_abstract_sales', label: 'Abstract Sales', category: 'Reports' },
   
   // System Administration
   { id: 'system_view', label: 'View System', category: 'System' },
   { id: 'system_config', label: 'System Configuration', category: 'System' },
   { id: 'system_logs', label: 'View System Logs', category: 'System' },
   { id: 'system_backup', label: 'System Backup', category: 'System' },
+  { id: 'system_user_rights', label: 'User Rights', category: 'System' },
+  { id: 'system_change_password', label: 'Change Username/Password', category: 'System' },
 ];
 
 // Group permissions by category

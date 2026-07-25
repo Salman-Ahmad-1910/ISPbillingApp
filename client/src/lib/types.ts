@@ -507,13 +507,27 @@ export type VendorInvoiceItem = {
 export type InstallmentPlan = {
   id: string;
   name: string;
-  productId: string;
-  productName: string;
-  downPayment: number;
   installments: number;
+  percentageIncrease: number;
+  companyId: string;
+};
+
+export type SubscriberInstallment = {
+  id: string;
+  saleId: string;
+  subscriberId: string;
+  subscriberName: string;
+  installmentPlanId: string;
+  planName: string;
+  totalInstallments: number;
+  paidInstallments: number;
   installmentAmount: number;
   totalAmount: number;
+  nextInstallment: number;
+  status: string;
   companyId: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type pricingPlans = {

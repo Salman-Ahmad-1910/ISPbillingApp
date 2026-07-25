@@ -309,10 +309,8 @@ export const invoiceSchema = z.object({
 export const installmentPlanSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1, 'Plan name is required'),
-  productId: z.string().min(1, 'Product is required'),
-  downPayment: z.coerce.number().min(0, 'Down payment must be a non-negative number'),
   installments: z.coerce.number().int().positive('Installments must be a positive integer'),
-  installmentAmount: z.coerce.number().min(0, 'Installment amount must be a non-negative number'),
+  percentageIncrease: z.coerce.number().min(0, 'Percentage must be a non-negative number'),
 });
 
 export const pricingPlanSchema = z.object({

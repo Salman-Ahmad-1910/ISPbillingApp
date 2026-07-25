@@ -26,9 +26,10 @@ type ConnectionFormValues = z.infer<typeof connectionSchema>;
 
 interface ClientPageProps {
   connections: Connection[];
+  initialConnectionId?: string;
 }
 
-export function ClientPage({ connections }: ClientPageProps) {
+export function ClientPage({ connections, initialConnectionId }: ClientPageProps) {
   const { companyId } = useCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -50,6 +51,15 @@ export function ClientPage({ connections }: ClientPageProps) {
   const [filterSortBy, setFilterSortBy] = useState('all');
   const [filterProvider, setFilterProvider] = useState('all');
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
+
+  useEffect(() => {
+    if (initialConnectionId && connections.length > 0) {
+      const conn = connections.find(c => c.id === initialConnectionId);
+      if (conn) {
+        setSearch(conn.internetId || conn.name || '');
+      }
+    }
+  }, [initialConnectionId, connections]);
 
   const { data: areasData } = useGenericQuery<Area[]>('network/areas', companyId ?? undefined);
   const { data: boxesData } = useGenericQuery<DistributionBox[]>('network/boxes', companyId ?? undefined);

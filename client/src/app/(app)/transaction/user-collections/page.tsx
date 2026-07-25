@@ -30,11 +30,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { useCompany } from '@/context/company-context';
+import { useQueryClient } from '@tanstack/react-query';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
-import { Loader2, MoreHorizontal, Wallet, DollarSign, UserCheck, Trash2, Pencil, Copy, FileText, Users } from 'lucide-react';
+import { Loader2, MoreHorizontal, Wallet, DollarSign, UserCheck, Trash2, Pencil, Copy, FileText, Users, AlertTriangle } from 'lucide-react';
 
 import type { Connection, Payment, Area, RecoveryOfficer } from '@/lib/types';
 import { SubscriberPrintDialog } from './_components/subscriber-print-dialog';
@@ -56,8 +57,10 @@ export default function SubscriberCollectionsPage() {
   const currentCompany = companies.find(c => c.id === companyId);
   const { toast } = useToast();
   const { user } = useUser();
+  const queryClient = useQueryClient();
 
   const [selectedSubscriberId, setSelectedSubscriberId] = useState<string | null>(null);
+  const [subscriberSearch, setSubscriberSearch] = useState('');
   const [showReceiveDialog, setShowReceiveDialog] = useState(false);
 
   const [receiveAmount, setReceiveAmount] = useState(0);
@@ -80,18 +83,26 @@ export default function SubscriberCollectionsPage() {
     companyId ?? undefined,
   );
 
-  const subscriberOptions = useMemo(() => {
-    return (connections as Connection[]).map(c => ({
-      id: c.id,
-      name: c.name,
-      secondary: `${c.cell || ''} ${c.mobile || ''}`.trim() || c.address || '',
-    }));
-  }, [connections]);
+  const filteredSubscribers = useMemo(() => {
+    if (!subscriberSearch.trim()) return [];
+    const q = subscriberSearch.toLowerCase();
+    return (connections as Connection[]).filter(c =>
+      c.id?.toLowerCase().includes(q) ||
+      c.name?.toLowerCase().includes(q)
+    ).slice(0, 20);
+  }, [connections, subscriberSearch]);
 
   const selectedSubscriber = useMemo(() => {
     if (!selectedSubscriberId) return null;
     return (connections as Connection[]).find(c => c.id === selectedSubscriberId) || null;
   }, [connections, selectedSubscriberId]);
+
+  const subscriberRemaining = useMemo(() => {
+    if (!selectedSubscriber) return 0;
+    return selectedSubscriber.remainingAmount || selectedSubscriber.sameAmount || 0;
+  }, [selectedSubscriber]);
+
+  const isAmountExceeding = receiveAmount > 0 && receiveAmount > subscriberRemaining;
 
   const { data: payments = [], isLoading: isLoadingPayments, refetch: refetchPayments } = useGenericQuery<Payment>(
     selectedSubscriberId ? 'billing/payments' : null,
@@ -176,6 +187,7 @@ export default function SubscriberCollectionsPage() {
       toast({ title: 'Success', description: 'Payment received and recorded.' });
       setShowReceiveDialog(false);
       refetchPayments();
+      queryClient.invalidateQueries({ queryKey: ['admin/connections'] });
       setReceiveAmount(0);
       setReceiveDate(new Date().toISOString().split('T')[0]);
       setReceiveMethod('cash');
@@ -303,15 +315,55 @@ export default function SubscriberCollectionsPage() {
 
       <Card className="transition-all duration-300 hover:shadow-md">
         <div className="p-4 border-b">
-          <div className="max-w-md">
-            <SearchableSelect
-              value={selectedSubscriberId}
-              onValueChange={setSelectedSubscriberId}
-              options={subscriberOptions}
-              placeholder="Search and select a subscriber..."
-              searchPlaceholder="Type to search by name, CNIC, or phone..."
-              label="Select Subscriber"
-            />
+          <div className="max-w-md space-y-2">
+            <Label>Search Subscriber</Label>
+            <div className="relative">
+              <Input
+                value={subscriberSearch}
+                onChange={(e) => {
+                  setSubscriberSearch(e.target.value);
+                  if (selectedSubscriberId) setSelectedSubscriberId(null);
+                }}
+                placeholder="Type subscriber ID or name..."
+              />
+              {filteredSubscribers.length > 0 && (
+                <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md max-h-60 overflow-auto">
+                  {filteredSubscribers.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      className="w-full text-left px-3 py-2 hover:bg-accent hover:text-accent-foreground text-sm border-b last:border-b-0"
+                      onClick={() => {
+                        setSelectedSubscriberId(c.id);
+                        setSubscriberSearch('');
+                      }}
+                    >
+                      <span className="font-mono font-medium">{c.id?.slice(0, 8)}</span>
+                      <span className="ml-2 text-muted-foreground">{c.name}</span>
+                      {(c.cell || c.mobile) && (
+                        <span className="ml-2 text-xs text-muted-foreground">• {c.cell || c.mobile}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {selectedSubscriber && (
+              <div className="flex items-center gap-2 text-sm">
+                <Badge variant="secondary" className="gap-1">
+                  <span className="font-mono">{selectedSubscriber.id?.slice(0, 8)}</span>
+                  <span className="text-muted-foreground">•</span>
+                  <span>{selectedSubscriber.name}</span>
+                  <button
+                    type="button"
+                    className="ml-1 hover:text-destructive"
+                    onClick={() => setSelectedSubscriberId(null)}
+                  >
+                    ×
+                  </button>
+                </Badge>
+              </div>
+            )}
           </div>
         </div>
 
@@ -496,13 +548,24 @@ export default function SubscriberCollectionsPage() {
               <Input value={recoveryOfficerName} readOnly />
             </div>
             <div className="space-y-1">
+              <Label>Remaining (PKR)</Label>
+              <Input value={`PKR ${subscriberRemaining.toLocaleString()}`} readOnly />
+            </div>
+            <div className="space-y-1">
               <Label>Amount (PKR)</Label>
               <Input
                 type="number"
                 value={receiveAmount}
                 onChange={(e) => setReceiveAmount(parseFloat(e.target.value) || 0)}
                 placeholder="Enter amount"
+                className={isAmountExceeding ? 'border-destructive focus-visible:ring-destructive' : ''}
               />
+              {isAmountExceeding && (
+                <p className="text-xs text-destructive flex items-center gap-1 mt-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  Amount is more than the total receivable amount
+                </p>
+              )}
             </div>
             <div className="space-y-1">
               <Label>Pay Date</Label>
@@ -534,7 +597,7 @@ export default function SubscriberCollectionsPage() {
             </div>
             <Button
               onClick={handleReceive}
-              disabled={isSaving || !receiveAmount}
+              disabled={isSaving || !receiveAmount || isAmountExceeding}
               className="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md"
             >
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

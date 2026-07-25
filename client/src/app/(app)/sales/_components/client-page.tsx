@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCompany } from '@/context/company-context';
+import api from '@/lib/api';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
@@ -15,6 +16,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { Printer } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { printSaleReceipt, type SaleReceiptData } from './sale-receipt';
 import { getColumns } from './columns';
 import { DataTable } from './data-table';
@@ -29,6 +31,8 @@ interface Sale {
   paymentMethod: string;
   date: string;
   companyId: string;
+  isInstallment?: boolean;
+  installmentPlanId?: string;
   items: {
     id: string;
     saleId: string;
@@ -39,6 +43,19 @@ interface Sale {
     saleTax?: number;
     wthTax?: number;
   }[];
+}
+
+interface InstallmentInfo {
+  id: string;
+  planName: string;
+  totalInstallments: number;
+  paidInstallments: number;
+  nextInstallment: number;
+  installmentAmount: number;
+  totalAmount: number;
+  status: string;
+  subscriberName?: string;
+  saleId?: string;
 }
 
 interface ClientPageProps {
@@ -59,6 +76,40 @@ export function ClientPage({ data }: ClientPageProps) {
   const [isPrintOpen, setIsPrintOpen] = useState(false);
 
   const [filter, setFilter] = useState('');
+  const [isAddingToCollection, setIsAddingToCollection] = useState(false);
+  const [viewSaleInstallment, setViewSaleInstallment] = useState<InstallmentInfo | null>(null);
+
+  useEffect(() => {
+    if (!viewSale?.isInstallment || !viewSale?.subscriberId || !companyId) {
+      setViewSaleInstallment(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.get(`/pos/installment/${viewSale.subscriberId}?companyId=${companyId}&saleId=${viewSale.id}`);
+        const payload = res.data?.data || res.data;
+        const instData = payload?.installment || payload;
+        if (!cancelled && instData && instData.id) {
+          setViewSaleInstallment({
+            id: instData.id,
+            planName: instData.planName,
+            totalInstallments: instData.totalInstallments,
+            paidInstallments: instData.paidInstallments,
+            nextInstallment: instData.nextInstallment,
+            installmentAmount: instData.installmentAmount,
+            totalAmount: instData.totalAmount,
+            status: instData.status,
+            subscriberName: instData.subscriberName,
+            saleId: instData.saleId,
+          });
+        }
+      } catch {
+        if (!cancelled) setViewSaleInstallment(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [viewSale?.id, viewSale?.isInstallment, viewSale?.subscriberId, companyId]);
 
   const filteredData = useMemo(() => data.filter(sale =>
     sale?.subscriberName?.toLowerCase()?.includes(filter?.toLowerCase()) ||
@@ -72,6 +123,7 @@ export function ClientPage({ data }: ClientPageProps) {
     taxAmount: Number(s.taxAmount) || 0,
     paymentMethod: s.paymentMethod,
     date: s.date,
+    isInstallment: s.isInstallment,
     items: (s.items || []).map(i => ({
       productName: i.productName,
       quantity: i.quantity,
@@ -87,20 +139,92 @@ export function ClientPage({ data }: ClientPageProps) {
 
   const handlePrint = async (size: 'a4' | 'thermal') => {
     if (!selectedSale) return;
-    await printSaleReceipt(toReceipt(selectedSale), company, size);
+    const receipt = toReceipt(selectedSale);
+    if (selectedSale.isInstallment && selectedSale.subscriberId && companyId) {
+      try {
+        const res = await api.get(`/pos/installment/${selectedSale.subscriberId}?companyId=${companyId}&saleId=${selectedSale.id}`);
+        const payload = res.data?.data || res.data;
+        const i = payload?.installment || payload;
+        if (i && i.id) {
+          receipt.installmentInfo = {
+            planName: i.planName,
+            totalInstallments: i.totalInstallments,
+            paidInstallments: i.paidInstallments,
+            nextInstallment: i.nextInstallment,
+            installmentAmount: i.installmentAmount,
+            totalAmount: i.totalAmount,
+            remainingInstallments: i.totalInstallments - i.paidInstallments,
+            percentage: Math.round((i.paidInstallments / i.totalInstallments) * 100),
+            status: i.status,
+          };
+        }
+      } catch {
+        // Fall back to receipt without installment info
+      }
+    }
+    await printSaleReceipt(receipt, company, size);
     setIsPrintOpen(false);
     setSelectedSale(null);
   };
 
   const handlePrintFromView = async (size: 'a4' | 'thermal') => {
     if (!viewSale) return;
-    await printSaleReceipt(toReceipt(viewSale), company, size);
+    const receipt = toReceipt(viewSale);
+    if (viewSale.isInstallment && viewSale.subscriberId && companyId) {
+      try {
+        const res = await api.get(`/pos/installment/${viewSale.subscriberId}?companyId=${companyId}&saleId=${viewSale.id}`);
+        const payload = res.data?.data || res.data;
+        const i = payload?.installment || payload;
+        if (i && i.id) {
+          receipt.installmentInfo = {
+            planName: i.planName,
+            totalInstallments: i.totalInstallments,
+            paidInstallments: i.paidInstallments,
+            nextInstallment: i.nextInstallment,
+            installmentAmount: i.installmentAmount,
+            totalAmount: i.totalAmount,
+            remainingInstallments: i.totalInstallments - i.paidInstallments,
+            percentage: Math.round((i.paidInstallments / i.totalInstallments) * 100),
+            status: i.status,
+          };
+        }
+      } catch {
+        // Fall back to receipt without installment info
+      }
+    }
+    await printSaleReceipt(receipt, company, size);
   };
 
   const handlePrintView = () => {
     if (!viewSale) return;
     setSelectedSale(viewSale);
     setIsPrintOpen(true);
+  };
+
+  const handleAddToCollection = async () => {
+    if (!viewSale || !companyId) return;
+    setIsAddingToCollection(true);
+    try {
+      await api.post(`/billing/payments?companyId=${companyId}`, {
+        subscriberId: viewSale.subscriberId,
+        subscriberName: viewSale.subscriberName || 'Walk-in',
+        amount: Number(viewSale.totalAmount) || 0,
+        paymentDate: viewSale.date || new Date().toISOString(),
+        method: viewSale.paymentMethod || 'cash',
+      });
+      toast({
+        title: 'Added to Collection',
+        description: `PKR ${fmtPKR(viewSale.totalAmount)} has been added to the subscriber collection.`,
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.message || error.response?.data?.error || 'Failed to add to collection',
+      });
+    } finally {
+      setIsAddingToCollection(false);
+    }
   };
 
   const columns = getColumns();
@@ -167,9 +291,12 @@ export function ClientPage({ data }: ClientPageProps) {
                     {viewSale.subscriberName || 'Walk-in'} &middot; {viewSale.date ? new Date(viewSale.date).toLocaleDateString() : ''}
                   </SheetDescription>
                 </div>
-                <div className="flex gap-2 mt-2">
+                <div className="flex gap-2 mt-2 flex-wrap">
                   <Badge variant="outline" className="capitalize text-xs">{viewSale.paymentMethod}</Badge>
                   <Badge variant="secondary" className="text-xs">#{viewSale.id.slice(0, 8)}</Badge>
+                  {viewSale.isInstallment && (
+                    <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">Installment</Badge>
+                  )}
                 </div>
               </SheetHeader>
 
@@ -215,6 +342,67 @@ export function ClientPage({ data }: ClientPageProps) {
                   })}
                 </div>
 
+                {/* Installment Details */}
+                {viewSale.isInstallment && viewSaleInstallment && (
+                  <div className="mx-5 border rounded-lg overflow-hidden border-blue-200 dark:border-blue-800">
+                    <div className="px-4 py-2 bg-blue-50 dark:bg-blue-950">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-300">Installment Details</span>
+                    </div>
+                    <div className="px-4 py-3 space-y-2.5 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Plan</span>
+                        <span className="font-medium">{viewSaleInstallment.planName}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Selling Price (Subtotal)</span>
+                        <span className="font-medium">PKR {fmtPKR((Number(viewSale.totalAmount) || 0) - (Number(viewSale.taxAmount) || 0))}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Total Amount (incl. increase)</span>
+                        <span className="font-semibold">PKR {fmtPKR(viewSaleInstallment.totalAmount)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Amount per Installment</span>
+                        <span className="font-medium text-blue-600 dark:text-blue-400">PKR {fmtPKR(viewSaleInstallment.installmentAmount)}</span>
+                      </div>
+                      <div className="border-t pt-2 mt-1">
+                        <div className="flex justify-between mb-1">
+                          <span className="text-muted-foreground">Total Installments</span>
+                          <span>{viewSaleInstallment.totalInstallments}</span>
+                        </div>
+                        <div className="flex justify-between mb-1">
+                          <span className="text-muted-foreground">Paid</span>
+                          <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{viewSaleInstallment.paidInstallments} / {viewSaleInstallment.totalInstallments}</span>
+                        </div>
+                        <div className="flex justify-between mb-1">
+                          <span className="text-muted-foreground">Remaining</span>
+                          <span className="text-amber-600 dark:text-amber-400 font-semibold">{viewSaleInstallment.totalInstallments - viewSaleInstallment.paidInstallments} / {viewSaleInstallment.totalInstallments}</span>
+                        </div>
+                        {viewSaleInstallment.nextInstallment > 0 && (
+                          <div className="flex justify-between mb-1">
+                            <span className="text-muted-foreground">Next Installment #</span>
+                            <span className="font-medium">{viewSaleInstallment.nextInstallment}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="border-t pt-2 mt-1 space-y-1.5">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Paid Amount</span>
+                          <span className="text-emerald-600 dark:text-emerald-400 font-semibold">PKR {fmtPKR(viewSaleInstallment.paidInstallments * viewSaleInstallment.installmentAmount)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Remaining Amount</span>
+                          <span className="text-amber-600 dark:text-amber-400 font-semibold">PKR {fmtPKR((viewSaleInstallment.totalInstallments - viewSaleInstallment.paidInstallments) * viewSaleInstallment.installmentAmount)}</span>
+                        </div>
+                      </div>
+                      <div className="flex justify-between pt-1">
+                        <span className="text-muted-foreground">Status</span>
+                        <Badge variant={viewSaleInstallment.status === 'completed' ? 'default' : 'secondary'} className="text-xs capitalize">{viewSaleInstallment.status}</Badge>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Totals */}
                 <div className="mx-5 mb-5 border rounded-lg overflow-hidden">
                   <div className="px-4 py-2 bg-muted/40">
@@ -243,9 +431,13 @@ export function ClientPage({ data }: ClientPageProps) {
 
               {/* Action Buttons */}
               <div className="border-t p-4 shrink-0">
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <Button variant="outline" size="sm" onClick={handlePrintView}>
                     <Printer className="mr-1.5 h-3.5 w-3.5" /> Print
+                  </Button>
+                  <Button variant="default" size="sm" disabled={isAddingToCollection || !viewSale.subscriberId} onClick={handleAddToCollection}>
+                    {isAddingToCollection ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+                    Add to Collection
                   </Button>
                   <Button variant="secondary" size="sm" onClick={() => setViewSale(null)}>Close</Button>
                 </div>

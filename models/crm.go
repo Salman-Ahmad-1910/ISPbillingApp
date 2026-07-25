@@ -47,13 +47,9 @@ type Product struct {
 // InstallmentPlan - Defined schedule for physical goods
 type InstallmentPlan struct {
 	TenantModel
-	Name              string    `gorm:"type:varchar(255);not null" json:"name"`
-	ProductID         uuid.UUID `gorm:"type:uuid;not null;index" json:"productId"`
-	ProductName       string    `gorm:"type:varchar(255)" json:"productName"`
-	DownPayment       float64   `gorm:"type:decimal(10,2);not null" json:"downPayment"`
-	Installments      int       `gorm:"not null" json:"installments"`
-	InstallmentAmount float64   `gorm:"type:decimal(10,2);not null" json:"installmentAmount"`
-	TotalAmount       float64   `gorm:"type:decimal(10,2);not null" json:"totalAmount"`
+	Name               string  `gorm:"type:varchar(255);not null" json:"name"`
+	Installments       int     `gorm:"not null" json:"installments"`
+	PercentageIncrease float64 `gorm:"type:decimal(5,2);not null;default:0" json:"percentageIncrease"`
 }
 
 // PricingPlans (SaaS tier definition, different from package context, mainly root level)
@@ -67,13 +63,16 @@ type PricingPlan struct {
 // Sale - Point of Sale Transaction
 type Sale struct {
 	TenantModel
-	SubscriberID   uuid.UUID  `gorm:"type:uuid;not null;index" json:"subscriberId"`
-	SubscriberName string     `gorm:"type:varchar(255)" json:"subscriberName"`
-	TotalAmount    float64    `gorm:"type:decimal(10,2);not null" json:"totalAmount"`
-	TaxAmount      float64    `gorm:"type:decimal(10,2);not null" json:"taxAmount"`
-	PaymentMethod  string     `gorm:"type:varchar(50);not null" json:"paymentMethod"`
-	Date           string     `gorm:"type:varchar(50);not null" json:"date"`
-	Items          []SaleItem `gorm:"foreignKey:SaleID;constraint:OnDelete:CASCADE" json:"items"`
+	SubscriberID    uuid.UUID  `gorm:"type:uuid;not null;index" json:"subscriberId"`
+	SubscriberName  string     `gorm:"type:varchar(255)" json:"subscriberName"`
+	TotalAmount     float64    `gorm:"type:decimal(10,2);not null" json:"totalAmount"`
+	TaxAmount       float64    `gorm:"type:decimal(10,2);not null" json:"taxAmount"`
+	PaymentMethod   string     `gorm:"type:varchar(50);not null" json:"paymentMethod"`
+	Date            string     `gorm:"type:varchar(50);not null" json:"date"`
+	IsInstallment   bool       `gorm:"default:false" json:"isInstallment"`
+	Status          string     `gorm:"type:varchar(20);default:'completed'" json:"status"`
+	Discount        float64    `gorm:"type:decimal(10,2);default:0" json:"discount"`
+	Items           []SaleItem `gorm:"foreignKey:SaleID;constraint:OnDelete:CASCADE" json:"items"`
 }
 
 // SaleItem - Individual product in a Sale
@@ -87,4 +86,20 @@ type SaleItem struct {
 	TaxPercent  float64   `gorm:"type:decimal(5,2);not null;default:0" json:"taxPercent"` // tax % applied to this line
 	SaleTax     float64   `gorm:"type:decimal(10,2);default:0" json:"saleTax"`
 	WthTax      float64   `gorm:"type:decimal(10,2);default:0" json:"wthTax"`
+}
+
+// SubscriberInstallment tracks an installment agreement for a subscriber on a sale.
+type SubscriberInstallment struct {
+	TenantModel
+	SaleID             uuid.UUID `gorm:"type:uuid;not null;index" json:"saleId"`
+	SubscriberID       uuid.UUID `gorm:"type:uuid;not null;index" json:"subscriberId"`
+	SubscriberName     string    `gorm:"type:varchar(255)" json:"subscriberName"`
+	InstallmentPlanID  uuid.UUID `gorm:"type:uuid;not null;index" json:"installmentPlanId"`
+	PlanName           string    `gorm:"type:varchar(255)" json:"planName"`
+	TotalInstallments  int       `gorm:"not null" json:"totalInstallments"`
+	PaidInstallments   int       `gorm:"not null;default:0" json:"paidInstallments"`
+	InstallmentAmount  float64   `gorm:"type:decimal(10,2);not null" json:"installmentAmount"`
+	TotalAmount        float64   `gorm:"type:decimal(10,2);not null" json:"totalAmount"`
+	NextInstallment    int       `gorm:"not null;default:1" json:"nextInstallment"`
+	Status             string    `gorm:"type:varchar(20);default:'active'" json:"status"` // active, completed, defaulted
 }

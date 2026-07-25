@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Users, Wifi, WifiOff, UserX, Pause, Loader2 } from 'lucide-react';
 import { ClientPage } from './_components/client-page';
@@ -10,6 +11,8 @@ import type { Connection } from '@/lib/types';
 
 export default function SubscriberDetailPage() {
   const { companyId } = useCompany();
+  const searchParams = useSearchParams();
+  const connectionId = searchParams.get('connectionId') || undefined;
   const { data: connectionsData, isLoading } = useGenericQuery<Connection[]>('admin/connections', companyId ?? undefined);
 
   const connections = (connectionsData || []) as Connection[];
@@ -129,7 +132,7 @@ export default function SubscriberDetailPage() {
 
       <Card className="transition-all duration-300 hover:shadow-md">
         <CardContent className="p-0">
-          <ClientPage connections={connections} />
+          <ClientPage connections={connections} initialConnectionId={connectionId} />
         </CardContent>
       </Card>
     </div>

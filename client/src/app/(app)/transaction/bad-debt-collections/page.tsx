@@ -29,6 +29,7 @@ import {
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCompany } from '@/context/company-context';
+import { useQueryClient } from '@tanstack/react-query';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
@@ -48,6 +49,7 @@ export default function BadDebtCollectionsPage() {
   const { companyId } = useCompany();
   const { toast } = useToast();
   const { user } = useUser();
+  const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState('subscribers');
 
@@ -131,6 +133,13 @@ export default function BadDebtCollectionsPage() {
     return (connections as Connection[]).find(c => c.id === selectedSubscriberId) || null;
   }, [connections, selectedSubscriberId]);
 
+  const subscriberRemaining = useMemo(() => {
+    if (!selectedSubscriber) return 0;
+    return selectedSubscriber.remainingAmount || selectedSubscriber.sameAmount || 0;
+  }, [selectedSubscriber]);
+
+  const isAmountExceeding = receiveAmount > 0 && receiveAmount > subscriberRemaining;
+
   // --- Dealer selection ---
   const dealerOptions = useMemo(() => {
     return overdueDealers.map(d => {
@@ -209,6 +218,7 @@ export default function BadDebtCollectionsPage() {
       toast({ title: 'Success', description: 'Payment recorded.' });
       setShowReceiveDialog(false);
       refetchPayments();
+      queryClient.invalidateQueries({ queryKey: ['admin/connections'] });
       setReceiveAmount(0);
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.response?.data?.message || 'Failed' });
@@ -232,6 +242,7 @@ export default function BadDebtCollectionsPage() {
       toast({ title: 'Success', description: 'Dealer payment recorded.' });
       setShowDealerReceiveDialog(false);
       refetchDealerCollections();
+      queryClient.invalidateQueries({ queryKey: ['dealers'] });
       setDealerReceiveAmount(0);
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.response?.data?.message || 'Failed' });
@@ -579,10 +590,26 @@ export default function BadDebtCollectionsPage() {
               <Input value={subscriberRecoveryOfficerName} readOnly />
             </div>
             <div className="space-y-1">
-              <Label>Amount (PKR)</Label>
-              <Input type="number" value={receiveAmount} onChange={e => setReceiveAmount(parseFloat(e.target.value) || 0)} placeholder="Enter amount" />
+              <Label>Remaining (PKR)</Label>
+              <Input value={`PKR ${subscriberRemaining.toLocaleString()}`} readOnly />
             </div>
-            <Button onClick={handleReceivePayment} disabled={isSaving || !receiveAmount} className="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white">
+            <div className="space-y-1">
+              <Label>Amount (PKR)</Label>
+              <Input
+                type="number"
+                value={receiveAmount}
+                onChange={e => setReceiveAmount(parseFloat(e.target.value) || 0)}
+                placeholder="Enter amount"
+                className={isAmountExceeding ? 'border-destructive focus-visible:ring-destructive' : ''}
+              />
+              {isAmountExceeding && (
+                <p className="text-xs text-destructive flex items-center gap-1 mt-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  Amount is more than the total receivable amount
+                </p>
+              )}
+            </div>
+            <Button onClick={handleReceivePayment} disabled={isSaving || !receiveAmount || isAmountExceeding} className="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white">
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Receive
             </Button>

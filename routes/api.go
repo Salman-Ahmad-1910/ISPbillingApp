@@ -626,8 +626,11 @@ func SetupRoutes(r *gin.Engine) {
 			// Dedicated POS sales routes: persist nested line items, preload
 			// them on read, and decrement product stock on sale.
 			pos.POST("/sales", controllers.CreatePOSSale)
+			pos.POST("/installment-sales", controllers.CreateInstallmentSale)
 			pos.GET("/sales", controllers.GetPOSSales)
 			pos.GET("/sales/:id", controllers.GetPOSSale)
+			pos.GET("/installment/:subscriberId", controllers.GetSubscriberInstallment)
+			pos.PUT("/installment/:id/pay", controllers.PayInstallment)
 		}
 
 		// Support routes

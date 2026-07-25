@@ -245,17 +245,23 @@ func GetCollectionChart(c *gin.Context) {
 		}
 	}
 
-	// Overwrite the last point with the live total so the current value is
-	// always accurate, even when the latest payment just arrived.
-	var liveTotal float64
-	config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL`, companyID).Scan(&liveTotal)
-	if len(results) > 0 {
-		results[len(results)-1].Value = liveTotal
+	// Compute the sum of payments made within the selected period window.
+	var periodTotal float64
+	switch period {
+	case "daily":
+		config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL AND created_at >= date_trunc('hour', NOW() - INTERVAL '24 hours')`, companyID).Scan(&periodTotal)
+	case "weekly":
+		config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL AND created_at >= (CURRENT_DATE - INTERVAL '7 days')::date`, companyID).Scan(&periodTotal)
+	case "monthly":
+		config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL AND created_at >= ?::date AND created_at < ?::date + INTERVAL '1 day'`, companyID, monthStart.Format("2006-01-02"), monthEnd.Format("2006-01-02")).Scan(&periodTotal)
+	case "yearly":
+		config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL AND created_at >= (CURRENT_DATE - INTERVAL '2 years')::date`, companyID).Scan(&periodTotal)
 	}
 
 	utils.SuccessResponse(c, fmt.Sprintf("Collection chart data (%s)", period), gin.H{
-		"period": period,
-		"data":   results,
+		"period":      period,
+		"data":        results,
+		"periodTotal": periodTotal,
 	})
 }
 

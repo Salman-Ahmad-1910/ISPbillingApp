@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CircleDollarSign, Users, Wallet, Clock, CheckCircle2, XCircle, ArrowUpRight, LayoutDashboard } from 'lucide-react';
+import { CircleDollarSign, Users, Wallet, Clock, CheckCircle2, XCircle, ArrowUpRight, LayoutDashboard, Landmark, CreditCard } from 'lucide-react';
 import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertCircle, Ticket } from 'lucide-react';
@@ -29,6 +29,7 @@ const SubscriberGrowthChart = dynamic(
     ssr: false
   }
 );
+
 
 export default function DashboardPage() {
   const { companyId, companyName, companies } = useCompany();
@@ -177,7 +178,7 @@ export default function DashboardPage() {
         <div className="lg:col-span-4 transition-all duration-300 rounded-xl">
           <DailyCollectionChart />
         </div>
-        <div className="lg:col-span-3 transition-all duration-300 rounded-xl">
+        <div className="lg:col-span-3 flex flex-col gap-4">
           <SubscriberGrowthChart liveActiveCount={data?.subscribersStats?.active || 0} />
         </div>
       </div>
