@@ -149,8 +149,8 @@ export function ClientPage({ data }: ClientPageProps) {
     payMutation.mutate(purchase);
   };
 
-  const handlePrint = (purchase: Purchase) => {
-    const url = `/inventory/purchases/print?id=${purchase.id}`;
+  const handlePrint = (purchase: Purchase, format: 'a4' | 'thermal' = 'a4') => {
+    const url = `/inventory/purchases/print?id=${purchase.id}&size=${format}`;
     window.open(url, '_blank');
   };
 

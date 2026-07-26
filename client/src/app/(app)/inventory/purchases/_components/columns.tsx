@@ -9,13 +9,17 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu';
 
 interface PurchaseColumnsProps {
   onEdit: (purchase: Purchase) => void;
   onPay: (purchase: Purchase) => void;
-  onPrint: (purchase: Purchase) => void;
+  onPrint: (purchase: Purchase, format: 'a4' | 'thermal') => void;
   onDelete: (purchase: Purchase) => void;
   companyName?: string | null;
 }
@@ -110,10 +114,21 @@ export const columns = ({ onEdit, onPay, onPrint, onDelete, companyName }: Purch
               <Pencil className="mr-2 h-4 w-4" />
               Edit
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onPrint(purchase)}>
-              <Printer className="mr-2 h-4 w-4" />
-              Print
-            </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <Printer className="mr-2 h-4 w-4" />
+                Print
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                <DropdownMenuItem onClick={() => onPrint(purchase, 'a4')}>
+                  A4 Invoice
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onPrint(purchase, 'thermal')}>
+                  Thermal Receipt
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => onDelete(purchase)} className="text-destructive">
               <Trash2 className="mr-2 h-4 w-4" />
               Delete

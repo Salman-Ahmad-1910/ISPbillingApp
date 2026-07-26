@@ -28,6 +28,7 @@ interface CollectionRecord {
   sublocality: string;
   connectionType: string;
   collectedBy: string;
+  method: string;
 }
 
 export default function UserCollectionPage() {
@@ -81,7 +82,8 @@ export default function UserCollectionPage() {
     address: p.subscriber?.installationAddress || '',
     sublocality: p.subscriber?.areaName || '',
     connectionType: p.subscriber?.connectionType || 'internet',
-    collectedBy: p.collectorId || p.method || '',
+    collectedBy: p.collectorId || '',
+    method: p.method || 'cash',
   })), [payments]);
 
   const filteredData = useMemo(() => data.filter((item) => {
@@ -110,7 +112,7 @@ export default function UserCollectionPage() {
   const exportExcel = () => {
     if (filteredData.length === 0) return;
 
-    const headers = ['Subscriber Name', 'Bill ID', 'Amount', 'Collection Date', 'Address', 'Connection Type', 'Collected By'];
+    const headers = ['Subscriber Name', 'Bill ID', 'Amount', 'Collection Date', 'Address', 'Connection Type', 'Received By', 'Collected By'];
     const rows = filteredData.map((item) => [
       item.subscriberName,
       item.billId,
@@ -118,6 +120,7 @@ export default function UserCollectionPage() {
       item.collectionDate,
       item.address,
       item.connectionType,
+      item.method,
       item.collectedBy,
     ]);
 
@@ -327,6 +330,7 @@ export default function UserCollectionPage() {
                       <TableHead>Collection Date</TableHead>
                       <TableHead>Address</TableHead>
                       <TableHead>Connection Type</TableHead>
+                      <TableHead>Received By</TableHead>
                       <TableHead>Collected By</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -347,6 +351,7 @@ export default function UserCollectionPage() {
                         <TableCell>{item.collectionDate ? format(new Date(item.collectionDate), 'dd MMM yyyy') : '-'}</TableCell>
                         <TableCell className="text-xs text-muted-foreground max-w-[120px] truncate">{item.address || '---'}</TableCell>
                         <TableCell>{item.connectionType}</TableCell>
+                        <TableCell className="capitalize">{item.method}</TableCell>
                         <TableCell>{item.collectedBy}</TableCell>
                       </TableRow>
                     ))}

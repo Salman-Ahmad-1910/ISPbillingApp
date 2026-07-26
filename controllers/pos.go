@@ -92,7 +92,7 @@ func CreatePOSSale(c *gin.Context) {
 			return err
 		}
 
-		// Decrement stock from purchase_items for each sold product.
+		// Decrement stock from purchase_items and product stock for each sold product.
 		for _, it := range req.Items {
 			qty := it.Quantity
 			if qty <= 0 {
@@ -110,6 +110,13 @@ func CreatePOSSale(c *gin.Context) {
 			`, qty, it.ProductID, companyID)
 			if result.Error != nil {
 				return result.Error
+			}
+
+			// Also decrement Product.stock so inventory status page stays in sync.
+			if err := tx.Model(&models.Product{}).
+				Where("id = ? AND company_id = ?", it.ProductID, companyID).
+				Update("stock", gorm.Expr("GREATEST(stock - ?, 0)", qty)).Error; err != nil {
+				return err
 			}
 		}
 		return nil

@@ -108,14 +108,20 @@ func GetPayments(c *gin.Context) {
 		return
 	}
 
-	// Populate subscriber names
+	// Populate subscriber names from connections (payments use connection IDs)
 	for i := range payments {
 		if payments[i].SubscriberID != nil {
-			var subscriber models.Subscriber
-			if err := config.DB.Where("id = ?", *payments[i].SubscriberID).First(&subscriber).Error; err == nil {
-				payments[i].SubscriberName = subscriber.Name
+			var conn models.Connection
+			if err := config.DB.Where("id = ?", *payments[i].SubscriberID).First(&conn).Error; err == nil {
+				payments[i].SubscriberName = conn.Name
 			} else {
-				payments[i].SubscriberName = "Unknown Subscriber"
+				// Fallback: try the subscribers table
+				var subscriber models.Subscriber
+				if err := config.DB.Where("id = ?", *payments[i].SubscriberID).First(&subscriber).Error; err == nil {
+					payments[i].SubscriberName = subscriber.Name
+				} else {
+					payments[i].SubscriberName = "Unknown Subscriber"
+				}
 			}
 		} else {
 			payments[i].SubscriberName = "Unknown Subscriber"
@@ -136,11 +142,16 @@ func CreatePayment(c *gin.Context) {
 	companyID, _ := c.Get("companyID")
 	payment.CompanyID = companyID.(uuid.UUID)
 
-	// Get subscriber name
+	// Get subscriber name from connections (payments use connection IDs)
 	if payment.SubscriberID != nil {
-		var subscriber models.Subscriber
-		if err := config.DB.Where("id = ?", *payment.SubscriberID).First(&subscriber).Error; err == nil {
-			payment.SubscriberName = subscriber.Name
+		var conn models.Connection
+		if err := config.DB.Where("id = ?", *payment.SubscriberID).First(&conn).Error; err == nil {
+			payment.SubscriberName = conn.Name
+		} else {
+			var subscriber models.Subscriber
+			if err := config.DB.Where("id = ?", *payment.SubscriberID).First(&subscriber).Error; err == nil {
+				payment.SubscriberName = subscriber.Name
+			}
 		}
 	}
 

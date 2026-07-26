@@ -435,7 +435,7 @@ export default function SubscriberCollectionsPage() {
                         <TableHead className="py-1 px-1.5 whitespace-nowrap">Address</TableHead>
                         <TableHead className="py-1 px-1.5 whitespace-nowrap">Month/Year</TableHead>
                         <TableHead className="py-1 px-1.5 whitespace-nowrap">Payment Type</TableHead>
-                        <TableHead className="py-1 px-1.5 whitespace-nowrap">Received</TableHead>
+                        <TableHead className="py-1 px-1.5 whitespace-nowrap">Paid Amount</TableHead>
                         <TableHead className="py-1 px-1.5 whitespace-nowrap">Pay Date</TableHead>
                         <TableHead className="py-1 px-1.5 whitespace-nowrap">Comment</TableHead>
                         <TableHead className="py-1 px-1.5 whitespace-nowrap">Status</TableHead>

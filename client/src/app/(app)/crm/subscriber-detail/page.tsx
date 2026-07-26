@@ -13,6 +13,7 @@ export default function SubscriberDetailPage() {
   const { companyId } = useCompany();
   const searchParams = useSearchParams();
   const connectionId = searchParams.get('connectionId') || undefined;
+  const packageName = searchParams.get('package') || undefined;
   const { data: connectionsData, isLoading } = useGenericQuery<Connection[]>('admin/connections', companyId ?? undefined);
 
   const connections = (connectionsData || []) as Connection[];
@@ -132,7 +133,7 @@ export default function SubscriberDetailPage() {
 
       <Card className="transition-all duration-300 hover:shadow-md">
         <CardContent className="p-0">
-          <ClientPage connections={connections} initialConnectionId={connectionId} />
+          <ClientPage connections={connections} initialConnectionId={connectionId} initialPackageName={packageName} />
         </CardContent>
       </Card>
     </div>

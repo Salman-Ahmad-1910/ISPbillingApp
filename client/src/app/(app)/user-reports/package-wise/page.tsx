@@ -14,62 +14,48 @@ import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 
 interface PackageData {
-  packageId: string;
   packageName: string;
-  internetId: string;
   amount: number;
-  installDate: string;
   subscriberCount: number;
 }
 
 export default function PackageWiseReportsPage() {
-  const { companyId, companies } = useCompany();
+  const { companyId } = useCompany();
 
   const { data: packages = [], isLoading: loadingPackages } = useGenericQuery<any>('billing/packages', companyId ?? undefined);
-  const { data: subscribers = [], isLoading: loadingSubscribers } = useGenericQuery<any>('subscribers', companyId ?? undefined);
+  const { data: connections = [], isLoading: loadingConnections } = useGenericQuery<any>('admin/connections', companyId ?? undefined);
 
-  const loading = loadingPackages || loadingSubscribers;
+  const loading = loadingPackages || loadingConnections;
 
-  const [selectedCompany, setSelectedCompany] = useState('all');
   const [selectedPackage, setSelectedPackage] = useState('all');
-  const [filterBy, setFilterBy] = useState('all');
-  const [filterValue, setFilterValue] = useState('');
+  const [connectionType, setConnectionType] = useState('both');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const packageData: PackageData[] = useMemo(() => {
-    const packageMap = new Map<string, any>();
-    packages.forEach((p: any) => { packageMap.set(p.id || p.name, p); });
+    return packages.map((pkg: any) => {
+      const pkgName = pkg.name || '';
+      const count = connections.filter((c: any) => {
+        const matchesInternet = c.packageInternet && c.packageInternet === pkgName;
+        const matchesCable = c.packageCable && c.packageCable === pkgName;
+        const typeMatch = connectionType === 'both' ||
+          (connectionType === 'internet' && matchesInternet) ||
+          (connectionType === 'tv_cable' && matchesCable);
+        return typeMatch && (matchesInternet || matchesCable);
+      }).length;
 
-    const subscriberCounts = new Map<string, number>();
-    subscribers.forEach((s: any) => {
-      const pkgId = s.packageId || s.packageName || 'unknown';
-      subscriberCounts.set(pkgId, (subscriberCounts.get(pkgId) || 0) + 1);
-    });
-
-    return Array.from(packageMap.entries()).map(([id, pkg]) => ({
-      packageId: id,
-      packageName: pkg.name || id,
-      internetId: pkg.id?.slice(0, 8) || id.slice(0, 8),
-      amount: Number(pkg.price) || 0,
-      installDate: pkg.createdAt || '',
-      subscriberCount: subscriberCounts.get(id) || 0,
-    }));
-  }, [packages, subscribers]);
+      return {
+        packageName: pkgName,
+        amount: Number(pkg.price) || 0,
+        subscriberCount: count,
+      };
+    }).filter((p: PackageData) => p.packageName);
+  }, [packages, connections, connectionType]);
 
   const filteredData = useMemo(() => packageData.filter((item) => {
-    const pkgMatch = selectedPackage === 'all' || item.packageId === selectedPackage || item.packageName === selectedPackage;
-    let filterMatch = true;
-    if (filterBy !== 'all' && filterValue) {
-      const val = filterValue.toLowerCase();
-      if (filterBy === 'internet_id') {
-        filterMatch = item.internetId.toLowerCase().includes(val);
-      } else if (filterBy === 'amount') {
-        filterMatch = item.amount.toString().includes(val);
-      } else if (filterBy === 'install_date') {
-        filterMatch = item.installDate.toLowerCase().includes(val);
-      }
-    }
-    return pkgMatch && filterMatch;
-  }), [packageData, selectedPackage, filterBy, filterValue]);
+    const pkgMatch = selectedPackage === 'all' || item.packageName === selectedPackage;
+    const searchMatch = !searchTerm || item.packageName.toLowerCase().includes(searchTerm.toLowerCase());
+    return pkgMatch && searchMatch;
+  }), [packageData, selectedPackage, searchTerm]);
 
   const totalSubscribers = filteredData.reduce((sum, item) => sum + item.subscriberCount, 0);
   const totalPackages = filteredData.length;
@@ -77,11 +63,9 @@ export default function PackageWiseReportsPage() {
   const exportExcel = () => {
     if (filteredData.length === 0) return;
 
-    const headers = ['Package Name', 'Internet ID', 'Amount', 'Install Date', 'Subscriber Count'];
+    const headers = ['Package Name', 'Amount', 'Subscriber Count'];
     const rows = filteredData.map((item) => [
-      item.packageName, item.internetId, item.amount.toFixed(2),
-      item.installDate ? format(new Date(item.installDate), 'dd MMM yyyy') : '',
-      item.subscriberCount.toString(),
+      item.packageName, item.amount.toFixed(2), item.subscriberCount.toString(),
     ]);
 
     const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
@@ -152,53 +136,38 @@ export default function PackageWiseReportsPage() {
       {/* Filter Card */}
       <Card className="no-print transition-all duration-300 hover:shadow-md">
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label>Company</Label>
-              <Select value={selectedCompany} onValueChange={setSelectedCompany}>
-                <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
-                <SelectContent portal={false}>
-                  <SelectItem value="all">All Companies</SelectItem>
-                  {companies.map((c: any) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Internet Packages</Label>
+              <Label>Package</Label>
               <Select value={selectedPackage} onValueChange={setSelectedPackage}>
                 <SelectTrigger><SelectValue placeholder="Select package" /></SelectTrigger>
                 <SelectContent portal={false}>
                   <SelectItem value="all">All Packages</SelectItem>
                   {packages.map((p: any) => (
-                    <SelectItem key={p.id} value={p.id || p.name}>{p.name}</SelectItem>
+                    <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label>Filter By</Label>
-              <Select value={filterBy} onValueChange={setFilterBy}>
-                <SelectTrigger><SelectValue placeholder="Select filter" /></SelectTrigger>
+              <Label>Connection Type</Label>
+              <Select value={connectionType} onValueChange={setConnectionType}>
+                <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                 <SelectContent portal={false}>
-                  <SelectItem value="all">None</SelectItem>
-                  <SelectItem value="internet_id">Internet ID</SelectItem>
-                  <SelectItem value="amount">Amount</SelectItem>
-                  <SelectItem value="install_date">Install Date</SelectItem>
+                  <SelectItem value="both">Both</SelectItem>
+                  <SelectItem value="internet">Internet</SelectItem>
+                  <SelectItem value="tv_cable">TV Cable</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label>Value</Label>
+              <Label>Search</Label>
               <Input
-                placeholder="Enter filter value..."
-                value={filterValue}
-                onChange={(e) => setFilterValue(e.target.value)}
-                disabled={filterBy === 'all'}
+                placeholder="Search by package name..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
           </div>
@@ -241,21 +210,28 @@ export default function PackageWiseReportsPage() {
                     <TableRow>
                       <TableHead>#</TableHead>
                       <TableHead>Package Name</TableHead>
-                      <TableHead>Internet ID</TableHead>
                       <TableHead>Amount</TableHead>
-                      <TableHead>Install Date</TableHead>
                       <TableHead>Subscriber Count</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredData.map((item, i) => (
-                      <TableRow key={item.packageId}>
+                      <TableRow key={item.packageName}>
                         <TableCell className="text-muted-foreground">{i + 1}</TableCell>
                         <TableCell className="font-medium">{item.packageName}</TableCell>
-                        <TableCell>{item.internetId}</TableCell>
                         <TableCell>PKR {item.amount.toLocaleString()}</TableCell>
-                        <TableCell>{item.installDate ? format(new Date(item.installDate), 'dd MMM yyyy') : '-'}</TableCell>
-                        <TableCell>{item.subscriberCount}</TableCell>
+                        <TableCell>
+                          {item.subscriberCount > 0 ? (
+                            <Link
+                              href={`/crm/subscriber-detail?package=${encodeURIComponent(item.packageName)}`}
+                              className="text-blue-600 hover:underline dark:text-blue-400 font-medium"
+                            >
+                              {item.subscriberCount}
+                            </Link>
+                          ) : (
+                            <span className="text-muted-foreground">0</span>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

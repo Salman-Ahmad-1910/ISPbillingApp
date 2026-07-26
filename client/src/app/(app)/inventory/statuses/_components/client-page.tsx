@@ -3,27 +3,20 @@
 import { useState, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
-import { useCompany } from '@/context/company-context';
 
 import { DataTable } from './data-table';
-import { columns } from './columns';
-
-interface Product {
-  id: string;
-  name: string;
-  stock: number;
-  category: string;
-}
+import { columns, type PurchasedProduct } from './columns';
 
 interface ClientPageProps {
-  data: Product[];
+  data: PurchasedProduct[];
 }
 
 const PAGE_SIZES = [10, 25, 50, 100];
 
 export function ClientPage({ data }: ClientPageProps) {
-  const { companyId } = useCompany();
   const [searchTerm, setSearchTerm] = useState('');
+  const [vendorFilter, setVendorFilter] = useState('');
+  const [batchFilter, setBatchFilter] = useState('');
   const [maxQuantity, setMaxQuantity] = useState('');
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(0);
@@ -36,6 +29,16 @@ export function ClientPage({ data }: ClientPageProps) {
       result = result.filter(p => p.name.toLowerCase().includes(lower));
     }
 
+    if (vendorFilter) {
+      const lower = vendorFilter.toLowerCase();
+      result = result.filter(p => p.vendorName?.toLowerCase().includes(lower));
+    }
+
+    if (batchFilter) {
+      const lower = batchFilter.toLowerCase();
+      result = result.filter(p => p.batch?.toLowerCase().includes(lower));
+    }
+
     if (maxQuantity !== '') {
       const max = parseInt(maxQuantity, 10);
       if (!isNaN(max)) {
@@ -44,7 +47,7 @@ export function ClientPage({ data }: ClientPageProps) {
     }
 
     return result;
-  }, [data, searchTerm, maxQuantity]);
+  }, [data, searchTerm, vendorFilter, batchFilter, maxQuantity]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages - 1);
@@ -55,24 +58,42 @@ export function ClientPage({ data }: ClientPageProps) {
 
   return (
     <div className="space-y-4 p-6">
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-xs">
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="relative flex-1 min-w-[150px] max-w-xs">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Less than"
+            placeholder="Search product name..."
+            value={searchTerm}
+            onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
+            className="pl-8"
+          />
+        </div>
+        <div className="relative flex-1 min-w-[150px] max-w-xs">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Filter vendor..."
+            value={vendorFilter}
+            onChange={(e) => { setVendorFilter(e.target.value); setPage(0); }}
+            className="pl-8"
+          />
+        </div>
+        <div className="relative flex-1 min-w-[150px] max-w-xs">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Filter batch..."
+            value={batchFilter}
+            onChange={(e) => { setBatchFilter(e.target.value); setPage(0); }}
+            className="pl-8"
+          />
+        </div>
+        <div className="relative flex-1 min-w-[150px] max-w-xs">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Less than qty"
             type="number"
             min={0}
             value={maxQuantity}
             onChange={(e) => { setMaxQuantity(e.target.value); setPage(0); }}
-            className="pl-8"
-          />
-        </div>
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by product name..."
-            value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
             className="pl-8"
           />
         </div>

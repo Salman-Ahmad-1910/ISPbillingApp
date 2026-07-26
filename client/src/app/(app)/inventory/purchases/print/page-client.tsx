@@ -10,6 +10,7 @@ import type { Purchase, Company } from '@/lib/types';
 export default function PrintPurchasePage() {
   const searchParams = useSearchParams();
   const id = searchParams.get('id');
+  const size = (searchParams.get('size') as 'a4' | 'thermal') || 'a4';
   const { companyId } = useCompany();
 
   const [purchase, setPurchase] = useState<Purchase | null>(null);
@@ -86,6 +87,7 @@ export default function PrintPurchasePage() {
     <PrintablePurchaseInvoice
       purchase={purchase}
       company={defaultCompany}
+      size={size}
     />
   );
 }

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -18,23 +19,23 @@ import { useGenericQuery } from '@/hooks/api/use-generic-query';
 
 interface DeactivatedRecord {
   id: string;
-  subscriberName: string;
-  subscriberId: string;
+  internetId: string;
+  name: string;
   cnic: string;
-  phone: string;
   address: string;
-  sublocality: string;
-  connectionType: string;
-  packageName: string;
-  deactivationDate: string;
+  leavingDate: string;
   reason: string;
-  deactivatedBy: string;
+  comments: string;
+  mobile: string;
+  connectionType: string;
+  amount: number;
+  badDebt: boolean;
 }
 
 export default function DeactivatedUsersPage() {
   const { companyId } = useCompany();
 
-  const { data: allSubscribers = [], isLoading: loading } = useGenericQuery<any>('subscribers', companyId ?? undefined);
+  const { data: connections = [], isLoading: loading } = useGenericQuery<any>('admin/connections', companyId ?? undefined);
 
   const [filterFromDate, setFilterFromDate] = useState<Date>(() => {
     const d = new Date();
@@ -45,60 +46,53 @@ export default function DeactivatedUsersPage() {
   const [filterToDate, setFilterToDate] = useState<Date>(new Date());
   const [filterToDateOpen, setFilterToDateOpen] = useState(false);
 
-  const [reportType, setReportType] = useState('all');
-  const [sublocality, setSublocality] = useState('all');
   const [connectionType, setConnectionType] = useState('both');
-
-  const allSublocalities = useMemo(() => {
-    const set = new Set<string>();
-    allSubscribers.forEach((s: any) => { if (s.areaName) set.add(s.areaName); });
-    return Array.from(set);
-  }, [allSubscribers]);
+  const [badDebtFilter, setBadDebtFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const deactivatedData: DeactivatedRecord[] = useMemo(() => {
-    return allSubscribers
-      .filter((s: any) => s.status === 'deactivated' || s.status === 'inactive')
-      .map((s: any) => ({
-        id: s.id,
-        subscriberName: s.name || '',
-        subscriberId: s.subscriber_identity || '',
-        cnic: s.cnic || '',
-        phone: s.phone || '',
-        address: s.installationAddress || '',
-        sublocality: s.areaName || '',
-        connectionType: s.connectionType || 'internet',
-        packageName: s.packageName || '',
-        deactivationDate: s.updatedAt || s.connectionDate || '',
-        reason: s.deactivationReason || '',
-        deactivatedBy: s.deactivatedBy || '',
+    return connections
+      .filter((c: any) => c.status === 'deactivated')
+      .map((c: any) => ({
+        id: c.id,
+        internetId: c.internetId || '',
+        name: c.name || '',
+        cnic: c.cnic || '',
+        address: c.address || '',
+        leavingDate: c.leavingDate || c.updatedAt || '',
+        reason: c.deactivationReason || '',
+        comments: c.comments || '',
+        mobile: c.mobile || c.cell || '',
+        connectionType: c.connectionType || 'both',
+        amount: Number(c.remainingAmount) || 0,
+        badDebt: !!c.badDebt,
       }));
-  }, [allSubscribers]);
+  }, [connections]);
 
   const filteredData = useMemo(() => deactivatedData.filter((item) => {
-    const itemDate = new Date(item.deactivationDate);
-    const from = new Date(filterFromDate);
-    from.setHours(0, 0, 0, 0);
-    const to = new Date(filterToDate);
-    to.setHours(23, 59, 59, 999);
-
-    const afterFrom = itemDate >= from;
-    const beforeTo = itemDate <= to;
-    const sublocalityMatch = sublocality === 'all' || item.sublocality === sublocality;
     const connectionMatch = connectionType === 'both' || item.connectionType === connectionType;
-    const typeMatch = reportType === 'all' || item.reason === reportType;
+    const badDebtMatch = badDebtFilter === 'all' ||
+      (badDebtFilter === 'yes' && item.badDebt) ||
+      (badDebtFilter === 'no' && !item.badDebt);
+    const searchMatch = !searchTerm ||
+      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.internetId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.cnic.includes(searchTerm);
 
-    return afterFrom && beforeTo && sublocalityMatch && connectionMatch && typeMatch;
-  }), [deactivatedData, filterFromDate, filterToDate, sublocality, connectionType, reportType]);
+    return connectionMatch && badDebtMatch && searchMatch;
+  }), [deactivatedData, connectionType, badDebtFilter, searchTerm]);
 
   const totalRecords = filteredData.length;
 
   const exportExcel = () => {
     if (filteredData.length === 0) return;
 
-    const headers = ['Subscriber Name', 'Subscriber ID', 'CNIC', 'Phone', 'Address', 'Sublocality', 'Connection Type', 'Package', 'Deactivation Date', 'Reason', 'Deactivated By'];
+    const headers = ['ID', 'Internet ID', 'Name', 'CNIC', 'Address', 'Leaving Date', 'Reason', 'Comments', 'Mobile No', 'Cable/Internet', 'Amount', 'Bad Debt'];
     const rows = filteredData.map((item) => [
-      item.subscriberName, item.subscriberId, item.cnic, item.phone, item.address,
-      item.sublocality, item.connectionType, item.packageName, item.deactivationDate, item.reason, item.deactivatedBy,
+      item.id, item.internetId, item.name, item.cnic, item.address,
+      item.leavingDate ? format(new Date(item.leavingDate), 'dd MMM yyyy') : '',
+      item.reason, item.comments, item.mobile, item.connectionType,
+      item.amount.toFixed(2), item.badDebt ? 'Yes' : 'No',
     ]);
 
     const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
@@ -158,48 +152,14 @@ export default function DeactivatedUsersPage() {
       {/* Filter Card */}
       <Card className="no-print transition-all duration-300 hover:shadow-md">
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
-              <Label>From Date</Label>
-              <Popover open={filterFromDateOpen} onOpenChange={setFilterFromDateOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className={cn('w-full justify-start text-left font-normal', !filterFromDate && 'text-muted-foreground')}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {filterFromDate ? format(filterFromDate, 'PPP') : 'Pick a date'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar mode="single" selected={filterFromDate} onSelect={(date) => { if (date) { setFilterFromDate(date); setFilterFromDateOpen(false); } }} initialFocus />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="space-y-2">
-              <Label>To Date</Label>
-              <Popover open={filterToDateOpen} onOpenChange={setFilterToDateOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className={cn('w-full justify-start text-left font-normal', !filterToDate && 'text-muted-foreground')}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {filterToDate ? format(filterToDate, 'PPP') : 'Pick a date'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar mode="single" selected={filterToDate} onSelect={(date) => { if (date) { setFilterToDate(date); setFilterToDateOpen(false); } }} initialFocus />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Sublocality</Label>
-              <Select value={sublocality} onValueChange={setSublocality}>
-                <SelectTrigger><SelectValue placeholder="Select sublocality" /></SelectTrigger>
-                <SelectContent portal={false}>
-                  <SelectItem value="all">All</SelectItem>
-                  {allSublocalities.map((loc) => (
-                    <SelectItem key={loc} value={loc}>{loc}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Search</Label>
+              <Input
+                placeholder="Search by name, ID, or CNIC..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
 
             <div className="space-y-2">
@@ -215,14 +175,13 @@ export default function DeactivatedUsersPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Report Type</Label>
-              <Select value={reportType} onValueChange={setReportType}>
-                <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+              <Label>Bad Debt</Label>
+              <Select value={badDebtFilter} onValueChange={setBadDebtFilter}>
+                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                 <SelectContent portal={false}>
                   <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="voluntary">Voluntary</SelectItem>
-                  <SelectItem value="non-payment">Non-Payment</SelectItem>
-                  <SelectItem value="system">System</SelectItem>
+                  <SelectItem value="yes">Yes</SelectItem>
+                  <SelectItem value="no">No</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -238,7 +197,7 @@ export default function DeactivatedUsersPage() {
               <div>
                 <h2 className="text-xl font-bold">Deactivation History</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  From: {format(filterFromDate, 'dd MMM yyyy')} — To: {format(filterToDate, 'dd MMM yyyy')}
+                  {totalRecords} deactivated subscribers
                 </p>
               </div>
               <div className="flex gap-2 no-print">
@@ -267,43 +226,51 @@ export default function DeactivatedUsersPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>#</TableHead>
-                      <TableHead>Subscriber Name</TableHead>
-                      <TableHead>Subscriber ID</TableHead>
+                      <TableHead>ID</TableHead>
+                      <TableHead>Internet ID</TableHead>
+                      <TableHead>Name</TableHead>
                       <TableHead>CNIC</TableHead>
-                      <TableHead>Phone</TableHead>
                       <TableHead>Address</TableHead>
-                      <TableHead>Sublocality</TableHead>
-                      <TableHead>Connection Type</TableHead>
-                      <TableHead>Package</TableHead>
-                      <TableHead>Deactivation Date</TableHead>
+                      <TableHead>Leaving Date</TableHead>
                       <TableHead>Reason</TableHead>
-                      <TableHead>Deactivated By</TableHead>
+                      <TableHead>Comments</TableHead>
+                      <TableHead>Mobile No</TableHead>
+                      <TableHead>Cable/Internet</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Bad Debt</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredData.map((item, i) => (
                       <TableRow key={item.id}>
                         <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                        <TableCell className="text-xs">{item.id.slice(0, 8)}...</TableCell>
+                        <TableCell>{item.internetId}</TableCell>
                         <TableCell className="font-medium">
                           <Link
                             href={`/crm/subscriber-detail?connectionId=${item.id}`}
                             className="text-blue-600 hover:underline dark:text-blue-400"
                           >
-                            {item.subscriberName}
+                            {item.name}
                           </Link>
                         </TableCell>
-                        <TableCell>{item.subscriberId}</TableCell>
-                        <TableCell>{item.cnic}</TableCell>
-                        <TableCell>{item.phone}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground max-w-[120px] truncate">{item.address || '---'}</TableCell>
-                        <TableCell>{item.sublocality}</TableCell>
+                        <TableCell>{item.cnic || '-'}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground max-w-[120px] truncate">{item.address || '-'}</TableCell>
+                        <TableCell>{item.leavingDate ? format(new Date(item.leavingDate), 'dd MMM yyyy') : '-'}</TableCell>
+                        <TableCell>{item.reason || '-'}</TableCell>
+                        <TableCell className="text-xs max-w-[100px] truncate">{item.comments || '-'}</TableCell>
+                        <TableCell>{item.mobile || '-'}</TableCell>
                         <TableCell>
                           <Badge variant="outline">{item.connectionType}</Badge>
                         </TableCell>
-                        <TableCell>{item.packageName}</TableCell>
-                        <TableCell>{item.deactivationDate ? format(new Date(item.deactivationDate), 'dd MMM yyyy') : '-'}</TableCell>
-                        <TableCell>{item.reason || '-'}</TableCell>
-                        <TableCell>{item.deactivatedBy || '-'}</TableCell>
+                        <TableCell>PKR {item.amount.toLocaleString()}</TableCell>
+                        <TableCell>
+                          {item.badDebt ? (
+                            <Badge variant="destructive">Yes</Badge>
+                          ) : (
+                            <Badge variant="secondary">No</Badge>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

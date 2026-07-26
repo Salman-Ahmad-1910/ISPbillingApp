@@ -34,6 +34,11 @@ type Connection struct {
 	RemainingAmount     float64 `gorm:"type:decimal(10,2);default:0" json:"remainingAmount"`
 	SplitterID          string  `gorm:"type:varchar(36)" json:"splitterId"`
 	SplitterPort        int     `gorm:"default:0" json:"splitterPort"`
+	Cnic                string  `gorm:"type:varchar(20)" json:"cnic"`
+	LeavingDate         string  `gorm:"type:varchar(50)" json:"leavingDate"`
+	DeactivationReason  string  `gorm:"type:varchar(255)" json:"deactivationReason"`
+	Comments            string  `gorm:"type:text" json:"comments"`
+	BadDebt             bool    `gorm:"default:false" json:"badDebt"`
 }
 
 // ConnectionStatusChange logs every status transition for accurate historical tracking

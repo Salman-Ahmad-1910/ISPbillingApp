@@ -175,20 +175,24 @@ const navItems: NavItemGroup[] = [
     ],
   },
   {
-    title: 'Finance',
-    items: [
-      { title: 'Customer Ledger', href: '/accounts/customer-ledger', icon: UserSearch, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
-      { title: 'Cash/Bank Ledger', href: '/accounts/cash-bank-ledger', icon: Wallet, allowedRoles: ['admin', 'manager'] },
-      { title: 'Expenses', href: '/accounts/expenses', icon: CircleDollarSign, allowedRoles: ['admin', 'manager'] },
-    ],
-  },
-  {
     title: 'Accounts',
     items: [
       { title: 'Account Head', href: '/accounts/account-head', icon: Layers, allowedRoles: ['admin', 'manager'] },
       { title: 'Account Entry', href: '/accounts/account-entry', icon: ClipboardPen, allowedRoles: ['admin', 'manager'] },
       { title: 'Account Reports', href: '/accounts/account-reports', icon: FileText, allowedRoles: ['admin', 'manager'] },
       { title: 'One Day Balance Sheet', href: '/accounts/one-day-balance-sheet', icon: BarChartBig, allowedRoles: ['admin', 'manager'] },
+    ],
+  },
+  {
+    title: 'Stock Report',
+    items: [
+      { title: 'Abstract Stock', href: '/reports/abstract-stock', icon: Box, allowedRoles: ['admin', 'manager'] },
+    ],
+  },
+  {
+    title: 'Sale Report',
+    items: [
+      { title: 'Abstract Sale', href: '/reports/abstract-sale', icon: Receipt, allowedRoles: ['admin', 'manager'] },
     ],
   },
   {

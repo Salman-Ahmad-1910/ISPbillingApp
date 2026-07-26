@@ -21,15 +21,17 @@ import { getColumns } from './columns';
 import { ConnectionForm } from './connection-form';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 import { ImportExportDialog } from './import-export-dialog';
+import { DeactivateDialog } from './deactivate-dialog';
 
 type ConnectionFormValues = z.infer<typeof connectionSchema>;
 
 interface ClientPageProps {
   connections: Connection[];
   initialConnectionId?: string;
+  initialPackageName?: string;
 }
 
-export function ClientPage({ connections, initialConnectionId }: ClientPageProps) {
+export function ClientPage({ connections, initialConnectionId, initialPackageName }: ClientPageProps) {
   const { companyId } = useCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -37,7 +39,9 @@ export function ClientPage({ connections, initialConnectionId }: ClientPageProps
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedConnection, setSelectedConnection] = useState<Connection | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeactivateDialogOpen, setIsDeactivateDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeactivating, setIsDeactivating] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [pageInput, setPageInput] = useState('');
@@ -60,6 +64,12 @@ export function ClientPage({ connections, initialConnectionId }: ClientPageProps
       }
     }
   }, [initialConnectionId, connections]);
+
+  useEffect(() => {
+    if (initialPackageName) {
+      setFilterPackage(initialPackageName);
+    }
+  }, [initialPackageName]);
 
   const { data: areasData } = useGenericQuery<Area[]>('network/areas', companyId ?? undefined);
   const { data: boxesData } = useGenericQuery<DistributionBox[]>('network/boxes', companyId ?? undefined);
@@ -217,9 +227,39 @@ export function ClientPage({ connections, initialConnectionId }: ClientPageProps
     setIsDeleteDialogOpen(true);
   };
 
+  const openDeactivateDialog = (connection: Connection) => {
+    setSelectedConnection(connection);
+    setIsDeactivateDialogOpen(true);
+  };
+
+  const handleDeactivate = async (connection: Connection, reason: string, comments: string) => {
+    setIsDeactivating(true);
+    try {
+      await api.put(`/admin/connections/${connection.id}?companyId=${companyId}`, {
+        status: 'deactivated',
+        deactivationReason: reason,
+        comments: comments,
+        leavingDate: new Date().toISOString(),
+      });
+      toast({ title: "Success", description: "Subscriber deactivated successfully." });
+      queryClient.invalidateQueries({ queryKey: ['admin/connections', companyId] });
+      setIsDeactivateDialogOpen(false);
+      setSelectedConnection(null);
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: "Error",
+        description: error.response?.data?.message || "Failed to deactivate subscriber"
+      });
+    } finally {
+      setIsDeactivating(false);
+    }
+  };
+
   const columns = getColumns({
     onEdit: handleEdit,
     onDelete: openDeleteDialog,
+    onDeactivate: openDeactivateDialog,
   });
 
   return (
@@ -460,6 +500,14 @@ export function ClientPage({ connections, initialConnectionId }: ClientPageProps
         onClose={() => setIsDeleteDialogOpen(false)}
         onDelete={handleDelete}
         itemName={selectedConnection?.name || ''}
+      />
+
+      <DeactivateDialog
+        isOpen={isDeactivateDialogOpen}
+        onClose={() => setIsDeactivateDialogOpen(false)}
+        onDeactivate={handleDeactivate}
+        connection={selectedConnection}
+        isSaving={isDeactivating}
       />
 
       <ImportExportDialog

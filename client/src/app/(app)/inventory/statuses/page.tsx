@@ -4,14 +4,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { Loader2, ClipboardCheck, Package, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
-import { useMemo } from 'react';
 
 import { ClientPage } from './_components/client-page';
 
 export default function InventoryStatusesPage() {
   const { companyId } = useCompany();
 
-  const { data: products = [], isLoading, error } = useGenericQuery<any>('inventory/products', companyId ?? undefined);
+  const { data: items = [], isLoading, error } = useGenericQuery<any>('inventory/purchased-products', companyId ?? undefined);
 
   if (isLoading) {
     return (
@@ -28,6 +27,8 @@ export default function InventoryStatusesPage() {
     return <div className="p-4 text-red-500">Failed to load inventory status</div>;
   }
 
+  const list = Array.isArray(items) ? items : [];
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-3">
@@ -36,7 +37,7 @@ export default function InventoryStatusesPage() {
         </div>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Inventory Status</h1>
-          <p className="text-sm text-muted-foreground">View current stock levels of all products.</p>
+          <p className="text-sm text-muted-foreground">View stock levels per purchase item.</p>
         </div>
       </div>
 
@@ -49,8 +50,8 @@ export default function InventoryStatusesPage() {
               <Package className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-xs font-medium text-muted-foreground">Total Products</p>
-              <p className="text-2xl font-bold">{Array.isArray(products) ? products.length : 0}</p>
+              <p className="text-xs font-medium text-muted-foreground">Total Items</p>
+              <p className="text-2xl font-bold">{list.length}</p>
             </div>
           </div>
         </div>
@@ -62,7 +63,7 @@ export default function InventoryStatusesPage() {
             <div>
               <p className="text-xs font-medium text-muted-foreground">In Stock</p>
               <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                {Array.isArray(products) ? products.filter((p: any) => Number(p.stock) > 0).length : 0}
+                {list.filter((p: any) => Number(p.stock) > 0).length}
               </p>
             </div>
           </div>
@@ -75,7 +76,7 @@ export default function InventoryStatusesPage() {
             <div>
               <p className="text-xs font-medium text-muted-foreground">Low Stock</p>
               <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-                {Array.isArray(products) ? products.filter((p: any) => Number(p.stock) > 0 && Number(p.stock) <= 5).length : 0}
+                {list.filter((p: any) => Number(p.stock) > 0 && Number(p.stock) <= 5).length}
               </p>
             </div>
           </div>
@@ -84,7 +85,7 @@ export default function InventoryStatusesPage() {
 
       <Card className="transition-all duration-300 hover:shadow-md">
         <CardContent className="p-0">
-          <ClientPage data={products} />
+          <ClientPage data={list} />
         </CardContent>
       </Card>
     </div>

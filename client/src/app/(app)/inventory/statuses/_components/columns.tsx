@@ -2,43 +2,81 @@
 
 import { type ColumnDef } from '@tanstack/react-table';
 
-interface Product {
+export interface PurchasedProduct {
+  purchaseItemId: string;
   id: string;
   name: string;
+  price: number;
   stock: number;
+  unitType: string;
+  taxPercent: number;
+  purchasePrice: number;
+  billId: string;
+  purchaseNumber: string;
+  vendorName: string;
+  purchaseDate: string;
+  batch: string;
 }
 
-export const columns: ColumnDef<Product>[] = [
+export const columns: ColumnDef<PurchasedProduct, unknown>[] = [
   {
-    accessorKey: 'id',
-    header: 'Product ID',
+    accessorKey: 'billId',
+    header: 'Bill ID',
     cell: ({ row }) => (
-      <div className="text-xs font-mono text-muted-foreground">
-        {row.original.id}
-      </div>
+      <span className="font-medium">{row.original.billId || row.original.purchaseNumber || '-'}</span>
     ),
   },
   {
+    accessorKey: 'vendorName',
+    header: 'Vendor',
+    cell: ({ row }) => <span>{row.original.vendorName || '-'}</span>,
+  },
+  {
+    accessorKey: 'purchaseDate',
+    header: 'Date',
+    cell: ({ row }) => <span>{row.original.purchaseDate || '-'}</span>,
+  },
+  {
+    accessorKey: 'batch',
+    header: 'Batch',
+    cell: ({ row }) => <span>{row.original.batch || '-'}</span>,
+  },
+  {
     accessorKey: 'name',
-    header: 'Product Name',
-    cell: ({ row }) => {
-      const name = row.original.name;
-      return <div className="font-medium">{name}</div>;
-    },
+    header: 'Product',
+    cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
   },
   {
     accessorKey: 'stock',
     header: 'Quantity',
     cell: ({ row }) => {
-      const stock = row.original.stock;
-      return <span>{stock}</span>;
+      const qty = row.original.stock;
+      return (
+        <span className={qty === 0 ? 'text-muted-foreground' : 'font-medium'}>
+          {qty}
+        </span>
+      );
     },
   },
   {
     id: 'damageQuantity',
-    header: 'Damage Quantity',
-    cell: () => {
-      return <span>0</span>;
+    header: 'Damage Qty',
+    cell: () => <span>0</span>,
+  },
+  {
+    accessorKey: 'purchasePrice',
+    header: 'Purchase Price',
+    cell: ({ row }) => {
+      const amount = row.original.purchasePrice;
+      return <span>PKR {new Intl.NumberFormat('en-US').format(amount)}</span>;
+    },
+  },
+  {
+    accessorKey: 'price',
+    header: 'Selling Price',
+    cell: ({ row }) => {
+      const amount = row.original.price;
+      return <span>PKR {new Intl.NumberFormat('en-US').format(amount)}</span>;
     },
   },
 ];

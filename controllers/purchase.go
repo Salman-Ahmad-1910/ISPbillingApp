@@ -442,8 +442,14 @@ func GetPurchasedProducts(c *gin.Context) {
 				THEN ROUND(pi.sale_tax / (pi.quantity * pi.selling_price) * 100, 2)
 				ELSE 0
 			END                                            AS tax_percent,
-			pi.purchase_price                             AS purchase_price
+			pi.purchase_price                             AS purchase_price,
+			p.bill_id                                     AS bill_id,
+			p.purchase_number                             AS purchase_number,
+			p.vendor_name                                 AS vendor_name,
+			p.purchase_date                               AS purchase_date,
+			p.batch                                       AS batch
 		FROM purchase_items pi
+		JOIN purchases p ON p.id = pi.purchase_id AND p.deleted_at IS NULL
 		WHERE pi.company_id = ?
 			AND pi.deleted_at IS NULL
 		ORDER BY pi.product_name

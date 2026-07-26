@@ -4,7 +4,6 @@ import (
 	"awesomeProject/config"
 	"awesomeProject/models"
 	"awesomeProject/utils"
-	"fmt"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -40,17 +39,20 @@ func GetCustomBills(c *gin.Context) {
 		// Handle Subscriber Name
 		if customBills[i].Subscriber.ID != uuid.Nil && customBills[i].Subscriber.ID.String() != "00000000-0000-0000-0000-000000000000" {
 			customBills[i].SubscriberName = customBills[i].Subscriber.Name
-			fmt.Printf("DEBUG: Found subscriber %s with name %s\n", customBills[i].Subscriber.ID, customBills[i].Subscriber.Name)
 		} else {
-			// Try to fetch subscriber directly if preload failed
-			var subscriber models.Subscriber
-			if err := config.DB.Where("id = ?", customBills[i].SubscriberID).First(&subscriber).Error; err == nil {
-				customBills[i].SubscriberName = subscriber.Name
-				customBills[i].Subscriber = subscriber
-				fmt.Printf("DEBUG: Fetched subscriber %s with name %s\n", customBills[i].SubscriberID, subscriber.Name)
+			// Try connections table first (payments use connection IDs)
+			var conn models.Connection
+			if err := config.DB.Where("id = ?", customBills[i].SubscriberID).First(&conn).Error; err == nil {
+				customBills[i].SubscriberName = conn.Name
 			} else {
-				customBills[i].SubscriberName = "Unknown Subscriber"
-				fmt.Printf("DEBUG: Could not find subscriber %s\n", customBills[i].SubscriberID)
+				// Fallback: try the subscribers table
+				var subscriber models.Subscriber
+				if err := config.DB.Where("id = ?", customBills[i].SubscriberID).First(&subscriber).Error; err == nil {
+					customBills[i].SubscriberName = subscriber.Name
+					customBills[i].Subscriber = subscriber
+				} else {
+					customBills[i].SubscriberName = "Unknown Subscriber"
+				}
 			}
 		}
 
