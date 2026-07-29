@@ -8,7 +8,7 @@ import { KeyRound, ShieldCheck, Users } from 'lucide-react';
 import { LoadingSpinner } from '@/components/shared/loading-spinner';
 import type { Role } from '@/lib/types';
 
-import { ClientPage } from './_components/client-page';
+import ClientPage from './_components/client-page';
 
 export default function RolesPage() {
   const { companyId } = useCompany();
