@@ -27,6 +27,7 @@ interface CartItem {
 interface DropdownItem {
     id: string;
     name: string;
+    secondary?: string;
 }
 
 function SearchableDropdown({
@@ -55,7 +56,10 @@ function SearchableDropdown({
     const filtered = useMemo(() => {
         if (!query) return items;
         const q = query.toLowerCase();
-        return items.filter(i => i.name.toLowerCase().includes(q));
+        return items.filter(i =>
+            i.name.toLowerCase().includes(q) ||
+            i.secondary?.toLowerCase().includes(q)
+        );
     }, [items, query]);
 
     useEffect(() => {
@@ -112,7 +116,7 @@ function SearchableDropdown({
                         {filtered.map((item) => (
                             <div
                                 key={item.id}
-                                className={`flex items-center px-3 py-2 cursor-pointer hover:bg-accent transition-colors text-sm ${selectedId === item.id ? 'bg-accent font-medium' : ''}`}
+                                className={`flex flex-col px-3 py-2 cursor-pointer hover:bg-accent transition-colors text-sm ${selectedId === item.id ? 'bg-accent font-medium' : ''}`}
                                 onMouseDown={(e) => {
                                     e.preventDefault();
                                     onSelect(item.id);
@@ -120,7 +124,10 @@ function SearchableDropdown({
                                     setOpen(false);
                                 }}
                             >
-                                {item.name}
+                                <span className="font-medium">{item.name}</span>
+                                {item.secondary && (
+                                    <span className="text-xs text-muted-foreground">{item.secondary}</span>
+                                )}
                             </div>
                         ))}
                     </div>
@@ -174,7 +181,11 @@ export default function POSPage() {
 
     const subscriberList = useMemo(() => {
         if (!Array.isArray(subscribersData)) return [];
-        return subscribersData.map((s: any): DropdownItem => ({ id: s.id, name: s.name }));
+        return subscribersData.map((s: any): DropdownItem => ({
+            id: s.id,
+            name: `${s.id?.slice(0, 8)} | ${s.name}`,
+            secondary: s.phone || s.cell || '',
+        }));
     }, [subscribersData]);
 
     const dealerList = useMemo(() => {
@@ -450,6 +461,7 @@ export default function POSPage() {
                         quantity: item.quantity,
                         price: item.product.price,
                         taxPercent: Number(item.product.taxPercent) || 0,
+                        serialNumber: (item.product as any).serialNumber || '',
                     }))
                 });
             } else if (isInstallment && existingInstallment) {
@@ -470,6 +482,7 @@ export default function POSPage() {
                         quantity: item.quantity,
                         price: item.product.price,
                         taxPercent: Number(item.product.taxPercent) || 0,
+                        serialNumber: (item.product as any).serialNumber || '',
                     }))
                 });
             }
@@ -655,6 +668,11 @@ export default function POSPage() {
                                     <div className="p-2 text-center">
                                         <h4 className="font-medium text-sm truncate">{product.name}</h4>
                                         <p className="text-xs font-semibold">PKR {product.price.toLocaleString()}</p>
+                                        {product.serialNumber && (
+                                          <p className="text-[10px] font-mono text-muted-foreground truncate mt-0.5" title={product.serialNumber}>
+                                            SN: {product.serialNumber}
+                                          </p>
+                                        )}
                                     </div>
                                 </Card>
                                 );

@@ -17,14 +17,14 @@ export default function VendorInvoicesPage() {
       <div className="flex h-[50vh] items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground animate-pulse">Loading store data...</p>
+          <p className="text-sm text-muted-foreground animate-pulse">Loading vendor invoices...</p>
         </div>
       </div>
     );
   }
 
   if (error) {
-    return <div className="p-4 text-red-500">Failed to load store data</div>;
+    return <div className="p-4 text-red-500">Failed to load vendor invoices</div>;
   }
 
   return (
@@ -34,8 +34,8 @@ export default function VendorInvoicesPage() {
           <ShoppingCart className="h-5 w-5" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Store</h1>
-          <p className="text-sm text-muted-foreground">Track purchases from vendors and manage inventory.</p>
+          <h1 className="text-2xl font-bold tracking-tight">Vendor Invoice</h1>
+          <p className="text-sm text-muted-foreground">Manage vendor invoices and track product purchases with serial numbers.</p>
         </div>
       </div>
 
@@ -48,7 +48,7 @@ export default function VendorInvoicesPage() {
               <ShoppingCart className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-xs font-medium text-muted-foreground">Total Purchases</p>
+              <p className="text-xs font-medium text-muted-foreground">Total Invoices</p>
               <p className="text-2xl font-bold">{Array.isArray(vendorInvoices) ? vendorInvoices.length : 0}</p>
             </div>
           </div>

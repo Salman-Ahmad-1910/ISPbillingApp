@@ -27,7 +27,7 @@ export const getColumns = ({ onEdit, onDelete, areas = [] }: ColumnsProps): Colu
     header: 'ID',
     cell: ({ row }) => (
       <div className="text-xs font-mono text-muted-foreground">
-        {row.original.id}
+        {row.index + 1}
       </div>
     ),
   },
@@ -62,7 +62,7 @@ export const getColumns = ({ onEdit, onDelete, areas = [] }: ColumnsProps): Colu
         return <Badge variant="outline">{area.city} - {area.zone}</Badge>;
       }
       // Fallback to showing ID if area not found
-      return <Badge variant="outline">{areaId}</Badge>;
+      return <Badge variant="outline">{areaId.slice(0, 8)}</Badge>;
     },
   },
   {

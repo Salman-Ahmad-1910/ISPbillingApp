@@ -42,6 +42,7 @@ interface Sale {
     price: number;
     saleTax?: number;
     wthTax?: number;
+    serialNumber?: string;
   }[];
 }
 
@@ -130,6 +131,7 @@ export function ClientPage({ data }: ClientPageProps) {
       price: Number(i.price) || 0,
       saleTax: Number(i.saleTax) || 0,
       wthTax: Number(i.wthTax) || 0,
+      serialNumber: i.serialNumber || '',
     })),
   });
 
@@ -227,7 +229,17 @@ export function ClientPage({ data }: ClientPageProps) {
     }
   };
 
-  const columns = getColumns();
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this sale?')) return;
+    try {
+      await api.delete(`/pos/sales/${id}`);
+      toast({ title: 'Deleted', description: 'Sale entry deleted.' });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.response?.data?.message || 'Failed to delete' });
+    }
+  };
+
+  const columns = getColumns(handleDelete);
 
   const viewSubtotal = viewSale ? (Number(viewSale.totalAmount) || 0) - (Number(viewSale.taxAmount) || 0) : 0;
   const viewTotalItems = viewSale ? (viewSale.items || []).reduce((sum, i) => sum + (Number(i.quantity) || 0), 0) : 0;
@@ -293,7 +305,7 @@ export function ClientPage({ data }: ClientPageProps) {
                 </div>
                 <div className="flex gap-2 mt-2 flex-wrap">
                   <Badge variant="outline" className="capitalize text-xs">{viewSale.paymentMethod}</Badge>
-                  <Badge variant="secondary" className="text-xs">#{viewSale.id.slice(0, 8)}</Badge>
+                  <Badge variant="secondary" className="text-xs">#{viewSale.id}</Badge>
                   {viewSale.isInstallment && (
                     <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">Installment</Badge>
                   )}

@@ -310,7 +310,7 @@ export default function WhatsAppDraftPage() {
                 ) : (
                   paginatedData.map((item) => (
                     <TableRow key={item.id} className="transition-all duration-300 hover:bg-muted/50 hover:shadow-sm">
-                      <TableCell className="font-medium">{item.entityId || item.id.slice(0, 8)}</TableCell>
+                      <TableCell className="font-medium">{item.entityId || item.id}</TableCell>
                       <TableCell>{item.name}</TableCell>
                       <TableCell>{item.mobileNo || '-'}</TableCell>
                       <TableCell className="max-w-[200px] truncate">{item.messageText || '-'}</TableCell>

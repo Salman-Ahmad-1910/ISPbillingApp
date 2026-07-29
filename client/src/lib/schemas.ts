@@ -92,6 +92,7 @@ export const vendorInvoiceItemSchema = z.object({
   unitPrice: z.coerce.number().min(0, 'Unit price must be positive'),
   unitType: z.string().min(1, 'Unit type is required'),
   subtotal: z.coerce.number().min(0, 'Subtotal must be positive'),
+  serialNumber: z.string().optional(),
 });
 
 export const vendorInvoiceSchema = z.object({

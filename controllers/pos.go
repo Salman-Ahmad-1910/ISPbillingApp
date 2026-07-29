@@ -33,6 +33,7 @@ type posSaleItem struct {
 	TaxPercent  float64   `json:"taxPercent"`
 	SaleTax     float64   `json:"saleTax"`
 	WthTax      float64   `json:"wthTax"`
+	SerialNumber string   `json:"serialNumber"`
 }
 
 type installmentRequest struct {
@@ -75,13 +76,14 @@ func CreatePOSSale(c *gin.Context) {
 	}
 	for _, it := range req.Items {
 		sale.Items = append(sale.Items, models.SaleItem{
-			ProductID:   it.ProductID,
-			ProductName: it.ProductName,
-			Quantity:    it.Quantity,
-			Price:       it.Price,
-			TaxPercent:  it.TaxPercent,
-			SaleTax:     it.SaleTax,
-			WthTax:      it.WthTax,
+			ProductID:    it.ProductID,
+			ProductName:  it.ProductName,
+			Quantity:     it.Quantity,
+			Price:        it.Price,
+			TaxPercent:   it.TaxPercent,
+			SaleTax:      it.SaleTax,
+			WthTax:       it.WthTax,
+			SerialNumber: it.SerialNumber,
 		})
 	}
 
@@ -186,13 +188,14 @@ func CreateInstallmentSale(c *gin.Context) {
 	}
 	for _, it := range req.Items {
 		sale.Items = append(sale.Items, models.SaleItem{
-			ProductID:   it.ProductID,
-			ProductName: it.ProductName,
-			Quantity:    it.Quantity,
-			Price:       it.Price,
-			TaxPercent:  it.TaxPercent,
-			SaleTax:     it.SaleTax,
-			WthTax:      it.WthTax,
+			ProductID:    it.ProductID,
+			ProductName:  it.ProductName,
+			Quantity:     it.Quantity,
+			Price:        it.Price,
+			TaxPercent:   it.TaxPercent,
+			SaleTax:      it.SaleTax,
+			WthTax:       it.WthTax,
+			SerialNumber: it.SerialNumber,
 		})
 	}
 
@@ -412,4 +415,26 @@ func GetPOSSale(c *gin.Context) {
 	}
 
 	utils.SuccessResponse(c, "Record found", sale)
+}
+
+// DeletePOSSale deletes a sale and its line items (cascaded).
+func DeletePOSSale(c *gin.Context) {
+	companyID := c.MustGet("companyID").(uuid.UUID)
+	id := c.Param("id")
+
+	var sale models.Sale
+	if err := config.DB.
+		Scopes(models.TenantScope(companyID)).
+		Where("id = ?", id).
+		First(&sale).Error; err != nil {
+		utils.ErrorResponse(c, 404, "Sale not found", err.Error())
+		return
+	}
+
+	if err := config.DB.Delete(&sale).Error; err != nil {
+		utils.ErrorResponse(c, 500, "Failed to delete sale", err.Error())
+		return
+	}
+
+	utils.SuccessResponse(c, "Sale deleted successfully", nil)
 }

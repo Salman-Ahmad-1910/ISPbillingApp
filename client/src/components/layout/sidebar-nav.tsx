@@ -162,16 +162,15 @@ const navItems: NavItemGroup[] = [
   {
     title: 'Inventory',
     items: [
-      { title: 'Products', href: '/inventory/products', icon: Box, allowedRoles: ['admin', 'manager'] },
-      { title: 'Plans', href: '/inventory/plans', icon: Receipt, allowedRoles: ['admin', 'manager'] },
-      { title: 'Stock', href: '/inventory/stock', icon: Warehouse, allowedRoles: ['admin', 'manager'] },
       { title: 'Brands', href: '/inventory/brands', icon: Tag, allowedRoles: ['admin', 'manager'] },
-      { title: 'Unit Type', href: '/inventory/unit-types', icon: Ruler, allowedRoles: ['admin', 'manager'] },
-      { title: 'Product Type', href: '/inventory/product-types', icon: Shapes, allowedRoles: ['admin', 'manager'] },
-      { title: 'Inventory Status', href: '/inventory/statuses', icon: Activity, allowedRoles: ['admin', 'manager'] },
-      { title: 'Purchase', href: '/inventory/purchases', icon: ArrowLeftRight, allowedRoles: ['admin', 'manager'] },
       { title: 'Vendors', href: '/inventory/vendors', icon: Building2, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
-      { title: 'Store', href: '/inventory/vendor-invoices', icon: FileText, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
+      { title: 'Unit Type', href: '/inventory/unit-types', icon: Ruler, allowedRoles: ['admin', 'manager'] },
+      { title: 'Products', href: '/inventory/products', icon: Box, allowedRoles: ['admin', 'manager'] },
+      { title: 'Purchase', href: '/inventory/purchases', icon: ArrowLeftRight, allowedRoles: ['admin', 'manager'] },
+      { title: 'Inventory Status', href: '/inventory/statuses', icon: Activity, allowedRoles: ['admin', 'manager'] },
+      { title: 'Product Type', href: '/inventory/product-types', icon: Shapes, allowedRoles: ['admin', 'manager'] },
+      { title: 'Stock', href: '/inventory/stock', icon: Warehouse, allowedRoles: ['admin', 'manager'] },
+      { title: 'Vendor Invoice', href: '/inventory/vendor-invoices', icon: FileText, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
     ],
   },
   {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,6 +55,7 @@ export default function BadDebtCollectionsPage() {
 
   // Subscriber state
   const [selectedSubscriberId, setSelectedSubscriberId] = useState<string | null>(null);
+  const [subscriberSearch, setSubscriberSearch] = useState('');
   const [showReceiveDialog, setShowReceiveDialog] = useState(false);
   const [receiveAmount, setReceiveAmount] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
@@ -104,6 +105,8 @@ export default function BadDebtCollectionsPage() {
 
   const overdueConnections = useMemo(() => {
     return (connections as Connection[]).filter(c => {
+      const remaining = Number(c.remainingAmount) || 0;
+      if (remaining <= 0) return false;
       const activeDate = getLastActiveDate(c);
       if (!activeDate) return false;
       const daysSince = getDaysSince(activeDate);
@@ -120,25 +123,19 @@ export default function BadDebtCollectionsPage() {
   }
 
   // --- Subscriber selection ---
-  const subscriberOptions = useMemo(() => {
-    return overdueConnections.map(c => ({
-      id: c.id,
-      name: c.name,
-      secondary: `Overdue ${getDaysSince(getLastActiveDate(c))} days`,
-    }));
-  }, [overdueConnections]);
+  const filteredSubscribers = useMemo(() => {
+    if (!subscriberSearch.trim()) return [];
+    const q = subscriberSearch.toLowerCase();
+    return overdueConnections.filter(c =>
+      c.id?.toLowerCase().includes(q) ||
+      c.name?.toLowerCase().includes(q)
+    ).slice(0, 20);
+  }, [overdueConnections, subscriberSearch]);
 
   const selectedSubscriber = useMemo(() => {
     if (!selectedSubscriberId) return null;
     return (connections as Connection[]).find(c => c.id === selectedSubscriberId) || null;
   }, [connections, selectedSubscriberId]);
-
-  const subscriberRemaining = useMemo(() => {
-    if (!selectedSubscriber) return 0;
-    return selectedSubscriber.remainingAmount || selectedSubscriber.sameAmount || 0;
-  }, [selectedSubscriber]);
-
-  const isAmountExceeding = receiveAmount > 0 && receiveAmount > subscriberRemaining;
 
   // --- Dealer selection ---
   const dealerOptions = useMemo(() => {
@@ -332,25 +329,65 @@ export default function BadDebtCollectionsPage() {
         <TabsContent value="subscribers" className="mt-4">
           <Card>
             <div className="p-4 border-b">
-              <div className="max-w-md">
-                <SearchableSelect
-                  value={selectedSubscriberId}
-                  onValueChange={setSelectedSubscriberId}
-                  options={subscriberOptions}
-                  placeholder="Search overdue subscribers..."
-                  searchPlaceholder="Type to search by name..."
-                  label="Select Subscriber"
-                />
+              <div className="max-w-md space-y-2">
+                <Label>Search Subscriber</Label>
+                <div className="relative">
+                  <Input
+                    value={subscriberSearch}
+                    onChange={(e) => {
+                      setSubscriberSearch(e.target.value);
+                      if (selectedSubscriberId) setSelectedSubscriberId(null);
+                    }}
+                    placeholder="Type subscriber ID or name..."
+                  />
+                  {filteredSubscribers.length > 0 && (
+                    <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md max-h-60 overflow-auto">
+                      {filteredSubscribers.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          className="w-full text-left px-3 py-2 hover:bg-accent hover:text-accent-foreground text-sm border-b last:border-b-0"
+                          onClick={() => {
+                            setSelectedSubscriberId(c.id);
+                            setSubscriberSearch('');
+                          }}
+                        >
+                          <span className="font-mono font-medium">{c.id}</span>
+                          <span className="ml-2 text-muted-foreground">{c.name}</span>
+                          {(c.cell || c.mobile) && (
+                            <span className="ml-2 text-xs text-muted-foreground">• {c.cell || c.mobile}</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {selectedSubscriber && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Badge variant="secondary" className="gap-1">
+                      <span className="font-mono">{selectedSubscriber.id}</span>
+                      <span className="text-muted-foreground">•</span>
+                      <span>{selectedSubscriber.name}</span>
+                      <button
+                        type="button"
+                        className="ml-1 hover:text-destructive"
+                        onClick={() => setSelectedSubscriberId(null)}
+                      >
+                        ×
+                      </button>
+                    </Badge>
+                  </div>
+                )}
               </div>
             </div>
 
             {selectedSubscriber ? (
               <CardContent className="p-0">
                 <div className="p-4 border-b">
-                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
                     <div>
                       <Label className="text-xs text-muted-foreground">Subscriber ID</Label>
-                      <p className="font-medium font-mono text-sm">{selectedSubscriber.id?.slice(0, 8) || '---'}</p>
+                      <p className="font-medium font-mono text-sm">{selectedSubscriber.id || '---'}</p>
                     </div>
                     <div>
                       <Label className="text-xs text-muted-foreground">Name</Label>
@@ -373,13 +410,9 @@ export default function BadDebtCollectionsPage() {
                       <p className="font-medium truncate" title={selectedSubscriber.address}>{selectedSubscriber.address || '---'}</p>
                     </div>
                     <div>
-                      <Label className="text-xs text-muted-foreground">Amount</Label>
-                      <p className="font-medium text-violet-600 dark:text-violet-400">PKR {selectedSubscriber.amount.toLocaleString()}</p>
-                    </div>
-                    <div>
                       <Label className="text-xs text-muted-foreground">Remaining</Label>
-                      <p className={`font-medium ${(selectedSubscriber.remainingAmount || selectedSubscriber.sameAmount || 0) > 0 ? 'text-destructive' : 'text-green-600'}`}>
-                        PKR {(selectedSubscriber.remainingAmount || selectedSubscriber.sameAmount || 0).toLocaleString()}
+                      <p className={`font-medium ${(selectedSubscriber.remainingAmount || 0) > 0 ? 'text-destructive' : 'text-green-600'}`}>
+                        PKR {(selectedSubscriber.remainingAmount || 0).toLocaleString()}
                       </p>
                     </div>
                   </div>
@@ -423,7 +456,7 @@ export default function BadDebtCollectionsPage() {
                           {subscriberPayments.map((payment, idx) => (
                             <TableRow key={payment.id}>
                               <TableCell className="py-1.5 px-1.5 font-mono">{idx + 1}</TableCell>
-                              <TableCell className="py-1.5 px-1.5 font-mono">{payment.id.slice(0, 8).toUpperCase()}</TableCell>
+                              <TableCell className="py-1.5 px-1.5 font-mono">{idx + 1}</TableCell>
                               <TableCell className="py-1.5 px-1.5">{payment.subscriberName}</TableCell>
                               <TableCell className="py-1.5 px-1.5">
                                 {payment.paymentDate ? new Date(payment.paymentDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '---'}
@@ -538,7 +571,7 @@ export default function BadDebtCollectionsPage() {
                           {dealerPayments.map((col: any, idx: number) => (
                             <TableRow key={col.id}>
                               <TableCell className="py-1.5 px-1.5 font-mono">{idx + 1}</TableCell>
-                              <TableCell className="py-1.5 px-1.5 font-mono">{col.id.slice(0, 8).toUpperCase()}</TableCell>
+                              <TableCell className="py-1.5 px-1.5 font-mono">{idx + 1}</TableCell>
                               <TableCell className="py-1.5 px-1.5">{col.dealerName}</TableCell>
                               <TableCell className="py-1.5 px-1.5">{col.collectionDate || '---'}</TableCell>
                               <TableCell className="py-1.5 px-1.5 capitalize">{col.transactionType || 'cash'}</TableCell>
@@ -590,26 +623,15 @@ export default function BadDebtCollectionsPage() {
               <Input value={subscriberRecoveryOfficerName} readOnly />
             </div>
             <div className="space-y-1">
-              <Label>Remaining (PKR)</Label>
-              <Input value={`PKR ${subscriberRemaining.toLocaleString()}`} readOnly />
-            </div>
-            <div className="space-y-1">
               <Label>Amount (PKR)</Label>
               <Input
                 type="number"
                 value={receiveAmount}
                 onChange={e => setReceiveAmount(parseFloat(e.target.value) || 0)}
                 placeholder="Enter amount"
-                className={isAmountExceeding ? 'border-destructive focus-visible:ring-destructive' : ''}
               />
-              {isAmountExceeding && (
-                <p className="text-xs text-destructive flex items-center gap-1 mt-1">
-                  <AlertTriangle className="h-3 w-3" />
-                  Amount is more than the total receivable amount
-                </p>
-              )}
             </div>
-            <Button onClick={handleReceivePayment} disabled={isSaving || !receiveAmount || isAmountExceeding} className="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white">
+            <Button onClick={handleReceivePayment} disabled={isSaving || !receiveAmount} className="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white">
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Receive
             </Button>

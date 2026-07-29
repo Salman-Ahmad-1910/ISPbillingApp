@@ -375,9 +375,9 @@ export default function AccountHeadPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  paginatedHeads.map((item) => (
+                  paginatedHeads.map((item, index) => (
                     <TableRow key={item.id}>
-                      <TableCell className="text-muted-foreground truncate">{item.id}</TableCell>
+                      <TableCell className="text-muted-foreground truncate">{index + 1}</TableCell>
                       <TableCell className="font-medium truncate">{item.masterAccount}</TableCell>
                       <TableCell className="truncate">{item.accountType}</TableCell>
                       <TableCell className="truncate">{item.description}</TableCell>
@@ -484,9 +484,9 @@ export default function AccountHeadPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  paginatedSubHeads.map((item) => (
+                  paginatedSubHeads.map((item, index) => (
                     <TableRow key={item.id}>
-                      <TableCell className="text-muted-foreground truncate">{item.id}</TableCell>
+                      <TableCell className="text-muted-foreground truncate">{index + 1}</TableCell>
                       <TableCell className="font-medium truncate">{item.subMasterAccount}</TableCell>
                       <TableCell className="truncate">{item.masterAccount}</TableCell>
                       <TableCell className="font-mono truncate">{item.budget ? `Rs. ${Number(item.budget).toLocaleString()}` : '-'}</TableCell>

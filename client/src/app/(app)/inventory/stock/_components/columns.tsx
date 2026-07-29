@@ -1,93 +1,80 @@
 'use client';
 
 import { type ColumnDef } from '@tanstack/react-table';
-import type { InventoryItem } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
-import { MoreHorizontal } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 
-interface ColumnsProps {
-  onEdit: (item: InventoryItem) => void;
-  onDelete: (item: InventoryItem) => void;
+interface PurchasedProduct {
+  purchaseItemId: string;
+  id: string;
+  name: string;
+  price: number;
+  stock: number;
+  unitType: string;
+  purchasePrice: number;
+  billId: string;
+  purchaseNumber: string;
+  vendorName: string;
+  purchaseDate: string;
+  batch: string;
+  serialNumber: string;
 }
 
-export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<InventoryItem>[] => [
+export const columns: ColumnDef<PurchasedProduct>[] = [
   {
-    accessorKey: 'id',
-    header: 'ID',
+    id: 'index',
+    header: '#',
     cell: ({ row }) => (
       <div className="text-xs font-mono text-muted-foreground">
-        {row.original.id}
+        {row.index + 1}
       </div>
     ),
   },
   {
     accessorKey: 'name',
-    header: 'Item Name',
+    header: 'Product',
+    cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
   },
   {
-    accessorKey: 'type',
-    header: 'Type',
-    cell: ({ row }) => <Badge variant="outline" className="capitalize">{row.original.type}</Badge>,
+    accessorKey: 'vendorName',
+    header: 'Vendor',
+  },
+  {
+    accessorKey: 'purchaseDate',
+    header: 'Purchase Date',
+  },
+  {
+    accessorKey: 'batch',
+    header: 'Batch',
+    cell: ({ row }) => row.original.batch || '—',
+  },
+  {
+    accessorKey: 'serialNumber',
+    header: 'SN / MAC',
+    cell: ({ row }) => (
+      <span className="text-xs font-mono">{row.original.serialNumber || '—'}</span>
+    ),
   },
   {
     accessorKey: 'stock',
     header: 'Stock',
-     cell: ({ row }) => {
-      const stock = row.original.stock;
+    cell: ({ row }) => {
+      const stock = Number(row.original.stock) || 0;
       return (
         <div className="text-center">
-            <Badge variant={stock > 10 ? 'default' : stock > 0 ? 'secondary' : 'destructive'} className={stock > 10 ? 'bg-green-600' : ''}>{stock > 0 ? `${stock} in stock` : 'Out of stock'}</Badge>
+          <Badge variant={stock > 10 ? 'default' : stock > 0 ? 'secondary' : 'destructive'} className={stock > 10 ? 'bg-green-600' : ''}>
+            {stock > 0 ? `${stock} in stock` : 'Out of stock'}
+          </Badge>
         </div>
-      )
+      );
     },
   },
   {
     accessorKey: 'price',
     header: 'Price (PKR)',
     cell: ({ row }) => {
-      const amount = parseFloat(String(row.getValue('price')));
+      const amount = Number(row.original.price) || 0;
       const formatted = new Intl.NumberFormat('en-US').format(amount);
       return <div className="text-right font-medium">{formatted}</div>;
-    },
-  },
-  {
-    accessorKey: 'status',
-    header: 'Status',
-    cell: ({ row }) => <Badge variant="secondary" className="capitalize">{row.original.status.replace('_', ' ')}</Badge>,
-  },
-  {
-    id: 'actions',
-    cell: ({ row }) => {
-      const item = row.original;
-      return (
-        <div className="text-right">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => onEdit(item)}>Edit / Adjust Stock</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive" onClick={() => onDelete(item)}>
-                Delete Item
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      );
     },
   },
 ];

@@ -443,6 +443,7 @@ func GetPurchasedProducts(c *gin.Context) {
 				ELSE 0
 			END                                            AS tax_percent,
 			pi.purchase_price                             AS purchase_price,
+			pi.serial_number                              AS serial_number,
 			p.bill_id                                     AS bill_id,
 			p.purchase_number                             AS purchase_number,
 			p.vendor_name                                 AS vendor_name,

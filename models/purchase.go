@@ -80,4 +80,5 @@ type PurchasedProduct struct {
 	VendorName      string  `json:"vendorName"`
 	PurchaseDate    string  `json:"purchaseDate"`
 	Batch           string  `json:"batch"`
+	SerialNumber    string  `json:"serialNumber"`
 }

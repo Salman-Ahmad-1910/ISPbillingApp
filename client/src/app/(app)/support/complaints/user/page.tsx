@@ -179,9 +179,9 @@ export default function UserComplaintPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  paginatedData.map((item) => (
+                  paginatedData.map((item, index) => (
                     <TableRow key={item.id}>
-                      <TableCell className="font-mono text-xs text-muted-foreground">{item.id.slice(0, 8)}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">{index + 1}</TableCell>
                       <TableCell className="font-medium">{item.subscriberName}</TableCell>
                       <TableCell className="max-w-xs truncate">{item.description}</TableCell>
                       <TableCell>

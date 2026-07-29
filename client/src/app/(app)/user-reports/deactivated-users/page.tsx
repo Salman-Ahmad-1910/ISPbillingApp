@@ -244,7 +244,7 @@ export default function DeactivatedUsersPage() {
                     {filteredData.map((item, i) => (
                       <TableRow key={item.id}>
                         <TableCell className="text-muted-foreground">{i + 1}</TableCell>
-                        <TableCell className="text-xs">{item.id.slice(0, 8)}...</TableCell>
+                        <TableCell className="text-xs">{item.id}</TableCell>
                         <TableCell>{item.internetId}</TableCell>
                         <TableCell className="font-medium">
                           <Link

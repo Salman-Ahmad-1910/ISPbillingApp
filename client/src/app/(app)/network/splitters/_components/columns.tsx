@@ -17,7 +17,7 @@ export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<Splitt
     header: 'ID',
     cell: ({ row }) => (
       <div className="text-xs font-mono text-muted-foreground">
-        {row.original.id}
+        {row.index + 1}
       </div>
     ),
   },
@@ -47,7 +47,7 @@ export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<Splitt
     cell: ({ row }) => (
       <div className="flex items-center gap-1.5 text-muted-foreground">
         <RadioTower className="h-3 w-3" />
-        {row.original.oltId}
+        {row.original.oltId.slice(0, 8)}
       </div>
     ),
   },

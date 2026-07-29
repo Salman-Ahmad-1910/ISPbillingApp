@@ -17,22 +17,22 @@ type ChartPoint struct {
 }
 
 func GetDashboardData(c *gin.Context) {
-	companyIDStr := c.Query("companyId")
-	companyID, err := uuid.Parse(companyIDStr)
-	if err != nil {
+	companyID, exists := c.Get("companyID")
+	if !exists {
 		utils.ErrorResponse(c, 400, "Invalid company ID", nil)
 		return
 	}
+	companyUUID := companyID.(uuid.UUID)
 
 	var activeCount, suspendedCount int64
-	config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL AND status = 'active'`, companyID).Scan(&activeCount)
-	config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL AND status = 'suspended'`, companyID).Scan(&suspendedCount)
+	config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL AND status = 'active'`, companyUUID).Scan(&activeCount)
+	config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL AND status = 'suspended'`, companyUUID).Scan(&suspendedCount)
 
 	var totalCollectionToday float64
-	config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL AND payment_date = CURRENT_DATE::text`, companyID).Scan(&totalCollectionToday)
+	config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL AND payment_date = CURRENT_DATE::text`, companyUUID).Scan(&totalCollectionToday)
 
 	var totalCollectionMonth float64
-	config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL AND payment_date >= (DATE_TRUNC('month', CURRENT_DATE))::text`, companyID).Scan(&totalCollectionMonth)
+	config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL AND payment_date >= (DATE_TRUNC('month', CURRENT_DATE))::text`, companyUUID).Scan(&totalCollectionMonth)
 
 	var overdueCount int64
 	config.DB.Raw(`
@@ -40,7 +40,7 @@ func GetDashboardData(c *gin.Context) {
 		FROM connections
 		WHERE company_id = ? AND deleted_at IS NULL
 		AND COALESCE(last_payment_date, recharge_date, created_at::text) < (CURRENT_DATE - INTERVAL '30 days')::text
-	`, companyID).Scan(&overdueCount)
+	`, companyUUID).Scan(&overdueCount)
 
 	var overdueAmount float64
 	config.DB.Raw(`
@@ -48,18 +48,18 @@ func GetDashboardData(c *gin.Context) {
 		FROM connections
 		WHERE company_id = ? AND deleted_at IS NULL
 		AND COALESCE(last_payment_date, recharge_date, created_at::text) < (CURRENT_DATE - INTERVAL '30 days')::text
-	`, companyID).Scan(&overdueAmount)
+	`, companyUUID).Scan(&overdueAmount)
 
 	var payments []models.Payment
-	config.DB.Scopes(models.TenantScope(companyID)).Order("payment_date desc").Limit(5).Find(&payments)
+	config.DB.Scopes(models.TenantScope(companyUUID)).Order("payment_date desc").Limit(5).Find(&payments)
 
 	var complaintCount int64
 	var recentComplaints []models.Complaint
-	config.DB.Model(&models.Complaint{}).Scopes(models.TenantScope(companyID)).Where("status NOT IN (?)", []string{"resolved", "closed"}).Count(&complaintCount)
-	config.DB.Scopes(models.TenantScope(companyID)).Where("status NOT IN (?)", []string{"resolved", "closed"}).Order("created_at desc").Limit(5).Find(&recentComplaints)
+	config.DB.Model(&models.Complaint{}).Scopes(models.TenantScope(companyUUID)).Where("status NOT IN (?)", []string{"resolved", "closed"}).Count(&complaintCount)
+	config.DB.Scopes(models.TenantScope(companyUUID)).Where("status NOT IN (?)", []string{"resolved", "closed"}).Order("created_at desc").Limit(5).Find(&recentComplaints)
 
 	var dailyCollection []ChartPoint
-	config.DB.Raw(`SELECT payment_date as label, SUM(CAST(amount AS numeric)) as value FROM payments WHERE company_id = ? AND deleted_at IS NULL AND payment_date >= (CURRENT_DATE - INTERVAL '7 days')::text GROUP BY payment_date ORDER BY payment_date ASC`, companyID).Scan(&dailyCollection)
+	config.DB.Raw(`SELECT payment_date as label, SUM(CAST(amount AS numeric)) as value FROM payments WHERE company_id = ? AND deleted_at IS NULL AND payment_date >= (CURRENT_DATE - INTERVAL '7 days')::text GROUP BY payment_date ORDER BY payment_date ASC`, companyUUID).Scan(&dailyCollection)
 
 	var subscriberGrowth []ChartPoint
 	config.DB.Raw(`
@@ -75,7 +75,7 @@ func GetDashboardData(c *gin.Context) {
 			GROUP BY date_trunc('month', changed_at)::date
 		) de ON gs.day = de.day
 		ORDER BY gs.day
-	`, companyID).Scan(&subscriberGrowth)
+	`, companyUUID).Scan(&subscriberGrowth)
 
 	utils.SuccessResponse(c, "Dashboard data retrieved", gin.H{
 		"subscribersStats": gin.H{
@@ -95,12 +95,12 @@ func GetDashboardData(c *gin.Context) {
 }
 
 func GetCollectionChart(c *gin.Context) {
-	companyIDStr := c.Query("companyId")
-	companyID, err := uuid.Parse(companyIDStr)
-	if err != nil {
+	companyID, exists := c.Get("companyID")
+	if !exists {
 		utils.ErrorResponse(c, 400, "Invalid company ID", nil)
 		return
 	}
+	companyUUID := companyID.(uuid.UUID)
 
 	period := c.DefaultQuery("period", "daily")
 	monthParam := c.DefaultQuery("month", "")
@@ -131,7 +131,7 @@ func GetCollectionChart(c *gin.Context) {
 			FROM buckets b
 			LEFT JOIN per_bucket pb ON pb.bucket = b.bucket
 			ORDER BY b.bucket
-		`, companyID).Scan(&results)
+		`, companyUUID).Scan(&results)
 
 	case "weekly":
 		config.DB.Raw(`
@@ -154,7 +154,7 @@ func GetCollectionChart(c *gin.Context) {
 			FROM buckets b
 			LEFT JOIN per_bucket pb ON pb.bucket = b.bucket
 			ORDER BY b.bucket
-		`, companyID).Scan(&results)
+		`, companyUUID).Scan(&results)
 
 	case "monthly":
 		if monthParam != "" {
@@ -186,7 +186,7 @@ func GetCollectionChart(c *gin.Context) {
 			FROM buckets b
 			LEFT JOIN per_bucket pb ON pb.bucket = b.bucket
 			ORDER BY b.bucket
-		`, monthStart.Format("2006-01-02"), monthEnd.Format("2006-01-02"), companyID, monthEnd.Format("2006-01-02")).Scan(&results)
+		`, monthStart.Format("2006-01-02"), monthEnd.Format("2006-01-02"), companyUUID, monthEnd.Format("2006-01-02")).Scan(&results)
 
 	case "yearly":
 		config.DB.Raw(`
@@ -209,7 +209,7 @@ func GetCollectionChart(c *gin.Context) {
 			FROM buckets b
 			LEFT JOIN per_bucket pb ON pb.bucket = b.bucket
 			ORDER BY b.bucket
-		`, companyID).Scan(&results)
+		`, companyUUID).Scan(&results)
 
 	default:
 		period = "daily"
@@ -219,7 +219,7 @@ func GetCollectionChart(c *gin.Context) {
 	// Fallback: if no payments exist, render a flat line at 0.
 	if len(results) == 0 || results[len(results)-1].Value == 0 {
 		var liveTotal float64
-		config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL`, companyID).Scan(&liveTotal)
+		config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL`, companyUUID).Scan(&liveTotal)
 		results = []ChartPoint{}
 		now := time.Now()
 		switch period {
@@ -249,13 +249,13 @@ func GetCollectionChart(c *gin.Context) {
 	var periodTotal float64
 	switch period {
 	case "daily":
-		config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL AND created_at >= date_trunc('hour', NOW() - INTERVAL '24 hours')`, companyID).Scan(&periodTotal)
+		config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL AND created_at >= date_trunc('hour', NOW() - INTERVAL '24 hours')`, companyUUID).Scan(&periodTotal)
 	case "weekly":
-		config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL AND created_at >= (CURRENT_DATE - INTERVAL '7 days')::date`, companyID).Scan(&periodTotal)
+		config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL AND created_at >= (CURRENT_DATE - INTERVAL '7 days')::date`, companyUUID).Scan(&periodTotal)
 	case "monthly":
-		config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL AND created_at >= ?::date AND created_at < ?::date + INTERVAL '1 day'`, companyID, monthStart.Format("2006-01-02"), monthEnd.Format("2006-01-02")).Scan(&periodTotal)
+		config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL AND created_at >= ?::date AND created_at < ?::date + INTERVAL '1 day'`, companyUUID, monthStart.Format("2006-01-02"), monthEnd.Format("2006-01-02")).Scan(&periodTotal)
 	case "yearly":
-		config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL AND created_at >= (CURRENT_DATE - INTERVAL '2 years')::date`, companyID).Scan(&periodTotal)
+		config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL AND created_at >= (CURRENT_DATE - INTERVAL '2 years')::date`, companyUUID).Scan(&periodTotal)
 	}
 
 	utils.SuccessResponse(c, fmt.Sprintf("Collection chart data (%s)", period), gin.H{
@@ -266,31 +266,18 @@ func GetCollectionChart(c *gin.Context) {
 }
 
 func GetSubscriberGrowthChart(c *gin.Context) {
-	companyIDStr := c.Query("companyId")
-	companyID, err := uuid.Parse(companyIDStr)
-	if err != nil {
+	companyID, exists := c.Get("companyID")
+	if !exists {
 		utils.ErrorResponse(c, 400, "Invalid company ID", nil)
 		return
 	}
+	companyUUID := companyID.(uuid.UUID)
 
 	period := c.DefaultQuery("period", "daily")
 	monthParam := c.DefaultQuery("month", "")
 	var results []ChartPoint
 	var monthStart, monthEnd time.Time
 
-	// Reconstruct the running active-subscriber count at each time bucket
-	// by accumulating every status transition logged in connection_status_changes.
-	//
-	// Net-change logic per row:
-	//   created active          → +1
-	//   created non-active       →  0
-	//   reactivated              → +1
-	//   deactivated (active→*)   → -1
-	//   non-active → non-active  →  0
-	//
-	// A PostgreSQL trigger (trg_connection_status_change) on the connections
-	// table guarantees that every INSERT and every status UPDATE writes a row
-	// to connection_status_changes, so the ledger is always complete.
 	switch period {
 	case "daily":
 		config.DB.Raw(`
@@ -325,7 +312,7 @@ func GetSubscriberGrowthChart(c *gin.Context) {
 			FROM buckets b
 			LEFT JOIN running r ON r.bucket = b.bucket
 			ORDER BY b.bucket
-		`, companyID).Scan(&results)
+		`, companyUUID).Scan(&results)
 
 	case "weekly":
 		config.DB.Raw(`
@@ -360,7 +347,7 @@ func GetSubscriberGrowthChart(c *gin.Context) {
 			FROM buckets b
 			LEFT JOIN running r ON r.bucket = b.bucket
 			ORDER BY b.bucket
-		`, companyID).Scan(&results)
+		`, companyUUID).Scan(&results)
 
 	case "monthly":
 		if monthParam != "" {
@@ -403,7 +390,7 @@ func GetSubscriberGrowthChart(c *gin.Context) {
 			FROM buckets b
 			LEFT JOIN running r ON r.bucket = b.bucket
 			ORDER BY b.bucket
-		`, monthStart.Format("2006-01-02"), monthEnd.Format("2006-01-02"), companyID, monthEnd.Format("2006-01-02")).Scan(&results)
+		`, monthStart.Format("2006-01-02"), monthEnd.Format("2006-01-02"), companyUUID, monthEnd.Format("2006-01-02")).Scan(&results)
 
 	case "yearly":
 		config.DB.Raw(`
@@ -438,7 +425,7 @@ func GetSubscriberGrowthChart(c *gin.Context) {
 			FROM buckets b
 			LEFT JOIN running r ON r.bucket = b.bucket
 			ORDER BY b.bucket
-		`, companyID).Scan(&results)
+		`, companyUUID).Scan(&results)
 
 	default:
 		period = "daily"
@@ -449,7 +436,7 @@ func GetSubscriberGrowthChart(c *gin.Context) {
 	// render a flat line at the current active count.
 	if len(results) == 0 || results[len(results)-1].Value == 0 {
 		var currentCount int64
-		config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL AND status = 'active'`, companyID).Scan(&currentCount)
+		config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL AND status = 'active'`, companyUUID).Scan(&currentCount)
 		results = []ChartPoint{}
 		now := time.Now()
 		switch period {
@@ -478,7 +465,7 @@ func GetSubscriberGrowthChart(c *gin.Context) {
 	// Overwrite the last point with the live count so the current value is
 	// always accurate, even when the trigger hasn't caught up yet.
 	var currentCount int64
-	config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL AND status = 'active'`, companyID).Scan(&currentCount)
+	config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL AND status = 'active'`, companyUUID).Scan(&currentCount)
 	if len(results) > 0 {
 		results[len(results)-1].Value = float64(currentCount)
 	}

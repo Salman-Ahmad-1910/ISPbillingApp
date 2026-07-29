@@ -145,7 +145,7 @@ function A4Invoice({ payment, company, logoUrl, stampUrl, subscriberName, collec
           <div className="text-right">
             <h2 className="text-4xl font-extrabold tracking-wider text-blue-600">RECEIPT</h2>
             <div className="mt-3 space-y-1 text-sm">
-              <p className="text-gray-500">Bill ID: <span className="text-gray-900 font-semibold font-mono">{payment.id.slice(0, 8).toUpperCase()}</span></p>
+              <p className="text-gray-500">Bill ID: <span className="text-gray-900 font-semibold font-mono">{payment.id}</span></p>
               <p className="text-gray-500">Date: <span className="text-gray-900 font-semibold">{payment.paymentDate}</span></p>
               <p className="text-gray-500">Status:
                 <span className="ml-1 px-2 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-800">PAID</span>
@@ -250,7 +250,7 @@ function ThermalInvoice({ payment, company, logoUrl, subscriberName, collectorNa
           <div className="mb-3 pb-2 border-b border-dashed border-gray-400">
             <div className="flex justify-between mb-1">
               <span className="text-gray-500">Bill ID:</span>
-              <span className="font-bold">{payment.id.slice(0, 8).toUpperCase()}</span>
+              <span className="font-bold">{payment.id}</span>
             </div>
             <div className="flex justify-between mb-1">
               <span className="text-gray-500">Date:</span>

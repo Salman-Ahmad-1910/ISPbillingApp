@@ -100,6 +100,16 @@ type RolePermission struct {
 	Company    Company    `gorm:"foreignKey:CompanyID" json:"company"`
 }
 
+// UserPermission stores direct permission assignments for a user with platform flags
+type UserPermission struct {
+	BaseModel
+	UserID       uuid.UUID `gorm:"type:uuid;not null;index:idx_user_perm" json:"userId"`
+	PermissionID string    `gorm:"type:varchar(100);not null;index:idx_user_perm" json:"permissionId"`
+	WebEnabled   bool      `gorm:"default:true" json:"webEnabled"`
+	MobileEnabled bool     `gorm:"default:true" json:"mobileEnabled"`
+	CompanyID    uuid.UUID `gorm:"type:uuid;not null;index" json:"companyId"`
+}
+
 // SystemLog represents an audit trail entry for system actions
 type SystemLog struct {
 	TenantModel

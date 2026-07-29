@@ -13,14 +13,20 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
-import { FileText, CalendarIcon, Eye, Download, Printer, BarChart3, ClipboardCheck, ScrollText, Search, DollarSign, Loader2, MoreHorizontal } from 'lucide-react';
+import { FileText, CalendarIcon, Eye, Download, Printer, BarChart3, ClipboardCheck, ScrollText, Search, DollarSign, Loader2, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { AccountEntryPrintDialog } from './_components/account-entry-print-dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
+import api from '@/lib/api';
 
 interface AccountHead {
   id: string;
@@ -100,6 +106,19 @@ export default function AccountReportsPage() {
   const [printEntry, setPrintEntry] = useState<AccountEntry | null>(null);
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
 
+  // Edit/Delete state
+  const [editingEntry, setEditingEntry] = useState<AccountEntry | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [formHeadId, setFormHeadId] = useState('');
+  const [formSubHeadId, setFormSubHeadId] = useState('');
+  const [formDate, setFormDate] = useState<Date | undefined>();
+  const [formDateOpen, setFormDateOpen] = useState(false);
+  const [formDescription, setFormDescription] = useState('');
+  const [formAmount, setFormAmount] = useState('');
+  const [formTxnTypeId, setFormTxnTypeId] = useState('');
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   const usersList = useMemo(() => {
     const names = entriesList.map(e => e.addBy).filter(Boolean);
     return [...new Set(names)];
@@ -151,6 +170,54 @@ export default function AccountReportsPage() {
   const handlePrintSingle = (entry: AccountEntry) => {
     setPrintEntry(entry);
     setIsPrintDialogOpen(true);
+  };
+
+  const subHeadOptions = useMemo(() => {
+    if (!formHeadId) return [];
+    return subHeadsList.filter(s => s.masterAccountId === formHeadId);
+  }, [formHeadId, subHeadsList]);
+
+  const openEditDialog = (entry: AccountEntry) => {
+    setEditingEntry(entry);
+    setFormHeadId(entry.head);
+    setFormSubHeadId(entry.subHead);
+    setFormDate(new Date(entry.date));
+    setFormDescription(entry.description);
+    setFormAmount(String(entry.amount));
+    setFormTxnTypeId(entry.transactionType);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleEditSave = async () => {
+    if (!editingEntry || !formHeadId || !formSubHeadId || !formAmount) return;
+    try {
+      await api.put(`/accounts/entries/${editingEntry.id}`, {
+        head: formHeadId,
+        subHead: formSubHeadId,
+        description: formDescription,
+        date: formDate ? format(formDate, 'yyyy-MM-dd') : editingEntry.date,
+        addBy: editingEntry.addBy,
+        editBy: 'Admin',
+        amount: parseFloat(formAmount),
+        transactionType: formTxnTypeId,
+      });
+      queryClient.invalidateQueries({ queryKey: ['accounts/entries', companyId] });
+      toast({ title: 'Success', description: 'Entry updated.' });
+      setIsEditDialogOpen(false);
+      setEditingEntry(null);
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.response?.data?.message || 'Failed to update' });
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await api.delete(`/accounts/entries/${id}`);
+      queryClient.invalidateQueries({ queryKey: ['accounts/entries', companyId] });
+      toast({ title: 'Success', description: 'Entry deleted.' });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.response?.data?.message || 'Failed to delete' });
+    }
   };
 
   const fd = fromDate ? format(fromDate, 'dd MMM yyyy') : '';
@@ -366,12 +433,21 @@ export default function AccountReportsPage() {
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handlePrintSingle(item)}>
-                                <Printer className="mr-2 h-4 w-4" />
-                                Print Entry
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openEditDialog(item)}>
+                              <Pencil className="mr-2 h-4 w-4" />
+                              Edit Entry
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handlePrintSingle(item)}>
+                              <Printer className="mr-2 h-4 w-4" />
+                              Print Entry
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(item.id)}>
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete Entry
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
                       </TableRow>
@@ -399,6 +475,76 @@ export default function AccountReportsPage() {
         subHeadsList={subHeadsList}
         txnTypesList={txnTypesList}
       />
+
+      {/* Edit Entry Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={(open) => { if (!open) { setIsEditDialogOpen(false); setEditingEntry(null); } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Account Entry</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Account Head</Label>
+                <Select value={formHeadId} onValueChange={(v) => { setFormHeadId(v); const m = subHeadsList.filter(s => s.masterAccountId === v); setFormSubHeadId(m.length > 0 ? m[0].id : ''); }}>
+                  <SelectTrigger><SelectValue placeholder="Select head" /></SelectTrigger>
+                  <SelectContent portal={false}>
+                    {headsList.map(h => <SelectItem key={h.id} value={h.id}>{h.masterAccount}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Sub Account Head</Label>
+                <Select value={formSubHeadId} onValueChange={setFormSubHeadId} disabled={!formHeadId}>
+                  <SelectTrigger><SelectValue placeholder="Select sub head" /></SelectTrigger>
+                  <SelectContent portal={false}>
+                    {subHeadOptions.map(s => <SelectItem key={s.id} value={s.id}>{s.subMasterAccount}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Date</Label>
+              <Popover open={formDateOpen} onOpenChange={setFormDateOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn('w-full justify-start text-left font-normal', !formDate && 'text-muted-foreground')}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formDate ? format(formDate, 'PPP') : 'Pick date'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar mode="single" selected={formDate} onSelect={(d) => { setFormDate(d); setFormDateOpen(false); }} initialFocus />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea placeholder="Enter description..." value={formDescription} onChange={(e) => setFormDescription(e.target.value)} rows={3} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Amount</Label>
+                <Input type="number" placeholder="Enter amount" value={formAmount} onChange={(e) => setFormAmount(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Transaction Type</Label>
+                <Select value={formTxnTypeId} onValueChange={setFormTxnTypeId}>
+                  <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                  <SelectContent portal={false}>
+                    {txnTypesList.map(t => <SelectItem key={t.id} value={t.id}>{t.paymentChannel}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => { setIsEditDialogOpen(false); setEditingEntry(null); }}>Cancel</Button>
+              <Button onClick={handleEditSave} disabled={!formHeadId || !formSubHeadId || !formAmount} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700">
+                Update
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

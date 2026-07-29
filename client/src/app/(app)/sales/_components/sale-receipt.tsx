@@ -10,6 +10,7 @@ export interface SaleReceiptItem {
   price: number;
   saleTax: number;
   wthTax: number;
+  serialNumber?: string;
 }
 
 export interface SaleReceiptData {
@@ -274,6 +275,7 @@ function buildA4Receipt(
         return `
       <tr>
         <td class="border border-gray-300 p-3">${escapeHtml(item.productName)}</td>
+        <td class="border border-gray-300 p-3 text-xs font-mono">${escapeHtml(item.serialNumber || '')}</td>
         <td class="border border-gray-300 p-3 text-right">${formatPKR(price)}</td>
         <td class="border border-gray-300 p-3 text-center font-semibold">${qty}</td>
         <td class="border border-gray-300 p-3 text-right">${formatPKR(price)}</td>
@@ -354,6 +356,7 @@ function buildA4Receipt(
     <thead>
       <tr>
         <th>Product</th>
+        <th>SN / MAC</th>
         <th class="text-right">Price</th>
         <th class="text-center">Quantity</th>
         <th class="text-right">Unit Price</th>
@@ -363,7 +366,7 @@ function buildA4Receipt(
       </tr>
     </thead>
     <tbody>
-      ${itemRows || '<tr><td colspan="7" style="text-align:center;color:#9ca3af">No items</td></tr>'}
+      ${itemRows || '<tr><td colspan="8" style="text-align:center;color:#9ca3af">No items</td></tr>'}
     </tbody>
   </table>
 
@@ -507,6 +510,7 @@ async function buildThermalReceipt(
         </div>
         <div class="line-bot">
           <span>${item.quantity} x ${formatPKR(item.price)}</span>
+          ${item.serialNumber ? `<span style="float:right">${escapeHtml(item.serialNumber)}</span>` : ''}
         </div>
       </div>`
     )

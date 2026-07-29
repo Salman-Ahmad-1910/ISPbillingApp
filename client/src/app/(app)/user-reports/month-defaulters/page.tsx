@@ -324,7 +324,7 @@ export default function MonthDefaultersPage() {
                             {item.subscriberName}
                           </Link>
                         </TableCell>
-                        <TableCell>{item.subscriberId}</TableCell>
+                        <TableCell>{item.subscriberId.slice(0, 8)}</TableCell>
                         <TableCell>{item.phone}</TableCell>
                         <TableCell className="text-xs text-muted-foreground max-w-[120px] truncate">{item.address || '---'}</TableCell>
                         <TableCell>{item.sublocality}</TableCell>

@@ -2,7 +2,7 @@
 
 import { type ColumnDef } from '@tanstack/react-table';
 import type { VendorInvoice } from '@/lib/types';
-import { MoreHorizontal, Calendar, Building2 } from 'lucide-react';
+import { MoreHorizontal, Calendar, Building2, Printer, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -16,22 +16,14 @@ import {
 interface VendorInvoiceColumnsProps {
   onEdit: (invoice: VendorInvoice) => void;
   onDelete: (invoice: VendorInvoice) => void;
+  onPrint: (invoice: VendorInvoice) => void;
 }
 
-export const columns = ({ onEdit, onDelete }: VendorInvoiceColumnsProps): ColumnDef<VendorInvoice>[] => [
+export const columns = ({ onEdit, onDelete, onPrint }: VendorInvoiceColumnsProps): ColumnDef<VendorInvoice>[] => [
   {
-    id: 'productId',
-    header: 'Product ID',
-    cell: ({ row }) => {
-      const items = row.original.items;
-      if (!items || items.length === 0) return <span className="text-muted-foreground">—</span>;
-      const id = items[0]?.productId;
-      return (
-        <div className="text-xs font-mono" title={id}>
-          {id || '—'}
-        </div>
-      );
-    },
+    id: 'index',
+    header: '#',
+    cell: ({ row }) => <span className="font-mono text-xs">{row.index + 1}</span>,
   },
   {
     accessorKey: 'vendorName',
@@ -67,6 +59,20 @@ export const columns = ({ onEdit, onDelete }: VendorInvoiceColumnsProps): Column
       return (
         <div className="text-sm">
           {batch || '—'}
+        </div>
+      );
+    },
+  },
+  {
+    id: 'serialNumber',
+    header: 'SN / MAC',
+    cell: ({ row }) => {
+      const items = row.original.items;
+      if (!items || items.length === 0) return <span className="text-muted-foreground">—</span>;
+      const sn = items[0]?.serialNumber;
+      return (
+        <div className="text-xs font-mono" title={sn}>
+          {sn || '—'}
         </div>
       );
     },
@@ -114,9 +120,17 @@ export const columns = ({ onEdit, onDelete }: VendorInvoiceColumnsProps): Column
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => onEdit(invoice)}>Edit</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onPrint(invoice)}>
+                <Printer className="mr-2 h-4 w-4" />
+                Print
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onEdit(invoice)}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive" onClick={() => onDelete(invoice)}>
+                <Trash2 className="mr-2 h-4 w-4" />
                 Delete
               </DropdownMenuItem>
             </DropdownMenuContent>

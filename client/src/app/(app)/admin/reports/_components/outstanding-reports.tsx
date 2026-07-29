@@ -386,7 +386,7 @@ export function OutstandingReports() {
                     <TableCell>
                       <div>
                         <div className="font-medium">{item.subscriberName}</div>
-                        <div className="text-sm text-muted-foreground">{item.subscriberId}</div>
+                        <div className="text-sm text-muted-foreground">{item.subscriberId.slice(0, 8)}</div>
                       </div>
                     </TableCell>
                     <TableCell>{item.area}</TableCell>

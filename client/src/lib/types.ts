@@ -507,6 +507,7 @@ export type VendorInvoiceItem = {
   unitPrice: number;
   unitType: 'piece' | 'meter';
   subtotal: number;
+  serialNumber?: string;
 };
 
 export type InstallmentPlan = {

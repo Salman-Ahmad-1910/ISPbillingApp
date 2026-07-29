@@ -262,9 +262,9 @@ export default function SubjectTypePage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  paginatedData.map((item) => (
+                  paginatedData.map((item, index) => (
                     <TableRow key={item.id}>
-                      <TableCell className="text-muted-foreground">{item.id}</TableCell>
+                      <TableCell className="text-muted-foreground">{index + 1}</TableCell>
                       <TableCell className="font-medium">{item.subject}</TableCell>
                       <TableCell>
                         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${

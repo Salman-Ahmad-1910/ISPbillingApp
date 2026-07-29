@@ -17,6 +17,7 @@ import (
 	"awesomeProject/config"
 	_ "awesomeProject/models"
 	"awesomeProject/routes"
+	"awesomeProject/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -104,6 +105,11 @@ func main() {
 
 	config.ConnectDatabase()
 	config.RunMigrations()
+
+	// Migrate any plaintext passwords to bcrypt hashes
+	if err := utils.HashExistingPasswords(); err != nil {
+		log.Printf("Warning: password migration error (non-fatal): %v", err)
+	}
 
 	if *migrateOnly {
 		log.Println("Migration completed successfully. Exiting...")

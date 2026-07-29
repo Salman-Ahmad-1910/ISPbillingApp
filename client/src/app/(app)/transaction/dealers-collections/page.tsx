@@ -414,9 +414,9 @@ export default function DealersCollectionsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {dealerCollections.map((col) => (
+                      {dealerCollections.map((col, index) => (
                         <TableRow key={col.id}>
-                          <TableCell className="py-1.5 px-1.5 font-mono whitespace-nowrap">{col.id.slice(0, 8).toUpperCase()}</TableCell>
+                          <TableCell className="py-1.5 px-1.5 font-mono whitespace-nowrap">{index + 1}</TableCell>
                           <TableCell className="py-1.5 px-1.5 font-mono whitespace-nowrap">{col.dealerId?.slice(0, 8) || '---'}</TableCell>
                           <TableCell className="py-1.5 px-1.5 whitespace-nowrap">{col.dealerName}</TableCell>
                           <TableCell className="py-1.5 px-1.5 max-w-[100px] truncate" title={col.dealerAddress}>{col.dealerAddress || '---'}</TableCell>

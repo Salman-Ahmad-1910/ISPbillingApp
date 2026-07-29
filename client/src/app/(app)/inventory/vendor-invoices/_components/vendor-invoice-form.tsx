@@ -267,6 +267,15 @@ export function VendorInvoiceForm({
                   className="bg-muted font-semibold"
                 />
               </div>
+
+              <div>
+                <FormLabel className="text-sm">SN / MAC</FormLabel>
+                <Input
+                  value={singleItem.serialNumber || ''}
+                  onChange={(e) => updateItem(0, 'serialNumber', e.target.value)}
+                  placeholder="e.g., SN001 / AA:BB:CC:DD:EE:FF"
+                />
+              </div>
             </div>
           </div>
         )}

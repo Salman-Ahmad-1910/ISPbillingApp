@@ -86,6 +86,7 @@ type SaleItem struct {
 	TaxPercent  float64   `gorm:"type:decimal(5,2);not null;default:0" json:"taxPercent"` // tax % applied to this line
 	SaleTax     float64   `gorm:"type:decimal(10,2);default:0" json:"saleTax"`
 	WthTax      float64   `gorm:"type:decimal(10,2);default:0" json:"wthTax"`
+	SerialNumber string  `gorm:"type:text" json:"serialNumber"`
 }
 
 // SubscriberInstallment tracks an installment agreement for a subscriber on a sale.

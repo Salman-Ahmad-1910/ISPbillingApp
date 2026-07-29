@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -38,6 +38,10 @@ export function ClientPage({ data }: ClientPageProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [invoices, setInvoices] = useState<VendorInvoice[]>(data);
+
+  useEffect(() => {
+    setInvoices(data);
+  }, [data]);
   const [searchTerm, setSearchTerm] = useState('');
   const [vendorFilter, setVendorFilter] = useState('all');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -85,7 +89,7 @@ export function ClientPage({ data }: ClientPageProps) {
       setSelectedInvoice(null);
       toast({
         title: "Success",
-        description: selectedInvoice ? "Store entry updated successfully" : "Product purchased successfully",
+        description: selectedInvoice ? "Vendor invoice updated successfully" : "Product purchased successfully",
       });
     },
     onError: (error: any) => {
@@ -108,7 +112,7 @@ export function ClientPage({ data }: ClientPageProps) {
       setSelectedInvoice(null);
       toast({
         title: "Success",
-        description: "Store entry deleted successfully",
+        description: "Vendor invoice deleted successfully",
       });
     },
     onError: (error: any) => {
@@ -145,12 +149,17 @@ export function ClientPage({ data }: ClientPageProps) {
     }
   };
 
+  const handlePrint = (invoice: VendorInvoice) => {
+    const url = `/inventory/vendor-invoices/print?id=${invoice.id}&size=a4`;
+    window.open(url, '_blank');
+  };
+
   const handleAddNew = () => {
     setSelectedInvoice(null);
     setIsFormOpen(true);
   };
 
-  const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete });
+  const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, onPrint: handlePrint });
 
   return (
     <div className="space-y-4">
@@ -200,7 +209,7 @@ export function ClientPage({ data }: ClientPageProps) {
               <div className="rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 p-1.5 text-white shadow-sm">
                 <ShoppingCart className="h-4 w-4" />
               </div>
-              <span>{selectedInvoice ? `Edit Purchase` : 'Buy a Product'}</span>
+              <span>{selectedInvoice ? `Edit Vendor Invoice` : 'Buy a Product'}</span>
             </DialogTitle>
           </DialogHeader>
           <VendorInvoiceForm

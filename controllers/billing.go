@@ -160,7 +160,7 @@ func CreatePayment(c *gin.Context) {
 		return
 	}
 
-	// Update Connection's lastPaymentDate and remainingAmount
+	// Update Connection's lastPaymentDate and reduce remainingAmount
 	if payment.SubscriberID != nil {
 		paymentDate := payment.PaymentDate
 		if paymentDate == "" {
@@ -168,63 +168,10 @@ func CreatePayment(c *gin.Context) {
 		}
 		config.DB.Model(&models.Connection{}).
 			Where("id = ?", *payment.SubscriberID).
-			UpdateColumn("last_payment_date", paymentDate)
-
-		// Deduct from the oldest pending invoice for this subscriber
-		var invoices []models.Invoice
-		config.DB.Where("subscriber_id = ? AND company_id = ? AND remaining_amount > 0", *payment.SubscriberID, companyID).
-			Order("created_at ASC").
-			Find(&invoices)
-
-		remaining := payment.Amount
-		for _, inv := range invoices {
-			if remaining <= 0 {
-				break
-			}
-			deduct := remaining
-			if deduct > inv.RemainingAmount {
-				deduct = inv.RemainingAmount
-			}
-			newRemaining := inv.RemainingAmount - deduct
-			remaining -= deduct
-
-			status := inv.Status
-			if newRemaining <= 0 {
-				status = "paid"
-			}
-			config.DB.Model(&models.Invoice{}).Where("id = ?", inv.ID).
-				UpdateColumns(map[string]interface{}{
-					"paid_amount":      gorm.Expr("paid_amount + ?", deduct),
-					"remaining_amount": newRemaining,
-					"status":           status,
-				})
-		}
-
-		// Recalculate Connection.remaining_amount from sum of unpaid invoices
-		var totalInvoiceRemaining float64
-		config.DB.Model(&models.Invoice{}).
-			Where("subscriber_id = ? AND company_id = ? AND remaining_amount > 0", *payment.SubscriberID, companyID).
-			Select("COALESCE(SUM(remaining_amount), 0)").
-			Scan(&totalInvoiceRemaining)
-
-		// If no pending invoices exist, fall back to the connection's monthly amount
-		if totalInvoiceRemaining == 0 {
-			var conn models.Connection
-			if err := config.DB.Where("id = ?", *payment.SubscriberID).First(&conn).Error; err == nil {
-				switch conn.ConnectionType {
-				case "tv_cable":
-					totalInvoiceRemaining = conn.Amount
-				case "internet":
-					totalInvoiceRemaining = conn.SameAmount
-				default:
-					totalInvoiceRemaining = conn.Amount + conn.SameAmount
-				}
-			}
-		}
-
-		config.DB.Model(&models.Connection{}).
-			Where("id = ?", *payment.SubscriberID).
-			UpdateColumn("remaining_amount", totalInvoiceRemaining)
+			UpdateColumns(map[string]interface{}{
+				"last_payment_date": paymentDate,
+				"remaining_amount":  gorm.Expr("GREATEST(remaining_amount - ?, 0)", payment.Amount),
+			})
 	}
 
 	utils.CreatedResponse(c, "Payment created successfully", payment)

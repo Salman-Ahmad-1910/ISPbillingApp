@@ -252,7 +252,7 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
                   <SelectContent>
                     {areas.map((area) => (
                       <SelectItem key={area.id} value={area.id}>
-                        {area.subLocality || area.locality || area.id}
+                        {area.subLocality || area.locality || area.id.slice(0, 8)}
                       </SelectItem>
                     ))}
                   </SelectContent>

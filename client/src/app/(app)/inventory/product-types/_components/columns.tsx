@@ -16,7 +16,7 @@ export const columns = ({ onEdit, onDelete }: ProductTypeColumnsProps): ColumnDe
     header: 'ID',
     cell: ({ row }) => (
       <div className="text-xs font-mono text-muted-foreground">
-        {row.original.id}
+        {row.index + 1}
       </div>
     ),
   },

@@ -1,516 +1,392 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, ShieldCheck, Check, Settings, RefreshCw, KeyRound } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { useToast } from '@/hooks/use-toast';
+import { Loader2, Search, Eye, Save, Users, UserRound, Handshake } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
-import type { Role } from '@/lib/types';
-import { roleSchema } from '@/lib/schemas';
-import { z } from 'zod';
-import { EnhancedRoleForm } from './enhanced-role-form';
-import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
+import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 
-type RoleFormValues = z.infer<typeof roleSchema>;
+const PERMISSIONS = [
+  { id: '13309', name: 'Country', module: 'Area' },
+  { id: '13310', name: 'City', module: 'Area' },
+  { id: '13311', name: 'Locality', module: 'Area' },
+  { id: '13312', name: 'Sublocality', module: 'Area' },
+  { id: '13313', name: 'Package', module: 'Users Profile' },
+  { id: '13314', name: 'Box/Media', module: 'Users Profile' },
+  { id: '13315', name: 'Users Details', module: 'Users Profile' },
+  { id: '13316', name: 'New Queries', module: 'Users Profile' },
+  { id: '13351', name: 'User Location', module: 'Users Profile' },
+  { id: '13318', name: 'Dealers Details', module: 'Dealers Profile' },
+  { id: '13317', name: 'Recovery Officer', module: 'Recovery Officer' },
+  { id: '13319', name: 'Area Allocation', module: 'Recovery Officer' },
+  { id: '13305', name: 'Allocated Collection', module: 'Transactions' },
+  { id: '13324', name: 'Transaction Type', module: 'Transactions' },
+  { id: '14079', name: 'New Collection', module: 'Transactions' },
+  { id: '13308', name: 'Reprint Slip', module: 'Transactions' },
+  { id: '13304', name: 'Users Collections', module: 'Transactions' },
+  { id: '13320', name: 'Bills Creator', module: 'Transactions' },
+  { id: '13321', name: 'Dealers Collections', module: 'Transactions' },
+  { id: '13357', name: 'Baddebt Collection', module: 'Transactions' },
+  { id: '15323', name: 'Subject Type', module: 'Complain' },
+  { id: '15325', name: 'Complain Type', module: 'Complain' },
+  { id: '15326', name: 'Complain Report', module: 'Complain' },
+  { id: '13342', name: 'Users Complain', module: 'Complain' },
+  { id: '13343', name: 'Allocated Complains', module: 'Complain' },
+  { id: '13347', name: 'Draft Messages', module: 'Messages' },
+  { id: '13348', name: 'Sent Messages', module: 'Messages' },
+  { id: '13359', name: 'Whatsapp Draft Message', module: 'Messages' },
+  { id: '13346', name: 'Other Messages', module: 'Messages' },
+  { id: '13345', name: 'Expire Messages', module: 'Messages' },
+  { id: '13344', name: 'New Messages', module: 'Messages' },
+  { id: '13322', name: 'Account Heads', module: 'Accounts' },
+  { id: '13323', name: 'Account Entry', module: 'Accounts' },
+  { id: '13341', name: 'One Day Accounts', module: 'Accounts' },
+  { id: '15313', name: 'Purchase', module: 'Inventory' },
+  { id: '15312', name: 'Products', module: 'Inventory' },
+  { id: '15309', name: 'Brand', module: 'Inventory' },
+  { id: '15311', name: 'Unit Type', module: 'Inventory' },
+  { id: '15310', name: 'Vendor', module: 'Inventory' },
+  { id: '15321', name: 'Product Type', module: 'Inventory' },
+  { id: '15314', name: 'Inventory Status', module: 'Inventory' },
+  { id: '15315', name: 'Sales', module: 'Point Of Sale' },
+  { id: '15317', name: 'Advance & Loan', module: 'HRM' },
+  { id: '15318', name: 'Employee Salary', module: 'HRM' },
+  { id: '15324', name: 'User Wise Attendance', module: 'HRM' },
+  { id: '15322', name: 'Day Wise Attendance', module: 'HRM' },
+  { id: '15316', name: 'Employee Details', module: 'HRM' },
+  { id: '13334', name: 'Deleted Collection', module: 'Logs' },
+  { id: '15328', name: 'Update Connections Log', module: 'Logs' },
+  { id: '13335', name: 'Deleted Users', module: 'Logs' },
+  { id: '13307', name: 'Allocated Defualters', module: 'Users Reports' },
+  { id: '13325', name: 'Users Defaulter', module: 'Users Reports' },
+  { id: '13326', name: 'New Users List', module: 'Users Reports' },
+  { id: '13328', name: 'Package Wise List', module: 'Users Reports' },
+  { id: '13329', name: 'Promise Date Report', module: 'Users Reports' },
+  { id: '13330', name: 'Allocated Collections', module: 'Users Reports' },
+  { id: '13355', name: 'Month Wise Collection', module: 'Users Reports' },
+  { id: '13349', name: 'Expiry Wise Defaulter', module: 'Users Reports' },
+  { id: '13356', name: 'Collection Not Generated', module: 'Users Reports' },
+  { id: '13354', name: 'Monthly Collection Month Wise', module: 'Users Reports' },
+  { id: '13358', name: 'Unpaid Collection', module: 'Users Reports' },
+  { id: '13306', name: 'User Collections', module: 'Users Reports' },
+  { id: '13353', name: 'Month Wise Defualter', module: 'Users Reports' },
+  { id: '13327', name: 'Deactivate User List', module: 'Users Reports' },
+  { id: '15327', name: 'User Creator Summary', module: 'Users Reports' },
+  { id: '13331', name: 'Dealers Collection', module: 'Dealers Reports' },
+  { id: '13333', name: 'New Dealers List', module: 'Dealers Reports' },
+  { id: '13350', name: 'Dealer Invoice List', module: 'Dealers Reports' },
+  { id: '13332', name: 'Dealers Defaulter', module: 'Dealers Reports' },
+  { id: '13340', name: 'One Day Balance Sheet', module: 'Accounts Reports' },
+  { id: '13336', name: 'Accounts Report', module: 'Accounts Reports' },
+  { id: '15319', name: 'Abstract Stock', module: 'Stock Reports' },
+  { id: '15320', name: 'Abstract Sales', module: 'Sales Reports' },
+  { id: '13339', name: 'Change Username/Password', module: 'Settings' },
+  { id: '13338', name: 'User Rights', module: 'Settings' },
+  { id: '13337', name: 'Configurations', module: 'Settings' },
+];
 
-interface ClientPageProps {
-  data: Role[];
-}
+const MODULES = [...new Set(PERMISSIONS.map(p => p.module))];
 
-interface DefaultRole {
-  name: string;
-  description: string;
-  permissions: string[];
-}
+const USER_CATEGORIES = [
+  { key: 'staff', label: 'Staff', icon: Users, endpoint: 'hr/staff' },
+  { key: 'recovery', label: 'Recovery Officer', icon: UserRound, endpoint: 'admin/recovery-officers' },
+  { key: 'dealer', label: 'Dealer', icon: Handshake, endpoint: 'dealers' },
+] as const;
 
-// Helper functions
-const groupPermissionsByCategory = (permissions: string[]) => {
-  const categories: Record<string, string[]> = {
-    'Dashboard': [],
-    'Users': [],
-    'Companies': [],
-    'Network': [],
-    'Billing': [],
-    'Subscribers': [],
-    'Dealers': [],
-    'Recovery Officers': [],
-    'Transactions': [],
-    'Complaints': [],
-    'Messages': [],
-    'Accounts': [],
-    'Inventory': [],
-    'Point of Sale': [],
-    'HR': [],
-    'Logs': [],
-    'Reports': [],
-    'System': [],
-  };
-
-  permissions.forEach(permission => {
-    if (permission.startsWith('dashboard_')) categories['Dashboard'].push(permission);
-    else if (permission.startsWith('users_')) categories['Users'].push(permission);
-    else if (permission.startsWith('companies_')) categories['Companies'].push(permission);
-    else if (permission.startsWith('network_')) categories['Network'].push(permission);
-    else if (permission.startsWith('billing_')) categories['Billing'].push(permission);
-    else if (permission.startsWith('subscribers_')) categories['Subscribers'].push(permission);
-    else if (permission.startsWith('dealers_')) categories['Dealers'].push(permission);
-    else if (permission.startsWith('hr_recovery_officers_allocate')) categories['Recovery Officers'].push(permission);
-    else if (permission.startsWith('transactions_')) categories['Transactions'].push(permission);
-    else if (permission.startsWith('complaints_')) categories['Complaints'].push(permission);
-    else if (permission.startsWith('messages_')) categories['Messages'].push(permission);
-    else if (permission.startsWith('accounts_')) categories['Accounts'].push(permission);
-    else if (permission.startsWith('inventory_')) categories['Inventory'].push(permission);
-    else if (permission.startsWith('pos_')) categories['Point of Sale'].push(permission);
-    else if (permission.startsWith('hr_')) categories['HR'].push(permission);
-    else if (permission.startsWith('logs_')) categories['Logs'].push(permission);
-    else if (permission.startsWith('reports_')) categories['Reports'].push(permission);
-    else if (permission.startsWith('system_')) categories['System'].push(permission);
-  });
-
-  return Object.entries(categories).filter(([_, perms]) => perms.length > 0);
-};
-
-const formatPermissionLabel = (permissionId: string) => {
-  const permissionMap: Record<string, string> = {
-    'dashboard_view': 'View Dashboard',
-    'users_view': 'View Users',
-    'users_add': 'Add Users',
-    'users_edit': 'Edit Users',
-    'users_delete': 'Delete Users',
-    'users_change_status': 'Change User Status',
-    'companies_view': 'View Companies',
-    'companies_add': 'Add Companies',
-    'companies_edit': 'Edit Companies',
-    'companies_delete': 'Delete Companies',
-    'network_view': 'View Network',
-    'network_areas_add': 'Add Areas',
-    'network_areas_edit': 'Edit Areas',
-    'network_areas_delete': 'Delete Areas',
-    'network_olts_add': 'Add OLTs',
-    'network_olts_edit': 'Edit OLTs',
-    'network_olts_delete': 'Delete OLTs',
-    'network_splitters_add': 'Add Splitters',
-    'network_splitters_edit': 'Edit Splitters',
-    'network_splitters_delete': 'Delete Splitters',
-    'network_pops_add': 'Add POPs',
-    'network_pops_edit': 'Edit POPs',
-    'network_pops_delete': 'Delete POPs',
-    'network_boxes_view': 'Box / Media',
-    'billing_view': 'View Billing',
-    'billing_packages_add': 'Add Packages',
-    'billing_packages_edit': 'Edit Packages',
-    'billing_packages_delete': 'Delete Packages',
-    'billing_invoices_add': 'Create Invoices',
-    'billing_invoices_edit': 'Edit Invoices',
-    'billing_invoices_delete': 'Delete Invoices',
-    'billing_payments_process': 'Process Payments',
-    'subscribers_view': 'View Subscribers',
-    'subscribers_add': 'Add Subscribers',
-    'subscribers_edit': 'Edit Subscribers',
-    'subscribers_delete': 'Delete Subscribers',
-    'subscribers_packages_view': 'Packages',
-    'subscribers_inquiries_view': 'New Inquiries',
-    'subscribers_location_view': 'User Location',
-    'dealers_view': 'View Dealers',
-    'dealers_add': 'Add Dealers',
-    'dealers_edit': 'Edit Dealers',
-    'dealers_delete': 'Delete Dealers',
-    'dealers_franchises_add': 'Add Franchises',
-    'dealers_franchises_edit': 'Edit Franchises',
-    'dealers_franchises_delete': 'Delete Franchises',
-    'hr_recovery_officers_allocate': 'Area Allocation',
-    'transactions_user_collections_view': 'User Collections',
-    'transactions_dealers_collections_view': 'Dealers Collections',
-    'transactions_allocated_view': 'Allocated Collection',
-    'transactions_reprint': 'Reprint Slip',
-    'transactions_bills_create': 'Bills Creator',
-    'transactions_types_view': 'Transaction Type',
-    'transactions_new_collection': 'New Collection',
-    'transactions_bad_debt_view': 'Bad Debt Collection',
-    'complaints_users_view': 'Users Complain',
-    'complaints_allocated_view': 'Allocated Complains',
-    'complaints_subjects_view': 'Subject Type',
-    'complaints_types_view': 'Complain Type',
-    'complaints_report_view': 'Complain Report',
-    'messages_new_view': 'New Messages',
-    'messages_other_view': 'Other Messages',
-    'messages_draft_view': 'Draft Messages',
-    'messages_sent_view': 'Sent Messages',
-    'messages_expired_view': 'Expired Messages',
-    'messages_whatsapp_view': 'WhatsApp Drafts',
-    'accounts_heads_view': 'Account Heads',
-    'accounts_entry_view': 'Account Entry',
-    'accounts_one_day_view': 'One Day Balance Sheet',
-    'accounts_reports_view': 'Accounts Report',
-    'inventory_products_view': 'Products',
-    'inventory_purchase_view': 'Purchase',
-    'inventory_status_view': 'Inventory Status',
-    'inventory_product_types_view': 'Product Type',
-    'inventory_vendors_view': 'Vendor',
-    'inventory_brands_view': 'Brand',
-    'inventory_unit_types_view': 'Unit Type',
-    'pos_sales_view': 'Sales (POS)',
-    'hr_view': 'View HR',
-    'hr_staff_add': 'Add Staff',
-    'hr_staff_edit': 'Edit Staff',
-    'hr_staff_delete': 'Delete Staff',
-    'hr_recovery_officers_add': 'Add Recovery Officers',
-    'hr_recovery_officers_edit': 'Edit Recovery Officers',
-    'hr_recovery_officers_delete': 'Delete Recovery Officers',
-    'hr_salary_view': 'Employee Salary',
-    'hr_advances_view': 'Advances & Loans',
-    'hr_attendance_day_view': 'Day Wise Attendance',
-    'hr_attendance_user_view': 'User Wise Attendance',
-    'logs_connections_view': 'Update Connections Log',
-    'logs_deleted_collection_view': 'Deleted Collection',
-    'logs_deleted_users_view': 'Deleted Users',
-    'reports_view': 'View Reports',
-    'reports_sales_view': 'Sales Reports',
-    'reports_stock_movement_view': 'Stock Movement Reports',
-    'reports_outstanding_payments_view': 'Outstanding Payments Reports',
-    'reports_collections_view': 'Collections Reports',
-    'reports_financial': 'Financial Reports',
-    'reports_usage': 'Usage Reports',
-    'reports_collections': 'Collections Reports',
-    'reports_users_defaulter': 'Users Defaulter',
-    'reports_allocated_defaulters': 'Allocated Defaulters',
-    'reports_new_users': 'New Users List',
-    'reports_monthly_collection_month_wise': 'Monthly Collection Month Wise',
-    'reports_month_wise_collection': 'Month Wise Collection',
-    'reports_unpaid_collection': 'Unpaid Collection',
-    'reports_allocated_collections': 'Allocated Collections',
-    'reports_promise_date': 'Promise Date Report',
-    'reports_user_collections': 'User Collections Report',
-    'reports_expiry_defaulters': 'Expiry Wise Defaulter',
-    'reports_month_defaulters': 'Month Wise Defaulter',
-    'reports_collection_not_generated': 'Collection Not Generated',
-    'reports_creator_summary': 'User Creator Summary',
-    'reports_package_wise': 'Package Wise List',
-    'reports_deactivated_users': 'Deactivate User List',
-    'reports_dealer_invoices': 'Dealer Invoice List',
-    'reports_new_dealers': 'New Dealers List',
-    'reports_dealers_collection': 'Dealers Collection',
-    'reports_dealers_defaulter': 'Dealers Defaulter',
-    'reports_abstract_stock': 'Abstract Stock',
-    'reports_abstract_sales': 'Abstract Sales',
-    'system_view': 'View System',
-    'system_config': 'System Configuration',
-    'system_logs': 'View System Logs',
-    'system_backup': 'System Backup',
-    'system_user_rights': 'User Rights',
-    'system_change_password': 'Change Username/Password',
-    'profile_manage': 'Manage Profile',
-    'password_change': 'Change Password',
-    'notifications_manage': 'Manage Notifications',
-  };
-  return permissionMap[permissionId] || permissionId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-};
-
-export function ClientPage({ data }: ClientPageProps) {
+export default function ClientPage() {
   const { companyId } = useCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
+  const [userCategory, setUserCategory] = useState<string>('');
+  const [userSearch, setUserSearch] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedUserName, setSelectedUserName] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [permissions, setPermissions] = useState<Record<string, { web: boolean; mobile: boolean }>>({});
+  const [isLoadingPerms, setIsLoadingPerms] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [defaultRoles, setDefaultRoles] = useState<DefaultRole[]>([]);
-  const [showDefaultRoles, setShowDefaultRoles] = useState(false);
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
 
-  const fetchDefaultRoles = async () => {
+  const { data: staff = [] } = useGenericQuery<any>(userCategory === 'staff' ? 'hr/staff' : null, companyId ?? undefined);
+  const { data: recoveryOfficers = [] } = useGenericQuery<any>(userCategory === 'recovery' ? 'admin/recovery-officers' : null, companyId ?? undefined);
+  const { data: dealers = [] } = useGenericQuery<any>(userCategory === 'dealer' ? 'dealers' : null, companyId ?? undefined);
+
+  const userList = useMemo(() => {
+    let items: any[] = [];
+    if (userCategory === 'staff') items = Array.isArray(staff) ? staff : [];
+    else if (userCategory === 'recovery') items = Array.isArray(recoveryOfficers) ? recoveryOfficers : [];
+    else if (userCategory === 'dealer') items = Array.isArray(dealers) ? dealers : [];
+    return items;
+  }, [userCategory, staff, recoveryOfficers, dealers]);
+
+  const filteredUsers = useMemo(() => {
+    if (!userSearch.trim()) return userList.slice(0, 20);
+    const q = userSearch.toLowerCase();
+    return userList.filter((u: any) =>
+      (u.id?.toLowerCase().includes(q) || u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q))
+    ).slice(0, 20);
+  }, [userList, userSearch]);
+
+  const handleSelectUser = (user: any) => {
+    setSelectedUserId(user.id);
+    setSelectedUserName(user.name || user.email || '');
+    setUserSearch(user.name || user.email || '');
+    setShowDropdown(false);
+    setPermissionsLoaded(false);
+    setPermissions({});
+  };
+
+  const handleShowPermissions = async () => {
+    if (!selectedUserId || !companyId) return;
+    setIsLoadingPerms(true);
     try {
-      const response = await api.get('/admin/roles/default');
-      console.log('Default roles API response:', response.data);
-      // Handle the wrapped response structure
-      const rolesData = response.data?.data || response.data || [];
-      console.log('Extracted roles data:', rolesData);
-      setDefaultRoles(Array.isArray(rolesData) ? rolesData : []);
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.response?.data?.message || 'Failed to fetch default roles',
+      const res = await api.get(`/admin/roles/user-permissions/${selectedUserId}`, { params: { companyId } });
+      const data = res.data?.data || [];
+      const permMap: Record<string, { web: boolean; mobile: boolean }> = {};
+      PERMISSIONS.forEach(p => { permMap[p.id] = { web: false, mobile: false }; });
+      (Array.isArray(data) ? data : []).forEach((p: any) => {
+        permMap[p.permissionId] = { web: p.webEnabled ?? true, mobile: p.mobileEnabled ?? true };
       });
+      setPermissions(permMap);
+      setPermissionsLoaded(true);
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to load permissions' });
+    } finally {
+      setIsLoadingPerms(false);
     }
   };
 
-  const seedDefaultRoles = async () => {
-    try {
-      await api.post('/admin/roles/seed');
-      toast({ title: 'Success', description: 'Default roles seeded successfully' });
-      // Refresh roles data
-      queryClient.invalidateQueries({ queryKey: ['admin/roles', companyId] });
-      fetchDefaultRoles();
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.response?.data?.message || 'Failed to seed default roles',
-      });
-    }
+  const handleToggleWeb = (permId: string) => {
+    setPermissions(prev => ({
+      ...prev,
+      [permId]: { ...prev[permId], web: !prev[permId]?.web },
+    }));
   };
 
-  useEffect(() => {
-    fetchDefaultRoles();
-  }, []);
+  const handleToggleMobile = (permId: string) => {
+    setPermissions(prev => ({
+      ...prev,
+      [permId]: { ...prev[permId], mobile: !prev[permId]?.mobile },
+    }));
+  };
 
-  const handleSave = async (formData: any) => {
+  const handleToggleModuleWeb = (module: string, checked: boolean) => {
+    const ids = PERMISSIONS.filter(p => p.module === module).map(p => p.id);
+    setPermissions(prev => {
+      const next = { ...prev };
+      ids.forEach(id => { if (next[id]) next[id] = { ...next[id], web: checked }; });
+      return next;
+    });
+  };
+
+  const handleToggleModuleMobile = (module: string, checked: boolean) => {
+    const ids = PERMISSIONS.filter(p => p.module === module).map(p => p.id);
+    setPermissions(prev => {
+      const next = { ...prev };
+      ids.forEach(id => { if (next[id]) next[id] = { ...next[id], mobile: checked }; });
+      return next;
+    });
+  };
+
+  const moduleWebAllSelected = (module: string) => {
+    const ids = PERMISSIONS.filter(p => p.module === module).map(p => p.id);
+    return ids.every(id => permissions[id]?.web);
+  };
+
+  const moduleMobileAllSelected = (module: string) => {
+    const ids = PERMISSIONS.filter(p => p.module === module).map(p => p.id);
+    return ids.every(id => permissions[id]?.mobile);
+  };
+
+  const handleSave = async () => {
+    if (!selectedUserId || !companyId) return;
     setIsSaving(true);
     try {
-      const payload = { ...formData, companyId: companyId! };
-
-      if (selectedRole) {
-        await api.put(`/admin/roles/${selectedRole.id}`, payload);
-        toast({ title: 'Success', description: 'Role updated successfully.' });
-      } else {
-        await api.post('/admin/roles', payload);
-        toast({ title: 'Success', description: 'Role added successfully.' });
-      }
-      queryClient.invalidateQueries({ queryKey: ['admin/roles', companyId] });
-      setIsFormOpen(false);
-      setSelectedRole(null);
+      const permList = Object.entries(permissions).map(([permissionId, val]) => ({
+        permissionId,
+        webEnabled: val.web,
+        mobileEnabled: val.mobile,
+      }));
+      await api.put(`/admin/roles/user-permissions/${selectedUserId}`, { permissions: permList, companyId });
+      toast({ title: 'Success', description: 'Permissions saved successfully.' });
+      queryClient.invalidateQueries({ queryKey: ['admin/roles/user-permissions'] });
     } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.response?.data?.message || 'Failed to save role',
-      });
+      toast({ variant: 'destructive', title: 'Error', description: error.response?.data?.message || 'Failed to save permissions' });
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleEdit = (role: Role) => {
-    // Parse permissions from string to array if needed
-    const parsedRole = {
-      ...role,
-      permissions: typeof role.permissions === 'string' 
-        ? role.permissions === 'all' 
-          ? ['all'] 
-          : role.permissions.split(',').map(p => p.trim()).filter(p => p)
-        : role.permissions || []
-    };
-    setSelectedRole(parsedRole);
-    setIsFormOpen(true);
-  };
-
-  const handleDelete = async () => {
-    if (selectedRole) {
-      try {
-        await api.delete(`/admin/roles/${selectedRole.id}`);
-        queryClient.invalidateQueries({ queryKey: ['admin/roles', companyId] });
-        toast({ title: 'Success', description: 'Role deleted successfully.' });
-        setIsDeleteDialogOpen(false);
-        setSelectedRole(null);
-      } catch (error: any) {
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: error.response?.data?.message || 'Failed to delete role',
-        });
-      }
-    }
-  };
-
-  const openDeleteDialog = (role: Role) => {
-    setSelectedRole(role);
-    setIsDeleteDialogOpen(true);
-  };
-
-  const isDefaultRole = (roleName: string) => {
-    return defaultRoles.some(defaultRole => defaultRole.name === roleName);
-  };
+  const selectedCount = Object.values(permissions).filter(p => p?.web || p?.mobile).length;
 
   return (
-    <>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Roles & Permissions</h1>
-            <p className="text-muted-foreground">
-              Define user roles and manage access control permissions.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Dialog open={showDefaultRoles} onOpenChange={setShowDefaultRoles}>
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  <Settings className="mr-2 h-4 w-4" />
-                  Default Roles
+    <div className="space-y-6">
+      {/* User Selector */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Select User</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-4">
+            {/* User Category Tabs */}
+            <div className="flex flex-wrap gap-2">
+              {USER_CATEGORIES.map(cat => (
+                <Button
+                  key={cat.key}
+                  variant={userCategory === cat.key ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => { setUserCategory(cat.key); setSelectedUserId(null); setSelectedUserName(''); setUserSearch(''); setPermissionsLoaded(false); setPermissions({}); }}
+                >
+                  <cat.icon className="mr-1.5 h-4 w-4" />
+                  {cat.label}
                 </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Default System Roles</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2">
-                    {(defaultRoles || []).map((role, index) => (
-                      <Card key={index} className={isDefaultRole(role.name) ? 'border-blue-500 bg-blue-50' : ''}>
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2">
-                            <ShieldCheck className="h-5 w-5" />
-                            {role.name}
-                            {isDefaultRole(role.name) && <Badge className="ml-2 bg-blue-100 text-blue-800">Active</Badge>}
-                          </CardTitle>
-                          <CardDescription>{role.description}</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-2">
-                            <h5 className="font-medium text-sm">Permissions ({role.permissions?.length || 0}):</h5>
-                            <div className="flex flex-wrap gap-1">
-                              {(role.permissions || []).map((permission) => (
-                                <Badge key={permission} variant="secondary" className="text-xs">
-                                  {permission.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                  <div className="flex justify-between items-center pt-4 border-t">
-                    <p className="text-sm text-muted-foreground">
-                      Default roles provide pre-configured permission sets for common user types.
-                    </p>
-                    <Button onClick={seedDefaultRoles}>
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      Seed/Update Default Roles
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-            <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={() => setSelectedRole(null)} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700">
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Add Role
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto rounded-xl shadow-lg">
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-sm">
-                      <KeyRound className="h-4 w-4" />
-                    </div>
-                    {selectedRole ? 'Edit' : 'Add'} Role
-                  </DialogTitle>
-                </DialogHeader>
-                <EnhancedRoleForm
-                  role={selectedRole}
-                  onSave={handleSave}
-                  onCancel={() => setIsFormOpen(false)}
-                  isSaving={isSaving}
-                />
-              </DialogContent>
-            </Dialog>
-          </div>
-        </div>
-
-        {/* Default Roles Management */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Default System Roles</CardTitle>
-            <CardDescription>
-              Pre-configured roles with standard permissions. These can be used as templates or directly assigned to users.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2">
-              {(defaultRoles || []).map((role, index) => (
-                <Card key={index} className={isDefaultRole(role.name) ? 'border-blue-500 bg-blue-50' : ''}>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <ShieldCheck className="h-5 w-5" />
-                      {role.name}
-                      {isDefaultRole(role.name) && <Badge className="ml-2 bg-blue-100 text-blue-800">Active</Badge>}
-                    </CardTitle>
-                    <CardDescription>{role.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <h5 className="font-medium text-sm">Permissions ({role.permissions?.length || 0}):</h5>
-                      <div className="flex flex-wrap gap-1">
-                        {(role.permissions || []).map((permission) => (
-                          <Badge key={permission} variant="secondary" className="text-xs">
-                            {permission.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
               ))}
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Custom Roles */}
+            {userCategory && (
+              <div className="flex gap-3 items-end">
+                <div className="relative flex-1 max-w-sm">
+                  <Label className="text-xs mb-1 block">Search by name or ID</Label>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      value={userSearch}
+                      onChange={e => { setUserSearch(e.target.value); setShowDropdown(true); }}
+                      onFocus={() => setShowDropdown(true)}
+                      placeholder="Type name or ID..."
+                      className="pl-8"
+                    />
+                  </div>
+                  {showDropdown && filteredUsers.length > 0 && (
+                    <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md max-h-60 overflow-auto">
+                      {filteredUsers.map((u: any) => (
+                        <button
+                          key={u.id}
+                          type="button"
+                          className="w-full text-left px-3 py-2 hover:bg-accent hover:text-accent-foreground text-sm border-b last:border-b-0"
+                          onClick={() => handleSelectUser(u)}
+                        >
+                          <span className="font-mono font-medium text-xs">{u.id?.slice(0, 8)}</span>
+                          <span className="ml-2">{u.name}</span>
+                          <span className="ml-2 text-xs text-muted-foreground">{u.email || u.phone || ''}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <Button
+                  onClick={handleShowPermissions}
+                  disabled={!selectedUserId || isLoadingPerms}
+                  className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white"
+                >
+                  {isLoadingPerms ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Eye className="mr-2 h-4 w-4" />}
+                  Show
+                </Button>
+              </div>
+            )}
+
+            {selectedUserId && (
+              <Badge variant="secondary" className="w-fit gap-1">
+                <span className="font-mono text-xs">{selectedUserId?.slice(0, 8)}</span>
+                <span>•</span>
+                <span>{selectedUserName}</span>
+              </Badge>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Permissions Table */}
+      {permissionsLoaded && (
         <Card>
-          <CardHeader>
-            <CardTitle>Custom Roles</CardTitle>
-            <CardDescription>
-              User-defined roles with customized permissions for your specific business needs.
-            </CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-base">Permissions</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">{selectedCount} permissions enabled</p>
+            </div>
+            <Button onClick={handleSave} disabled={isSaving} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white">
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Save className="mr-2 h-4 w-4" />
+              Save
+            </Button>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {data
-                .filter(role => !isDefaultRole(role.name))
-                .map((role) => (
-                  <Card key={role.id}>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="flex items-center gap-2">
-                          <ShieldCheck className="h-6 w-6 text-primary" />
-                          {role.name}
-                        </CardTitle>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={() => handleEdit(role)}>Edit</Button>
-                          <Button variant="destructive" size="sm" onClick={() => openDeleteDialog(role)}>Delete</Button>
-                        </div>
-                      </div>
-                      <CardDescription>{role.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        <h4 className="font-medium mb-2">Permissions</h4>
-                        <div className="space-y-2">
-                          {groupPermissionsByCategory(typeof role.permissions === 'string' ? role.permissions.split(',').map(p => p.trim()) : role.permissions).map(([category, permissions]) => (
-                            <div key={category}>
-                              <h5 className="text-sm font-medium text-muted-foreground mb-2">{category}</h5>
-                              <div className="flex flex-wrap gap-1">
-                                {permissions.map((permission) => (
-                                  <Badge key={permission} variant="outline" className="text-xs">
-                                    {formatPermissionLabel(permission)}
-                                  </Badge>
-                                ))}
-                              </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="text-left py-2.5 px-3 font-medium">ID</th>
+                    <th className="text-left py-2.5 px-3 font-medium">Name</th>
+                    <th className="text-left py-2.5 px-3 font-medium">Module Name</th>
+                    <th className="text-center py-2.5 px-3 font-medium">Website</th>
+                    <th className="text-center py-2.5 px-3 font-medium">Mobile</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {MODULES.map(module => {
+                    const modulePerms = PERMISSIONS.filter(p => p.module === module);
+                    const webAll = moduleWebAllSelected(module);
+                    const mobileAll = moduleMobileAllSelected(module);
+                    return (
+                      <>
+                        <tr key={module} className="border-b bg-accent/30">
+                          <td colSpan={5} className="py-2 px-3">
+                            <div className="flex items-center gap-4">
+                              <span className="font-semibold text-sm">{module}</span>
+                              <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                                <Checkbox
+                                  checked={webAll}
+                                  onCheckedChange={c => handleToggleModuleWeb(module, !!c)}
+                                />
+                                Web
+                              </label>
+                              <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                                <Checkbox
+                                  checked={mobileAll}
+                                  onCheckedChange={c => handleToggleModuleMobile(module, !!c)}
+                                />
+                                Mobile
+                              </label>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                          </td>
+                        </tr>
+                        {modulePerms.map(p => (
+                          <tr key={p.id} className="border-b hover:bg-muted/30">
+                            <td className="py-2 px-3 font-mono text-xs text-muted-foreground">{p.id}</td>
+                            <td className="py-2 px-3">{p.name}</td>
+                            <td className="py-2 px-3 text-muted-foreground">{p.module}</td>
+                            <td className="py-2 px-3 text-center">
+                              <Checkbox
+                                checked={permissions[p.id]?.web ?? false}
+                                onCheckedChange={() => handleToggleWeb(p.id)}
+                              />
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              <Checkbox
+                                checked={permissions[p.id]?.mobile ?? false}
+                                onCheckedChange={() => handleToggleMobile(p.id)}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </CardContent>
         </Card>
-      </div>
-
-      <DeleteAlertDialog
-        isOpen={isDeleteDialogOpen}
-        onClose={() => setIsDeleteDialogOpen(false)}
-        onDelete={handleDelete}
-        itemName={selectedRole?.name}
-      />
-    </>
+      )}
+    </div>
   );
 }

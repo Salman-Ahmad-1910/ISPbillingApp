@@ -131,7 +131,7 @@ export function AccountEntryPrintDialog({ isOpen, onClose, entry, headsList, sub
             <div className="text-right">
               <h2 className="text-4xl font-extrabold tracking-wider text-violet-600">ACCOUNT ENTRY</h2>
               <div className="mt-3 space-y-1 text-sm">
-                <p className="text-gray-500">Entry ID: <span className="text-gray-900 font-semibold">{entry.id.slice(0, 8)}</span></p>
+                <p className="text-gray-500">Entry ID: <span className="text-gray-900 font-semibold">{entry.id}</span></p>
                 <p className="text-gray-500">Date: <span className="text-gray-900 font-semibold">{entry.date}</span></p>
               </div>
             </div>

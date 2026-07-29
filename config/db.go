@@ -125,10 +125,11 @@ func RunMigrations() {
 	)
 
 	if err != nil {
-		log.Fatal("Migration failed:", err)
+		log.Printf("Migration warning (non-fatal): %v", err)
+		// Continue despite migration errors so cleanup statements below can run
+	} else {
+		log.Println("Migration completed successfully")
 	}
-
-	log.Println("Migration completed successfully")
 
 	// Backfill installment_plans: set percentage_increase to 0 for existing rows
 	DB.Exec("UPDATE installment_plans SET percentage_increase = 0 WHERE percentage_increase IS NULL")

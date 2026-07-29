@@ -2,6 +2,14 @@
 
 import { type ColumnDef } from '@tanstack/react-table';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 
 interface Sale {
   id: string;
@@ -25,16 +33,17 @@ interface SaleItem {
   price: number;
   saleTax?: number;
   wthTax?: number;
+  serialNumber?: string;
 }
 
-export function getColumns(): ColumnDef<Sale>[] {
+export function getColumns(onDelete?: (id: string) => void): ColumnDef<Sale>[] {
   return [
     {
       accessorKey: 'id',
       header: 'ID',
       cell: ({ row }) => (
         <div className="text-xs font-mono text-muted-foreground">
-          {row.original.id}
+          {row.index + 1}
         </div>
       ),
     },
@@ -88,6 +97,20 @@ export function getColumns(): ColumnDef<Sale>[] {
       },
     },
     {
+      id: 'serialNumber',
+      header: 'SN / MAC',
+      cell: ({ row }) => {
+        const items = row.original.items || [];
+        const serials = items.map(i => i.serialNumber).filter(Boolean);
+        const uniqueSerials = [...new Set(serials)];
+        return (
+          <div className="text-xs font-mono max-w-[140px]" title={uniqueSerials.join(', ')}>
+            {uniqueSerials.length > 0 ? uniqueSerials.join(', ') : '—'}
+          </div>
+        );
+      },
+    },
+    {
       accessorKey: 'totalAmount',
       header: 'Total Amount',
       cell: ({ row }) => {
@@ -122,6 +145,41 @@ export function getColumns(): ColumnDef<Sale>[] {
         const amount = parseFloat(row.getValue('taxAmount'));
         const formatted = new Intl.NumberFormat('en-US').format(amount);
         return <div className="text-right text-sm text-muted-foreground">PKR {formatted}</div>;
+      },
+    },
+    {
+      id: 'actions',
+      header: '',
+      cell: ({ row }) => {
+        const sale = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={(e) => {
+                e.stopPropagation();
+                row.original;
+              }}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-red-600"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete?.(sale.id);
+                }}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
       },
     },
   ];

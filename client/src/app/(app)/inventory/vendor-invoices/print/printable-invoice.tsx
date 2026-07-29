@@ -108,34 +108,51 @@ export function PrintableVendorInvoice({ invoice, company, vendor, size }: Print
           </div>
 
           {/* Items Table */}
-          <table className="w-full text-left border-collapse text-sm mb-8">
-            <thead>
-              <tr className="bg-emerald-600 text-white">
-                <th className="border border-gray-300 p-3 text-xs font-semibold uppercase tracking-wider">Product</th>
-                <th className="border border-gray-300 p-3 text-center text-xs font-semibold uppercase tracking-wider">Qty</th>
-                <th className="border border-gray-300 p-3 text-center text-xs font-semibold uppercase tracking-wider">Unit</th>
-                <th className="border border-gray-300 p-3 text-right text-xs font-semibold uppercase tracking-wider">Price</th>
-                <th className="border border-gray-300 p-3 text-right text-xs font-semibold uppercase tracking-wider">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoice.items?.map((item, index) => (
-                <tr key={index} className="hover:bg-emerald-50/50">
-                  <td className="border border-gray-300 p-3">{item.productName}</td>
-                  <td className="border border-gray-300 p-3 text-center font-semibold">{item.quantity}</td>
-                  <td className="border border-gray-300 p-3 text-center">{item.unitType === 'piece' ? 'Pcs' : 'Mtr'}</td>
-                  <td className="border border-gray-300 p-3 text-right">{item.unitPrice.toFixed(2)}</td>
-                  <td className="border border-gray-300 p-3 text-right font-semibold">{item.subtotal.toFixed(2)}</td>
+            <table className="w-full text-left border-collapse text-sm mb-8">
+              <thead>
+                <tr className="bg-emerald-600 text-white">
+                  <th className="border border-gray-300 p-3 text-xs font-semibold uppercase tracking-wider">Product</th>
+                  <th className="border border-gray-300 p-3 text-xs font-semibold uppercase tracking-wider">SN / MAC</th>
+                  <th className="border border-gray-300 p-3 text-center text-xs font-semibold uppercase tracking-wider">Qty</th>
+                  <th className="border border-gray-300 p-3 text-center text-xs font-semibold uppercase tracking-wider">Unit</th>
+                  <th className="border border-gray-300 p-3 text-right text-xs font-semibold uppercase tracking-wider">Price</th>
+                  <th className="border border-gray-300 p-3 text-right text-xs font-semibold uppercase tracking-wider">Total</th>
                 </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="bg-gray-50 font-bold">
-                <td className="border border-gray-300 p-3" colSpan={4}>TOTAL</td>
-                <td className="border border-gray-300 p-3 text-right text-lg">{total.toFixed(2)}</td>
-              </tr>
-            </tfoot>
-          </table>
+              </thead>
+              <tbody>
+                {(() => {
+                  const grouped = invoice.items?.reduce((acc: any[], item) => {
+                    const existing = acc.find(i => i.productId === item.productId);
+                    if (existing) {
+                      existing.quantity += item.quantity;
+                      existing.subtotal += item.subtotal;
+                      if (item.serialNumber) {
+                        existing.serialNumbers.push(item.serialNumber);
+                      }
+                    } else {
+                      acc.push({ ...item, serialNumbers: item.serialNumber ? [item.serialNumber] : [] });
+                    }
+                    return acc;
+                  }, []) || [];
+                  return grouped.map((item, index) => (
+                    <tr key={index} className="hover:bg-emerald-50/50">
+                      <td className="border border-gray-300 p-3">{item.productName}</td>
+                      <td className="border border-gray-300 p-3 text-xs font-mono">{item.serialNumbers.length > 0 ? item.serialNumbers.join(', ') : '-'}</td>
+                      <td className="border border-gray-300 p-3 text-center font-semibold">{item.quantity}</td>
+                      <td className="border border-gray-300 p-3 text-center">{item.unitType === 'piece' ? 'Pcs' : 'Mtr'}</td>
+                      <td className="border border-gray-300 p-3 text-right">{item.unitPrice.toFixed(2)}</td>
+                      <td className="border border-gray-300 p-3 text-right font-semibold">{item.subtotal.toFixed(2)}</td>
+                    </tr>
+                  ));
+                })()}
+              </tbody>
+              <tfoot>
+                <tr className="bg-gray-50 font-bold">
+                  <td className="border border-gray-300 p-3" colSpan={5}>TOTAL</td>
+                  <td className="border border-gray-300 p-3 text-right text-lg">{total.toFixed(2)}</td>
+                </tr>
+              </tfoot>
+            </table>
 
           {/* Footer */}
           <footer className="mt-12 pt-6 border-t border-gray-300">
@@ -182,12 +199,34 @@ export function PrintableVendorInvoice({ invoice, company, vendor, size }: Print
             <div>Vendor: {vendor.name}</div>
           </div>
           <div style={{ borderBottom: '1px dashed #000', paddingBottom: '8px', marginBottom: '8px' }}>
-            {invoice.items?.map((item, index) => (
-              <div key={index} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>{item.productName} x{item.quantity}</span>
-                <span>{item.subtotal.toFixed(0)}</span>
-              </div>
-            ))}
+            {(() => {
+              const grouped = invoice.items?.reduce((acc: any[], item) => {
+                const existing = acc.find(i => i.productId === item.productId);
+                if (existing) {
+                  existing.quantity += item.quantity;
+                  existing.subtotal += item.subtotal;
+                  if (item.serialNumber) {
+                    existing.serialNumbers.push(item.serialNumber);
+                  }
+                } else {
+                  acc.push({ ...item, serialNumbers: item.serialNumber ? [item.serialNumber] : [] });
+                }
+                return acc;
+              }, []) || [];
+              return grouped.map((item, index) => (
+                <div key={index} style={{ marginBottom: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>{item.productName} x{item.quantity}</span>
+                    <span>{item.subtotal.toFixed(0)}</span>
+                  </div>
+                  {item.serialNumbers.length > 0 && (
+                    <div style={{ fontSize: '10px', color: '#666', paddingLeft: '4px' }}>
+                      {item.serialNumbers.join(', ')}
+                    </div>
+                  )}
+                </div>
+              ));
+            })()}
           </div>
           <div style={{ fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #000', paddingTop: '8px' }}>
             <span>TOTAL:</span>

@@ -28,7 +28,7 @@ export function getColumns(actions: CollectionActions): ColumnDef<DealerCollecti
       header: 'Bill #',
       cell: ({ row }) => (
         <div className="text-xs font-mono text-muted-foreground">
-          {row.original.id.slice(0, 8).toUpperCase()}
+          {row.index + 1}
         </div>
       ),
     },

@@ -475,9 +475,9 @@ export default function AccountEntryPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  paginatedData.map((item) => (
+                  paginatedData.map((item, index) => (
                     <TableRow key={item.id}>
-                      <TableCell className="text-muted-foreground truncate">{item.id}</TableCell>
+                      <TableCell className="text-muted-foreground truncate">{index + 1}</TableCell>
                       <TableCell className="font-medium truncate">{getHeadName(item.head)}</TableCell>
                       <TableCell className="truncate">{getSubHeadName(item.subHead)}</TableCell>
                       <TableCell className="truncate">{item.description}</TableCell>

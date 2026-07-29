@@ -88,8 +88,8 @@ export default function AllocatedCollectionsPage() {
   const subscriberOptions = useMemo(() => {
     return (subscribers as Subscriber[]).map(s => ({
       id: s.id,
-      name: s.name,
-      secondary: `${s.subscriber_identity} • ${s.phone}`,
+      name: `${s.subscriber_identity || s.id.slice(0, 8)} | ${s.name}`,
+      secondary: s.phone,
     }));
   }, [subscribers]);
 

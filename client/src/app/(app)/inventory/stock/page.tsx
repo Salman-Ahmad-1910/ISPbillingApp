@@ -8,11 +8,10 @@ import { useMemo } from 'react';
 import { ClientPage } from './_components/client-page';
 import { useCompany } from '@/context/company-context';
 
-
 export default function StockPage() {
   const { companyId } = useCompany();
 
-  const { data: items = [], isLoading } = useGenericQuery<any>('inventory/items', companyId ?? undefined);
+  const { data: products = [], isLoading } = useGenericQuery<any>('inventory/purchased-products', companyId ?? undefined);
 
   if (isLoading) {
     return (
@@ -32,8 +31,8 @@ export default function StockPage() {
           <Boxes className="h-5 w-5" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Inventory & Stock</h1>
-          <p className="text-sm text-muted-foreground">Manage your stock of routers, ONTs, and other equipment.</p>
+          <h1 className="text-2xl font-bold tracking-tight">Stock</h1>
+          <p className="text-sm text-muted-foreground">View all products purchased and their current stock.</p>
         </div>
       </div>
 
@@ -47,7 +46,7 @@ export default function StockPage() {
             </div>
             <div>
               <p className="text-xs font-medium text-muted-foreground">Total Items</p>
-              <p className="text-2xl font-bold">{Array.isArray(items) ? items.length : 0}</p>
+              <p className="text-2xl font-bold">{Array.isArray(products) ? products.length : 0}</p>
             </div>
           </div>
         </div>
@@ -59,7 +58,7 @@ export default function StockPage() {
             <div>
               <p className="text-xs font-medium text-muted-foreground">Total Stock</p>
               <p className="text-2xl font-bold">
-                {Array.isArray(items) ? items.reduce((s: number, i: any) => s + (Number(i.stock || i.quantity) || 0), 0) : 0}
+                {Array.isArray(products) ? products.reduce((s: number, i: any) => s + (Number(i.stock) || 0), 0) : 0}
               </p>
             </div>
           </div>
@@ -72,8 +71,8 @@ export default function StockPage() {
             <div>
               <p className="text-xs font-medium text-muted-foreground">Total Value</p>
               <p className="text-2xl font-bold text-violet-600 dark:text-violet-400">
-                PKR {Array.isArray(items)
-                  ? items.reduce((s: number, i: any) => s + ((Number(i.stock || i.quantity) || 0) * (Number(i.price || i.purchasePrice) || 0)), 0).toLocaleString()
+                PKR {Array.isArray(products)
+                  ? products.reduce((s: number, i: any) => s + ((Number(i.stock) || 0) * (Number(i.price || i.purchasePrice) || 0)), 0).toLocaleString()
                   : 0}
               </p>
             </div>
@@ -83,7 +82,7 @@ export default function StockPage() {
 
       <Card className="transition-all duration-300 hover:shadow-md">
         <CardContent className="p-0">
-          <ClientPage data={items} />
+          <ClientPage data={products} />
         </CardContent>
       </Card>
     </div>

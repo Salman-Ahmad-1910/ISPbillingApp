@@ -130,7 +130,7 @@ export function PrintablePurchaseInvoice({ purchase, company, size = 'a4', open,
               <h3 className="font-bold text-gray-700 mb-2 text-sm uppercase tracking-wider">Vendor Information</h3>
               <div className="text-sm text-gray-700">
                 <p className="font-semibold">{purchase.vendorName}</p>
-                {purchase.vendorId && <p className="text-gray-500">Vendor ID: {purchase.vendorId}</p>}
+                {purchase.vendorId && <p className="text-gray-500">Vendor ID: {purchase.vendorId.slice(0, 8)}</p>}
               </div>
             </div>
 

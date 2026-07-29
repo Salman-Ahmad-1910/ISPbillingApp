@@ -5,9 +5,9 @@ type Company struct {
 	BaseModel
 	Name             string `gorm:"type:varchar(255);not null" json:"name"`
 	Email            string `gorm:"type:varchar(255);not null" json:"email"`
-	Contact1         string `gorm:"type:varchar(50);not null" json:"contact1"`
+	Contact1         string `gorm:"type:varchar(50);not null;default:''" json:"contact1"`
 	Contact2         string `gorm:"type:varchar(50)" json:"contact2"`
-	Address          string `gorm:"type:text;not null" json:"address"`
+	Address          string `gorm:"type:text;not null;default:''" json:"address"`
 	Description      string `gorm:"type:text" json:"description"`
 	TaxRules         string `gorm:"type:text" json:"taxRules"`
 	InvoiceTemplate  string `gorm:"type:varchar(100)" json:"invoiceTemplate"`

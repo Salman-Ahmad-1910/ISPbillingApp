@@ -227,8 +227,11 @@ func SetupRoutes(r *gin.Engine) {
 			controllers.RegisterGenericCRUD[models.Role](roles, "")
 			controllers.RegisterGenericCRUD[models.Permission](roles, "/permissions")
 			controllers.RegisterGenericCRUD[models.RolePermission](roles, "/role-permissions")
+			controllers.RegisterGenericCRUD[models.UserPermission](roles, "/user-permissions")
 			roles.GET("/default", controllers.GetDefaultRoles)
 			roles.POST("/seed", controllers.SeedDefaultRoles)
+			roles.GET("/user-permissions/:userId", controllers.GetUserPermissions)
+			roles.PUT("/user-permissions/:userId", controllers.UpdateUserPermissions)
 		}
 
 		// Logs routes (with RBAC)
@@ -629,6 +632,7 @@ func SetupRoutes(r *gin.Engine) {
 			pos.POST("/installment-sales", controllers.CreateInstallmentSale)
 			pos.GET("/sales", controllers.GetPOSSales)
 			pos.GET("/sales/:id", controllers.GetPOSSale)
+			pos.DELETE("/sales/:id", controllers.DeletePOSSale)
 			pos.GET("/installment/:subscriberId", controllers.GetSubscriberInstallment)
 			pos.PUT("/installment/:id/pay", controllers.PayInstallment)
 		}

@@ -49,14 +49,12 @@ func Login(c *gin.Context) {
 	// Load user companies and relationships - accept both active and offline users
 	if err := config.DB.Preload("UserCompanies.Company").Where("email = ? AND status IN ('active', 'offline')", req.Email).First(&user).Error; err != nil {
 		utils.ErrorResponse(c, 401, "Invalid credentials or inactive user", nil)
-		c.JSON(401, gin.H{
-			"error": err,
-		})
 		return
 	}
 
 	// Compare hashed password with provided password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+		log.Printf("Password mismatch for user %s (id=%s): %v | stored len=%d", req.Email, user.ID, err, len(user.Password))
 		utils.ErrorResponse(c, 401, "Invalid credentials", nil)
 		return
 	}

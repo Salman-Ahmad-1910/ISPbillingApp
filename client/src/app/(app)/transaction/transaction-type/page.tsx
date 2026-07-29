@@ -80,8 +80,6 @@ export default function TransactionTypePage() {
   const [isSaving, setIsSaving] = useState(false);
 
   const [formTransaction, setFormTransaction] = useState('');
-  const [formOpeningBalance, setFormOpeningBalance] = useState(0);
-  const [formTitle, setFormTitle] = useState('');
   const [formPaymentChannel, setFormPaymentChannel] = useState('');
 
   const { data: records = [], isLoading, refetch } = useGenericQuery<TransactionType>(
@@ -125,8 +123,6 @@ export default function TransactionTypePage() {
   const openAddDialog = () => {
     setEditingId(null);
     setFormTransaction('');
-    setFormOpeningBalance(0);
-    setFormTitle('');
     setFormPaymentChannel('');
     setShowDialog(true);
   };
@@ -134,8 +130,6 @@ export default function TransactionTypePage() {
   const openEditDialog = (record: TransactionType) => {
     setEditingId(record.id);
     setFormTransaction(record.transaction);
-    setFormOpeningBalance(record.openingBalance);
-    setFormTitle(record.title || '');
     setFormPaymentChannel(record.paymentChannel || '');
     setShowDialog(true);
   };
@@ -146,8 +140,6 @@ export default function TransactionTypePage() {
     try {
       const payload = {
         transaction: formTransaction.trim(),
-        openingBalance: formOpeningBalance,
-        title: formTitle.trim(),
         paymentChannel: formPaymentChannel,
       };
       if (editingId) {
@@ -277,9 +269,9 @@ export default function TransactionTypePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginated.map((record) => (
+                {paginated.map((record, index) => (
                   <TableRow key={record.id}>
-                    <TableCell className="font-mono text-xs">{record.id.slice(0, 8)}</TableCell>
+                    <TableCell className="font-mono text-xs">{index + 1}</TableCell>
                     <TableCell className="font-medium">{record.paymentChannel || '---'}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
@@ -339,22 +331,6 @@ export default function TransactionTypePage() {
                 value={formTransaction}
                 onChange={(e) => setFormTransaction(e.target.value)}
                 placeholder="e.g. Cash Collection"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Opening Balance</Label>
-              <Input
-                type="number"
-                value={formOpeningBalance}
-                onChange={(e) => setFormOpeningBalance(parseFloat(e.target.value) || 0)}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Title</Label>
-              <Input
-                value={formTitle}
-                onChange={(e) => setFormTitle(e.target.value)}
-                placeholder="e.g. Daily cash collections from customers"
               />
             </div>
             <div className="space-y-1">

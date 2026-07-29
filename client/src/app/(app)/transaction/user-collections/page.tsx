@@ -35,16 +35,15 @@ import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
-import { Loader2, MoreHorizontal, Wallet, DollarSign, UserCheck, Trash2, Pencil, Copy, FileText, Users, AlertTriangle } from 'lucide-react';
+import { Loader2, MoreHorizontal, Wallet, DollarSign, UserCheck, Trash2, Pencil, Copy, FileText, Users } from 'lucide-react';
 
-import type { Connection, Payment, Area, RecoveryOfficer } from '@/lib/types';
+import type { Connection, Payment, Area, RecoveryOfficer, TransactionType } from '@/lib/types';
 import { SubscriberPrintDialog } from './_components/subscriber-print-dialog';
 
 const PAYMENT_TYPE_OPTIONS = [
   { id: 'cash', name: 'Cash' },
   { id: 'bank', name: 'Bank' },
   { id: 'online', name: 'Online' },
-  { id: 'dealer', name: 'Dealer' },
 ];
 
 const STATUS_OPTIONS = [
@@ -68,6 +67,7 @@ export default function SubscriberCollectionsPage() {
   const [receiveMethod, setReceiveMethod] = useState<string>('cash');
   const [receiveComment, setReceiveComment] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedTransactionTypeId, setSelectedTransactionTypeId] = useState('');
 
   const [printPayment, setPrintPayment] = useState<Payment | null>(null);
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
@@ -96,13 +96,6 @@ export default function SubscriberCollectionsPage() {
     if (!selectedSubscriberId) return null;
     return (connections as Connection[]).find(c => c.id === selectedSubscriberId) || null;
   }, [connections, selectedSubscriberId]);
-
-  const subscriberRemaining = useMemo(() => {
-    if (!selectedSubscriber) return 0;
-    return selectedSubscriber.remainingAmount || selectedSubscriber.sameAmount || 0;
-  }, [selectedSubscriber]);
-
-  const isAmountExceeding = receiveAmount > 0 && receiveAmount > subscriberRemaining;
 
   const { data: payments = [], isLoading: isLoadingPayments, refetch: refetchPayments } = useGenericQuery<Payment>(
     selectedSubscriberId ? 'billing/payments' : null,
@@ -140,6 +133,17 @@ export default function SubscriberCollectionsPage() {
     companyId ?? undefined,
   );
 
+  const { data: transactionTypes = [] } = useGenericQuery<TransactionType>(
+    'billing/transaction-types',
+    companyId ?? undefined,
+  );
+
+  const filteredTransactionTypes = useMemo(() => {
+    const all = transactionTypes as TransactionType[];
+    if (!receiveMethod || receiveMethod === 'cash') return [];
+    return all.filter(t => t.paymentChannel && t.paymentChannel !== 'Cash');
+  }, [transactionTypes, receiveMethod]);
+
   // Resolve the recovery officer assigned to the selected subscriber's area.
   // Chain: connection.sublocalityId (which is an Area ID) -> area -> recoveryOfficer
   // Tries both area.recoveryOfficerId and recoveryOfficer.areaId directions.
@@ -167,11 +171,6 @@ export default function SubscriberCollectionsPage() {
     return officer?.name || user?.name || '---';
   }, [selectedSubscriber, areas, recoveryOfficers, user]);
 
-  const totalRemainingAmount = useMemo(() => {
-    if (!Array.isArray(connections)) return 0;
-    return (connections as Connection[]).reduce((sum: number, c) => sum + (Number(c.remainingAmount) || Number(c.sameAmount) || 0), 0);
-  }, [connections]);
-
   const handleReceive = async () => {
     if (!selectedSubscriber || !user) return;
     setIsSaving(true);
@@ -183,6 +182,9 @@ export default function SubscriberCollectionsPage() {
         paymentDate: receiveDate,
         method: receiveMethod,
         collectorId: user.id,
+        transactionType: receiveMethod !== 'cash' && selectedTransactionTypeId
+          ? (transactionTypes as TransactionType[]).find(t => t.id === selectedTransactionTypeId)?.transaction
+          : undefined,
       });
       toast({ title: 'Success', description: 'Payment received and recorded.' });
       setShowReceiveDialog(false);
@@ -192,6 +194,7 @@ export default function SubscriberCollectionsPage() {
       setReceiveDate(new Date().toISOString().split('T')[0]);
       setReceiveMethod('cash');
       setReceiveComment('');
+      setSelectedTransactionTypeId('');
     } catch (error: any) {
       const serverMsg = error.response?.data?.message || error.response?.data?.error || '';
       toast({
@@ -300,17 +303,6 @@ export default function SubscriberCollectionsPage() {
             </div>
           </div>
         </div>
-        <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
-              <UserCheck className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">Remaining Amount</p>
-              <p className="text-2xl font-bold text-violet-600 dark:text-violet-400">PKR {totalRemainingAmount.toLocaleString()}</p>
-            </div>
-          </div>
-        </div>
       </div>
 
       <Card className="transition-all duration-300 hover:shadow-md">
@@ -370,7 +362,7 @@ export default function SubscriberCollectionsPage() {
         {selectedSubscriber ? (
           <CardContent className="p-0">
             <div className="p-4 border-b">
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                 <div>
                   <Label className="text-xs text-muted-foreground">Subscriber ID</Label>
                   <p className="font-medium font-mono text-sm">{selectedSubscriber.id?.slice(0, 8) || '---'}</p>
@@ -392,13 +384,9 @@ export default function SubscriberCollectionsPage() {
                   <p className="font-medium truncate" title={selectedSubscriber.address}>{selectedSubscriber.address || '---'}</p>
                 </div>
                 <div>
-                  <Label className="text-xs text-muted-foreground">Amount</Label>
-                  <p className="font-medium text-violet-600 dark:text-violet-400">PKR {selectedSubscriber.amount.toLocaleString()}</p>
-                </div>
-                <div>
                   <Label className="text-xs text-muted-foreground">Remaining</Label>
-                  <p className={`font-medium ${(selectedSubscriber.remainingAmount || selectedSubscriber.sameAmount || 0) > 0 ? 'text-destructive' : 'text-green-600'}`}>
-                    PKR {(selectedSubscriber.remainingAmount || selectedSubscriber.sameAmount || 0).toLocaleString()}
+                  <p className={`font-medium ${(selectedSubscriber.remainingAmount || 0) > 0 ? 'text-destructive' : 'text-green-600'}`}>
+                    PKR {(selectedSubscriber.remainingAmount || 0).toLocaleString()}
                   </p>
                 </div>
               </div>
@@ -444,9 +432,9 @@ export default function SubscriberCollectionsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {subscriberPayments.map((payment) => (
+                      {subscriberPayments.map((payment, index) => (
                         <TableRow key={payment.id}>
-                          <TableCell className="py-1.5 px-1.5 font-mono whitespace-nowrap">{payment.id.slice(0, 8).toUpperCase()}</TableCell>
+                          <TableCell className="py-1.5 px-1.5 font-mono whitespace-nowrap">{index + 1}</TableCell>
                           <TableCell className="py-1.5 px-1.5 font-mono whitespace-nowrap">{payment.subscriberId?.slice(0, 8) || '---'}</TableCell>
                           <TableCell className="py-1.5 px-1.5 whitespace-nowrap">{payment.subscriberName}</TableCell>
                           <TableCell className="py-1.5 px-1.5 max-w-[100px] truncate" title={selectedSubscriber.address}>{selectedSubscriber.address || '---'}</TableCell>
@@ -538,18 +526,10 @@ export default function SubscriberCollectionsPage() {
                 <Label>Mobile</Label>
                 <Input value={selectedSubscriber?.mobile || selectedSubscriber?.cell || '---'} readOnly />
               </div>
-              <div className="space-y-1">
-                <Label>Amount (PKR)</Label>
-                <Input value={selectedSubscriber?.amount?.toLocaleString() || '0'} readOnly />
-              </div>
             </div>
             <div className="space-y-1">
               <Label>Received By</Label>
               <Input value={recoveryOfficerName} readOnly />
-            </div>
-            <div className="space-y-1">
-              <Label>Remaining (PKR)</Label>
-              <Input value={`PKR ${subscriberRemaining.toLocaleString()}`} readOnly />
             </div>
             <div className="space-y-1">
               <Label>Amount (PKR)</Label>
@@ -558,14 +538,7 @@ export default function SubscriberCollectionsPage() {
                 value={receiveAmount}
                 onChange={(e) => setReceiveAmount(parseFloat(e.target.value) || 0)}
                 placeholder="Enter amount"
-                className={isAmountExceeding ? 'border-destructive focus-visible:ring-destructive' : ''}
               />
-              {isAmountExceeding && (
-                <p className="text-xs text-destructive flex items-center gap-1 mt-1">
-                  <AlertTriangle className="h-3 w-3" />
-                  Amount is more than the total receivable amount
-                </p>
-              )}
             </div>
             <div className="space-y-1">
               <Label>Pay Date</Label>
@@ -586,6 +559,19 @@ export default function SubscriberCollectionsPage() {
                 allowClear={false}
               />
             </div>
+            {receiveMethod !== 'cash' && (
+              <div className="space-y-1">
+                <Label>Transaction Type</Label>
+                <SearchableSelect
+                  value={selectedTransactionTypeId}
+                  onValueChange={(v) => { if (v) setSelectedTransactionTypeId(v); }}
+                  options={filteredTransactionTypes.map(t => ({ id: t.id, name: t.paymentChannel }))}
+                  placeholder="Select transaction type..."
+                  searchPlaceholder="Search transaction type..."
+                  allowClear={false}
+                />
+              </div>
+            )}
             <div className="space-y-1">
               <Label>Comment</Label>
               <Textarea
@@ -597,7 +583,7 @@ export default function SubscriberCollectionsPage() {
             </div>
             <Button
               onClick={handleReceive}
-              disabled={isSaving || !receiveAmount || isAmountExceeding}
+              disabled={isSaving || !receiveAmount}
               className="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md"
             >
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
