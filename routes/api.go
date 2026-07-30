@@ -230,8 +230,8 @@ func SetupRoutes(r *gin.Engine) {
 			controllers.RegisterGenericCRUD[models.UserPermission](roles, "/user-permissions")
 			roles.GET("/default", controllers.GetDefaultRoles)
 			roles.POST("/seed", controllers.SeedDefaultRoles)
-			roles.GET("/user-permissions/:userId", controllers.GetUserPermissions)
-			roles.PUT("/user-permissions/:userId", controllers.UpdateUserPermissions)
+			roles.GET("/users/:userId/permissions", controllers.GetUserPermissions)
+			roles.PUT("/users/:userId/permissions", controllers.UpdateUserPermissions)
 		}
 
 		// Logs routes (with RBAC)
