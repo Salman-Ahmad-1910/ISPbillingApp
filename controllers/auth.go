@@ -123,9 +123,48 @@ func GetMe(c *gin.Context) {
 		}
 		response["role"] = firstCompany.UserRole
 		response["company_id"] = firstCompany.CompanyID
+
+		// Include granted page/feature permissions for this user in the company.
+		permissions, configured := getUserPermissionIDs(user.ID, firstCompany.CompanyID, user.Email)
+		response["permissions"] = permissions
+		response["permissionsConfigured"] = configured
 	}
 
 	utils.SuccessResponse(c, "User profile retrieved", response)
+}
+
+// getUserPermissionIDs returns the web-enabled permission IDs granted to a user
+// within a company. Permissions may be saved against the user record itself or
+// against the linked staff / recovery officer / dealer record (which can carry a
+// different primary key), so those are resolved via the user's email.
+func getUserPermissionIDs(userID uuid.UUID, companyID uuid.UUID, email string) ([]string, bool) {
+	entityIDs := []string{userID.String()}
+
+	var staffIDs []string
+	config.DB.Model(&models.Staff{}).Where("email = ? AND company_id = ?", email, companyID).Pluck("id", &staffIDs)
+	entityIDs = append(entityIDs, staffIDs...)
+
+	var officerIDs []string
+	config.DB.Model(&models.RecoveryOfficer{}).Where("email = ? AND company_id = ?", email, companyID).Pluck("id", &officerIDs)
+	entityIDs = append(entityIDs, officerIDs...)
+
+	var dealerIDs []string
+	config.DB.Model(&models.Dealer{}).Where("email = ? AND company_id = ?", email, companyID).Pluck("id", &dealerIDs)
+	entityIDs = append(entityIDs, dealerIDs...)
+
+	var perms []models.UserPermission
+	if err := config.DB.Where("user_id IN ? AND company_id = ?", entityIDs, companyID).Find(&perms).Error; err != nil {
+		return nil, false
+	}
+
+	ids := make([]string, 0, len(perms))
+	for _, p := range perms {
+		if p.WebEnabled {
+			ids = append(ids, p.PermissionID)
+		}
+	}
+
+	return ids, len(perms) > 0
 }
 
 // Logout handles user logout

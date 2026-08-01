@@ -39,8 +39,8 @@ func UpdateUserPermissions(c *gin.Context) {
 		return
 	}
 
-	// Delete existing permissions for this user
-	config.DB.Where("user_id = ? AND company_id = ?", userID, companyID).Delete(&models.UserPermission{})
+	// Delete existing permissions for this user (hard delete to avoid soft-delete rows piling up)
+	config.DB.Unscoped().Where("user_id = ? AND company_id = ?", userID, companyID).Delete(&models.UserPermission{})
 
 	// Insert new permissions
 	if len(req.Permissions) > 0 {

@@ -48,12 +48,19 @@ function getMonthsSince(dateStr: string): number {
   return (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
 }
 
+function getPackagePrice(c: Connection): number {
+  const cable = Number(c.amount) || 0;
+  const internet = Number(c.sameAmount) || 0;
+  if (c.connectionType === 'tv_cable') return cable;
+  if (c.connectionType === 'internet') return internet;
+  return cable + internet;
+}
+
 function getTotalOwed(c: Connection): number {
   const remaining = Number(c.remainingAmount) || 0;
-  const amount = Number(c.amount) || 0;
   const activeDate = c.lastPaymentDate || c.rechargeDate || c.createdAt;
   const months = getMonthsSince(activeDate);
-  return remaining + amount * Math.max(0, months);
+  return remaining + getPackagePrice(c) * Math.max(0, months);
 }
 
 const PAYMENT_TYPE_OPTIONS = [

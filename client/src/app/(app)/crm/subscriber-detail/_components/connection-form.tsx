@@ -97,12 +97,12 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
       boxNumber: '',
       packageCable: '',
       discount: '',
-      amount: 0,
+      amount: undefined,
       packageInternet: '',
       createBalance: false,
       balanceDays: 0,
       sameDiscount: '',
-      sameAmount: 0,
+      sameAmount: undefined,
       status: 'active',
       splitterId: '',
       splitterPort: 0,
@@ -173,27 +173,53 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
   const sameDiscount = form.watch('sameDiscount');
   const installationAmount = form.watch('installationAmount');
   const otherAmount = form.watch('otherAmount');
+  const packageCable = form.watch('packageCable');
+  const packageInternet = form.watch('packageInternet');
 
   const showCable = connectionType === 'both' || connectionType === 'tv_cable';
   const showInternet = connectionType === 'both' || connectionType === 'internet';
   const isCableDisabled = !showCable;
   const isInternetDisabled = !showInternet;
 
+  const [cablePkgId, setCablePkgId] = React.useState<string | undefined>();
+  const [internetPkgId, setInternetPkgId] = React.useState<string | undefined>();
+
+  const resolvePackage = (name: string, id?: string) => {
+    if (id) {
+      const byId = packages.find(p => p.id === id);
+      if (byId) return byId;
+    }
+    return packages.find(p => p.name === name);
+  };
+
+  const selectedCablePkg = resolvePackage(packageCable, cablePkgId);
+  const selectedInternetPkg = resolvePackage(packageInternet, internetPkgId);
+
+  const packagePrice = (pkg?: Package) => {
+    if (!pkg) return 0;
+    return pkg.salePrice > 0 ? pkg.salePrice : pkg.price;
+  };
+
+  const cablePackagePrice = packagePrice(selectedCablePkg);
+  const internetPackagePrice = packagePrice(selectedInternetPkg);
+
   const baseAmount = (installationAmount || 0) + (otherAmount || 0);
+  const cableBase = baseAmount + cablePackagePrice;
+  const internetBase = baseAmount + internetPackagePrice;
 
   React.useEffect(() => {
     if (discount === 'custom') return;
-    if (showCable) {
-      form.setValue('amount', calcDiscountedAmount(baseAmount, discount), { shouldValidate: true });
+    if (showCable && cablePackagePrice > 0) {
+      form.setValue('amount', calcDiscountedAmount(cableBase, discount), { shouldValidate: true });
     }
-  }, [baseAmount, discount, showCable, form]);
+  }, [cableBase, discount, showCable, form]);
 
   React.useEffect(() => {
     if (sameDiscount === 'custom') return;
-    if (showInternet) {
-      form.setValue('sameAmount', calcDiscountedAmount(baseAmount, sameDiscount), { shouldValidate: true });
+    if (showInternet && internetPackagePrice > 0) {
+      form.setValue('sameAmount', calcDiscountedAmount(internetBase, sameDiscount), { shouldValidate: true });
     }
-  }, [baseAmount, sameDiscount, showInternet, form]);
+  }, [internetBase, sameDiscount, showInternet, form]);
 
   function onSubmit(values: ConnectionFormValues) {
     onSave(values);
@@ -549,7 +575,15 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Package Cable</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value} disabled={isCableDisabled}>
+                  <Select
+                    onValueChange={(id) => {
+                      const pkg = packages.find(p => p.id === id);
+                      setCablePkgId(id);
+                      field.onChange(pkg ? pkg.name : '');
+                    }}
+                    value={cablePkgId ?? (packageCable ? packages.find(p => p.name === packageCable)?.id ?? '' : '')}
+                    disabled={isCableDisabled}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select cable package" />
@@ -557,7 +591,9 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
                     </FormControl>
                     <SelectContent>
                       {packages.map((pkg) => (
-                        <SelectItem key={pkg.id} value={pkg.name}>{pkg.name}</SelectItem>
+                        <SelectItem key={pkg.id} value={pkg.id}>
+                          {pkg.name}{packagePrice(pkg) > 0 ? ` — PKR ${packagePrice(pkg)}` : ''}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -603,7 +639,12 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
                   </FormControl>
                   {discount !== 'custom' && discount !== 'no_discount' && (
                     <p className="text-xs text-muted-foreground">
-                      Base: {baseAmount} → {calcDiscountedAmount(baseAmount, discount)}
+                      Base: {cableBase} → {calcDiscountedAmount(cableBase, discount)}
+                    </p>
+                  )}
+                  {selectedCablePkg && (
+                    <p className="text-xs text-muted-foreground">
+                      {selectedCablePkg.name} = {cablePackagePrice} + {installationAmount || 0} + {otherAmount || 0} = {cableBase}
                     </p>
                   )}
                   <FormMessage />
@@ -626,7 +667,15 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Package Internet</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value} disabled={isInternetDisabled}>
+                  <Select
+                    onValueChange={(id) => {
+                      const pkg = packages.find(p => p.id === id);
+                      setInternetPkgId(id);
+                      field.onChange(pkg ? pkg.name : '');
+                    }}
+                    value={internetPkgId ?? (packageInternet ? packages.find(p => p.name === packageInternet)?.id ?? '' : '')}
+                    disabled={isInternetDisabled}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select internet package" />
@@ -634,7 +683,9 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
                     </FormControl>
                     <SelectContent>
                       {packages.map((pkg) => (
-                        <SelectItem key={pkg.id} value={pkg.name}>{pkg.name}</SelectItem>
+                        <SelectItem key={pkg.id} value={pkg.id}>
+                          {pkg.name}{packagePrice(pkg) > 0 ? ` — PKR ${packagePrice(pkg)}` : ''}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -680,7 +731,12 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
                   </FormControl>
                   {sameDiscount !== 'custom' && sameDiscount !== 'no_discount' && (
                     <p className="text-xs text-muted-foreground">
-                      Base: {baseAmount} → {calcDiscountedAmount(baseAmount, sameDiscount)}
+                      Base: {internetBase} → {calcDiscountedAmount(internetBase, sameDiscount)}
+                    </p>
+                  )}
+                  {selectedInternetPkg && (
+                    <p className="text-xs text-muted-foreground">
+                      {selectedInternetPkg.name} = {internetPackagePrice} + {installationAmount || 0} + {otherAmount || 0} = {internetBase}
                     </p>
                   )}
                   <FormMessage />

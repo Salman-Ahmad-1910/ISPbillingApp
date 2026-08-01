@@ -83,6 +83,7 @@ import type { NavItem, NavItemGroup } from '@/lib/types';
 import { CircleDollarSign as AppIcon } from 'lucide-react';
 import { LogoutButton } from '@/components/shared/logout-button';
 import { useUserPermissions } from '@/hooks/usePermissions';
+import { getAllowedHrefs } from '@/lib/permission-pages';
 
 const navItems: NavItemGroup[] = [
   {
@@ -257,6 +258,8 @@ const navItems: NavItemGroup[] = [
       { title: 'Expiry Wise Defaulters', href: '/subscriber-reports/expiry-defaulters', icon: BarChartBig, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
       { title: 'Month Wise Defaulters', href: '/subscriber-reports/month-defaulters', icon: FileText, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
       { title: 'Monthly Collections', href: '/subscriber-reports/monthly-collections', icon: HandCoins, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
+      { title: 'Not Generated Collections', href: '/subscriber-reports/not-generated-collections', icon: FileEdit, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
+      { title: 'Unpaid Collections', href: '/subscriber-reports/unpaid-collections', icon: Wallet, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
       { title: 'User Creator Summary', href: '/subscriber-reports/creator-summary', icon: UserPlus, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
     ],
   },
@@ -268,7 +271,7 @@ const navItems: NavItemGroup[] = [
   },
 ];
 
-function filterNavItems(items: NavItem[], hasPermission: (perm: string) => boolean, hasMinimumRole: (role: string) => boolean, userRole: string): NavItem[] {
+function filterNavItems(items: NavItem[], hasPermission: (perm: string) => boolean, hasMinimumRole: (role: string) => boolean, userRole: string, allowedHrefs: Set<string> | null): NavItem[] {
   return items
     .filter(item => {
       if (item.hidden) {
@@ -291,13 +294,16 @@ function filterNavItems(items: NavItem[], hasPermission: (perm: string) => boole
       if (item.permission && !hasPermission(item.permission)) {
         return false;
       }
+      if (allowedHrefs && item.href && !allowedHrefs.has(item.href)) {
+        return false;
+      }
       return true;
     })
     .map(item => {
       if (item.items) {
         return {
           ...item,
-          items: filterNavItems(item.items, hasPermission, hasMinimumRole, userRole),
+          items: filterNavItems(item.items, hasPermission, hasMinimumRole, userRole, allowedHrefs),
         };
       }
       return item;
@@ -415,8 +421,13 @@ function NavCollapsibleGroup({
 
 export function SidebarNav() {
   const pathname = usePathname();
-  const { hasPermission, hasMinimumRole, userRole, user } = useUserPermissions();
+  const { hasPermission, hasMinimumRole, userRole, user, grantedPermissions, permissionsConfigured } = useUserPermissions();
   const [openGroup, setOpenGroup] = useState<string | null>(null);
+
+  // Admin/manager accounts always see everything. For other users, when an admin
+  // has configured page permissions, only the granted pages are shown.
+  const isAdminRole = ['admin', 'owner', 'manager'].includes(userRole);
+  const allowedHrefs = permissionsConfigured && !isAdminRole ? getAllowedHrefs(grantedPermissions) : null;
 
   if (!user) {
     return (
@@ -440,7 +451,7 @@ export function SidebarNav() {
 
   const filteredNavItems = navItems.map(group => ({
     ...group,
-    items: filterNavItems(group.items, hasPermission, hasMinimumRole, userRole)
+    items: filterNavItems(group.items, hasPermission, hasMinimumRole, userRole, allowedHrefs)
   })).filter(group => group.items.length > 0);
 
   return (

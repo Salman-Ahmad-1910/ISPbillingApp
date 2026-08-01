@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, Fragment } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -14,85 +14,9 @@ import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import { smartMatch } from '@/lib/search';
 import { useQueryClient } from '@tanstack/react-query';
+import { PERMISSION_DEFS } from '@/lib/permission-pages';
 
-const PERMISSIONS = [
-  { id: '13309', name: 'Country', module: 'Area' },
-  { id: '13310', name: 'City', module: 'Area' },
-  { id: '13311', name: 'Locality', module: 'Area' },
-  { id: '13312', name: 'Sublocality', module: 'Area' },
-  { id: '13313', name: 'Package', module: 'Users Profile' },
-  { id: '13314', name: 'Box/Media', module: 'Users Profile' },
-  { id: '13315', name: 'Users Details', module: 'Users Profile' },
-  { id: '13316', name: 'New Queries', module: 'Users Profile' },
-  { id: '13351', name: 'User Location', module: 'Users Profile' },
-  { id: '13318', name: 'Dealers Details', module: 'Dealers Profile' },
-  { id: '13317', name: 'Recovery Officer', module: 'Recovery Officer' },
-  { id: '13319', name: 'Area Allocation', module: 'Recovery Officer' },
-  { id: '13305', name: 'Allocated Collection', module: 'Transactions' },
-  { id: '13324', name: 'Transaction Type', module: 'Transactions' },
-  { id: '14079', name: 'New Collection', module: 'Transactions' },
-  { id: '13308', name: 'Reprint Slip', module: 'Transactions' },
-  { id: '13304', name: 'Users Collections', module: 'Transactions' },
-  { id: '13320', name: 'Bills Creator', module: 'Transactions' },
-  { id: '13321', name: 'Dealers Collections', module: 'Transactions' },
-  { id: '13357', name: 'Baddebt Collection', module: 'Transactions' },
-  { id: '15323', name: 'Subject Type', module: 'Complain' },
-  { id: '15325', name: 'Complain Type', module: 'Complain' },
-  { id: '15326', name: 'Complain Report', module: 'Complain' },
-  { id: '13342', name: 'Users Complain', module: 'Complain' },
-  { id: '13343', name: 'Allocated Complains', module: 'Complain' },
-  { id: '13347', name: 'Draft Messages', module: 'Messages' },
-  { id: '13348', name: 'Sent Messages', module: 'Messages' },
-  { id: '13359', name: 'Whatsapp Draft Message', module: 'Messages' },
-  { id: '13346', name: 'Other Messages', module: 'Messages' },
-  { id: '13345', name: 'Expire Messages', module: 'Messages' },
-  { id: '13344', name: 'New Messages', module: 'Messages' },
-  { id: '13322', name: 'Account Heads', module: 'Accounts' },
-  { id: '13323', name: 'Account Entry', module: 'Accounts' },
-  { id: '13341', name: 'One Day Accounts', module: 'Accounts' },
-  { id: '15313', name: 'Purchase', module: 'Inventory' },
-  { id: '15312', name: 'Products', module: 'Inventory' },
-  { id: '15309', name: 'Brand', module: 'Inventory' },
-  { id: '15311', name: 'Unit Type', module: 'Inventory' },
-  { id: '15310', name: 'Vendor', module: 'Inventory' },
-  { id: '15321', name: 'Product Type', module: 'Inventory' },
-  { id: '15314', name: 'Inventory Status', module: 'Inventory' },
-  { id: '15315', name: 'Sales', module: 'Point Of Sale' },
-  { id: '15317', name: 'Advance & Loan', module: 'HRM' },
-  { id: '15318', name: 'Employee Salary', module: 'HRM' },
-  { id: '15324', name: 'User Wise Attendance', module: 'HRM' },
-  { id: '15322', name: 'Day Wise Attendance', module: 'HRM' },
-  { id: '15316', name: 'Employee Details', module: 'HRM' },
-  { id: '13334', name: 'Deleted Collection', module: 'Logs' },
-  { id: '15328', name: 'Update Connections Log', module: 'Logs' },
-  { id: '13335', name: 'Deleted Users', module: 'Logs' },
-  { id: '13307', name: 'Allocated Defualters', module: 'Users Reports' },
-  { id: '13325', name: 'Users Defaulter', module: 'Users Reports' },
-  { id: '13326', name: 'New Users List', module: 'Users Reports' },
-  { id: '13328', name: 'Package Wise List', module: 'Users Reports' },
-  { id: '13329', name: 'Promise Date Report', module: 'Users Reports' },
-  { id: '13330', name: 'Allocated Collections', module: 'Users Reports' },
-  { id: '13355', name: 'Month Wise Collection', module: 'Users Reports' },
-  { id: '13349', name: 'Expiry Wise Defaulter', module: 'Users Reports' },
-  { id: '13356', name: 'Collection Not Generated', module: 'Users Reports' },
-  { id: '13354', name: 'Monthly Collection Month Wise', module: 'Users Reports' },
-  { id: '13358', name: 'Unpaid Collection', module: 'Users Reports' },
-  { id: '13306', name: 'User Collections', module: 'Users Reports' },
-  { id: '13353', name: 'Month Wise Defualter', module: 'Users Reports' },
-  { id: '13327', name: 'Deactivate User List', module: 'Users Reports' },
-  { id: '15327', name: 'User Creator Summary', module: 'Users Reports' },
-  { id: '13331', name: 'Dealers Collection', module: 'Dealers Reports' },
-  { id: '13333', name: 'New Dealers List', module: 'Dealers Reports' },
-  { id: '13350', name: 'Dealer Invoice List', module: 'Dealers Reports' },
-  { id: '13332', name: 'Dealers Defaulter', module: 'Dealers Reports' },
-  { id: '13340', name: 'One Day Balance Sheet', module: 'Accounts Reports' },
-  { id: '13336', name: 'Accounts Report', module: 'Accounts Reports' },
-  { id: '15319', name: 'Abstract Stock', module: 'Stock Reports' },
-  { id: '15320', name: 'Abstract Sales', module: 'Sales Reports' },
-  { id: '13339', name: 'Change Username/Password', module: 'Settings' },
-  { id: '13338', name: 'User Rights', module: 'Settings' },
-  { id: '13337', name: 'Configurations', module: 'Settings' },
-];
+const PERMISSIONS = PERMISSION_DEFS;
 
 const MODULES = [...new Set(PERMISSIONS.map(p => p.module))];
 
@@ -149,7 +73,7 @@ export default function ClientPage() {
     if (!selectedUserId || !companyId) return;
     setIsLoadingPerms(true);
     try {
-      const res = await api.get(`/admin/roles/user-permissions/${selectedUserId}`, { params: { companyId } });
+      const res = await api.get(`/admin/roles/users/${selectedUserId}/permissions`, { params: { companyId } });
       const data = res.data?.data || [];
       const permMap: Record<string, { web: boolean; mobile: boolean }> = {};
       PERMISSIONS.forEach(p => { permMap[p.id] = { web: false, mobile: false }; });
@@ -216,9 +140,9 @@ export default function ClientPage() {
         webEnabled: val.web,
         mobileEnabled: val.mobile,
       }));
-      await api.put(`/admin/roles/user-permissions/${selectedUserId}`, { permissions: permList, companyId });
+      await api.put(`/admin/roles/users/${selectedUserId}/permissions`, { permissions: permList, companyId });
       toast({ title: 'Success', description: 'Permissions saved successfully.' });
-      queryClient.invalidateQueries({ queryKey: ['admin/roles/user-permissions'] });
+      queryClient.invalidateQueries({ queryKey: ['admin/roles/users', selectedUserId, 'permissions'] });
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.response?.data?.message || 'Failed to save permissions' });
     } finally {
@@ -337,8 +261,8 @@ export default function ClientPage() {
                     const webAll = moduleWebAllSelected(module);
                     const mobileAll = moduleMobileAllSelected(module);
                     return (
-                      <>
-                        <tr key={module} className="border-b bg-accent/30">
+                      <Fragment key={module}>
+                        <tr className="border-b bg-accent/30">
                           <td colSpan={5} className="py-2 px-3">
                             <div className="flex items-center gap-4">
                               <span className="font-semibold text-sm">{module}</span>
@@ -378,7 +302,7 @@ export default function ClientPage() {
                             </td>
                           </tr>
                         ))}
-                      </>
+                      </Fragment>
                     );
                   })}
                 </tbody>

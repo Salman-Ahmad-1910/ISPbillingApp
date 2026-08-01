@@ -83,4 +83,6 @@ type BillRecord struct {
 	Status          string    `gorm:"type:varchar(20);not null;default:'Created'" json:"status"`
 	BillDate        string    `gorm:"type:varchar(50);not null" json:"billDate"`
 	CreatedBy       string    `gorm:"type:varchar(255)" json:"createdBy"`
+	SubscriberCount int64     `gorm:"type:bigint;default:0" json:"subscriberCount"`
+	SubscriberIDs   string    `gorm:"type:text" json:"subscriberIds"`
 }

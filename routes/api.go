@@ -233,7 +233,6 @@ func SetupRoutes(r *gin.Engine) {
 			controllers.RegisterGenericCRUD[models.Role](roles, "")
 			controllers.RegisterGenericCRUD[models.Permission](roles, "/permissions")
 			controllers.RegisterGenericCRUD[models.RolePermission](roles, "/role-permissions")
-			controllers.RegisterGenericCRUD[models.UserPermission](roles, "/user-permissions")
 			roles.GET("/default", controllers.GetDefaultRoles)
 			roles.POST("/seed", controllers.SeedDefaultRoles)
 			roles.GET("/users/:userId/permissions", controllers.GetUserPermissions)
@@ -601,6 +600,7 @@ func SetupRoutes(r *gin.Engine) {
 				snPool := controllers.SerialNumberPoolCRUD{GenericCRUD: controllers.GenericCRUD[models.SerialNumberPool]{IsScoped: true}}
 				inventory.GET("/serial-number-pool", snPool.FindAll)
 				inventory.POST("/serial-number-pool", snPool.Create)
+				inventory.GET("/serial-number-pool/next", snPool.GetNextSerialNumber)
 				inventory.GET("/serial-number-pool/:id", snPool.FindOne)
 				inventory.PUT("/serial-number-pool/:id", snPool.Update)
 				inventory.DELETE("/serial-number-pool/:id", snPool.Delete)

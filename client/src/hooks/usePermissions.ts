@@ -22,6 +22,9 @@ export function usePermissions(user: User | null) {
     // Get user info
     userRole,
     userPermissions: getUserPermissions(userRole),
+    // Per-user permissions granted on the Roles & Permissions page
+    grantedPermissions: user?.permissions || [],
+    permissionsConfigured: user?.permissionsConfigured || false,
     user,
   };
 }

@@ -47,6 +47,9 @@ export type User = {
   companyId?: string;
   createdBy?: string;
   createdUsers?: User[];
+  // Granted page/feature permissions (permission ids from the Roles & Permissions page)
+  permissions?: string[];
+  permissionsConfigured?: boolean;
   // Hierarchy properties for display
   level?: number;
   isParent?: boolean;

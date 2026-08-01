@@ -64,6 +64,7 @@ func RunMigrations() {
 		&models.Role{},
 		&models.Permission{},
 		&models.RolePermission{},
+		&models.UserPermission{},
 
 		&models.Area{},
 		&models.OLT{},

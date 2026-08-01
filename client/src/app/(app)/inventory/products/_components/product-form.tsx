@@ -20,7 +20,8 @@ import { Loader2 } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import api from '@/lib/api';
 
 type ProductFormValues = z.infer<typeof productSchema>;
 
@@ -80,6 +81,8 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
   const brandIdValue = form.watch('brandId');
   const productTypeIdValue = form.watch('productTypeId');
 
+  const [isFetchingNextSn, setIsFetchingNextSn] = useState(false);
+
   useEffect(() => {
     const brand = brands.find(b => b.id === brandIdValue);
     form.setValue('brandName', brand?.name || '');
@@ -89,6 +92,28 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
     const pt = productTypes.find(pt => pt.id === productTypeIdValue);
     form.setValue('productTypeName', pt?.name || '');
   }, [productTypeIdValue, productTypes, form]);
+
+  // For new products, pre-fill the SN/MAC field with the next available
+  // serial number from the pool. The user can still edit it.
+  useEffect(() => {
+    if (product || !companyId) return;
+    let cancelled = false;
+    (async () => {
+      setIsFetchingNextSn(true);
+      try {
+        const res = await api.get(`/inventory/serial-number-pool/next?companyId=${companyId}`);
+        const sn = res.data?.data?.serialNumber;
+        if (!cancelled && sn) {
+          form.setValue('serialNumber', sn);
+        }
+      } catch {
+        // Ignore: user can type the serial number manually.
+      } finally {
+        if (!cancelled) setIsFetchingNextSn(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [product, companyId, form]);
 
   function onSubmit(values: ProductFormValues) {
     onSave({
@@ -220,9 +245,14 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
           name="serialNumber"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>SN / MAC</FormLabel>
+              <FormLabel>SN / MAC {!product && <span className="text-xs font-normal text-muted-foreground">(auto from pool)</span>}</FormLabel>
               <FormControl>
-                <Input placeholder="e.g., 00:1A:2B:3C:4D:5E" {...field} />
+                <div className="relative">
+                  <Input placeholder="e.g., 00:1A:2B:3C:4D:5E" {...field} disabled={isFetchingNextSn} />
+                  {isFetchingNextSn && (
+                    <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+                  )}
+                </div>
               </FormControl>
               <FormMessage />
             </FormItem>

@@ -75,8 +75,29 @@ func (g SerialNumberPoolCRUD) Create(c *gin.Context) {
 	utils.CreatedResponse(c, "Serial numbers added", created)
 }
 
+// GetNextSerialNumber returns the next available serial number from the pool
+// without marking it as used. The product form uses this to pre-fill the
+// SN/MAC field; the number is marked used when the product is created.
+func (g SerialNumberPoolCRUD) GetNextSerialNumber(c *gin.Context) {
+	companyID := c.MustGet("companyID").(uuid.UUID)
+
+	var pool models.SerialNumberPool
+	err := config.DB.Scopes(models.TenantScope(companyID)).
+		Where("status = ?", "available").
+		Order("created_at asc").
+		First(&pool).Error
+	if err != nil {
+		utils.SuccessResponse(c, "No serial numbers available", gin.H{"serialNumber": nil})
+		return
+	}
+
+	utils.SuccessResponse(c, "Next serial number", gin.H{"serialNumber": pool.SerialNumber})
+}
+
 // CreateProduct creates a product. If no serial number is provided, the next
-// available serial number is taken from the pool and marked as used.
+// available serial number is taken from the pool and marked as used. If the
+// serial number was filled in by the frontend (from the pool), the matching
+// pool entry is also marked as used so it is not reused.
 func CreateProduct(c *gin.Context) {
 	companyID := c.MustGet("companyID").(uuid.UUID)
 
@@ -110,10 +131,20 @@ func CreateProduct(c *gin.Context) {
 		return
 	}
 
+	// Mark the pool entry used. Prefer the entry we auto-assigned; otherwise
+	// match by serial number in case the frontend pre-filled it from the pool.
 	if assignedFromPool != "" {
 		config.DB.Model(&models.SerialNumberPool{}).
 			Scopes(models.TenantScope(companyID)).
 			Where("id = ?", assignedFromPool).
+			Updates(map[string]interface{}{
+				"status":     "used",
+				"product_id": product.ID.String(),
+			})
+	} else if strings.TrimSpace(product.SerialNumber) != "" {
+		config.DB.Model(&models.SerialNumberPool{}).
+			Scopes(models.TenantScope(companyID)).
+			Where("serial_number = ? AND status = ?", strings.TrimSpace(product.SerialNumber), "available").
 			Updates(map[string]interface{}{
 				"status":     "used",
 				"product_id": product.ID.String(),

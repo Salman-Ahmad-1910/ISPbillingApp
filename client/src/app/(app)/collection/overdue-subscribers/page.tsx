@@ -33,10 +33,12 @@ function getMonthsSince(dateStr: string): number {
 
 function getTotalOwed(c: Connection): number {
   const remaining = Number(c.remainingAmount) || 0;
-  const amount = Number(c.amount) || 0;
   const activeDate = getLastActiveDate(c);
   const months = getMonthsSince(activeDate);
-  return remaining + amount * Math.max(0, months);
+  const cable = Number(c.amount) || 0;
+  const internet = Number(c.sameAmount) || 0;
+  const packagePrice = c.connectionType === 'tv_cable' ? cable : c.connectionType === 'internet' ? internet : cable + internet;
+  return remaining + packagePrice * Math.max(0, months);
 }
 
 export default function OverdueSubscribersPage() {
