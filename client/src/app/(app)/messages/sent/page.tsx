@@ -15,6 +15,7 @@ import { Send, CalendarIcon, Search, ChevronLeft, ChevronRight, CheckCircle2, Cl
 import type { Message } from '@/lib/types';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { smartMatch } from '@/lib/search';
 
 export default function SentMessagesPage() {
   const { companyId } = useCompany();
@@ -32,12 +33,8 @@ export default function SentMessagesPage() {
   const filteredData = useMemo(() => {
     const sent = messages.filter(m => m.status === 'sent');
     if (!search) return sent;
-    const q = search.toLowerCase();
     return sent.filter(item =>
-      item.name?.toLowerCase().includes(q) ||
-      item.entityId?.toLowerCase().includes(q) ||
-      item.internetId?.toLowerCase().includes(q) ||
-      item.messageType?.toLowerCase().includes(q)
+      smartMatch(search, [item.entityId, item.internetId], [item.name, item.messageType])
     );
   }, [messages, search]);
 

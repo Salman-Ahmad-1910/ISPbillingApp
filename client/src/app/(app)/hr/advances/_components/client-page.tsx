@@ -19,7 +19,8 @@ import { getColumns } from './columns';
 import { AdvanceLoanForm } from './advance-loan-form';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 
-import api from '@/lib/api';
+  import api from '@/lib/api';
+  import { smartMatch } from '@/lib/search';
 import { useQueryClient } from '@tanstack/react-query';
 
 type AdvanceLoanFormValues = z.infer<typeof advanceLoanSchema>;
@@ -57,11 +58,8 @@ export function ClientPage({ data, staff }: ClientPageProps) {
         }
 
         if (searchQuery.trim()) {
-            const q = searchQuery.toLowerCase();
             result = result.filter(item =>
-                item.staffName.toLowerCase().includes(q) ||
-                item.comments?.toLowerCase().includes(q) ||
-                item.description?.toLowerCase().includes(q)
+                smartMatch(searchQuery, [], [item.staffName, item.comments, item.description])
             );
         }
 

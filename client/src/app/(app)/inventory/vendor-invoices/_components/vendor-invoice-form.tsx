@@ -100,6 +100,7 @@ export function VendorInvoiceForm({
           unitType: product.unitType,
           unitPrice: product.purchasePrice || product.price,
           subtotal: updatedItems[index].quantity * (product.purchasePrice || product.price),
+          serialNumber: product.serialNumber || '',
         };
       }
     } else if (field === 'quantity') {
@@ -271,9 +272,10 @@ export function VendorInvoiceForm({
               <div>
                 <FormLabel className="text-sm">SN / MAC</FormLabel>
                 <Input
+                  readOnly
                   value={singleItem.serialNumber || ''}
-                  onChange={(e) => updateItem(0, 'serialNumber', e.target.value)}
-                  placeholder="e.g., SN001 / AA:BB:CC:DD:EE:FF"
+                  className="bg-muted"
+                  placeholder="Auto-filled from product"
                 />
               </div>
             </div>

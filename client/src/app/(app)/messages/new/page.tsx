@@ -15,6 +15,7 @@ import { Inbox, CalendarIcon, Search, ChevronLeft, ChevronRight, Mail, Clock, Us
 import type { Message } from '@/lib/types';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { smartMatch } from '@/lib/search';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export default function NewMessagesPage() {
@@ -34,12 +35,8 @@ export default function NewMessagesPage() {
   const filteredData = useMemo(() => {
     const newMsgs = messages.filter(m => m.status === 'new' || m.status === 'outbox');
     if (!search) return newMsgs;
-    const q = search.toLowerCase();
     return newMsgs.filter(item =>
-      item.name?.toLowerCase().includes(q) ||
-      item.entityId?.toLowerCase().includes(q) ||
-      item.mobileNo?.toLowerCase().includes(q) ||
-      item.messageType?.toLowerCase().includes(q)
+      smartMatch(search, [item.entityId, item.mobileNo], [item.name, item.messageType])
     );
   }, [messages, search]);
 

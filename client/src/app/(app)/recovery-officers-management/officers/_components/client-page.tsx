@@ -24,7 +24,8 @@ import {
 } from '@/components/ui/dialog';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 
-import api from '@/lib/api';
+  import api from '@/lib/api';
+  import { smartMatch } from '@/lib/search';
 import { useQueryClient } from '@tanstack/react-query';
 
 type RecoveryOfficerFormValues = z.infer<typeof recoveryOfficerSchema>;
@@ -50,8 +51,7 @@ export function ClientPage({ data }: ClientPageProps) {
 
     const filteredData = useMemo(() => data.filter(
         (officer) =>
-            officer.name.toLowerCase().includes(filter.toLowerCase()) ||
-            officer.email.toLowerCase().includes(filter.toLowerCase())
+            smartMatch(filter, [], [officer.name, officer.email])
     ), [data, filter]);
 
     // Pagination helpers

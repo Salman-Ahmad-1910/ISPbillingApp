@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCompany } from '@/context/company-context';
-import api from '@/lib/api';
+  import api from '@/lib/api';
+  import { smartMatch } from '@/lib/search';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
@@ -15,12 +16,14 @@ import {
 } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 import { Printer } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { printSaleReceipt, type SaleReceiptData } from './sale-receipt';
 import { getColumns } from './columns';
 import { DataTable } from './data-table';
 import type { Company } from '@/lib/types';
+import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 
 interface Sale {
   id: string;
@@ -69,6 +72,7 @@ export function ClientPage({ data }: ClientPageProps) {
   const { companies } = useCompany();
   const { companyId } = useCompany();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const company: Company | undefined = companies.find(c => c.id === companyId);
 
@@ -79,6 +83,7 @@ export function ClientPage({ data }: ClientPageProps) {
   const [filter, setFilter] = useState('');
   const [isAddingToCollection, setIsAddingToCollection] = useState(false);
   const [viewSaleInstallment, setViewSaleInstallment] = useState<InstallmentInfo | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   useEffect(() => {
     if (!viewSale?.isInstallment || !viewSale?.subscriberId || !companyId) {
@@ -113,12 +118,12 @@ export function ClientPage({ data }: ClientPageProps) {
   }, [viewSale?.id, viewSale?.isInstallment, viewSale?.subscriberId, companyId]);
 
   const filteredData = useMemo(() => data.filter(sale =>
-    sale?.subscriberName?.toLowerCase()?.includes(filter?.toLowerCase()) ||
-    sale?.paymentMethod?.toLowerCase()?.includes(filter?.toLowerCase())
+    smartMatch(filter, [], [sale.subscriberName, sale.paymentMethod])
   ), [data, filter]);
 
   const toReceipt = (s: Sale): SaleReceiptData => ({
     id: s.id,
+    invoiceNumber: data.indexOf(s) + 1,
     subscriberName: s.subscriberName,
     totalAmount: Number(s.totalAmount) || 0,
     taxAmount: Number(s.taxAmount) || 0,
@@ -230,12 +235,19 @@ export function ClientPage({ data }: ClientPageProps) {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this sale?')) return;
+    setDeleteTarget(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await api.delete(`/pos/sales/${id}`);
+      await api.delete(`/pos/sales/${deleteTarget}`);
       toast({ title: 'Deleted', description: 'Sale entry deleted.' });
+      queryClient.invalidateQueries({ queryKey: ['pos/sales', companyId] });
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.response?.data?.message || 'Failed to delete' });
+    } finally {
+      setDeleteTarget(null);
     }
   };
 
@@ -458,6 +470,13 @@ export function ClientPage({ data }: ClientPageProps) {
           )}
         </SheetContent>
       </Sheet>
+
+      <DeleteAlertDialog
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onDelete={confirmDelete}
+        itemName="this sale"
+      />
     </div>
   );
 }

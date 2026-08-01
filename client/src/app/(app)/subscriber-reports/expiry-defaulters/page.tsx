@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
 
 interface RechargeRecord {
   id: string;
@@ -43,6 +44,7 @@ export default function ExpiryDefaultersPage() {
   const [filterToDateOpen, setFilterToDateOpen] = useState(false);
 
   const [sublocality, setSublocality] = useState('all');
+  const [showInvoice, setShowInvoice] = useState(false);
 
   const allSublocalities = useMemo(() => {
     const set = new Set<string>();
@@ -104,8 +106,37 @@ export default function ExpiryDefaultersPage() {
   };
 
   const handlePrint = () => {
-    window.print();
+    setShowInvoice(true);
   };
+
+  if (showInvoice) {
+    const accent = { title: 'text-violet-600', border: 'border-violet-600', headerBg: 'bg-violet-600', rowHover: 'hover:bg-violet-50/50' };
+    const columns: InvoiceColumn<RechargeRecord>[] = [
+      { header: '#', render: (_: RechargeRecord, i: number) => <span className="font-mono text-xs text-gray-500">{i + 1}</span> },
+      { header: 'Subscriber Name', render: (r) => <span className="font-semibold">{r.subscriberName}</span> },
+      { header: 'Subscriber ID', render: (r) => r.subscriberId.slice(0, 8) },
+      { header: 'Phone', render: (r) => r.phone },
+      { header: 'Address', render: (r) => r.address || '-' },
+      { header: 'Sublocality', render: (r) => r.sublocality },
+      { header: 'Recharge Date', render: (r) => (r.rechargeDate ? format(new Date(r.rechargeDate), 'dd MMM yyyy') : '-') },
+      { header: 'Amount (PKR)', align: 'right', render: (r) => r.amount.toLocaleString() },
+      { header: 'Status', render: (r) => <span className="capitalize">{r.status}</span> },
+    ];
+
+    return (
+      <div className="p-6">
+        <SubscriberReportInvoice<RechargeRecord>
+          title="EXPIRY DEFAULTERS REPORT"
+          subtitle={`From: ${format(filterFromDate, 'dd MMM yyyy')} — To: ${format(filterToDate, 'dd MMM yyyy')}`}
+          accent={accent}
+          data={filteredData}
+          columns={columns}
+          emptyMessage="No expiry defaulter records found for the selected criteria."
+          onBack={() => setShowInvoice(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 p-6">

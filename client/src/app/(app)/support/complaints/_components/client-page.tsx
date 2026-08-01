@@ -13,6 +13,7 @@ import { z } from 'zod';
 
 import type { Complaint, Subscriber, Staff } from '@/lib/types';
 import { complaintSchema } from '@/lib/schemas';
+import { smartMatch } from '@/lib/search';
 
 import { DataTable } from './data-table';
 import { getColumns } from './columns';
@@ -46,9 +47,7 @@ export function ClientPage({ data, subscribers, staff }: ClientPageProps) {
     const [pageInput, setPageInput] = useState<string>('');
 
     const filteredData = useMemo(() => data.filter(complaint =>
-        complaint.subscriberName.toLowerCase().includes(filter.toLowerCase()) ||
-        complaint.description.toLowerCase().includes(filter.toLowerCase()) ||
-        complaint.id.toLowerCase().includes(filter.toLowerCase())
+        smartMatch(filter, [complaint.id], [complaint.subscriberName, complaint.description])
     ), [data, filter]);
 
     // Pagination helpers

@@ -24,6 +24,7 @@ import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { prefixMatch } from '@/lib/search';
 
 type BrandFormValues = z.infer<typeof brandSchema>;
 
@@ -43,9 +44,8 @@ export function ClientPage({ data }: ClientPageProps) {
 
   const filteredBrands = useMemo(() => {
     if (!searchTerm) return data;
-    const lowerSearch = searchTerm.toLowerCase();
     return data.filter(brand =>
-      brand.name.toLowerCase().includes(lowerSearch)
+      prefixMatch(searchTerm, brand.name)
     );
   }, [data, searchTerm]);
 

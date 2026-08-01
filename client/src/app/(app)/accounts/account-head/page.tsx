@@ -25,6 +25,7 @@ import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
+import { smartMatch } from '@/lib/search';
 import { Layers, PlusCircle, MoreHorizontal, Edit3, Trash2, Search, Loader2 } from 'lucide-react';
 
 const accountTypes = [
@@ -102,15 +103,8 @@ export default function AccountHeadPage() {
   // Head filtering
   const filteredHeads = useMemo(() => {
     return headsList.filter((h) => {
-      if (headSearch) {
-        const q = headSearch.toLowerCase();
-        if (
-          !h.masterAccount.toLowerCase().includes(q) &&
-          !h.accountType.toLowerCase().includes(q) &&
-          !h.description.toLowerCase().includes(q)
-        ) {
-          return false;
-        }
+      if (headSearch && !smartMatch(headSearch, [], [h.masterAccount, h.accountType, h.description])) {
+        return false;
       }
       return true;
     });
@@ -125,16 +119,8 @@ export default function AccountHeadPage() {
   // Sub Head filtering
   const filteredSubHeads = useMemo(() => {
     return subHeadsList.filter((s) => {
-      if (subSearch) {
-        const q = subSearch.toLowerCase();
-        if (
-          !s.subMasterAccount.toLowerCase().includes(q) &&
-          !s.masterAccount.toLowerCase().includes(q) &&
-          !s.accountType.toLowerCase().includes(q) &&
-          !s.description.toLowerCase().includes(q)
-        ) {
-          return false;
-        }
+      if (subSearch && !smartMatch(subSearch, [], [s.subMasterAccount, s.masterAccount, s.accountType, s.description])) {
+        return false;
       }
       return true;
     });

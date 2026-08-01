@@ -19,6 +19,7 @@ type Invoice struct {
 // Payment handles specific remittances
 type Payment struct {
 	TenantModel
+	BillNo         uint       `gorm:"autoIncrement" json:"billNo"`
 	InvoiceID      *uuid.UUID `gorm:"type:uuid;index" json:"invoiceId"`
 	SubscriberID   *uuid.UUID `gorm:"type:uuid;index" json:"subscriberId"`
 	SubscriberName string     `gorm:"type:varchar(255)" json:"subscriberName"`
@@ -26,6 +27,11 @@ type Payment struct {
 	PaymentDate    string     `gorm:"type:varchar(50);not null" json:"paymentDate"`
 	Method         string     `gorm:"type:varchar(50);not null" json:"method"` // cash, bank, online, dealer
 	CollectorID    *uuid.UUID `gorm:"type:uuid" json:"collectorId"`
+
+	// Transient enrichment fields (not stored in DB)
+	Address         string `gorm:"-" json:"address"`
+	AreaName        string `gorm:"-" json:"areaName"`
+	CollectedByName string `gorm:"-" json:"collectedByName"`
 }
 
 // CustomBill handles ad-hoc charges outside of standard cycle

@@ -2,6 +2,7 @@
 
 import ReactSelect from 'react-select';
 import type { Subscriber } from '@/lib/types';
+import { smartMatch } from '@/lib/search';
 
 interface SubscriberSelectProps {
   subscribers: Subscriber[];
@@ -19,6 +20,7 @@ export function SubscriberSelect({
   disabled = false,
 }: SubscriberSelectProps) {
   const options = subscribers.map((subscriber) => ({
+    ...subscriber,
     value: subscriber.id,
     label: `${subscriber.subscriber_identity || ''} | ${subscriber.name || ''}`,
   }));
@@ -34,6 +36,10 @@ export function SubscriberSelect({
       placeholder={placeholder}
       isDisabled={disabled}
       isSearchable
+      filterOption={(option, rawInput) => {
+        const d = option.data as Subscriber;
+        return smartMatch(rawInput, [d.subscriber_identity, d.id, d.cnic, d.phone], [d.name]);
+      }}
       classNamePrefix="react-select"
     />
   );

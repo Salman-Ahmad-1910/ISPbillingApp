@@ -65,6 +65,17 @@ export const columns = ({ onEdit, onPay, onPrint, onDelete, companyName }: Purch
     cell: ({ row }) => <span>{row.original.purchaseDate}</span>,
   },
   {
+    id: 'serialNumber',
+    header: 'SN / MAC',
+    cell: ({ row }) => {
+      const items = row.original.items || [];
+      const serials = items.map(i => i.serialNumber).filter(Boolean);
+      if (serials.length === 0) return <span className="text-muted-foreground">\u2014</span>;
+      const display = serials.length > 2 ? `${serials.slice(0, 2).join(', ')} +${serials.length - 2}` : serials.join(', ');
+      return <span className="text-xs font-mono max-w-[200px] truncate block" title={serials.join(', ')}>{display}</span>;
+    },
+  },
+  {
     accessorKey: 'totalAmount',
     header: 'Total Amount',
     cell: ({ row }) => {

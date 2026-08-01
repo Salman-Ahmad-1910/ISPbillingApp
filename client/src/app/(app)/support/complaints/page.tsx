@@ -33,7 +33,7 @@ export default function ComplaintsPage() {
             <MessageSquare className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Complaint Management</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Subscriber Complaint</h1>
             <p className="text-sm text-muted-foreground">Track and resolve subscriber issues.</p>
           </div>
         </div>

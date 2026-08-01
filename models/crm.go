@@ -42,6 +42,7 @@ type Product struct {
 	BrandName      string  `gorm:"type:varchar(255)" json:"brandName"`
 	ProductTypeID  string  `gorm:"type:varchar(100)" json:"productTypeId"`
 	ProductTypeName string `gorm:"type:varchar(255)" json:"productTypeName"`
+	SerialNumber   string `gorm:"type:varchar(255)" json:"serialNumber"`
 }
 
 // InstallmentPlan - Defined schedule for physical goods

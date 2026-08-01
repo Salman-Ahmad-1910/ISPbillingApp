@@ -144,24 +144,34 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex flex-wrap items-stretch gap-3">
-            {[...kpiConfig, ...kpiConfigRight].map((kpi) => (
-              <Card
-                key={kpi.title}
-                className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 flex-1 min-w-[180px] max-w-[280px] min-h-[160px]"
-              >
-                <div className={`absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br ${kpi.gradient}`} />
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
-                  <CardTitle className="text-[11px] font-medium leading-tight">{kpi.title}</CardTitle>
-                  <div className={`rounded-lg p-1.5 bg-gradient-to-br ${kpi.gradient} text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md`}>
-                    <kpi.icon className="h-3 w-3" />
-                  </div>
-                </CardHeader>
-                <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
-                  <div className="text-2xl font-bold tracking-tight">{kpi.value}</div>
-                  <p className="text-xs text-muted-foreground mt-1">{kpi.change}</p>
-                </CardContent>
-              </Card>
-            ))}
+            {[...kpiConfig, ...kpiConfigRight].map((kpi) => {
+              const isOverdue = kpi.title === 'Total Overdue';
+              const card = (
+                <Card
+                  key={kpi.title}
+                  className={`group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 flex-1 min-w-[180px] max-w-[280px] min-h-[160px] ${isOverdue ? 'cursor-pointer' : ''}`}
+                >
+                  <div className={`absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br ${kpi.gradient}`} />
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
+                    <CardTitle className="text-[11px] font-medium leading-tight">{kpi.title}</CardTitle>
+                    <div className={`rounded-lg p-1.5 bg-gradient-to-br ${kpi.gradient} text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md`}>
+                      <kpi.icon className="h-3 w-3" />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
+                    <div className="text-2xl font-bold tracking-tight">{kpi.value}</div>
+                    <p className="text-xs text-muted-foreground mt-1">{kpi.change}</p>
+                  </CardContent>
+                </Card>
+              );
+              return isOverdue ? (
+                <Link key={kpi.title} href="/collection/overdue-subscribers" className="block">
+                  {card}
+                </Link>
+              ) : (
+                card
+              );
+            })}
           </div>
         </div>
 

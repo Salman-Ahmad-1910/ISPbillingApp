@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
 
 interface MonthCollectionRecord {
   id: string;
@@ -69,6 +70,7 @@ export default function MonthlyCollectionsPage() {
   const [historyFromDateOpen, setHistoryFromDateOpen] = useState(false);
   const [historyToDate, setHistoryToDate] = useState<Date>(new Date());
   const [historyToDateOpen, setHistoryToDateOpen] = useState(false);
+  const [showInvoice, setShowInvoice] = useState(false);
 
   const allRecords: MonthCollectionRecord[] = useMemo(() => {
     return payments.map((p: any) => {
@@ -169,8 +171,40 @@ export default function MonthlyCollectionsPage() {
   };
 
   const handlePrint = () => {
-    window.print();
+    setShowInvoice(true);
   };
+
+  if (showInvoice) {
+    const accent = { title: 'text-teal-600', border: 'border-teal-600', headerBg: 'bg-teal-600', rowHover: 'hover:bg-teal-50/50' };
+    const columns: InvoiceColumn<MonthCollectionRecord>[] = [
+      { header: '#', render: (_: MonthCollectionRecord, i: number) => <span className="font-mono text-xs text-gray-500">{i + 1}</span> },
+      { header: 'Subscriber Name', render: (r) => <span className="font-semibold">{r.subscriberName}</span> },
+      { header: 'Bill ID', render: (r) => r.billId || '-' },
+      { header: 'Amount (PKR)', align: 'right', render: (r) => r.amount.toLocaleString() },
+      { header: 'Generated Month', render: (r) => months.find((m) => m.value === r.generatedMonth)?.label || '-' },
+      { header: 'Collection Month', render: (r) => months.find((m) => m.value === r.collectionMonth)?.label || '-' },
+      { header: 'Collection Date', render: (r) => (r.collectionDate ? format(new Date(r.collectionDate), 'dd MMM yyyy') : '-') },
+      { header: 'Address', render: (r) => r.address || '-' },
+      { header: 'Sublocality', render: (r) => r.sublocality },
+      { header: 'Connection Type', render: (r) => <span className="capitalize">{r.connectionType}</span> },
+      { header: 'Collected By', render: (r) => r.collectedBy || '-' },
+      { header: 'Status', render: (r) => <span className="capitalize">{r.status}</span> },
+    ];
+
+    return (
+      <div className="p-6">
+        <SubscriberReportInvoice<MonthCollectionRecord>
+          title="MONTH WISE COLLECTION REPORT"
+          subtitle={`From: ${format(historyFromDate, 'dd MMM yyyy')} — To: ${format(historyToDate, 'dd MMM yyyy')}`}
+          accent={accent}
+          data={filteredData}
+          columns={columns}
+          emptyMessage="No month wise collection records found for the selected criteria."
+          onBack={() => setShowInvoice(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 p-6">

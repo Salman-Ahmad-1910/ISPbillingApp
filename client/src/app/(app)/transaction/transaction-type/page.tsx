@@ -30,6 +30,7 @@ import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
+import { smartMatch } from '@/lib/search';
 import { Loader2, Pencil, Plus, Search, Trash2, FileCog, ListChecks } from 'lucide-react';
 
 import type { TransactionType } from '@/lib/types';
@@ -90,11 +91,8 @@ export default function TransactionTypePage() {
   const filtered = useMemo(() => {
     const all = records as TransactionType[];
     if (!search.trim()) return all;
-    const q = search.toLowerCase();
     return all.filter(r =>
-      r.transaction.toLowerCase().includes(q) ||
-      r.title?.toLowerCase().includes(q) ||
-      r.paymentChannel?.toLowerCase().includes(q)
+      smartMatch(search, [r.id], [r.transaction, r.title, r.paymentChannel])
     );
   }, [records, search]);
 

@@ -33,12 +33,28 @@ import { useCompany } from '@/context/company-context';
 import { useQueryClient } from '@tanstack/react-query';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
+import { smartMatch } from '@/lib/search';
 import api from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
-import { Loader2, MoreHorizontal, Wallet, DollarSign, UserCheck, Trash2, Pencil, Copy, FileText, Users } from 'lucide-react';
+import { Loader2, MoreHorizontal, Wallet, DollarSign, UserCheck, Trash2, Pencil, Copy, FileText, Users, CalendarClock } from 'lucide-react';
 
-import type { Connection, Payment, Area, RecoveryOfficer, TransactionType } from '@/lib/types';
+import type { Connection, Payment, Area, RecoveryOfficer, TransactionType, PromiseEntry } from '@/lib/types';
 import { SubscriberPrintDialog } from './_components/subscriber-print-dialog';
+
+function getMonthsSince(dateStr: string): number {
+  if (!dateStr) return 0;
+  const d = new Date(dateStr);
+  const now = new Date();
+  return (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+}
+
+function getTotalOwed(c: Connection): number {
+  const remaining = Number(c.remainingAmount) || 0;
+  const amount = Number(c.amount) || 0;
+  const activeDate = c.lastPaymentDate || c.rechargeDate || c.createdAt;
+  const months = getMonthsSince(activeDate);
+  return remaining + amount * Math.max(0, months);
+}
 
 const PAYMENT_TYPE_OPTIONS = [
   { id: 'cash', name: 'Cash' },
@@ -62,6 +78,11 @@ export default function SubscriberCollectionsPage() {
   const [subscriberSearch, setSubscriberSearch] = useState('');
   const [showReceiveDialog, setShowReceiveDialog] = useState(false);
 
+  const [showPromiseDialog, setShowPromiseDialog] = useState(false);
+  const [promiseDate, setPromiseDate] = useState(new Date().toISOString().split('T')[0]);
+  const [promiseDescription, setPromiseDescription] = useState('');
+  const [isSavingPromise, setIsSavingPromise] = useState(false);
+
   const [receiveAmount, setReceiveAmount] = useState(0);
   const [receiveDate, setReceiveDate] = useState(new Date().toISOString().split('T')[0]);
   const [receiveMethod, setReceiveMethod] = useState<string>('cash');
@@ -70,8 +91,11 @@ export default function SubscriberCollectionsPage() {
   const [selectedTransactionTypeId, setSelectedTransactionTypeId] = useState('');
 
   const [printPayment, setPrintPayment] = useState<Payment | null>(null);
+  const [printPromise, setPrintPromise] = useState<PromiseEntry | null>(null);
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
   const [printFormatChoice, setPrintFormatChoice] = useState<'a4' | 'thermal'>('a4');
+
+  const [selectedPromiseId, setSelectedPromiseId] = useState<string | null>(null);
 
   const [editPayment, setEditPayment] = useState<Payment | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -85,10 +109,8 @@ export default function SubscriberCollectionsPage() {
 
   const filteredSubscribers = useMemo(() => {
     if (!subscriberSearch.trim()) return [];
-    const q = subscriberSearch.toLowerCase();
     return (connections as Connection[]).filter(c =>
-      c.id?.toLowerCase().includes(q) ||
-      c.name?.toLowerCase().includes(q)
+      smartMatch(subscriberSearch, [c.id, c.internetId, c.cell, c.mobile], [c.name])
     ).slice(0, 20);
   }, [connections, subscriberSearch]);
 
@@ -102,11 +124,22 @@ export default function SubscriberCollectionsPage() {
     selectedSubscriberId ? companyId ?? undefined : undefined,
   );
 
+  const { data: promises = [], isLoading: isLoadingPromises, refetch: refetchPromises } = useGenericQuery<PromiseEntry>(
+    selectedSubscriberId ? 'billing/promises' : null,
+    selectedSubscriberId ? companyId ?? undefined : undefined,
+  );
+
   const subscriberPayments = useMemo(() => {
     if (!selectedSubscriberId) return [];
     const all = payments as Payment[];
     return all.filter(p => p.subscriberId === selectedSubscriberId);
   }, [payments, selectedSubscriberId]);
+
+  const subscriberPromises = useMemo(() => {
+    if (!selectedSubscriberId) return [];
+    const all = promises as PromiseEntry[];
+    return all.filter(p => p.subscriberId === selectedSubscriberId && p.status !== 'completed');
+  }, [promises, selectedSubscriberId]);
 
   const totalSubscribers = useMemo(() => {
     if (!Array.isArray(connections)) return 0;
@@ -171,6 +204,56 @@ export default function SubscriberCollectionsPage() {
     return officer?.name || user?.name || '---';
   }, [selectedSubscriber, areas, recoveryOfficers, user]);
 
+  const sublocalityName = useMemo(() => {
+    if (!selectedSubscriber?.sublocalityId) return '';
+    const area = (areas as Area[]).find(a => a.id === selectedSubscriber.sublocalityId);
+    return area?.subLocality || area?.locality || '';
+  }, [selectedSubscriber, areas]);
+
+  const handlePromiseSave = async () => {
+    if (!selectedSubscriber || !user) return;
+    if (!promiseDate) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Please select a promise date.' });
+      return;
+    }
+    if (!promiseDescription.trim()) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Please enter a description for the promise.' });
+      return;
+    }
+    setIsSavingPromise(true);
+    try {
+      await api.post('/billing/promises', {
+        subscriberId: selectedSubscriber.id,
+        subscriberName: selectedSubscriber.name,
+        internetId: selectedSubscriber.internetId,
+        phone: selectedSubscriber.mobile || selectedSubscriber.cell || '',
+        address: selectedSubscriber.address,
+        sublocality: sublocalityName,
+        connectionType: selectedSubscriber.connectionType,
+        amount: getTotalOwed(selectedSubscriber),
+        promiseDate,
+        description: promiseDescription.trim(),
+        status: 'pending',
+        collectorId: user.id,
+        collectorName: recoveryOfficerName,
+      });
+      toast({ title: 'Success', description: 'Promise recorded successfully.' });
+      setShowPromiseDialog(false);
+      setPromiseDate(new Date().toISOString().split('T')[0]);
+      setPromiseDescription('');
+      refetchPromises();
+    } catch (error: any) {
+      const serverMsg = error.response?.data?.message || error.response?.data?.error || '';
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: serverMsg || 'Failed to record promise',
+      });
+    } finally {
+      setIsSavingPromise(false);
+    }
+  };
+
   const handleReceive = async () => {
     if (!selectedSubscriber || !user) return;
     setIsSaving(true);
@@ -186,15 +269,26 @@ export default function SubscriberCollectionsPage() {
           ? (transactionTypes as TransactionType[]).find(t => t.id === selectedTransactionTypeId)?.transaction
           : undefined,
       });
+      if (selectedPromiseId) {
+        const linkedPromise = subscriberPromises.find(p => p.id === selectedPromiseId);
+        if (linkedPromise) {
+          await api.put(`/billing/promises/${linkedPromise.id}`, {
+            ...linkedPromise,
+            status: 'completed',
+          });
+        }
+      }
       toast({ title: 'Success', description: 'Payment received and recorded.' });
       setShowReceiveDialog(false);
       refetchPayments();
+      refetchPromises();
       queryClient.invalidateQueries({ queryKey: ['admin/connections'] });
       setReceiveAmount(0);
       setReceiveDate(new Date().toISOString().split('T')[0]);
       setReceiveMethod('cash');
       setReceiveComment('');
       setSelectedTransactionTypeId('');
+      setSelectedPromiseId(null);
     } catch (error: any) {
       const serverMsg = error.response?.data?.message || error.response?.data?.error || '';
       toast({
@@ -216,6 +310,27 @@ export default function SubscriberCollectionsPage() {
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete entry.' });
     }
+  };
+
+  const handleDeletePromise = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this promise?')) return;
+    try {
+      await api.delete(`/billing/promises/${id}`);
+      toast({ title: 'Deleted', description: 'Promise entry deleted.' });
+      refetchPromises();
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete promise.' });
+    }
+  };
+
+  const handleReceivePromise = (promise: PromiseEntry) => {
+    setSelectedPromiseId(promise.id);
+    setReceiveAmount(promise.amount);
+    setReceiveDate(new Date().toISOString().split('T')[0]);
+    setReceiveMethod('cash');
+    setReceiveComment('');
+    setSelectedTransactionTypeId('');
+    setShowReceiveDialog(true);
   };
 
   const handleEditOpen = (payment: Payment) => {
@@ -385,8 +500,8 @@ export default function SubscriberCollectionsPage() {
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Remaining</Label>
-                  <p className={`font-medium ${(selectedSubscriber.remainingAmount || 0) > 0 ? 'text-destructive' : 'text-green-600'}`}>
-                    PKR {(selectedSubscriber.remainingAmount || 0).toLocaleString()}
+                  <p className={`font-medium ${getTotalOwed(selectedSubscriber) > 0 ? 'text-destructive' : 'text-green-600'}`}>
+                    PKR {getTotalOwed(selectedSubscriber).toLocaleString()}
                   </p>
                 </div>
               </div>
@@ -398,7 +513,11 @@ export default function SubscriberCollectionsPage() {
                 <span>Receiving as: <span className="font-medium text-foreground">{recoveryOfficerName}</span></span>
               </div>
               <div className="flex-1" />
-              <Button onClick={() => setShowReceiveDialog(true)} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
+              <Button variant="outline" onClick={() => setShowPromiseDialog(true)}>
+                <CalendarClock className="mr-2 h-4 w-4" />
+                Make Promise
+              </Button>
+              <Button onClick={() => { setSelectedPromiseId(null); setShowReceiveDialog(true); }} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
                 <DollarSign className="mr-2 h-4 w-4" />
                 Receive Payment
               </Button>
@@ -406,11 +525,11 @@ export default function SubscriberCollectionsPage() {
 
             <div className="p-4">
               <h3 className="text-lg font-semibold mb-4">{selectedSubscriber.name}&apos;s Payment History</h3>
-              {isLoadingPayments ? (
+              {isLoadingPayments || isLoadingPromises ? (
                 <div className="flex justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
-              ) : subscriberPayments.length === 0 ? (
+              ) : subscriberPayments.length === 0 && subscriberPromises.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">No payment history found.</p>
               ) : (
                 <div className="overflow-x-auto">
@@ -423,18 +542,82 @@ export default function SubscriberCollectionsPage() {
                         <TableHead className="py-1 px-1.5 whitespace-nowrap">Address</TableHead>
                         <TableHead className="py-1 px-1.5 whitespace-nowrap">Month/Year</TableHead>
                         <TableHead className="py-1 px-1.5 whitespace-nowrap">Payment Type</TableHead>
-                        <TableHead className="py-1 px-1.5 whitespace-nowrap">Paid Amount</TableHead>
-                        <TableHead className="py-1 px-1.5 whitespace-nowrap">Pay Date</TableHead>
+                        <TableHead className="py-1 px-1.5 whitespace-nowrap">Amount</TableHead>
+                        <TableHead className="py-1 px-1.5 whitespace-nowrap">Date</TableHead>
                         <TableHead className="py-1 px-1.5 whitespace-nowrap">Comment</TableHead>
                         <TableHead className="py-1 px-1.5 whitespace-nowrap">Status</TableHead>
                         <TableHead className="py-1 px-1.5 whitespace-nowrap">Received By</TableHead>
-                        <TableHead className="py-1 px-1.5 w-[40px]"></TableHead>
+                        <TableHead className="py-1 px-1.5 w-[110px]"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
+                      {subscriberPromises.map((promise) => (
+                        <TableRow key={promise.id} className="bg-amber-50/40 dark:bg-amber-950/20">
+                          <TableCell className="py-1.5 px-1.5 whitespace-nowrap">
+                            <span className="font-mono text-amber-700 dark:text-amber-400">PROMISE</span>
+                          </TableCell>
+                          <TableCell className="py-1.5 px-1.5 font-mono whitespace-nowrap">{promise.subscriberId?.slice(0, 8) || '---'}</TableCell>
+                          <TableCell className="py-1.5 px-1.5 whitespace-nowrap">{selectedSubscriber.name}</TableCell>
+                          <TableCell className="py-1.5 px-1.5 max-w-[100px] truncate" title={selectedSubscriber.address}>{selectedSubscriber.address || '---'}</TableCell>
+                          <TableCell className="py-1.5 px-1.5 whitespace-nowrap">
+                            {promise.promiseDate ? new Date(promise.promiseDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '---'}
+                          </TableCell>
+                          <TableCell className="py-1.5 px-1.5 whitespace-nowrap">
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-300 text-amber-700">Promise</Badge>
+                          </TableCell>
+                          <TableCell className="py-1.5 px-1.5 font-medium whitespace-nowrap">PKR {promise.amount.toLocaleString()}</TableCell>
+                          <TableCell className="py-1.5 px-1.5 whitespace-nowrap">
+                            {promise.promiseDate ? new Date(promise.promiseDate).toLocaleDateString() : '---'}
+                          </TableCell>
+                          <TableCell className="py-1.5 px-1.5 max-w-[80px] truncate" title={promise.description}>{promise.description || '---'}</TableCell>
+                          <TableCell className="py-1.5 px-1.5 whitespace-nowrap">
+                            <Badge variant="default" className="bg-amber-500 text-[10px] px-1.5 py-0">Pending</Badge>
+                          </TableCell>
+                          <TableCell className="py-1.5 px-1.5 whitespace-nowrap">{promise.collectorName || recoveryOfficerName}</TableCell>
+                          <TableCell className="py-1.5 px-1.5">
+                            <div className="flex items-center gap-1">
+                              <Button variant="outline" size="sm" className="h-6 px-2 text-[10px] text-emerald-600 hover:text-emerald-700" onClick={() => handleReceivePromise(promise)}>
+                                <DollarSign className="mr-1 h-3 w-3" />
+                                Receive
+                              </Button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6">
+                                    <MoreHorizontal className="h-3 w-3" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => {
+                                    setPrintPromise(promise);
+                                    setPrintPayment(null);
+                                    setPrintFormatChoice('a4');
+                                    setIsPrintDialogOpen(true);
+                                  }}>
+                                    <FileText className="mr-2 h-4 w-4" />
+                                    Print Slip
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => {
+                                    setPrintPromise(promise);
+                                    setPrintPayment(null);
+                                    setPrintFormatChoice('thermal');
+                                    setIsPrintDialogOpen(true);
+                                  }}>
+                                    <Copy className="mr-2 h-4 w-4" />
+                                    Duplicate Slip
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleDeletePromise(promise.id)} className="text-red-600">
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
                       {subscriberPayments.map((payment, index) => (
                         <TableRow key={payment.id}>
-                          <TableCell className="py-1.5 px-1.5 font-mono whitespace-nowrap">{index + 1}</TableCell>
+                          <TableCell className="py-1.5 px-1.5 font-mono whitespace-nowrap">{payment.billNo || index + 1}</TableCell>
                           <TableCell className="py-1.5 px-1.5 font-mono whitespace-nowrap">{payment.subscriberId?.slice(0, 8) || '---'}</TableCell>
                           <TableCell className="py-1.5 px-1.5 whitespace-nowrap">{payment.subscriberName}</TableCell>
                           <TableCell className="py-1.5 px-1.5 max-w-[100px] truncate" title={selectedSubscriber.address}>{selectedSubscriber.address || '---'}</TableCell>
@@ -464,6 +647,7 @@ export default function SubscriberCollectionsPage() {
                                   Edit
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => {
+                                  setPrintPromise(null);
                                   setPrintPayment(payment);
                                   setPrintFormatChoice('a4');
                                   setIsPrintDialogOpen(true);
@@ -472,6 +656,7 @@ export default function SubscriberCollectionsPage() {
                                   Print
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => {
+                                  setPrintPromise(null);
                                   setPrintPayment(payment);
                                   setPrintFormatChoice('thermal');
                                   setIsPrintDialogOpen(true);
@@ -505,12 +690,17 @@ export default function SubscriberCollectionsPage() {
       </Card>
 
       {/* Receive Payment Dialog */}
-      <Dialog open={showReceiveDialog} onOpenChange={setShowReceiveDialog}>
+      <Dialog open={showReceiveDialog} onOpenChange={(open) => { setShowReceiveDialog(open); if (!open) setSelectedPromiseId(null); }}>
         <DialogContent className="max-w-md max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Receive Payment</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 overflow-y-auto pr-2 flex-1 min-h-0">
+            {selectedPromiseId && (
+              <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-400">
+                Fulfilling a pending promise (amount pre-filled).
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label>Subscriber ID</Label>
@@ -593,6 +783,52 @@ export default function SubscriberCollectionsPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Make Promise Dialog */}
+      <Dialog open={showPromiseDialog} onOpenChange={setShowPromiseDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Make a Promise</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label>Subscriber ID</Label>
+                <Input value={selectedSubscriber?.id?.slice(0, 8) || ''} readOnly />
+              </div>
+              <div className="space-y-1">
+                <Label>Subscriber Name</Label>
+                <Input value={selectedSubscriber?.name || ''} readOnly />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Promise Date</Label>
+              <Input
+                type="date"
+                value={promiseDate}
+                onChange={(e) => setPromiseDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Description</Label>
+              <Textarea
+                value={promiseDescription}
+                onChange={(e) => setPromiseDescription(e.target.value)}
+                placeholder="e.g. I will pay the outstanding amount on this date."
+                rows={3}
+              />
+            </div>
+            <Button
+              onClick={handlePromiseSave}
+              disabled={isSavingPromise}
+              className="w-full bg-gradient-to-r from-cyan-500 to-teal-600 text-white hover:from-cyan-600 hover:to-teal-700 shadow-sm transition-all duration-300 hover:shadow-md"
+            >
+              {isSavingPromise && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Promise
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={(open) => { setShowEditDialog(open); if (!open) setEditPayment(null); }}>
         <DialogContent className="max-w-md">
@@ -632,8 +868,9 @@ export default function SubscriberCollectionsPage() {
 
       <SubscriberPrintDialog
         isOpen={isPrintDialogOpen}
-        onClose={() => { setIsPrintDialogOpen(false); setPrintPayment(null); }}
+        onClose={() => { setIsPrintDialogOpen(false); setPrintPayment(null); setPrintPromise(null); }}
         payment={printPayment}
+        promise={printPromise}
         company={currentCompany}
         subscriberName={selectedSubscriber?.name}
         collectorName={recoveryOfficerName}

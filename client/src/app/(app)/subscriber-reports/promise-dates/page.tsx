@@ -15,8 +15,11 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
+import type { PromiseEntry } from '@/lib/types';
 
 interface PromiseRecord {
+  key: string;
   id: string;
   subscriberName: string;
   subscriberId: string;
@@ -28,13 +31,17 @@ interface PromiseRecord {
   promiseType: string;
   amount: number;
   status: string;
-  remarks: string;
+  description: string;
+  promisedBy: string;
 }
 
 export default function PromiseDateReportsPage() {
   const { companyId } = useCompany();
 
-  const { data: subscribers = [], isLoading: loading } = useGenericQuery<any>('subscribers', companyId ?? undefined);
+  const { data: promises = [], isLoading: loading } = useGenericQuery<PromiseEntry>(
+    'billing/promises',
+    companyId ?? undefined,
+  );
 
   const [filterFromDate, setFilterFromDate] = useState<Date>(() => {
     const d = new Date();
@@ -44,6 +51,7 @@ export default function PromiseDateReportsPage() {
   const [filterFromDateOpen, setFilterFromDateOpen] = useState(false);
   const [filterToDate, setFilterToDate] = useState<Date>(new Date());
   const [filterToDateOpen, setFilterToDateOpen] = useState(false);
+  const [showInvoice, setShowInvoice] = useState(false);
 
   const [sublocality, setSublocality] = useState('all');
   const [promiseType, setPromiseType] = useState('all');
@@ -52,28 +60,28 @@ export default function PromiseDateReportsPage() {
 
   const allSublocalities = useMemo(() => {
     const set = new Set<string>();
-    subscribers.forEach((s: any) => { if (s.areaName) set.add(s.areaName); });
+    promises.forEach((p: any) => { if (p.sublocality) set.add(p.sublocality); });
     return Array.from(set);
-  }, [subscribers]);
+  }, [promises]);
 
   const promiseData: PromiseRecord[] = useMemo(() => {
-    return subscribers
-      .filter((s: any) => s.status === 'active' || s.status === 'suspended')
-      .map((s: any) => ({
-        id: s.id,
-        subscriberName: s.name || '',
-        subscriberId: s.subscriber_identity || '',
-        phone: s.phone || '',
-        address: s.installationAddress || '',
-        sublocality: s.areaName || '',
-        connectionType: s.connectionType || 'internet',
-        promiseDate: s.updatedAt || s.connectionDate || '',
-        promiseType: s.balance && Number(s.balance) > 0 ? 'payment' : 'other',
-        amount: Number(s.balance) || 0,
-        status: s.status === 'active' ? 'pending' : 'overdue',
-        remarks: '',
-      }));
-  }, [subscribers]);
+    return (promises as any[]).map((p: any) => ({
+      key: p.id,
+      id: p.subscriberId || p.id,
+      subscriberName: p.subscriberName || '',
+      subscriberId: p.internetId || p.subscriberId || p.id || '',
+      phone: p.phone || '',
+      address: p.address || '',
+      sublocality: p.sublocality || '',
+      connectionType: p.connectionType || 'internet',
+      promiseDate: p.promiseDate || '',
+      promiseType: 'payment',
+      amount: Number(p.amount) || 0,
+      status: p.status || 'pending',
+      description: p.description || '',
+      promisedBy: p.collectorName || '',
+    }));
+  }, [promises]);
 
   const filteredData = useMemo(() => promiseData.filter((item) => {
     const itemDate = new Date(item.promiseDate);
@@ -98,10 +106,10 @@ export default function PromiseDateReportsPage() {
   const exportExcel = () => {
     if (filteredData.length === 0) return;
 
-    const headers = ['Subscriber Name', 'Subscriber ID', 'Phone', 'Address', 'Sublocality', 'Connection Type', 'Promise Date', 'Promise Type', 'Amount', 'Status', 'Remarks'];
+    const headers = ['Subscriber Name', 'Subscriber ID', 'Phone', 'Address', 'Sublocality', 'Connection Type', 'Promise Date', 'Amount', 'Status', 'Description', 'Promised By'];
     const rows = filteredData.map((item) => [
       item.subscriberName, item.subscriberId, item.phone, item.address, item.sublocality,
-      item.connectionType, item.promiseDate, item.promiseType, item.amount.toFixed(2), item.status, item.remarks,
+      item.connectionType, item.promiseDate, item.amount.toFixed(2), item.status, item.description, item.promisedBy,
     ]);
 
     const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
@@ -117,8 +125,40 @@ export default function PromiseDateReportsPage() {
   };
 
   const handlePrint = () => {
-    window.print();
+    setShowInvoice(true);
   };
+
+  if (showInvoice) {
+    const accent = { title: 'text-cyan-600', border: 'border-cyan-600', headerBg: 'bg-cyan-600', rowHover: 'hover:bg-cyan-50/50' };
+    const columns: InvoiceColumn<PromiseRecord>[] = [
+      { header: '#', render: (_: PromiseRecord, i: number) => <span className="font-mono text-xs text-gray-500">{i + 1}</span> },
+      { header: 'Subscriber Name', render: (r) => <span className="font-semibold">{r.subscriberName}</span> },
+      { header: 'Subscriber ID', render: (r) => r.subscriberId.slice(0, 8) },
+      { header: 'Phone', render: (r) => r.phone },
+      { header: 'Address', render: (r) => r.address || '-' },
+      { header: 'Sublocality', render: (r) => r.sublocality },
+      { header: 'Connection Type', render: (r) => <span className="capitalize">{r.connectionType}</span> },
+      { header: 'Promise Date', render: (r) => (r.promiseDate ? format(new Date(r.promiseDate), 'dd MMM yyyy') : '-') },
+      { header: 'Amount (PKR)', align: 'right', render: (r) => r.amount.toLocaleString() },
+      { header: 'Status', render: (r) => <span className="capitalize">{r.status}</span> },
+      { header: 'Description', render: (r) => r.description || '-' },
+      { header: 'Promised By', render: (r) => r.promisedBy || '-' },
+    ];
+
+    return (
+      <div className="p-6">
+        <SubscriberReportInvoice<PromiseRecord>
+          title="PROMISE DATE REPORT"
+          subtitle={`From: ${format(filterFromDate, 'dd MMM yyyy')} — To: ${format(filterToDate, 'dd MMM yyyy')}`}
+          accent={accent}
+          data={filteredData}
+          columns={columns}
+          emptyMessage="No promise date records found for the selected criteria."
+          onBack={() => setShowInvoice(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -301,15 +341,15 @@ export default function PromiseDateReportsPage() {
                       <TableHead>Sublocality</TableHead>
                       <TableHead>Connection Type</TableHead>
                       <TableHead>Promise Date</TableHead>
-                      <TableHead>Promise Type</TableHead>
                       <TableHead>Amount</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Remarks</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Promised By</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredData.map((item, i) => (
-                      <TableRow key={item.id}>
+                      <TableRow key={item.key}>
                         <TableCell className="text-muted-foreground">{i + 1}</TableCell>
                         <TableCell className="font-medium">
                           <Link
@@ -327,16 +367,14 @@ export default function PromiseDateReportsPage() {
                           <Badge variant="outline">{item.connectionType}</Badge>
                         </TableCell>
                         <TableCell>{item.promiseDate ? format(new Date(item.promiseDate), 'dd MMM yyyy') : '-'}</TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{item.promiseType}</Badge>
-                        </TableCell>
                         <TableCell>PKR {item.amount.toLocaleString()}</TableCell>
                         <TableCell>
                           <Badge variant={item.status === 'overdue' ? 'destructive' : 'default'}>
                             {item.status}
                           </Badge>
                         </TableCell>
-                        <TableCell>{item.remarks || '-'}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground max-w-[160px] truncate" title={item.description}>{item.description || '-'}</TableCell>
+                        <TableCell>{item.promisedBy || '-'}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

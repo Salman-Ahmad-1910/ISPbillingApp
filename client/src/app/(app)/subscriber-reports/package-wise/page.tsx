@@ -12,6 +12,8 @@ import { Box, Loader2, Download, Printer } from 'lucide-react';
 import { format } from 'date-fns';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { smartMatch } from '@/lib/search';
+import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
 
 interface PackageData {
   packageName: string;
@@ -30,6 +32,7 @@ export default function PackageWiseReportsPage() {
   const [selectedPackage, setSelectedPackage] = useState('all');
   const [connectionType, setConnectionType] = useState('both');
   const [searchTerm, setSearchTerm] = useState('');
+  const [showInvoice, setShowInvoice] = useState(false);
 
   const packageData: PackageData[] = useMemo(() => {
     return packages.map((pkg: any) => {
@@ -53,7 +56,7 @@ export default function PackageWiseReportsPage() {
 
   const filteredData = useMemo(() => packageData.filter((item) => {
     const pkgMatch = selectedPackage === 'all' || item.packageName === selectedPackage;
-    const searchMatch = !searchTerm || item.packageName.toLowerCase().includes(searchTerm.toLowerCase());
+    const searchMatch = !searchTerm || smartMatch(searchTerm, [], [item.packageName]);
     return pkgMatch && searchMatch;
   }), [packageData, selectedPackage, searchTerm]);
 
@@ -81,8 +84,32 @@ export default function PackageWiseReportsPage() {
   };
 
   const handlePrint = () => {
-    window.print();
+    setShowInvoice(true);
   };
+
+  if (showInvoice) {
+    const accent = { title: 'text-sky-600', border: 'border-sky-600', headerBg: 'bg-sky-600', rowHover: 'hover:bg-sky-50/50' };
+    const columns: InvoiceColumn<PackageData>[] = [
+      { header: '#', render: (_: PackageData, i: number) => <span className="font-mono text-xs text-gray-500">{i + 1}</span> },
+      { header: 'Package Name', render: (r) => <span className="font-semibold">{r.packageName}</span> },
+      { header: 'Amount (PKR)', align: 'right', render: (r) => r.amount.toLocaleString() },
+      { header: 'Subscriber Count', align: 'right', render: (r) => <span className="font-bold">{r.subscriberCount}</span> },
+    ];
+
+    return (
+      <div className="p-6">
+        <SubscriberReportInvoice<PackageData>
+          title="PACKAGE WISE REPORT"
+          subtitle="Package-wise subscriber distribution"
+          accent={accent}
+          data={filteredData}
+          columns={columns}
+          emptyMessage="No package data found for the selected criteria."
+          onBack={() => setShowInvoice(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 p-6">

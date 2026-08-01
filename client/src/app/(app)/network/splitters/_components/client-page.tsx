@@ -24,6 +24,7 @@ import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { smartMatch } from '@/lib/search';
 
 type SplitterFormValues = z.infer<typeof splitterSchema>;
 
@@ -51,8 +52,7 @@ export function ClientPage({ data }: ClientPageProps) {
     }, [data]);
 
     const filteredData = useMemo(() => splitters.filter(splitter =>
-        splitter.name.toLowerCase().includes(filter.toLowerCase()) ||
-        splitter.location.toLowerCase().includes(filter.toLowerCase())
+        smartMatch(filter, [], [splitter.name, splitter.location])
     ), [splitters, filter]);
 
   // Pagination helpers

@@ -317,6 +317,7 @@ export type Invoice = {
 
 export type Payment = {
   id: string;
+  billNo?: number;
   invoiceId?: string;
   subscriberId?: string;
   subscriberName: string;
@@ -325,6 +326,9 @@ export type Payment = {
   method: 'cash' | 'bank' | 'online' | 'dealer';
   collectorId?: string;
   companyId: string;
+  address?: string;
+  areaName?: string;
+  collectedByName?: string;
 };
 
 export type CustomBill = {
@@ -339,6 +343,26 @@ export type CustomBill = {
   companyId: string;
   dealerId: string;
   subscriber?: Subscriber; // Optional subscriber relationship
+};
+
+export type PromiseEntry = {
+  id: string;
+  companyId: string;
+  subscriberId?: string;
+  subscriberName?: string;
+  internetId?: string;
+  phone?: string;
+  address?: string;
+  sublocality?: string;
+  connectionType?: string;
+  amount: number;
+  promiseDate: string;
+  description?: string;
+  status: 'pending' | 'completed' | 'overdue';
+  collectorId?: string;
+  collectorName?: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 // Recovery
@@ -357,6 +381,13 @@ export type Complaint = {
   id: string;
   subscriberId: string;
   subscriberName: string;
+  phone?: string;
+  address?: string;
+  type?: string;
+  subject?: string;
+  department?: string;
+  priority?: string;
+  deadline?: string;
   category: 'network' | 'billing' | 'service';
   description: string;
   status: 'open' | 'in-progress' | 'resolved' | 'closed';
@@ -368,6 +399,42 @@ export type Complaint = {
 
 
 // HR & Staff
+export type StaffQualification = {
+  id?: string;
+  staffId?: string;
+  qualification: string;
+  institute: string;
+  startDate: string;
+  endDate: string;
+  obtainedMarks: string;
+  grade: string;
+  majorSubject: string;
+};
+
+export type StaffExperience = {
+  id?: string;
+  staffId?: string;
+  organization: string;
+  designation: string;
+  startDate: string;
+  endDate: string;
+  description: string;
+};
+
+export type StaffWorkTime = {
+  id?: string;
+  staffId?: string;
+  day: string;
+  startTime: string;
+  endTime: string;
+};
+
+export type StaffDepartment = {
+  id: string;
+  name: string;
+  companyId: string;
+};
+
 export type Staff = {
   id: string;
   name: string;
@@ -375,10 +442,35 @@ export type Staff = {
   phone: string;
   secondaryPhone?: string;
   designation: string;
-  department: 'technical' | 'recovery' | 'sales' | 'admin';
+  department: string;
   salary: number;
   companyId: string;
   areaId?: string;
+  gender?: string;
+  maritalStatus?: string;
+  fatherName?: string;
+  nic?: string;
+  address?: string;
+  basicPay?: number;
+  leaveAllow?: number;
+  paymentMode?: string;
+  bankName?: string;
+  accountTitle?: string;
+  accountNo?: string;
+  appointedDate?: string;
+  technical?: string;
+  status?: string;
+  leaveDate?: string;
+  plainPassword?: string;
+  cnicFront?: string;
+  cnicBack?: string;
+  employeeImage?: string;
+  cv?: string;
+  qualifications?: StaffQualification[];
+  experiences?: StaffExperience[];
+  workTimes?: StaffWorkTime[];
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type RecoveryOfficer = {
@@ -394,6 +486,25 @@ export type RecoveryOfficer = {
   updatedAt: string;
   target?: number;
   collected?: number;
+};
+
+export type SalaryPayment = {
+  id: string;
+  staffId: string;
+  staffName: string;
+  month: string;
+  year: number;
+  salary: number;
+  basicPay: number;
+  leaveAllow: number;
+  otherAllowance: number;
+  deduction: number;
+  netPay: number;
+  paymentMode?: string;
+  paidAt?: string;
+  companyId: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type Attendance = {
@@ -470,6 +581,7 @@ export type Product = {
   purchasePrice?: number;
   salePrice?: number;
   discount?: number;
+  serialNumber?: string;
 };
 
 export type Vendor = {

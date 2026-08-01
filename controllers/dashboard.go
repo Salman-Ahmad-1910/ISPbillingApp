@@ -39,15 +39,28 @@ func GetDashboardData(c *gin.Context) {
 		SELECT COUNT(*)
 		FROM connections
 		WHERE company_id = ? AND deleted_at IS NULL
-		AND COALESCE(last_payment_date, recharge_date, created_at::text) < (CURRENT_DATE - INTERVAL '30 days')::text
+		AND GREATEST(remaining_amount, 0) + amount * GREATEST(0,
+			EXTRACT(YEAR FROM age(CURRENT_DATE, COALESCE(last_payment_date, recharge_date, created_at::text)::date)) * 12 +
+			EXTRACT(MONTH FROM age(CURRENT_DATE, COALESCE(last_payment_date, recharge_date, created_at::text)::date))
+		) > 0
 	`, companyUUID).Scan(&overdueCount)
 
 	var overdueAmount float64
 	config.DB.Raw(`
-		SELECT COALESCE(SUM(amount), 0)
+		SELECT COALESCE(SUM(
+			GREATEST(remaining_amount, 0) +
+			amount *
+			GREATEST(0,
+				EXTRACT(YEAR FROM age(CURRENT_DATE, COALESCE(last_payment_date, recharge_date, created_at::text)::date)) * 12 +
+				EXTRACT(MONTH FROM age(CURRENT_DATE, COALESCE(last_payment_date, recharge_date, created_at::text)::date))
+			)
+		), 0)
 		FROM connections
 		WHERE company_id = ? AND deleted_at IS NULL
-		AND COALESCE(last_payment_date, recharge_date, created_at::text) < (CURRENT_DATE - INTERVAL '30 days')::text
+		AND GREATEST(remaining_amount, 0) + amount * GREATEST(0,
+			EXTRACT(YEAR FROM age(CURRENT_DATE, COALESCE(last_payment_date, recharge_date, created_at::text)::date)) * 12 +
+			EXTRACT(MONTH FROM age(CURRENT_DATE, COALESCE(last_payment_date, recharge_date, created_at::text)::date))
+		) > 0
 	`, companyUUID).Scan(&overdueAmount)
 
 	var payments []models.Payment

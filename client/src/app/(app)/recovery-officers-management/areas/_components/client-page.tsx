@@ -20,7 +20,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
-import api from '@/lib/api';
+  import api from '@/lib/api';
+  import { smartMatch } from '@/lib/search';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface ClientPageProps {
@@ -317,9 +318,7 @@ export function ClientPage({ data, recoveryOfficers }: ClientPageProps) {
               />
             </div>
             <DataTable columns={columns} data={data.filter(a =>
-              a.city.toLowerCase().includes(filter.toLowerCase()) ||
-              a.zone.toLowerCase().includes(filter.toLowerCase()) ||
-              a.locality.toLowerCase().includes(filter.toLowerCase())
+              smartMatch(filter, [], [a.city, a.zone, a.locality])
             )} />
           </div>
         </CardContent>

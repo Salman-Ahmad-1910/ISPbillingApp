@@ -4,9 +4,10 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Wallet, Calendar } from 'lucide-react';
+import { Wallet, Calendar, ArrowUpRight } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
 import api from '@/lib/api';
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 interface ApiPoint {
@@ -198,6 +199,13 @@ export function DailyCollectionChart() {
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Wallet className="h-3.5 w-3.5" />
           <span>Collection</span>
+          <div className="flex-1" />
+          <Link
+            href={`/transaction/collection-details?period=${period}${period === 'monthly' && selectedMonth ? `&month=${selectedMonth}` : ''}`}
+            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline transition-all hover:gap-1.5"
+          >
+            View {PERIOD_TABS.find(t => t.key === period)?.label || 'All'} Details <ArrowUpRight className="h-3 w-3" />
+          </Link>
         </div>
         <div className="flex flex-wrap items-end justify-between gap-2 pt-1">
           <div>

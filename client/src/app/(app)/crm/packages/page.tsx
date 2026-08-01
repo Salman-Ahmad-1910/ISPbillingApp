@@ -11,6 +11,7 @@ import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { smartMatch } from '@/lib/search';
 import { useToast } from '@/hooks/use-toast';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 
@@ -52,9 +53,7 @@ export default function PackagesPage() {
   const filteredPackages = useMemo(() => {
     if (!Array.isArray(companyPackages)) return [];
     return companyPackages.filter((pkg: Package) =>
-      pkg.name.toLowerCase().includes(filter.toLowerCase()) ||
-      (pkg.companyName || '').toLowerCase().includes(filter.toLowerCase()) ||
-      (pkg.packageType || '').toLowerCase().includes(filter.toLowerCase())
+      smartMatch(filter, [pkg.id], [pkg.name, pkg.companyName, pkg.packageType])
     );
   }, [companyPackages, filter]);
 

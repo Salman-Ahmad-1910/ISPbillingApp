@@ -73,6 +73,7 @@ export const productSchema = z.object({
   purchasePrice: z.coerce.number().min(0).optional().default(0),
   salePrice: z.coerce.number().min(0).optional().default(0),
   discount: z.coerce.number().min(0).optional().default(0),
+  serialNumber: z.string().optional(),
 });
 
 export const vendorSchema = z.object({

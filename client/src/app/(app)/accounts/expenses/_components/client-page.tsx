@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { expenseSchema } from '@/lib/schemas';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
+import { smartMatch } from '@/lib/search';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { DataTable } from './data-table';
@@ -49,8 +50,7 @@ export function ClientPage({ data }: ClientPageProps) {
 
   const filteredData = useMemo(() => data.filter(
     (expense) =>
-      expense.description.toLowerCase().includes(filter.toLowerCase()) ||
-      expense.category.toLowerCase().includes(filter.toLowerCase())
+      smartMatch(filter, [expense.id], [expense.description, expense.category])
   ), [data, filter]);
 
     // Pagination helpers

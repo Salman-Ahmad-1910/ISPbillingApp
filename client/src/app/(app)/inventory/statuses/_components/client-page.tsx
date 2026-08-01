@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
+import { prefixMatch } from '@/lib/search';
 
 import { DataTable } from './data-table';
 import { columns, type PurchasedProduct } from './columns';
@@ -25,8 +26,7 @@ export function ClientPage({ data }: ClientPageProps) {
     let result = data;
 
     if (searchTerm) {
-      const lower = searchTerm.toLowerCase();
-      result = result.filter(p => p.name.toLowerCase().includes(lower));
+      result = result.filter(p => prefixMatch(searchTerm, p.name));
     }
 
     if (vendorFilter) {

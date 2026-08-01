@@ -69,10 +69,12 @@ export const columns = ({ onEdit, onDelete, onPrint }: VendorInvoiceColumnsProps
     cell: ({ row }) => {
       const items = row.original.items;
       if (!items || items.length === 0) return <span className="text-muted-foreground">—</span>;
-      const sn = items[0]?.serialNumber;
+      const serials = items.map((item: any) => item.serialNumber).filter(Boolean);
+      if (serials.length === 0) return <span className="text-muted-foreground">—</span>;
+      const display = serials.length > 2 ? `${serials.slice(0, 2).join(', ')} +${serials.length - 2}` : serials.join(', ');
       return (
-        <div className="text-xs font-mono" title={sn}>
-          {sn || '—'}
+        <div className="text-xs font-mono max-w-[200px] truncate" title={serials.join(', ')}>
+          {display}
         </div>
       );
     },

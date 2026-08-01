@@ -18,6 +18,7 @@ import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { smartMatch } from '@/lib/search';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 export default function WhatsAppDraftPage() {
@@ -43,11 +44,8 @@ export default function WhatsAppDraftPage() {
   const filteredData = useMemo(() => {
     const drafts = messages.filter(m => m.status === 'whatsapp_draft');
     if (!search) return drafts;
-    const q = search.toLowerCase();
     return drafts.filter(item =>
-      item.name?.toLowerCase().includes(q) ||
-      item.entityId?.toLowerCase().includes(q) ||
-      item.mobileNo?.toLowerCase().includes(q)
+      smartMatch(search, [item.entityId, item.mobileNo], [item.name])
     );
   }, [messages, search]);
 

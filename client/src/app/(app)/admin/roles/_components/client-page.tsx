@@ -12,6 +12,7 @@ import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
+import { smartMatch } from '@/lib/search';
 import { useQueryClient } from '@tanstack/react-query';
 
 const PERMISSIONS = [
@@ -130,9 +131,8 @@ export default function ClientPage() {
 
   const filteredUsers = useMemo(() => {
     if (!userSearch.trim()) return userList.slice(0, 20);
-    const q = userSearch.toLowerCase();
     return userList.filter((u: any) =>
-      (u.id?.toLowerCase().includes(q) || u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q))
+      smartMatch(userSearch, [u.id], [u.name, u.email])
     ).slice(0, 20);
   }, [userList, userSearch]);
 

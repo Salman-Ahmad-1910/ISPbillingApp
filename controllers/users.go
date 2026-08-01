@@ -35,6 +35,32 @@ type CreateSubUserRequest struct {
 
 	// Recovery Officer specific fields
 	SecondaryPhone string `json:"secondaryPhone,omitempty"` // For recovery officers
+
+	// Staff extended profile
+	Gender        string  `json:"gender,omitempty"`
+	MaritalStatus string  `json:"maritalStatus,omitempty"`
+	FatherName    string  `json:"fatherName,omitempty"`
+	NIC           string  `json:"nic,omitempty"`
+	Address       string  `json:"address,omitempty"`
+	BasicPay      float64 `json:"basicPay,omitempty"`
+	LeaveAllow    float64 `json:"leaveAllow,omitempty"`
+	PaymentMode   string  `json:"paymentMode,omitempty"`
+	BankName      string  `json:"bankName,omitempty"`
+	AccountTitle  string  `json:"accountTitle,omitempty"`
+	AccountNo     string  `json:"accountNo,omitempty"`
+	AppointedDate string  `json:"appointedDate,omitempty"`
+	Technical     string  `json:"technical,omitempty"`
+	Status        string  `json:"status,omitempty"`
+	LeaveDate     string  `json:"leaveDate,omitempty"`
+	PlainPassword string  `json:"plainPassword,omitempty"`
+	CNICFront     string  `json:"cnicFront,omitempty"`
+	CNICBack      string  `json:"cnicBack,omitempty"`
+	EmployeeImage string  `json:"employeeImage,omitempty"`
+	CV            string  `json:"cv,omitempty"`
+
+	Qualifications []models.StaffQualification `json:"qualifications,omitempty"`
+	Experiences    []models.StaffExperience    `json:"experiences,omitempty"`
+	WorkTimes      []models.StaffWorkTime      `json:"workTimes,omitempty"`
 }
 
 type UpdateSubUserRequest struct {
@@ -51,6 +77,32 @@ type UpdateSubUserRequest struct {
 	Salary         float64 `json:"salary,omitempty"`
 	CommissionRate float64 `json:"commissionRate,omitempty"`
 	SecondaryPhone string  `json:"secondaryPhone,omitempty"`
+
+	// Staff extended profile
+	Gender        string  `json:"gender,omitempty"`
+	MaritalStatus string  `json:"maritalStatus,omitempty"`
+	FatherName    string  `json:"fatherName,omitempty"`
+	NIC           string  `json:"nic,omitempty"`
+	Address       string  `json:"address,omitempty"`
+	BasicPay      float64 `json:"basicPay,omitempty"`
+	LeaveAllow    float64 `json:"leaveAllow,omitempty"`
+	PaymentMode   string  `json:"paymentMode,omitempty"`
+	BankName      string  `json:"bankName,omitempty"`
+	AccountTitle  string  `json:"accountTitle,omitempty"`
+	AccountNo     string  `json:"accountNo,omitempty"`
+	AppointedDate string  `json:"appointedDate,omitempty"`
+	Technical     string  `json:"technical,omitempty"`
+	Status        string  `json:"status,omitempty"`
+	LeaveDate     string  `json:"leaveDate,omitempty"`
+	PlainPassword string  `json:"plainPassword,omitempty"`
+	CNICFront     string  `json:"cnicFront,omitempty"`
+	CNICBack      string  `json:"cnicBack,omitempty"`
+	EmployeeImage string  `json:"employeeImage,omitempty"`
+	CV            string  `json:"cv,omitempty"`
+
+	Qualifications []models.StaffQualification `json:"qualifications,omitempty"`
+	Experiences    []models.StaffExperience    `json:"experiences,omitempty"`
+	WorkTimes      []models.StaffWorkTime      `json:"workTimes,omitempty"`
 }
 
 // GetRecoveryOfficers retrieves all recovery officers for a company
@@ -209,11 +261,82 @@ func UpdateSubUser(c *gin.Context) {
 			"department":      req.Department,
 			"salary":          req.Salary,
 			"area_id":         areaID,
+			"gender":          req.Gender,
+			"marital_status":  req.MaritalStatus,
+			"father_name":     req.FatherName,
+			"nic":             req.NIC,
+			"address":         req.Address,
+			"basic_pay":       req.BasicPay,
+			"leave_allow":     req.LeaveAllow,
+			"payment_mode":    req.PaymentMode,
+			"bank_name":       req.BankName,
+			"account_title":   req.AccountTitle,
+			"account_no":      req.AccountNo,
+			"appointed_date":  req.AppointedDate,
+			"technical":       req.Technical,
+			"status":          req.Status,
+			"leave_date":      req.LeaveDate,
+			"cnic_front":      req.CNICFront,
+			"cnic_back":       req.CNICBack,
+			"employee_image":  req.EmployeeImage,
+			"cv":              req.CV,
+		}
+		if req.PlainPassword != "" {
+			updates["plain_password"] = req.PlainPassword
+		}
+		if req.Status == "" {
+			updates["status"] = "working"
 		}
 		if err := tx.Model(&models.Staff{}).Where("id = ? AND company_id = ?", id, companyID).Updates(updates).Error; err != nil {
 			tx.Rollback()
 			utils.ErrorResponse(c, 500, "Failed to update staff", err.Error())
 			return
+		}
+
+		// Replace nested staff records (qualifications, experiences, work times)
+		if req.Qualifications != nil || req.Experiences != nil || req.WorkTimes != nil {
+			if err := tx.Where("staff_id = ?", id).Delete(&models.StaffQualification{}).Error; err != nil {
+				tx.Rollback()
+				utils.ErrorResponse(c, 500, "Failed to clear staff qualifications", err.Error())
+				return
+			}
+			if err := tx.Where("staff_id = ?", id).Delete(&models.StaffExperience{}).Error; err != nil {
+				tx.Rollback()
+				utils.ErrorResponse(c, 500, "Failed to clear staff experiences", err.Error())
+				return
+			}
+			if err := tx.Where("staff_id = ?", id).Delete(&models.StaffWorkTime{}).Error; err != nil {
+				tx.Rollback()
+				utils.ErrorResponse(c, 500, "Failed to clear staff work times", err.Error())
+				return
+			}
+			for _, q := range req.Qualifications {
+				q.StaffID = uuid.MustParse(id)
+				q.CompanyID = companyID.(uuid.UUID)
+				if err := tx.Create(&q).Error; err != nil {
+					tx.Rollback()
+					utils.ErrorResponse(c, 500, "Failed to update staff qualification", err.Error())
+					return
+				}
+			}
+			for _, e := range req.Experiences {
+				e.StaffID = uuid.MustParse(id)
+				e.CompanyID = companyID.(uuid.UUID)
+				if err := tx.Create(&e).Error; err != nil {
+					tx.Rollback()
+					utils.ErrorResponse(c, 500, "Failed to update staff experience", err.Error())
+					return
+				}
+			}
+			for _, w := range req.WorkTimes {
+				w.StaffID = uuid.MustParse(id)
+				w.CompanyID = companyID.(uuid.UUID)
+				if err := tx.Create(&w).Error; err != nil {
+					tx.Rollback()
+					utils.ErrorResponse(c, 500, "Failed to update staff work time", err.Error())
+					return
+				}
+			}
 		}
 	}
 
@@ -460,6 +583,29 @@ func CreateSubUser(c *gin.Context) {
 			Department:     req.Department,
 			Salary:         req.Salary,
 			AreaID:         areaID,
+			Gender:         req.Gender,
+			MaritalStatus:  req.MaritalStatus,
+			FatherName:     req.FatherName,
+			NIC:            req.NIC,
+			Address:        req.Address,
+			BasicPay:       req.BasicPay,
+			LeaveAllow:     req.LeaveAllow,
+			PaymentMode:    req.PaymentMode,
+			BankName:       req.BankName,
+			AccountTitle:   req.AccountTitle,
+			AccountNo:      req.AccountNo,
+			AppointedDate:  req.AppointedDate,
+			Technical:      req.Technical,
+			Status:         req.Status,
+			LeaveDate:      req.LeaveDate,
+			PlainPassword:  req.PlainPassword,
+			CNICFront:      req.CNICFront,
+			CNICBack:       req.CNICBack,
+			EmployeeImage:  req.EmployeeImage,
+			CV:             req.CV,
+		}
+		if staff.Status == "" {
+			staff.Status = "working"
 		}
 		staff.ID = user.ID // Set ID after struct creation
 		fmt.Printf("DEBUG: Creating staff with ID: %s, Name: %s, Email: %s\n", staff.ID, staff.Name, staff.Email)
@@ -467,6 +613,35 @@ func CreateSubUser(c *gin.Context) {
 			tx.Rollback()
 			utils.ErrorResponse(c, 500, "Failed to create staff record", err.Error())
 			return
+		}
+
+		// Create nested staff records (qualifications, experiences, work times)
+		for _, q := range req.Qualifications {
+			q.StaffID = staff.ID
+			q.CompanyID = companyID.(uuid.UUID)
+			if err := tx.Create(&q).Error; err != nil {
+				tx.Rollback()
+				utils.ErrorResponse(c, 500, "Failed to create staff qualification", err.Error())
+				return
+			}
+		}
+		for _, e := range req.Experiences {
+			e.StaffID = staff.ID
+			e.CompanyID = companyID.(uuid.UUID)
+			if err := tx.Create(&e).Error; err != nil {
+				tx.Rollback()
+				utils.ErrorResponse(c, 500, "Failed to create staff experience", err.Error())
+				return
+			}
+		}
+		for _, w := range req.WorkTimes {
+			w.StaffID = staff.ID
+			w.CompanyID = companyID.(uuid.UUID)
+			if err := tx.Create(&w).Error; err != nil {
+				tx.Rollback()
+				utils.ErrorResponse(c, 500, "Failed to create staff work time", err.Error())
+				return
+			}
 		}
 		fmt.Printf("DEBUG: Staff created successfully with ID: %s\n", staff.ID)
 	}
@@ -527,7 +702,12 @@ func GetStaff(c *gin.Context) {
 	fmt.Printf("DEBUG: GetStaff called with companyID: %v (type: %T)\n", companyID, companyID)
 
 	var staff []models.Staff
-	if err := config.DB.Where("company_id = ?", companyID).Find(&staff).Error; err != nil {
+	if err := config.DB.
+		Where("company_id = ?", companyID).
+		Preload("Qualifications").
+		Preload("Experiences").
+		Preload("WorkTimes").
+		Find(&staff).Error; err != nil {
 		utils.ErrorResponse(c, 500, "Failed to fetch staff", err.Error())
 		return
 	}
@@ -569,6 +749,29 @@ func GetStaff(c *gin.Context) {
 				"salary":         s.Salary,
 				"areaId":         s.AreaID,
 				"companyId":      s.CompanyID,
+				"gender":         s.Gender,
+				"maritalStatus":  s.MaritalStatus,
+				"fatherName":     s.FatherName,
+				"nic":            s.NIC,
+				"address":        s.Address,
+				"basicPay":       s.BasicPay,
+				"leaveAllow":     s.LeaveAllow,
+				"paymentMode":    s.PaymentMode,
+				"bankName":       s.BankName,
+				"accountTitle":   s.AccountTitle,
+				"accountNo":      s.AccountNo,
+				"appointedDate":  s.AppointedDate,
+				"technical":      s.Technical,
+				"status":         s.Status,
+				"leaveDate":      s.LeaveDate,
+				"plainPassword":  s.PlainPassword,
+				"cnicFront":      s.CNICFront,
+				"cnicBack":       s.CNICBack,
+				"employeeImage":  s.EmployeeImage,
+				"cv":             s.CV,
+				"qualifications": s.Qualifications,
+				"experiences":    s.Experiences,
+				"workTimes":      s.WorkTimes,
 				"userEmail":      nil,
 				"userStatus":     nil,
 				"createdAt":      s.CreatedAt,
@@ -593,6 +796,29 @@ func GetStaff(c *gin.Context) {
 			"salary":         s.Salary,
 			"areaId":         s.AreaID,
 			"companyId":      s.CompanyID,
+			"gender":         s.Gender,
+			"maritalStatus":  s.MaritalStatus,
+			"fatherName":     s.FatherName,
+			"nic":            s.NIC,
+			"address":        s.Address,
+			"basicPay":       s.BasicPay,
+			"leaveAllow":     s.LeaveAllow,
+			"paymentMode":    s.PaymentMode,
+			"bankName":       s.BankName,
+			"accountTitle":   s.AccountTitle,
+			"accountNo":      s.AccountNo,
+			"appointedDate":  s.AppointedDate,
+			"technical":      s.Technical,
+			"status":         s.Status,
+			"leaveDate":      s.LeaveDate,
+			"plainPassword":  s.PlainPassword,
+			"cnicFront":      s.CNICFront,
+			"cnicBack":       s.CNICBack,
+			"employeeImage":  s.EmployeeImage,
+			"cv":             s.CV,
+			"qualifications": s.Qualifications,
+			"experiences":    s.Experiences,
+			"workTimes":      s.WorkTimes,
 			"userEmail":      user.Email,
 			"userStatus":     user.Status,
 			"createdAt":      s.CreatedAt,

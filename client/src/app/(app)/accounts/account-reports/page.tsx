@@ -27,6 +27,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { smartMatch } from '@/lib/search';
 
 interface AccountHead {
   id: string;
@@ -143,12 +144,7 @@ export default function AccountReportsPage() {
         const to = format(toDate, 'yyyy-MM-dd');
         if (e.date > to) return false;
       }
-      if (search) {
-        const q = search.toLowerCase();
-        const headName = getHeadName(e.head).toLowerCase();
-        const subHeadName = getSubHeadName(e.subHead).toLowerCase();
-        if (!headName.includes(q) && !subHeadName.includes(q) && !e.description.toLowerCase().includes(q)) return false;
-      }
+      if (search && !smartMatch(search, [], [getHeadName(e.head), getSubHeadName(e.subHead), e.description])) return false;
       return true;
     });
   }, [entriesList, filterHead, filterSubHead, filterUser, filterTxnType, fromDate, toDate, search, headsList, subHeadsList]);

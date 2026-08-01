@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import api from '@/lib/api';
+import { smartMatch } from '@/lib/search';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   type ColumnDef,
@@ -133,7 +134,7 @@ export function LedgerView({ initialData, accountType }: LedgerViewProps) {
   }, [initialData]);
 
   const filteredData = useMemo(() => entries.filter(entry =>
-    entry.description?.toLowerCase().includes(filter.toLowerCase())
+    smartMatch(filter, [entry.id], [entry.description])
   ), [entries, filter]);
 
   // Pagination helpers

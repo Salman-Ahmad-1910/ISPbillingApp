@@ -29,6 +29,7 @@ import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
+import { smartMatch } from '@/lib/search';
 import { BookOpen, PlusCircle, MoreHorizontal, Edit3, Trash2, Search, CalendarIcon, DollarSign, FileText, Loader2 } from 'lucide-react';
 import type { Staff } from '@/lib/types';
 
@@ -180,13 +181,8 @@ export default function AccountEntryPage() {
         const to = format(filterToDate, 'yyyy-MM-dd');
         if (e.date > to) return false;
       }
-      if (search) {
-        const q = search.toLowerCase();
-        const headName = getHeadName(e.head).toLowerCase();
-        const subHeadName = getSubHeadName(e.subHead).toLowerCase();
-        if (!headName.includes(q) && !subHeadName.includes(q) && !e.description.toLowerCase().includes(q)) {
-          return false;
-        }
+      if (search && !smartMatch(search, [], [getHeadName(e.head), getSubHeadName(e.subHead), e.description])) {
+        return false;
       }
       return true;
     });

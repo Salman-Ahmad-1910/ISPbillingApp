@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
 
 interface AllocatedDefaulterRecord {
   id: string;
@@ -37,6 +38,7 @@ export default function AllocatedDefaultersPage() {
   const [reportType, setReportType] = useState('defaulter');
   const [sublocality, setSublocality] = useState('all');
   const [connectionType, setConnectionType] = useState('both');
+  const [showInvoice, setShowInvoice] = useState(false);
 
   const [historyFromDate, setHistoryFromDate] = useState<Date>(() => {
     const d = new Date();
@@ -126,8 +128,38 @@ export default function AllocatedDefaultersPage() {
   };
 
   const handlePrint = () => {
-    window.print();
+    setShowInvoice(true);
   };
+
+  if (showInvoice) {
+    const accent = { title: 'text-amber-600', border: 'border-amber-600', headerBg: 'bg-amber-600', rowHover: 'hover:bg-amber-50/50' };
+    const columns: InvoiceColumn<AllocatedDefaulterRecord>[] = [
+      { header: '#', render: (_: AllocatedDefaulterRecord, i: number) => <span className="font-mono text-xs text-gray-500">{i + 1}</span> },
+      { header: 'Subscriber Name', render: (r) => <span className="font-semibold">{r.subscriberName}</span> },
+      { header: 'Subscriber ID', render: (r) => r.subscriberId.slice(0, 8) },
+      { header: 'Phone', render: (r) => r.phone },
+      { header: 'Address', render: (r) => r.address || '-' },
+      { header: 'Sublocality', render: (r) => r.sublocality },
+      { header: 'Connection Type', render: (r) => <span className="capitalize">{r.connectionType}</span> },
+      { header: 'Allocated Date', render: (r) => (r.allocatedDate ? format(new Date(r.allocatedDate), 'dd MMM yyyy') : '-') },
+      { header: 'Amount (PKR)', align: 'right', render: (r) => r.amount.toLocaleString() },
+      { header: 'Status', render: (r) => <span className="capitalize">{r.status}</span> },
+    ];
+
+    return (
+      <div className="p-6">
+        <SubscriberReportInvoice<AllocatedDefaulterRecord>
+          title="ALLOCATED DEFAULTERS REPORT"
+          subtitle={`From: ${format(historyFromDate, 'dd MMM yyyy')} — To: ${format(historyToDate, 'dd MMM yyyy')}`}
+          accent={accent}
+          data={filteredData}
+          columns={columns}
+          emptyMessage="No allocated defaulters found for the selected criteria."
+          onBack={() => setShowInvoice(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 p-6">

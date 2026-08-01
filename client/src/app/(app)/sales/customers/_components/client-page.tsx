@@ -29,8 +29,9 @@ import { getColumns } from './columns';
 import { SalesCustomerForm } from './customer-form';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 
-import { useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+  import { useQueryClient } from '@tanstack/react-query';
+  import api from '@/lib/api';
+  import { smartMatch } from '@/lib/search';
 
 type CustomerFormValues = z.infer<typeof customerSchema>;
 
@@ -61,9 +62,7 @@ export function SalesCustomerClientPage({ data }: SalesCustomerClientPageProps) 
 
   const filteredData = useMemo(() => customers
     .filter(customer =>
-      customer.name.toLowerCase().includes(filter.toLowerCase()) ||
-      customer.cnic.includes(filter) ||
-      customer.phone.includes(filter)
+      smartMatch(filter, [customer.cnic, customer.phone], [customer.name])
     )
     .filter(customer => statusFilters.length === 0 || statusFilters.includes(customer.status)),
     [customers, filter, statusFilters]);

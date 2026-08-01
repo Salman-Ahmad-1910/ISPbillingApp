@@ -78,6 +78,7 @@ func RunMigrations() {
 		&models.Invoice{},
 		&models.Payment{},
 		&models.CustomBill{},
+		&models.Promise{},
 		&models.LedgerEntry{},
 		&models.Expense{},
 
@@ -86,10 +87,17 @@ func RunMigrations() {
 		&models.DealerCollection{},
 
 		&models.Complaint{},
+		&models.ComplaintSubject{},
+		&models.ComplaintType{},
 		&models.Staff{},
+		&models.StaffQualification{},
+		&models.StaffExperience{},
+		&models.StaffWorkTime{},
+		&models.StaffDepartment{},
 		&models.RecoveryOfficer{}, // Add Recovery Officer model
 		&models.Attendance{},
 		&models.AdvanceLoan{},
+		&models.SalaryPayment{},
 		&models.InventoryItem{},
 		&models.RecoveryTransaction{},
 		&models.SystemLog{},

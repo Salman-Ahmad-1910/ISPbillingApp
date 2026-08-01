@@ -18,6 +18,7 @@ import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { smartMatch } from '@/lib/search';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export default function ExpiredMessagesPage() {
@@ -45,12 +46,8 @@ export default function ExpiredMessagesPage() {
       return m.status === 'draft' && created < thirtyDaysAgo;
     });
     if (!search) return expired;
-    const q = search.toLowerCase();
     return expired.filter(item =>
-      item.name?.toLowerCase().includes(q) ||
-      item.entityId?.toLowerCase().includes(q) ||
-      item.mobileNo?.toLowerCase().includes(q) ||
-      item.messageType?.toLowerCase().includes(q)
+      smartMatch(search, [item.entityId, item.mobileNo], [item.name, item.messageType])
     );
   }, [messages, search]);
 

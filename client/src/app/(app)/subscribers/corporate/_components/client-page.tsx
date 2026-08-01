@@ -13,6 +13,7 @@ import { z } from 'zod';
 
 import type { CorporateCustomer } from '@/lib/types';
 import { corporateCustomerSchema } from '@/lib/schemas';
+import { smartMatch } from '@/lib/search';
 import { DataTable } from './data-table';
 import { getColumns } from './columns';
 import { CorporateCustomerForm } from './corporate-customer-form';
@@ -51,8 +52,7 @@ export function ClientPage({ data }: ClientPageProps) {
     const totalConnections = useMemo(() => customers.reduce((sum, c) => sum + c.totalConnections, 0), [customers]);
 
     const filteredData = useMemo(() => customers.filter(customer =>
-        (customer.companyName?.toLowerCase() || '').includes(filter.toLowerCase()) ||
-        (customer.contactPerson?.toLowerCase() || '').includes(filter.toLowerCase())
+        smartMatch(filter, [customer.id], [customer.companyName, customer.contactPerson])
     ), [customers, filter]);
 
   const totalPages = Math.ceil(filteredData.length / pageSize);

@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useCompany } from '@/context/company-context';
 import type { Inquiry } from '@/lib/types';
 import { inquirySchema } from '@/lib/schemas';
+import { smartMatch } from '@/lib/search';
 import { z } from 'zod';
 import { PlusCircle, Send, Users, Search, ChevronLeft, ChevronRight, UserPlus, UserCheck, XCircle, Sparkles, RefreshCw, CheckCircle2 } from 'lucide-react';
 
@@ -81,13 +82,8 @@ export function ClientPage({ data, areas, boxes, packages }: ClientPageProps) {
             });
         }
         if (searchQuery.trim()) {
-            const q = searchQuery.toLowerCase();
             result = result.filter(i =>
-                i.name.toLowerCase().includes(q) ||
-                i.cell?.includes(q) ||
-                i.mobile?.includes(q) ||
-                i.address.toLowerCase().includes(q) ||
-                i.internetId?.toLowerCase().includes(q)
+                smartMatch(searchQuery, [i.cell, i.mobile, i.internetId], [i.name, i.address])
             );
         }
 

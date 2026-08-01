@@ -13,6 +13,7 @@ import { z } from 'zod';
 
 import type { Guarantor, Customer } from '@/lib/types';
 import { guarantorSchema } from '@/lib/schemas';
+import { smartMatch } from '@/lib/search';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { Loader2 } from 'lucide-react';
 
@@ -56,9 +57,7 @@ export function ClientPage({ data }: ClientPageProps) {
     const uniqueCustomers = useMemo(() => new Set(guarantors.map(g => g.customerName)).size, [guarantors]);
 
     const filteredData = useMemo(() => guarantors.filter(guarantor =>
-        guarantor.name.toLowerCase().includes(filter.toLowerCase()) ||
-        guarantor.cnic.includes(filter) ||
-        guarantor.customerName.toLowerCase().includes(filter.toLowerCase())
+        smartMatch(filter, [guarantor.id, guarantor.cnic], [guarantor.name, guarantor.customerName])
     ), [guarantors, filter]);
 
     const totalPages = Math.ceil(filteredData.length / pageSize);

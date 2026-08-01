@@ -2,16 +2,8 @@
 
 import { type ColumnDef } from '@tanstack/react-table';
 import type { AdvanceLoan } from '@/lib/types';
-import { MoreHorizontal } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator
-} from '@/components/ui/dropdown-menu';
 
 interface ColumnsProps {
   onEdit: (advance: AdvanceLoan) => void;
@@ -66,7 +58,7 @@ export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<Advanc
   },
   {
     accessorKey: 'returnValue',
-    header: 'Loan Return Value',
+    header: 'Return Value',
     cell: ({ row }) => {
       const val = row.original.returnValue;
       if (!val || val === 0) return <div className="text-muted-foreground">-</div>;
@@ -84,26 +76,29 @@ export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<Advanc
   },
   {
     id: 'actions',
+    header: 'Action',
     cell: ({ row }) => {
       const advance = row.original;
       return (
-        <div className="text-right">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem className="data-[highlighted]:text-emerald-600" onClick={() => onEdit(advance)}>Edit Record</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive data-[highlighted]:text-red-600" onClick={() => onDelete(advance)}>
-                Delete Record
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        <div className="flex items-center justify-end gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+            title="Edit Record"
+            onClick={() => onEdit(advance)}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
+            title="Delete Record"
+            onClick={() => onDelete(advance)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
       );
     },

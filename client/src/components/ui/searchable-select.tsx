@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { X } from 'lucide-react';
+import { smartMatch } from '@/lib/search';
 
 interface SearchableSelectProps {
   value: string | null;
@@ -36,8 +37,7 @@ export function SearchableSelect({
 
   const filteredOptions = useMemo(() => {
     return options.filter(option =>
-      option.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      option.secondary?.toLowerCase().includes(searchTerm.toLowerCase())
+      smartMatch(searchTerm, [option.id, option.secondary], [option.name, option.secondary])
     );
   }, [options, searchTerm]);
 

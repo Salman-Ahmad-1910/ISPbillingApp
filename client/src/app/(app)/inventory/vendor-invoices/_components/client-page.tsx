@@ -26,6 +26,7 @@ import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { smartMatch } from '@/lib/search';
 
 type VendorInvoiceFormValues = z.infer<typeof vendorInvoiceSchema>;
 
@@ -58,10 +59,11 @@ export function ClientPage({ data }: ClientPageProps) {
     let filtered = invoices;
 
     if (searchTerm) {
-      const lowerSearch = searchTerm.toLowerCase();
-      filtered = filtered.filter(invoice => 
-        invoice.vendorName.toLowerCase().includes(lowerSearch) ||
-        invoice.items?.some((item: any) => item.productName.toLowerCase().includes(lowerSearch))
+      filtered = filtered.filter(invoice =>
+        smartMatch(searchTerm, [invoice.invoiceNumber], [
+          invoice.vendorName,
+          ...(invoice.items?.map((item: any) => item.productName) ?? []),
+        ])
       );
     }
 

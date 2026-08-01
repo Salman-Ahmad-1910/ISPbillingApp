@@ -16,6 +16,7 @@ export interface PurchasedProduct {
   vendorName: string;
   purchaseDate: string;
   batch: string;
+  serialNumber?: string;
 }
 
 export const columns: ColumnDef<PurchasedProduct, unknown>[] = [
@@ -40,6 +41,13 @@ export const columns: ColumnDef<PurchasedProduct, unknown>[] = [
     accessorKey: 'batch',
     header: 'Batch',
     cell: ({ row }) => <span>{row.original.batch || '-'}</span>,
+  },
+  {
+    accessorKey: 'serialNumber',
+    header: 'SN / MAC',
+    cell: ({ row }) => (
+      <span className="text-xs font-mono">{row.original.serialNumber || '\u2014'}</span>
+    ),
   },
   {
     accessorKey: 'name',

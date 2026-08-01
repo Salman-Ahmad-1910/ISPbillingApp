@@ -2,6 +2,7 @@
 
 import ReactSelect from 'react-select';
 import type { Package } from '@/lib/types';
+import { smartMatch } from '@/lib/search';
 
 interface PackageSelectProps {
   packages: Package[];
@@ -19,6 +20,7 @@ export function PackageSelect({
   disabled = false,
 }: PackageSelectProps) {
   const options = packages.map((pkg) => ({
+    ...pkg,
     value: pkg.id,
     label: `${pkg.name} - PKR ${pkg.price.toLocaleString()}`,
   }));
@@ -34,6 +36,10 @@ export function PackageSelect({
       placeholder={placeholder}
       isDisabled={disabled}
       isSearchable
+      filterOption={(option, rawInput) => {
+        const d = option.data as Package;
+        return smartMatch(rawInput, [d.id], [d.name]);
+      }}
       classNamePrefix="react-select"
     />
   );

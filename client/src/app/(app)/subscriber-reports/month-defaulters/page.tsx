@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
 
 interface MonthDefaulterRecord {
   id: string;
@@ -53,6 +54,7 @@ export default function MonthDefaultersPage() {
   const [sublocality, setSublocality] = useState('all');
   const [reportType, setReportType] = useState('all');
   const [connectionType, setConnectionType] = useState('both');
+  const [showInvoice, setShowInvoice] = useState(false);
 
   const [historyFromDate, setHistoryFromDate] = useState<Date>(() => {
     const d = new Date();
@@ -125,8 +127,38 @@ export default function MonthDefaultersPage() {
   };
 
   const handlePrint = () => {
-    window.print();
+    setShowInvoice(true);
   };
+
+  if (showInvoice) {
+    const accent = { title: 'text-indigo-600', border: 'border-indigo-600', headerBg: 'bg-indigo-600', rowHover: 'hover:bg-indigo-50/50' };
+    const columns: InvoiceColumn<MonthDefaulterRecord>[] = [
+      { header: '#', render: (_: MonthDefaulterRecord, i: number) => <span className="font-mono text-xs text-gray-500">{i + 1}</span> },
+      { header: 'Subscriber Name', render: (r) => <span className="font-semibold">{r.subscriberName}</span> },
+      { header: 'Subscriber ID', render: (r) => r.subscriberId.slice(0, 8) },
+      { header: 'Phone', render: (r) => r.phone },
+      { header: 'Address', render: (r) => r.address || '-' },
+      { header: 'Sublocality', render: (r) => r.sublocality },
+      { header: 'Connection Type', render: (r) => <span className="capitalize">{r.connectionType}</span> },
+      { header: 'Month', render: (r) => months.find((m) => m.value === r.month)?.label || '-' },
+      { header: 'Amount (PKR)', align: 'right', render: (r) => r.amount.toLocaleString() },
+      { header: 'Status', render: (r) => <span className="capitalize">{r.status}</span> },
+    ];
+
+    return (
+      <div className="p-6">
+        <SubscriberReportInvoice<MonthDefaulterRecord>
+          title="MONTH WISE DEFAULTERS REPORT"
+          subtitle={`From: ${format(historyFromDate, 'dd MMM yyyy')} — To: ${format(historyToDate, 'dd MMM yyyy')}`}
+          accent={accent}
+          data={filteredData}
+          columns={columns}
+          emptyMessage="No month wise defaulters found for the selected criteria."
+          onBack={() => setShowInvoice(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 p-6">

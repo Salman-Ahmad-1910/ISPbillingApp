@@ -21,6 +21,7 @@ import { getColumns } from './columns';
 import { ConnectionForm } from './connection-form';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 import { ImportExportDialog } from './import-export-dialog';
+import { smartMatch } from '@/lib/search';
 import { DeactivateDialog } from './deactivate-dialog';
 
 type ConnectionFormValues = z.infer<typeof connectionSchema>;
@@ -91,13 +92,8 @@ export function ClientPage({ connections, initialConnectionId, initialPackageNam
     let result = connections;
 
     if (search) {
-      const q = search.toLowerCase();
       result = result.filter(c =>
-        c.name.toLowerCase().includes(q) ||
-        c.internetId.toLowerCase().includes(q) ||
-        (c.address || '').toLowerCase().includes(q) ||
-        (c.cell || '').includes(q) ||
-        (c.mobile || '').includes(q)
+        smartMatch(search, [c.internetId, c.cell, c.mobile], [c.name, c.address])
       );
     }
 

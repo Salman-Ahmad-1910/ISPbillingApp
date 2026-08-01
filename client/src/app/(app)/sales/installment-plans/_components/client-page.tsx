@@ -18,8 +18,9 @@ import { getColumns } from './columns';
 import { InstallmentPlanForm } from './installment-plan-form';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 
-import { useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+  import { useQueryClient } from '@tanstack/react-query';
+  import api from '@/lib/api';
+  import { prefixMatch } from '@/lib/search';
 
 type PlanFormValues = z.infer<typeof installmentPlanSchema>;
 
@@ -47,7 +48,7 @@ export function ClientPage({ data }: ClientPageProps) {
     }, [data]);
 
     const filteredData = useMemo(() => plans.filter(plan =>
-        plan.name.toLowerCase().includes(filter.toLowerCase())
+        prefixMatch(filter, plan.name)
     ), [plans, filter]);
 
     const totalPages = Math.ceil(filteredData.length / pageSize);

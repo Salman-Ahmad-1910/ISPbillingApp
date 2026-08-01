@@ -39,7 +39,13 @@ func RunMigrations() {
 		&models.DealerCollection{},
 
 		&models.Complaint{},
+		&models.ComplaintSubject{},
+		&models.ComplaintType{},
 		&models.Staff{},
+		&models.StaffQualification{},
+		&models.StaffExperience{},
+		&models.StaffWorkTime{},
+		&models.StaffDepartment{},
 		&models.RecoveryOfficer{}, // Add Recovery Officer model
 		&models.Attendance{},
 		&models.AdvanceLoan{},

@@ -16,6 +16,7 @@ import { Headphones, Plus, Search, Filter, Loader2, TicketCheck, Clock, CircleCh
 import { useState } from 'react';
 import { toast } from '@/hooks/use-toast';
 import type { SupportTicket } from '@/lib/types';
+import { smartMatch } from '@/lib/search';
 
 export default function SupportTicketsPage() {
     const { companyId } = useCompany();
@@ -99,8 +100,7 @@ export default function SupportTicketsPage() {
     };
 
     const filteredTickets = useMemo(() => tickets?.filter(ticket => {
-        const matchesSearch = ticket.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            ticket.message.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesSearch = smartMatch(searchTerm, [], [ticket.subject, ticket.message]);
         const matchesStatus = statusFilter === 'all' || ticket.status === statusFilter;
         const matchesPriority = priorityFilter === 'all' || ticket.priority === priorityFilter;
         

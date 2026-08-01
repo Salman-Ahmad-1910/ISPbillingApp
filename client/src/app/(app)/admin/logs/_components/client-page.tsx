@@ -3,6 +3,7 @@
 import { DataTable } from './data-table';
 import { columns } from './columns';
 import type { SystemLog } from '@/lib/types';
+import { smartMatch } from '@/lib/search';
 import { Input } from '@/components/ui/input';
 import { useState } from 'react';
 
@@ -14,9 +15,7 @@ export function ClientPage({ data }: ClientPageProps) {
     const [filter, setFilter] = useState('');
 
     const filteredData = data.filter(log => 
-        log.user.toLowerCase().includes(filter.toLowerCase()) || 
-        log.action.toLowerCase().includes(filter.toLowerCase()) ||
-        log.details.toLowerCase().includes(filter.toLowerCase())
+        smartMatch(filter, [log.id], [log.user, log.action, log.details])
     );
 
     return (

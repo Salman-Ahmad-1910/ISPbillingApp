@@ -20,7 +20,8 @@ import {
 import { useState, useCallback } from 'react';
 import { useCompany } from '@/context/company-context';
 import { useToast } from '@/hooks/use-toast';
-import api from '@/lib/api';
+  import api from '@/lib/api';
+  import { smartMatch } from '@/lib/search';
 import { CollectionPrintDialog } from '@/app/(app)/transaction/dealers-collections/_components/collection-print-dialog';
 
 const STATUS_OPTIONS = [
@@ -54,8 +55,7 @@ export default function ClientPage({ data, onRefetch }: ClientPageProps) {
 
   const filteredData = data
     .filter(item =>
-      item?.dealerName?.toLowerCase().includes(filter.toLowerCase()) ||
-      item?.comment?.toLowerCase().includes(filter.toLowerCase())
+      smartMatch(filter, [item.id], [item.dealerName, item.comment])
     );
 
   const handleDelete = useCallback(async (id: string) => {

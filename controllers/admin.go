@@ -1,7 +1,12 @@
 package controllers
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
 	"strconv"
+	"strings"
+	"time"
 
 	"awesomeProject/config"
 	"awesomeProject/middleware"
@@ -11,6 +16,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 // CreateCompany handles creating a new company
@@ -118,7 +124,7 @@ func GetSystemLogs(c *gin.Context) {
 			al.action,
 			al.module,
 			al.description,
-			al.ip_address,
+			al.details,
 			al.user_agent,
 			al.status,
 			al.page
@@ -163,17 +169,17 @@ func GetSystemLogs(c *gin.Context) {
 	args = append(args, limit, offset)
 
 	type LogEntry struct {
-		ID          string `json:"id"`
-		Timestamp   string `json:"timestamp"`
-		UserID      string `json:"userId"`
-		UserName    string `json:"userName"`
-		Action      string `json:"action"`
-		Module      string `json:"module"`
-		Description string `json:"description"`
-		IPAddress   string `json:"ipAddress"`
-		UserAgent   string `json:"userAgent"`
-		Status      string `json:"status"`
-		Page        string `json:"page"`
+		ID          string          `json:"id"`
+		Timestamp   string          `json:"timestamp"`
+		UserID      string          `json:"userId"`
+		UserName    string          `json:"userName"`
+		Action      string          `json:"action"`
+		Module      string          `json:"module"`
+		Description string          `json:"description"`
+		Details     json.RawMessage `json:"details"`
+		UserAgent   string          `json:"userAgent"`
+		Status      string          `json:"status"`
+		Page        string          `json:"page"`
 	}
 
 	var logs []LogEntry
@@ -297,6 +303,170 @@ func GetSystemLogs(c *gin.Context) {
 	}
 
 	utils.SuccessResponse(c, "System logs retrieved", response)
+}
+
+// RestoreDeletedLog restores the soft-deleted record referenced by an audit log entry
+func RestoreDeletedLog(c *gin.Context) {
+	logID := c.Param("id")
+	if logID == "" {
+		utils.ErrorResponse(c, 400, "Log ID is required", nil)
+		return
+	}
+
+	companyID, exists := c.Get("companyID")
+	if !exists {
+		utils.ErrorResponse(c, 400, "Company context not found", nil)
+		return
+	}
+
+	var logEntry models.SystemLog
+	if err := config.DB.Where("id = ? AND company_id = ?", logID, companyID).First(&logEntry).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			utils.ErrorResponse(c, 404, "Log entry not found", nil)
+			return
+		}
+		utils.ErrorResponse(c, 500, "Failed to load log entry", err.Error())
+		return
+	}
+
+	// Decode stored details (entityId + path captured at delete time)
+	var row struct {
+		Details string
+	}
+	if err := config.DB.Table("audit_logs").Unscoped().Select("details").Where("id = ?", logID).Scan(&row).Error; err != nil {
+		utils.ErrorResponse(c, 500, "Failed to load log details", err.Error())
+		return
+	}
+
+	details := map[string]interface{}{}
+	if row.Details == "" {
+		utils.ErrorResponse(c, 400, "This log entry does not contain restore data", nil)
+		return
+	}
+	if err := json.Unmarshal([]byte(row.Details), &details); err != nil {
+		utils.ErrorResponse(c, 400, "Invalid restore data", err.Error())
+		return
+	}
+
+	entityID, _ := details["entityId"].(string)
+	path, _ := details["path"].(string)
+	if entityID == "" {
+		utils.ErrorResponse(c, 400, "This log entry does not contain a restorable record", nil)
+		return
+	}
+	if _, err := uuid.Parse(entityID); err != nil {
+		utils.ErrorResponse(c, 400, "Invalid entity ID in log entry", nil)
+		return
+	}
+
+	table := restoreTargetForPath(path)
+	if table == "" {
+		utils.ErrorResponse(c, 400, "No restore mapping for this log entry", nil)
+		return
+	}
+
+	restoredAt, err := restoreRecord(table, entityID, companyID.(uuid.UUID), config.DB)
+	if err != nil {
+		utils.ErrorResponse(c, 500, "Failed to restore record", err.Error())
+		return
+	}
+
+	middleware.LogActionWithContext(c, "restore", "logs", fmt.Sprintf("Restored %s record %s", table, entityID))
+
+	utils.SuccessResponse(c, "Record restored successfully", gin.H{
+		"table":      table,
+		"entityId":   entityID,
+		"restoredAt": restoredAt,
+	})
+}
+
+// restoreTargetForPath maps a deleted URL path to the table containing the deleted record
+func restoreTargetForPath(path string) string {
+	switch {
+	case strings.Contains(path, "/hr/staff/"):
+		return "staffs"
+	case strings.Contains(path, "/recovery-officers/"):
+		return "recovery_officers"
+	case strings.Contains(path, "/dealers/collections/"):
+		return "dealer_collections"
+	case strings.Contains(path, "/dealers/"):
+		return "dealers"
+	case strings.Contains(path, "/subscribers/"):
+		return "subscribers"
+	case strings.Contains(path, "/billing/payments/"):
+		return "payments"
+	case strings.Contains(path, "/billing/invoices/"):
+		return "invoices"
+	case strings.Contains(path, "/connections/"):
+		return "connections"
+	case strings.Contains(path, "/expenses/"):
+		return "expenses"
+	case strings.Contains(path, "/vendor-invoices/"):
+		return "vendor_invoices"
+	case strings.Contains(path, "/support-tickets/"):
+		return "support_tickets"
+	case strings.Contains(path, "/admin/users/"):
+		return "users"
+	}
+	return ""
+}
+
+// restoreRecord un-deletes a soft-deleted record and its linked login account where applicable
+func restoreRecord(table, entityID string, companyID uuid.UUID, db *gorm.DB) (string, error) {
+	now := time.Now().Format(time.RFC3339)
+
+	if table == "users" {
+		// users table has no company_id; restore by id and re-link company membership
+		if err := db.Table("users").Unscoped().Where("id = ?", entityID).Update("deleted_at", nil).Error; err != nil {
+			return "", err
+		}
+		if err := db.Table("user_companies").Unscoped().
+			Where("user_id = ? AND company_id = ?", entityID, companyID).
+			Update("deleted_at", nil).Error; err != nil {
+			return "", err
+		}
+		return now, nil
+	}
+
+	if err := db.Table(table).Unscoped().
+		Where("id = ? AND company_id = ?", entityID, companyID).
+		Update("deleted_at", nil).Error; err != nil {
+		return "", err
+	}
+
+	switch table {
+	case "staffs", "recovery_officers":
+		// Role records share the user ID, restore the linked login account too
+		if err := db.Table("users").Unscoped().Where("id = ?", entityID).Update("deleted_at", nil).Error; err != nil {
+			return "", err
+		}
+		if err := db.Table("user_companies").Unscoped().
+			Where("user_id = ? AND company_id = ?", entityID, companyID).
+			Update("deleted_at", nil).Error; err != nil {
+			return "", err
+		}
+	case "dealers":
+		// Dealers may have a linked user account matched by email
+		var dealer struct {
+			Email string `json:"email"`
+		}
+		if err := db.Table("dealers").Unscoped().Select("email").Where("id = ?", entityID).Scan(&dealer).Error; err != nil {
+			return "", err
+		}
+		if dealer.Email != "" {
+			if err := db.Table("users").Unscoped().Where("email = ?", dealer.Email).Update("deleted_at", nil).Error; err != nil {
+				return "", err
+			}
+			if err := db.Table("user_companies").Unscoped().
+				Where("company_id = ?", companyID).
+				Where("user_id IN (SELECT id FROM users WHERE email = ?)", dealer.Email).
+				Update("deleted_at", nil).Error; err != nil {
+				return "", err
+			}
+		}
+	}
+
+	return now, nil
 }
 
 // GetUserLogs retrieves audit logs for a specific user

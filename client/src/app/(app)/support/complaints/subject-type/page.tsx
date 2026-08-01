@@ -19,10 +19,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Tag, PlusCircle, MoreHorizontal, Edit3, Trash2, Search, Layers, Globe, Cable } from 'lucide-react';
+import { Tag, PlusCircle, MoreHorizontal, Edit3, Trash2, Search, Layers } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import api from '@/lib/api';
+import { smartMatch } from '@/lib/search';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -32,12 +33,18 @@ interface SubjectType {
   type: string;
 }
 
+interface ComplaintType {
+  id: string;
+  name: string;
+}
+
 export default function SubjectTypePage() {
   const { companyId } = useCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: fetchedData = [], isLoading } = useGenericQuery<SubjectType>('support/complaint-subjects', companyId ?? undefined);
+  const { data: complaintTypes = [] } = useGenericQuery<ComplaintType>('support/complaint-types', companyId ?? undefined);
 
   const [data, setData] = useState<SubjectType[]>([]);
   const [dataReady, setDataReady] = useState(false);
@@ -51,7 +58,7 @@ export default function SubjectTypePage() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<SubjectType | null>(null);
-  const [formType, setFormType] = useState('Internet');
+  const [formType, setFormType] = useState('');
   const [formSubject, setFormSubject] = useState('');
 
   const [pageSize, setPageSize] = useState('10');
@@ -60,17 +67,18 @@ export default function SubjectTypePage() {
 
   const kpiData = useMemo(() => [
     { title: 'Total Subjects', value: data.length, icon: Layers, gradient: 'from-blue-500 to-cyan-600' },
-    { title: 'Internet', value: data.filter(d => d.type === 'Internet').length, icon: Globe, gradient: 'from-emerald-500 to-green-600' },
-    { title: 'Cable', value: data.filter(d => d.type === 'Cable').length, icon: Cable, gradient: 'from-orange-500 to-red-600' },
-  ], [data]);
+    ...(complaintTypes as ComplaintType[]).map((t, i) => ({
+      title: t.name,
+      value: data.filter(d => d.type === t.name).length,
+      icon: Layers,
+      gradient: i % 2 === 0 ? 'from-emerald-500 to-green-600' : 'from-orange-500 to-red-600',
+    })),
+  ], [data, complaintTypes]);
 
   const filteredData = useMemo(() => {
     return data.filter((item) => {
-      if (search) {
-        const q = search.toLowerCase();
-        if (!item.subject.toLowerCase().includes(q) && !item.type.toLowerCase().includes(q)) {
-          return false;
-        }
+      if (search && !smartMatch(search, [], [item.subject, item.type])) {
+        return false;
       }
       return true;
     });
@@ -84,7 +92,8 @@ export default function SubjectTypePage() {
 
   const openAddDialog = () => {
     setEditingItem(null);
-    setFormType('Internet');
+    const types = complaintTypes as ComplaintType[];
+    setFormType(types.length > 0 ? types[0].name : '');
     setFormSubject('');
     setDialogOpen(true);
   };
@@ -267,9 +276,7 @@ export default function SubjectTypePage() {
                       <TableCell className="text-muted-foreground">{index + 1}</TableCell>
                       <TableCell className="font-medium">{item.subject}</TableCell>
                       <TableCell>
-                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          item.type === 'Internet' ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'
-                        }`}>
+                        <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-800">
                           {item.type}
                         </span>
                       </TableCell>
@@ -337,8 +344,13 @@ export default function SubjectTypePage() {
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent portal={false}>
-                  <SelectItem value="Internet">Internet</SelectItem>
-                  <SelectItem value="Cable">Cable</SelectItem>
+                  {(complaintTypes as ComplaintType[]).length === 0 ? (
+                    <SelectItem value="" disabled>No types available</SelectItem>
+                  ) : (
+                    (complaintTypes as ComplaintType[]).map((t) => (
+                      <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>

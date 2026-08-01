@@ -24,6 +24,7 @@ import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { prefixMatch } from '@/lib/search';
 
 type UnitTypeFormValues = z.infer<typeof unitTypeSchema>;
 
@@ -44,9 +45,8 @@ export function ClientPage({ data }: ClientPageProps) {
   const filteredUnitTypes = useMemo(() => {
     if (!searchTerm) return data;
 
-    const lowerSearch = searchTerm.toLowerCase();
     return data.filter(unitType =>
-      unitType.name.toLowerCase().includes(lowerSearch)
+      prefixMatch(searchTerm, unitType.name)
     );
   }, [data, searchTerm]);
 

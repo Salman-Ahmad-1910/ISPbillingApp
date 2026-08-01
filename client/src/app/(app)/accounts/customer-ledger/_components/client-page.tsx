@@ -16,6 +16,7 @@ import { DataTable } from './data-table';
 import { getColumns } from './columns';
 import { LedgerEntryForm } from '../../_components/ledger-entry-form';
 import api from '@/lib/api';
+import { smartMatch } from '@/lib/search';
 import { useQueryClient } from '@tanstack/react-query';
 import {
     Dialog,
@@ -59,7 +60,7 @@ export function ClientPage({ initialData, customerId }: ClientPageProps) {
     }, [initialData]);
 
     const filteredData = useMemo(() => entries.filter(entry =>
-        entry.description?.toLowerCase().includes(filter.toLowerCase())
+        smartMatch(filter, [entry.id], [entry.description])
     ), [entries, filter]);
 
     // Pagination helpers

@@ -26,6 +26,7 @@ import {
 
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { smartMatch } from '@/lib/search';
 
 type PurchaseFormValues = z.infer<typeof purchaseSchema>;
 
@@ -48,11 +49,8 @@ export function ClientPage({ data }: ClientPageProps) {
 
   const filteredPurchases = useMemo(() => {
     if (!searchTerm) return data;
-    const lowerSearch = searchTerm.toLowerCase();
     return data.filter(purchase =>
-      purchase.purchaseNumber.toLowerCase().includes(lowerSearch) ||
-      purchase.vendorName.toLowerCase().includes(lowerSearch) ||
-      (purchase.billId || '').toLowerCase().includes(lowerSearch)
+      smartMatch(searchTerm, [purchase.purchaseNumber, purchase.billId], [purchase.vendorName])
     );
   }, [data, searchTerm]);
 

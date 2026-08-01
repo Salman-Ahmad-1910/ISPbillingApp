@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import api from '@/lib/api';
+import { smartMatch } from '@/lib/search';
 import { useCompany } from '@/context/company-context';
 import { useToast } from '@/hooks/use-toast';
 
@@ -25,7 +26,6 @@ interface LogEntry {
   action: string;
   module: string;
   description: string;
-  ipAddress: string;
   userAgent: string;
   status: 'success' | 'error' | 'warning';
   page: string;
@@ -233,9 +233,7 @@ export default function LogsPage() {
   };
 
   const filteredLogs = Array.isArray(logsData) ? logsData.filter(log => {
-    if (searchTerm && !log.userName.toLowerCase().includes(searchTerm.toLowerCase()) && 
-        !log.action.toLowerCase().includes(searchTerm.toLowerCase()) && 
-        !log.description.toLowerCase().includes(searchTerm.toLowerCase())) {
+    if (searchTerm && !smartMatch(searchTerm, [], [log.userName, log.action, log.description])) {
       return false;
     }
     return true;
@@ -471,19 +469,18 @@ export default function LogsPage() {
                 <TableHead>Module</TableHead>
                 <TableHead>Page</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>IP Address</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8">
+                  <TableCell colSpan={6} className="text-center py-8">
                     Loading logs...
                   </TableCell>
                 </TableRow>
               ) : filteredLogs.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8">
+                  <TableCell colSpan={6} className="text-center py-8">
                     No logs found for the selected criteria.
                   </TableCell>
                 </TableRow>
@@ -510,9 +507,6 @@ export default function LogsPage() {
                     </TableCell>
                     <TableCell>{log.page || '-'}</TableCell>
                     <TableCell>{getStatusBadge(log.status)}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {log.ipAddress}
-                    </TableCell>
                   </TableRow>
                 ))
               )}

@@ -24,6 +24,7 @@ import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { smartMatch } from '@/lib/search';
 
 type POPFormValues = z.infer<typeof popSchema>;
 
@@ -51,8 +52,7 @@ export function ClientPage({ data }: ClientPageProps) {
     }, [data]);
 
     const filteredData = useMemo(() => pops.filter(pop =>
-        pop.name.toLowerCase().includes(filter.toLowerCase()) ||
-        pop.location.toLowerCase().includes(filter.toLowerCase())
+        smartMatch(filter, [], [pop.name, pop.location])
     ), [pops, filter]);
 
   // Pagination helpers

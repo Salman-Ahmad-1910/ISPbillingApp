@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import type { Company } from '@/lib/types';
 import api from '@/lib/api';
+import { smartMatch } from '@/lib/search';
 
 interface AccountEntry {
   id: string;
@@ -105,12 +106,7 @@ export default function PrintAccountReportsPage() {
       if (filterTxnType !== 'all' && e.transactionType !== filterTxnType) return false;
       if (filterFrom && e.date < filterFrom) return false;
       if (filterTo && e.date > filterTo) return false;
-      if (filterSearch) {
-        const q = filterSearch.toLowerCase();
-        const headName = getHeadName(e.head).toLowerCase();
-        const subHeadName = getSubHeadName(e.subHead).toLowerCase();
-        if (!headName.includes(q) && !subHeadName.includes(q) && !(e.description || '').toLowerCase().includes(q)) return false;
-      }
+      if (filterSearch && !smartMatch(filterSearch, [], [getHeadName(e.head), getSubHeadName(e.subHead), e.description])) return false;
       return true;
     });
   }, [entries, heads, subHeads, filterHead, filterSubHead, filterUser, filterTxnType, filterFrom, filterTo, filterSearch]);

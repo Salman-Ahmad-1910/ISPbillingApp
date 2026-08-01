@@ -28,6 +28,7 @@ import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { smartMatch } from '@/lib/search';
 
 type ProductFormValues = z.infer<typeof productSchema>;
 
@@ -58,9 +59,7 @@ export function ClientPage({ data }: ClientPageProps) {
 
   const filteredData = useMemo(() => products.filter(
     (product) =>
-      product.name.toLowerCase().includes(filter.toLowerCase()) ||
-      product.category.toLowerCase().includes(filter.toLowerCase()) ||
-      (product.brandName || '').toLowerCase().includes(filter.toLowerCase())
+      smartMatch(filter, [product.serialNumber], [product.name, product.category, product.brandName])
   ), [products, filter]);
 
     // Pagination helpers

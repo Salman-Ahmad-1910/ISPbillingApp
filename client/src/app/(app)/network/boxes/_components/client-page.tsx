@@ -24,6 +24,7 @@ import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { prefixMatch } from '@/lib/search';
 
 type BoxFormValues = z.infer<typeof distributionBoxSchema>;
 
@@ -52,7 +53,7 @@ export function ClientPage({ data }: ClientPageProps) {
   }, [filter]);
 
   const filteredData = useMemo(() => boxes.filter(
-    (box) => box.name.toLowerCase().includes(filter.toLowerCase())
+    (box) => prefixMatch(filter, box.name)
   ), [boxes, filter]);
 
   const totalPages = Math.ceil(filteredData.length / pageSize);

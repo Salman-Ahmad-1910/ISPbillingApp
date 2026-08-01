@@ -152,6 +152,30 @@ func ConnectDB() {
 		return
 	}
 
+	err = DB.AutoMigrate(&models.StaffQualification{})
+	if err != nil {
+		log.Fatal("Failed to migrate StaffQualification DB:", err)
+		return
+	}
+
+	err = DB.AutoMigrate(&models.StaffExperience{})
+	if err != nil {
+		log.Fatal("Failed to migrate StaffExperience DB:", err)
+		return
+	}
+
+	err = DB.AutoMigrate(&models.StaffWorkTime{})
+	if err != nil {
+		log.Fatal("Failed to migrate StaffWorkTime DB:", err)
+		return
+	}
+
+	err = DB.AutoMigrate(&models.StaffDepartment{})
+	if err != nil {
+		log.Fatal("Failed to migrate StaffDepartment DB:", err)
+		return
+	}
+
 	err = DB.AutoMigrate(&models.Attendance{})
 	if err != nil {
 		log.Fatal("Failed to migrate Attendance DB:", err)
@@ -161,6 +185,12 @@ func ConnectDB() {
 	err = DB.AutoMigrate(&models.AdvanceLoan{})
 	if err != nil {
 		log.Fatal("Failed to migrate AdvanceLoan DB:", err)
+		return
+	}
+
+	err = DB.AutoMigrate(&models.SalaryPayment{})
+	if err != nil {
+		log.Fatal("Failed to migrate SalaryPayment DB:", err)
 		return
 	}
 

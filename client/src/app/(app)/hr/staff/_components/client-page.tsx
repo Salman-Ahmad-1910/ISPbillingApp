@@ -3,13 +3,10 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PlusCircle, Briefcase } from 'lucide-react';
 import type { Staff } from '@/lib/types';
 import { useCompany } from '@/context/company-context';
-import { z } from 'zod';
-import { staffSchema } from '@/lib/schemas';
 import { useToast } from '@/hooks/use-toast';
 
 import { DataTable } from './data-table';
@@ -24,12 +21,9 @@ import {
 } from '@/components/ui/dialog';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 
-import api from '@/lib/api';
+  import api from '@/lib/api';
+  import { smartMatch } from '@/lib/search';
 import { useQueryClient } from '@tanstack/react-query';
-import { useGenericQuery } from '@/hooks/api/use-generic-query';
-import type { Area } from '@/lib/types';
-
-type StaffFormValues = z.infer<typeof staffSchema>;
 
 interface ClientPageProps {
     data: Staff[];
@@ -39,8 +33,7 @@ export function ClientPage({ data }: ClientPageProps) {
     const { companyId } = useCompany();
     const { toast } = useToast();
     const queryClient = useQueryClient();
-    const { data: areas = [] } = useGenericQuery<Area[]>('network/areas', companyId ?? undefined);
-    
+
     const [filter, setFilter] = useState('');
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
@@ -56,12 +49,12 @@ export function ClientPage({ data }: ClientPageProps) {
         if (!data || !Array.isArray(data)) return [];
         return data.filter(
             (member) =>
-                member.name.toLowerCase().includes(filter.toLowerCase()) ||
-                (member.designation && member.designation.toLowerCase().includes(filter.toLowerCase())) ||
-                (member.email && member.email.toLowerCase().includes(filter.toLowerCase())) ||
-                (member.phone && member.phone.toLowerCase().includes(filter.toLowerCase())) ||
-                (member.secondaryPhone && member.secondaryPhone.toLowerCase().includes(filter.toLowerCase())) ||
-                (member.department && member.department.toLowerCase().includes(filter.toLowerCase()))
+                smartMatch(filter, [member.phone, member.secondaryPhone], [
+                    member.name,
+                    member.designation,
+                    member.email,
+                    member.department,
+                ])
         );
     }, [data, filter]);
 
@@ -112,26 +105,19 @@ export function ClientPage({ data }: ClientPageProps) {
         setCurrentPage(1);
     }, [filter]);
 
-    const handleSave = async (formData: StaffFormValues) => {
-        console.log('handleSave called with:', formData);
-        console.log('selectedStaff:', selectedStaff);
-        console.log('companyId:', companyId);
-        
+    const handleSave = async (formData: any) => {
         setIsSaving(true);
         try {
-            const payload = { 
-                ...formData, 
-                role: 'staff', // Add role for backend processing
-                companyId: companyId! 
+            const payload = {
+                ...formData,
+                role: 'staff',
+                companyId: companyId!,
             };
-            console.log('Sending payload:', payload);
-            
+
             if (selectedStaff) {
-                console.log('Updating staff with ID:', selectedStaff.id);
                 await api.put(`/hr/staff/${selectedStaff.id}`, payload);
                 toast({ title: 'Success', description: 'Staff member updated successfully.' });
             } else {
-                console.log('Creating new staff member');
                 await api.post('/hr/staff', payload);
                 toast({ title: 'Success', description: 'Staff member added successfully.' });
             }
@@ -178,7 +164,7 @@ export function ClientPage({ data }: ClientPageProps) {
         setIsDeleteDialogOpen(true);
     };
 
-    const columns = getColumns({ onEdit: handleEdit, onDelete: openDeleteDialog, areas });
+    const columns = getColumns({ onEdit: handleEdit, onDelete: openDeleteDialog });
 
     return (
         <>
@@ -197,7 +183,7 @@ export function ClientPage({ data }: ClientPageProps) {
                                 Add Staff Member
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-h-[85vh] overflow-y-auto rounded-xl shadow-lg">
+                        <DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto rounded-xl shadow-lg">
                             <DialogHeader>
                                 <DialogTitle className="flex items-center gap-2">
                                     <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-sm">

@@ -14,8 +14,10 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { smartMatch } from '@/lib/search';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
 
 interface DeactivatedRecord {
   id: string;
@@ -49,6 +51,7 @@ export default function DeactivatedUsersPage() {
   const [connectionType, setConnectionType] = useState('both');
   const [badDebtFilter, setBadDebtFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [showInvoice, setShowInvoice] = useState(false);
 
   const deactivatedData: DeactivatedRecord[] = useMemo(() => {
     return connections
@@ -75,9 +78,7 @@ export default function DeactivatedUsersPage() {
       (badDebtFilter === 'yes' && item.badDebt) ||
       (badDebtFilter === 'no' && !item.badDebt);
     const searchMatch = !searchTerm ||
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.internetId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.cnic.includes(searchTerm);
+      smartMatch(searchTerm, [item.internetId, item.cnic, item.id], [item.name]);
 
     return connectionMatch && badDebtMatch && searchMatch;
   }), [deactivatedData, connectionType, badDebtFilter, searchTerm]);
@@ -108,8 +109,38 @@ export default function DeactivatedUsersPage() {
   };
 
   const handlePrint = () => {
-    window.print();
+    setShowInvoice(true);
   };
+
+  if (showInvoice) {
+    const accent = { title: 'text-red-600', border: 'border-red-600', headerBg: 'bg-red-600', rowHover: 'hover:bg-red-50/50' };
+    const columns: InvoiceColumn<DeactivatedRecord>[] = [
+      { header: '#', render: (_: DeactivatedRecord, i: number) => <span className="font-mono text-xs text-gray-500">{i + 1}</span> },
+      { header: 'Internet ID', render: (r) => r.internetId },
+      { header: 'Name', render: (r) => <span className="font-semibold">{r.name}</span> },
+      { header: 'CNIC', render: (r) => r.cnic || '-' },
+      { header: 'Address', render: (r) => r.address || '-' },
+      { header: 'Leaving Date', render: (r) => (r.leavingDate ? format(new Date(r.leavingDate), 'dd MMM yyyy') : '-') },
+      { header: 'Reason', render: (r) => r.reason || '-' },
+      { header: 'Mobile No', render: (r) => r.mobile || '-' },
+      { header: 'Amount (PKR)', align: 'right', render: (r) => r.amount.toLocaleString() },
+      { header: 'Bad Debt', render: (r) => (r.badDebt ? 'Yes' : 'No') },
+    ];
+
+    return (
+      <div className="p-6">
+        <SubscriberReportInvoice<DeactivatedRecord>
+          title="DEACTIVATED USERS REPORT"
+          subtitle={`${totalRecords} deactivated subscribers`}
+          accent={accent}
+          data={filteredData}
+          columns={columns}
+          emptyMessage="No deactivated user records found for the selected criteria."
+          onBack={() => setShowInvoice(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 p-6">

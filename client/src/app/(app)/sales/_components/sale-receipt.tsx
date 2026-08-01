@@ -15,6 +15,7 @@ export interface SaleReceiptItem {
 
 export interface SaleReceiptData {
   id: string;
+  invoiceNumber: number;
   subscriberName: string;
   totalAmount: number;
   taxAmount: number;
@@ -126,7 +127,7 @@ function buildA4Receipt(
 
     return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"/>
-<title>Installment Invoice ${escapeHtml(sale.id)}</title>
+<title>Installment Invoice #${sale.invoiceNumber}</title>
 <style>
   @page { size: A4; margin: 15mm; }
   * { box-sizing: border-box; }
@@ -184,7 +185,7 @@ function buildA4Receipt(
     <div class="doc">
       <div class="title">INSTALLMENT INVOICE</div>
       <div class="rid">
-        Sale ID: <span>${escapeHtml(sale.id)}</span><br/>
+        Sale #: <span>${sale.invoiceNumber}</span><br/>
         Date: <span>${escapeHtml(fmtDate(sale.date))}</span><br/>
         Plan: <span>${escapeHtml(inst!.planName)}</span><br/>
         Status: <span class="status-pill ${instStatusClass}">${instStatus}</span>
@@ -289,7 +290,7 @@ function buildA4Receipt(
 
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"/>
-<title>Sale Receipt ${escapeHtml(sale.id)}</title>
+<title>Sale Receipt #${sale.invoiceNumber}</title>
 <style>
   @page { size: A4; margin: 15mm; }
   * { box-sizing: border-box; }
@@ -345,7 +346,7 @@ function buildA4Receipt(
     <div class="doc">
       <div class="title">INVOICE</div>
       <div class="rid">
-        Sale ID: <span>${escapeHtml(sale.id)}</span><br/>
+        Sale #: <span>${sale.invoiceNumber}</span><br/>
         Date: <span>${escapeHtml(fmtDate(sale.date))}</span><br/>
         Status: <span class="status-pill status-${escapeHtml(sale.paymentMethod === 'cash' ? 'paid' : 'pending')}">${escapeHtml((sale.paymentMethod === 'cash' ? 'PAID' : sale.paymentMethod || 'PENDING').toUpperCase())}</span>
       </div>
@@ -442,7 +443,7 @@ async function buildThermalReceipt(
   if (isInst) {
     return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"/>
-<title>Installment Receipt ${escapeHtml(sale.id)}</title>
+<title>Installment Receipt #${sale.invoiceNumber}</title>
 <style>
   @page { size: 80mm auto; margin: 3mm; }
   * { box-sizing: border-box; }
@@ -476,7 +477,7 @@ async function buildThermalReceipt(
   <div class="center muted">INSTALLMENT RECEIPT</div>
   <div class="sep"></div>
 
-  <div class="row"><span class="lbl">No:</span><span class="val">${escapeHtml(sale.id.slice(0, 12))}</span></div>
+  <div class="row"><span class="lbl">No:</span><span class="val">${sale.invoiceNumber}</span></div>
   <div class="row"><span class="lbl">Date:</span><span class="val">${escapeHtml(fmtDate(sale.date))}</span></div>
   <div class="row"><span class="lbl">Customer:</span><span class="val">${escapeHtml(sale.subscriberName || 'Walk-in')}</span></div>
   <div class="row"><span class="lbl">Plan:</span><span class="val">${escapeHtml(inst!.planName)}</span></div>
@@ -518,7 +519,7 @@ async function buildThermalReceipt(
 
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"/>
-<title>Receipt ${escapeHtml(sale.id)}</title>
+<title>Receipt #${sale.invoiceNumber}</title>
 <style>
   @page { size: 80mm auto; margin: 3mm; }
   * { box-sizing: border-box; }
@@ -552,7 +553,7 @@ async function buildThermalReceipt(
   <div class="sep"></div>
   <div class="center muted">SALE RECEIPT</div>
   <div class="sep"></div>
-  <div class="row"><span>No:</span><span>${escapeHtml(sale.id)}</span></div>
+  <div class="row"><span>No:</span><span>${sale.invoiceNumber}</span></div>
   <div class="row"><span>Date:</span><span>${escapeHtml(fmtDate(sale.date))}</span></div>
   <div class="row"><span>Cust:</span><span>${escapeHtml(sale.subscriberName || 'Walk-in')}</span></div>
   <div class="row"><span>Pay:</span><span style="text-transform:uppercase">${escapeHtml(sale.paymentMethod || '')}</span></div>

@@ -65,6 +65,15 @@ export const columns = ({ onEdit, onDelete }: ProductColumnsProps): ColumnDef<Pr
     },
   },
   {
+    accessorKey: 'serialNumber',
+    header: 'SN / MAC',
+    cell: ({ row }) => (
+      <div className="text-xs font-mono text-muted-foreground">
+        {row.original.serialNumber || '-'}
+      </div>
+    ),
+  },
+  {
     accessorKey: 'discount',
     header: () => <div className="text-right">Discount</div>,
     cell: ({ row }) => {

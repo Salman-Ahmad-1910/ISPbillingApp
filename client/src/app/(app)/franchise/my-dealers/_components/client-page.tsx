@@ -20,7 +20,8 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
-import api from '@/lib/api';
+  import api from '@/lib/api';
+  import { smartMatch } from '@/lib/search';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface DealerFormValues {
@@ -105,9 +106,7 @@ export function ClientPage({ data }: ClientPageProps) {
   }, [selectedDealer, companyId]);
 
   const filteredData = useMemo(() => dealers.filter(dealer =>
-    dealer.name.toLowerCase().includes(filter.toLowerCase()) ||
-    dealer.cnic.includes(filter) ||
-    dealer.phone.includes(filter)
+    smartMatch(filter, [dealer.cnic, dealer.phone], [dealer.name])
   ), [dealers, filter]);
 
   // Pagination helpers

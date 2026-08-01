@@ -24,6 +24,7 @@ import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { smartMatch } from '@/lib/search';
 
 type VendorFormValues = z.infer<typeof vendorSchema>;
 
@@ -46,12 +47,8 @@ export function ClientPage({ data }: ClientPageProps) {
   const filteredVendors = useMemo(() => {
     if (!searchTerm) return vendors;
     
-    const lowerSearch = searchTerm.toLowerCase();
     return vendors.filter(vendor => 
-      vendor.name.toLowerCase().includes(lowerSearch) ||
-      vendor.contactPerson?.toLowerCase().includes(lowerSearch) ||
-      vendor.email?.toLowerCase().includes(lowerSearch) ||
-      vendor.phone?.includes(lowerSearch)
+      smartMatch(searchTerm, [vendor.phone], [vendor.name, vendor.contactPerson, vendor.email])
     );
   }, [vendors, searchTerm]);
 

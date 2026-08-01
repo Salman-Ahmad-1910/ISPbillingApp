@@ -64,6 +64,19 @@ func AuditMiddleware() gin.HandlerFunc {
 					Page:        extractPageFromPath(c.Request.URL.Path),
 				}
 
+				// Capture the deleted entity ID (trailing URL segment) so records
+				// can be restored later from the audit log
+				if c.Request.Method == "DELETE" {
+					details := map[string]interface{}{"path": c.Request.URL.Path}
+					pathParts := strings.Split(strings.Trim(c.Request.URL.Path, "/"), "/")
+					if len(pathParts) > 0 {
+						if entityID, err := uuid.Parse(pathParts[len(pathParts)-1]); err == nil {
+							details["entityId"] = entityID.String()
+						}
+					}
+					logEntry.Details = details
+				}
+
 				// Log to database asynchronously
 				go func() {
 					if err := config.DB.Create(&logEntry).Error; err != nil {
@@ -136,6 +149,10 @@ func extractPageFromPath(path string) string {
 	for i, part := range pathParts {
 		if part == "api" && i+1 < len(pathParts) {
 			if i+2 < len(pathParts) {
+				// For /api/v1/admin/<subpath>/..., return the subpath for a more specific page
+				if pathParts[i+2] == "admin" && i+3 < len(pathParts) {
+					return pathParts[i+3]
+				}
 				return pathParts[i+2]
 			}
 		}
@@ -186,14 +203,17 @@ func determineActionAndModule(method, path string) (string, string) {
 		action = "delete"
 	}
 
-	// Extract module from path
+	// Extract module from path (skip the leading api/v1 segments)
 	pathParts := strings.Split(strings.Trim(path, "/"), "/")
-	if len(pathParts) > 0 {
-		module := pathParts[0]
+	start := 0
+	for start < len(pathParts) && (pathParts[start] == "api" || pathParts[start] == "v1") {
+		start++
+	}
+	if start < len(pathParts) {
+		module := pathParts[start]
 
 		// Map common API paths to modules
 		moduleMap := map[string]string{
-			"api":         "system",
 			"auth":        "authentication",
 			"users":       "users",
 			"companies":   "companies",
@@ -211,6 +231,13 @@ func determineActionAndModule(method, path string) (string, string) {
 			"packages":    "billing",
 			"complaints":  "support",
 			"expenses":    "financial",
+			"dashboard":   "dashboard",
+			"admin":       "admin",
+			"hr":          "hr",
+			"accounts":    "accounts",
+			"inventory":   "inventory",
+			"crm":         "crm",
+			"messages":    "messages",
 		}
 
 		if mappedModule, exists := moduleMap[module]; exists {

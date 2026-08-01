@@ -114,6 +114,17 @@ func GetPayments(c *gin.Context) {
 			var conn models.Connection
 			if err := config.DB.Where("id = ?", *payments[i].SubscriberID).First(&conn).Error; err == nil {
 				payments[i].SubscriberName = conn.Name
+				payments[i].Address = conn.Address
+				if conn.SublocalityID != "" {
+					var area models.Area
+					if err := config.DB.Where("id = ?", conn.SublocalityID).First(&area).Error; err == nil {
+						if area.SubLocality != "" {
+							payments[i].AreaName = area.SubLocality
+						} else {
+							payments[i].AreaName = area.Locality
+						}
+					}
+				}
 			} else {
 				// Fallback: try the subscribers table
 				var subscriber models.Subscriber
@@ -125,6 +136,19 @@ func GetPayments(c *gin.Context) {
 			}
 		} else {
 			payments[i].SubscriberName = "Unknown Subscriber"
+		}
+
+		// Populate the collector name (recovery officer / user)
+		if payments[i].CollectorID != nil {
+			var user models.User
+			if err := config.DB.Where("id = ?", *payments[i].CollectorID).First(&user).Error; err == nil {
+				payments[i].CollectedByName = user.Name
+			} else {
+				var officer models.RecoveryOfficer
+				if err := config.DB.Where("id = ?", *payments[i].CollectorID).First(&officer).Error; err == nil {
+					payments[i].CollectedByName = officer.Name
+				}
+			}
 		}
 	}
 
@@ -166,12 +190,37 @@ func CreatePayment(c *gin.Context) {
 		if paymentDate == "" {
 			paymentDate = time.Now().Format("2006-01-02")
 		}
-		config.DB.Model(&models.Connection{}).
-			Where("id = ?", *payment.SubscriberID).
-			UpdateColumns(map[string]interface{}{
-				"last_payment_date": paymentDate,
-				"remaining_amount":  gorm.Expr("GREATEST(remaining_amount - ?, 0)", payment.Amount),
-			})
+		var conn models.Connection
+		if err := config.DB.Where("id = ?", *payment.SubscriberID).First(&conn).Error; err == nil {
+			months := 0
+			if conn.LastPaymentDate != nil && *conn.LastPaymentDate != "" {
+				lastDate, err := time.Parse("2006-01-02", *conn.LastPaymentDate)
+				if err == nil {
+					now := time.Now()
+					months = int(now.Year() - lastDate.Year())*12 + int(now.Month() - lastDate.Month())
+				}
+			} else if conn.RechargeDate != "" {
+				lastDate, err := time.Parse("2006-01-02", conn.RechargeDate)
+				if err == nil {
+					now := time.Now()
+					months = int(now.Year() - lastDate.Year())*12 + int(now.Month() - lastDate.Month())
+				}
+			} else {
+				now := time.Now()
+				months = int(now.Year()-conn.CreatedAt.Year())*12 + int(now.Month()-conn.CreatedAt.Month())
+			}
+			if months < 0 {
+				months = 0
+			}
+			actualOwed := max(0, conn.RemainingAmount) + conn.Amount*float64(months)
+			newRemaining := max(0, actualOwed-payment.Amount)
+			config.DB.Model(&models.Connection{}).
+				Where("id = ?", *payment.SubscriberID).
+				UpdateColumns(map[string]interface{}{
+					"last_payment_date": paymentDate,
+					"remaining_amount":  newRemaining,
+				})
+		}
 	}
 
 	utils.CreatedResponse(c, "Payment created successfully", payment)

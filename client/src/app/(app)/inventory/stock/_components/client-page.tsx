@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import { smartMatch } from '@/lib/search';
 
 import { DataTable } from './data-table';
 import { columns } from './columns';
@@ -25,9 +26,7 @@ export function ClientPage({ data }: ClientPageProps) {
     }, [data]);
 
     const filteredData = useMemo(() => items.filter(item =>
-        (item.name || '').toLowerCase().includes(filter.toLowerCase()) ||
-        (item.vendorName || '').toLowerCase().includes(filter.toLowerCase()) ||
-        (item.serialNumber || '').toLowerCase().includes(filter.toLowerCase())
+        smartMatch(filter, [item.serialNumber], [item.name, item.vendorName])
     ), [items, filter]);
 
     const totalPages = Math.ceil(filteredData.length / pageSize);

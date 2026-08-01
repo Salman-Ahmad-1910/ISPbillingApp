@@ -32,6 +32,7 @@ import { useCompany } from '@/context/company-context';
 import { useQueryClient } from '@tanstack/react-query';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
+import { smartMatch } from '@/lib/search';
 import api from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
 import { Loader2, MoreHorizontal, PlusCircle, TriangleAlert, Users, DollarSign, AlertTriangle, UserCheck } from 'lucide-react';
@@ -125,10 +126,8 @@ export default function BadDebtCollectionsPage() {
   // --- Subscriber selection ---
   const filteredSubscribers = useMemo(() => {
     if (!subscriberSearch.trim()) return [];
-    const q = subscriberSearch.toLowerCase();
     return overdueConnections.filter(c =>
-      c.id?.toLowerCase().includes(q) ||
-      c.name?.toLowerCase().includes(q)
+      smartMatch(subscriberSearch, [c.id, c.internetId, c.cell, c.mobile], [c.name])
     ).slice(0, 20);
   }, [overdueConnections, subscriberSearch]);
 

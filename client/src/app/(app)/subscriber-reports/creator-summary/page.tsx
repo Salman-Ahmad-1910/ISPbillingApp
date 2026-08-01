@@ -9,11 +9,13 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { UserPlus, Download, Loader2, Search } from 'lucide-react';
+import { UserPlus, Download, Printer, Loader2, Search } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import type { User } from '@/lib/types';
+import { smartMatch } from '@/lib/search';
 import { format } from 'date-fns';
+import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
 
 interface CreatorSummary {
   creatorId: string;
@@ -32,6 +34,7 @@ export default function CreatorSummaryPage() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [showInvoice, setShowInvoice] = useState(false);
 
   const creatorSummaries: CreatorSummary[] = useMemo(() => {
     const creatorsMap = new Map<string, User[]>();
@@ -60,10 +63,7 @@ export default function CreatorSummaryPage() {
         };
       })
       .filter((summary) => {
-        const matchSearch =
-          !searchTerm ||
-          summary.creatorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          summary.creatorEmail.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchSearch = !searchTerm || smartMatch(searchTerm, [], [summary.creatorName, summary.creatorEmail]);
         const matchRole = roleFilter === 'all' || summary.creatorRole === roleFilter;
         return matchSearch && matchRole;
       })
@@ -99,6 +99,36 @@ export default function CreatorSummaryPage() {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
+
+  const handlePrint = () => {
+    setShowInvoice(true);
+  };
+
+  if (showInvoice) {
+    const accent = { title: 'text-purple-600', border: 'border-purple-600', headerBg: 'bg-purple-600', rowHover: 'hover:bg-purple-50/50' };
+    const columns: InvoiceColumn<CreatorSummary>[] = [
+      { header: '#', render: (_: CreatorSummary, i: number) => <span className="font-mono text-xs text-gray-500">{i + 1}</span> },
+      { header: 'Creator Name', render: (r) => <span className="font-semibold">{r.creatorName}</span> },
+      { header: 'Email', render: (r) => r.creatorEmail || '-' },
+      { header: 'Role', render: (r) => r.creatorRole || '-' },
+      { header: 'Status', render: (r) => <span className="capitalize">{r.creatorStatus}</span> },
+      { header: 'Users Created', align: 'right', render: (r) => <span className="font-bold">{r.totalCreated}</span> },
+    ];
+
+    return (
+      <div className="p-6">
+        <SubscriberReportInvoice<CreatorSummary>
+          title="USER CREATOR SUMMARY"
+          subtitle="All creator records"
+          accent={accent}
+          data={creatorSummaries}
+          columns={columns}
+          emptyMessage="No creator summaries found."
+          onBack={() => setShowInvoice(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -197,6 +227,12 @@ export default function CreatorSummaryPage() {
               <div>
                 <h2 className="text-xl font-bold">Creator Summary</h2>
                 <p className="text-sm text-muted-foreground mt-1">All creator records</p>
+              </div>
+              <div className="flex gap-2 no-print">
+                <Button variant="outline" size="sm" onClick={handlePrint}>
+                  <Printer className="mr-2 h-4 w-4" />
+                  Print
+                </Button>
               </div>
             </div>
 

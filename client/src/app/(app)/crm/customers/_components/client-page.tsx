@@ -25,6 +25,7 @@ import { z } from 'zod';
 
 import type { Customer } from '@/lib/types';
 import { customerSchema } from '@/lib/schemas';
+import { smartMatch } from '@/lib/search';
 
 import { DataTable } from './data-table';
 import { getColumns } from './columns';
@@ -66,10 +67,7 @@ export function CustomerClientPage({ data }: CustomerClientPageProps) {
     const blacklistedCustomers = useMemo(() => customers.filter(c => c.status === 'blacklisted'), [customers]);
 
     const filteredData = useMemo(() => customers
-        .filter(customer =>
-            customer.name.toLowerCase().includes(filter.toLowerCase()) ||
-            customer.cnic.includes(filter)
-        )
+        .filter(customer => smartMatch(filter, [customer.id, customer.cnic], [customer.name]))
         .filter(customer => statusFilters.length === 0 || statusFilters.includes(customer.status)),
         [customers, filter, statusFilters]);
 

@@ -62,13 +62,14 @@ func CreateVendorInvoice(c *gin.Context) {
 				TenantModel: models.TenantModel{
 					CompanyID: invoice.CompanyID,
 				},
-				InvoiceID:   invoice.ID,
-				ProductID:   item.ProductID,
-				ProductName: item.ProductName,
-				Quantity:    item.Quantity,
-				UnitPrice:   item.UnitPrice,
-				UnitType:    item.UnitType,
-				Subtotal:    item.Subtotal,
+				InvoiceID:    invoice.ID,
+				ProductID:    item.ProductID,
+				ProductName:  item.ProductName,
+				Quantity:     item.Quantity,
+				UnitPrice:    item.UnitPrice,
+				UnitType:     item.UnitType,
+				Subtotal:     item.Subtotal,
+				SerialNumber: item.SerialNumber,
 			}
 			if err := tx.Create(&newItem).Error; err != nil {
 				tx.Rollback()
@@ -225,13 +226,14 @@ func UpdateVendorInvoice(c *gin.Context) {
 			TenantModel: models.TenantModel{
 				CompanyID: existingInvoice.CompanyID,
 			},
-			InvoiceID:   existingInvoice.ID,
-			ProductID:   item.ProductID,
-			ProductName: item.ProductName,
-			Quantity:    item.Quantity,
-			UnitPrice:   item.UnitPrice,
-			UnitType:    item.UnitType,
-			Subtotal:    item.Subtotal,
+			InvoiceID:    existingInvoice.ID,
+			ProductID:    item.ProductID,
+			ProductName:  item.ProductName,
+			Quantity:     item.Quantity,
+			UnitPrice:    item.UnitPrice,
+			UnitType:     item.UnitType,
+			Subtotal:     item.Subtotal,
+			SerialNumber: item.SerialNumber,
 		}
 		// Set ID and timestamps (TenantModel fields)
 		newItem.ID = uuid.New()

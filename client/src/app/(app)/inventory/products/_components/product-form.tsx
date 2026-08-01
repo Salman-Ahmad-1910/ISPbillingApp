@@ -56,6 +56,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
         brandName: product.brandName || '',
         productTypeId: product.productTypeId || '',
         productTypeName: product.productTypeName || '',
+        serialNumber: product.serialNumber || '',
     } : {
       name: '',
       category: '',
@@ -72,6 +73,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
       purchasePrice: 0,
       salePrice: 0,
       discount: 0,
+      serialNumber: '',
     },
   });
 
@@ -212,6 +214,20 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
             )}
           />
         </div>
+
+        <FormField
+          control={form.control}
+          name="serialNumber"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>SN / MAC</FormLabel>
+              <FormControl>
+                <Input placeholder="e.g., 00:1A:2B:3C:4D:5E" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FormField

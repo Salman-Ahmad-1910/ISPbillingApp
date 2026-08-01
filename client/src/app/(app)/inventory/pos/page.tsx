@@ -18,6 +18,7 @@ import { backendImageUrl } from '@/lib/utils';
 
 import api from '@/lib/api';
 import { useQueryClient } from '@tanstack/react-query';
+import { smartMatch, prefixMatch } from '@/lib/search';
 
 interface CartItem {
     product: Product;
@@ -55,10 +56,8 @@ function SearchableDropdown({
 
     const filtered = useMemo(() => {
         if (!query) return items;
-        const q = query.toLowerCase();
         return items.filter(i =>
-            i.name.toLowerCase().includes(q) ||
-            i.secondary?.toLowerCase().includes(q)
+            smartMatch(query, [i.id], [i.name, i.secondary])
         );
     }, [items, query]);
 
@@ -287,7 +286,7 @@ export default function POSPage() {
     }, [purchasedProducts]);
 
     const filteredProducts = useMemo(() => {
-        return posProducts.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+        return posProducts.filter(p => prefixMatch(searchTerm, p.name));
     }, [posProducts, searchTerm]);
 
     // Populate cart with original sale items when existing installment is found and products load

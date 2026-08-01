@@ -28,6 +28,7 @@ import type { Company } from '@/lib/types';
 import { z } from 'zod';
 import { companySchema } from '@/lib/schemas';
 import { useToast } from '@/hooks/use-toast';
+import { smartMatch } from '@/lib/search';
 
 import { DataTable } from './data-table';
 // import { columns as getColumns } from './columns';
@@ -59,8 +60,7 @@ export function ClientPage() {
 
   const filteredData = useMemo(() => displayCompanies.filter(
     (company) =>
-      (company.name?.toLowerCase() || '').includes(filter.toLowerCase()) ||
-      (company.email?.toLowerCase() || '').includes(filter.toLowerCase())
+      smartMatch(filter, [company.id], [company.name, company.email])
   ), [displayCompanies, filter]);
 
   // Pagination helpers

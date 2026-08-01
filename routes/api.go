@@ -107,6 +107,7 @@ func SetupRoutes(r *gin.Engine) {
 		recoveryOfficers := admin.Group("/recovery-officers")
 		recoveryOfficers.Use(middleware.AuthMiddleware())
 		recoveryOfficers.Use(middleware.CompanyMiddleware(config.DB))
+		recoveryOfficers.Use(middleware.AuditMiddleware())
 		{
 			recoveryOfficers.GET("", controllers.GetRecoveryOfficers)
 			recoveryOfficers.POST("", controllers.CreateSubUser)
@@ -181,6 +182,11 @@ func SetupRoutes(r *gin.Engine) {
 			billing.POST("/bills/create", middleware.RBACMiddleware(config.DB, "billing", "add"), controllers.CreateBills)
 			billing.POST("/bills/delete", middleware.RBACMiddleware(config.DB, "billing", "add"), controllers.DeleteBills)
 			billing.GET("/bills", controllers.GetBillRecords)
+
+			billing.GET("/promises", controllers.GetPromises)
+			billing.POST("/promises", controllers.CreatePromise)
+			billing.PUT("/promises/:id", controllers.UpdatePromise)
+			billing.DELETE("/promises/:id", controllers.DeletePromise)
 		}
 
 		crm := api.Group("/crm")
@@ -241,6 +247,7 @@ func SetupRoutes(r *gin.Engine) {
 			logs.GET("", controllers.GetSystemLogs)
 			logs.GET("/user/:userId", controllers.GetUserLogs)
 			logs.GET("/module/:module", controllers.GetModuleLogs)
+			logs.POST("/:id/restore", controllers.RestoreDeletedLog)
 		}
 
 		// System config routes (with RBAC)
@@ -312,6 +319,8 @@ func SetupRoutes(r *gin.Engine) {
 			c.Set("db", config.DB)
 			c.Next()
 		})
+		dealers.Use(middleware.AuthMiddleware())
+		dealers.Use(middleware.AuditMiddleware())
 		{
 			dealers.POST("", controllers.CreateDealer)
 			// Register only GET, PUT for generic CRUD, DELETE uses custom logic
@@ -664,6 +673,8 @@ func SetupRoutes(r *gin.Engine) {
 		})
 		{
 			controllers.RegisterGenericCRUD[models.Complaint](customerSupport, "/complaints")
+			controllers.RegisterGenericCRUD[models.ComplaintSubject](customerSupport, "/complaint-subjects")
+			controllers.RegisterGenericCRUD[models.ComplaintType](customerSupport, "/complaint-types")
 			controllers.RegisterGenericCRUD[models.AlertTemplate](customerSupport, "/alerts")
 		}
 
@@ -699,7 +710,10 @@ func SetupRoutes(r *gin.Engine) {
 			hr.PUT("/staff/:id", controllers.UpdateSubUser)
 			hr.DELETE("/staff/:id", controllers.DeleteSubUser)
 
+			controllers.RegisterGenericCRUD[models.StaffDepartment](hr, "/departments")
+
 			controllers.RegisterGenericCRUD[models.Attendance](hr, "/attendance")
+			controllers.RegisterGenericCRUD[models.SalaryPayment](hr, "/salary")
 			controllers.RegisterGenericCRUD[models.AdvanceLoan](hr, "/advance-loans")
 			controllers.RegisterGenericCRUD[models.AdvanceLoan](hr, "/advances")
 			controllers.RegisterGenericCRUD[models.AlertTemplate](hr, "/alerts")

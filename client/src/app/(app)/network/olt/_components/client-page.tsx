@@ -25,6 +25,7 @@ import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { smartMatch } from '@/lib/search';
 
 type OLTFormValues = z.infer<typeof oltSchema>;
 
@@ -54,9 +55,7 @@ export function ClientPage({ data }: ClientPageProps) {
     }, [data]);
 
     const filteredData = useMemo(() => olts.filter(olt =>
-        olt.name.toLowerCase().includes(filter.toLowerCase()) ||
-        olt.location.toLowerCase().includes(filter.toLowerCase()) ||
-        olt.ipAddress.includes(filter)
+        smartMatch(filter, [olt.ipAddress], [olt.name, olt.location])
     ), [olts, filter]);
 
   // Pagination helpers

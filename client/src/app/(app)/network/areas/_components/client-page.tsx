@@ -28,6 +28,7 @@ import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { smartMatch } from '@/lib/search';
 
 type AreaFormValues = z.infer<typeof areaSchema>;
 
@@ -56,9 +57,7 @@ export function ClientPage({ data }: ClientPageProps) {
 
   const filteredData = useMemo(() => areas.filter(
     (area) =>
-      area.city.toLowerCase().includes(filter.toLowerCase()) ||
-      area.zone.toLowerCase().includes(filter.toLowerCase()) ||
-      area.locality.toLowerCase().includes(filter.toLowerCase())
+      smartMatch(filter, [], [area.city, area.zone, area.locality])
   ), [areas, filter]);
 
   // Pagination helpers

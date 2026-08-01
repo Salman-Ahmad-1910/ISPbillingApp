@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -69,7 +70,19 @@ export function AdvanceLoanForm({ advance, staff, onSave, onCancel, isSaving }: 
     defaultValues,
   });
 
-  const selectedCategory = form.watch('category');
+  const amountWatcher = form.watch('amount');
+
+  // The money the staff will return is automatically written to match the amount.
+  const returnTouchedRef = useRef(false);
+  const prevAmountRef = useRef(amountWatcher);
+
+  useEffect(() => {
+    const changed = prevAmountRef.current !== amountWatcher;
+    prevAmountRef.current = amountWatcher;
+    if (changed && !returnTouchedRef.current && amountWatcher > 0) {
+      form.setValue('returnValue', amountWatcher);
+    }
+  }, [amountWatcher, form]);
 
   function onSubmit(values: AdvanceLoanFormValues) {
     onSave(values);
@@ -179,21 +192,27 @@ export function AdvanceLoanForm({ advance, staff, onSave, onCancel, isSaving }: 
           />
         </div>
 
-        {selectedCategory === 'loan' && (
-          <FormField
-            control={form.control}
-            name="returnValue"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Return Value (PKR)</FormLabel>
-                <FormControl>
-                  <Input type="number" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        )}
+        <FormField
+          control={form.control}
+          name="returnValue"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Return Value (PKR)</FormLabel>
+              <FormControl>
+                <Input
+                  type="number"
+                  {...field}
+                  onChange={e => {
+                    returnTouchedRef.current = true;
+                    field.onChange(parseFloat(e.target.value) || 0);
+                  }}
+                />
+              </FormControl>
+              <p className="text-xs text-muted-foreground">The money the staff will return is automatically filled with the amount.</p>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <FormField
           control={form.control}
