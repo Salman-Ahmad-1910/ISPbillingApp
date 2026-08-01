@@ -110,7 +110,7 @@ export default function SubscriberCollectionsPage() {
   const filteredSubscribers = useMemo(() => {
     if (!subscriberSearch.trim()) return [];
     return (connections as Connection[]).filter(c =>
-      smartMatch(subscriberSearch, [c.id, c.internetId, c.cell, c.mobile], [c.name])
+      smartMatch(subscriberSearch, [c.id, c.internetId, c.cell, c.mobile, c.cnic], [c.name, c.address])
     ).slice(0, 20);
   }, [connections, subscriberSearch]);
 

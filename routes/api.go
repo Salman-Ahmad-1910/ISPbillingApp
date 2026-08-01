@@ -261,6 +261,7 @@ func SetupRoutes(r *gin.Engine) {
 		messages := protected.Group("/messages")
 		{
 			controllers.RegisterGenericCRUDScoped[models.Message](messages, "", true)
+			controllers.RegisterGenericCRUDScoped[models.MessageTemplate](messages, "/templates", true)
 		}
 
 		// Support tickets routes (with RBAC)
@@ -531,7 +532,7 @@ func SetupRoutes(r *gin.Engine) {
 			c.Next()
 		})
 		{
-			controllers.RegisterGenericCRUD[models.Product](products, "")
+			controllers.RegisterProductRoutes(products)
 		}
 
 		// Plans routes
@@ -589,13 +590,21 @@ func SetupRoutes(r *gin.Engine) {
 		{
 			controllers.RegisterGenericCRUD[models.InventoryItem](inventory, "/stock")
 			controllers.RegisterGenericCRUD[models.InventoryItem](inventory, "/items")
-			controllers.RegisterGenericCRUD[models.Product](inventory, "/products")
+			controllers.RegisterProductRoutes(inventory.Group("/products"))
 			controllers.RegisterGenericCRUD[models.PricingPlan](inventory, "/plans")
 			controllers.RegisterGenericCRUD[models.Brand](inventory, "/brands")
 			controllers.RegisterGenericCRUD[models.UnitType](inventory, "/unit-types")
 			controllers.RegisterGenericCRUD[models.ProductType](inventory, "/product-types")
 			controllers.RegisterGenericCRUD[models.InventoryStatus](inventory, "/statuses")
 			controllers.RegisterGenericCRUD[models.Vendor](inventory, "/vendors")
+			{
+				snPool := controllers.SerialNumberPoolCRUD{GenericCRUD: controllers.GenericCRUD[models.SerialNumberPool]{IsScoped: true}}
+				inventory.GET("/serial-number-pool", snPool.FindAll)
+				inventory.POST("/serial-number-pool", snPool.Create)
+				inventory.GET("/serial-number-pool/:id", snPool.FindOne)
+				inventory.PUT("/serial-number-pool/:id", snPool.Update)
+				inventory.DELETE("/serial-number-pool/:id", snPool.Delete)
+			}
 			inventory.GET("/vendor-invoices", controllers.GetVendorInvoices)
 			inventory.GET("/vendor-invoices/:id", controllers.GetVendorInvoiceByID)
 			inventory.POST("/vendor-invoices", controllers.CreateVendorInvoice)

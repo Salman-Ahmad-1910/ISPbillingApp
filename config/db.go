@@ -130,6 +130,8 @@ func RunMigrations() {
 		&models.AccountSubHead{},
 		&models.AccountEntry{},
 		&models.SubscriberInstallment{},
+		&models.MessageTemplate{},
+		&models.SerialNumberPool{},
 	)
 
 	if err != nil {

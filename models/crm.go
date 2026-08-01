@@ -45,6 +45,14 @@ type Product struct {
 	SerialNumber   string `gorm:"type:varchar(255)" json:"serialNumber"`
 }
 
+// SerialNumberPool - Pool of serial numbers to be auto-assigned to products
+type SerialNumberPool struct {
+	TenantModel
+	SerialNumber string `gorm:"type:varchar(255);not null;index" json:"serialNumber"`
+	Status       string `gorm:"type:varchar(50);not null;default:'available'" json:"status"` // available | used
+	ProductID    string `gorm:"type:varchar(100)" json:"productId"`
+}
+
 // InstallmentPlan - Defined schedule for physical goods
 type InstallmentPlan struct {
 	TenantModel

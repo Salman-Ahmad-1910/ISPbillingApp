@@ -260,3 +260,17 @@ type SupportTicket struct {
 	// Temporarily comment out relationship to test migration
 	// User User `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }
+
+// MessageTemplate holds reusable SMS/notification message templates with
+// dynamic parameters (e.g. {name}, {balance}) that get filled when sending.
+type MessageTemplate struct {
+	TenantModel
+	Title      string `gorm:"type:varchar(255);not null" json:"title"`
+	Message    string `gorm:"type:text;not null" json:"message"`
+	Parameters string `gorm:"type:text" json:"parameters"` // comma-separated parameter names
+}
+
+// TableName specifies the exact table name
+func (MessageTemplate) TableName() string {
+	return "message_templates"
+}

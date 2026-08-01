@@ -233,8 +233,8 @@ function buildA4Receipt(
       <span class="value">PKR ${formatPKR(remainingAmount)}</span>
     </div>
     <div class="box-row total">
-      <span class="label">Total Amount (incl. increase)</span>
-      <span class="value">PKR ${formatPKR(inst!.totalAmount)}</span>
+      <span class="label">Per Installment Balance</span>
+      <span class="value">PKR ${formatPKR(inst!.installmentAmount)}</span>
     </div>
   </div>
 
@@ -490,7 +490,7 @@ async function buildThermalReceipt(
     <div class="row"><span class="lbl">Total Installments:</span><span class="val">${inst!.totalInstallments}</span></div>
     <div class="row"><span class="lbl">Paid:</span><span class="val">${inst!.paidInstallments} / ${inst!.totalInstallments} (PKR ${formatPKR(paidAmount)})</span></div>
     <div class="row"><span class="lbl">Remaining:</span><span class="val">${inst!.remainingInstallments} / ${inst!.totalInstallments} (PKR ${formatPKR(remainingAmount)})</span></div>
-    <div class="row total"><span>TOTAL AMOUNT:</span><span>PKR ${formatPKR(sale.totalAmount)}</span></div>
+    <div class="row total"><span>TOTAL (PER INSTALLMENT):</span><span>PKR ${formatPKR(inst!.installmentAmount)}</span></div>
   </div>
 
   <div class="sep"></div>

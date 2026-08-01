@@ -584,6 +584,16 @@ export type Product = {
   serialNumber?: string;
 };
 
+export type SerialNumberPoolEntry = {
+  id: string;
+  companyId: string;
+  serialNumber: string;
+  status: 'available' | 'used';
+  productId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type Vendor = {
   id: string;
   name: string;
@@ -791,6 +801,16 @@ export type Message = {
   messageText?: string;
   sentBy?: string;
   sendedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  companyId: string;
+};
+
+export type MessageTemplate = {
+  id: string;
+  title: string;
+  message: string;
+  parameters?: string;
   createdAt: string;
   updatedAt: string;
   companyId: string;

@@ -11,15 +11,19 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { Inbox, CalendarIcon, Search, ChevronLeft, ChevronRight, Mail, Clock, Users, Loader2, Send, Eye } from 'lucide-react';
-import type { Message } from '@/lib/types';
+import { Inbox, CalendarIcon, Search, ChevronLeft, ChevronRight, Mail, Clock, Users, Loader2, Send, Eye, Plus, Pencil, Trash2, FileText } from 'lucide-react';
+import type { Message, MessageTemplate } from '@/lib/types';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { smartMatch } from '@/lib/search';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import api from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
 export default function NewMessagesPage() {
   const { companyId } = useCompany();
+  const { toast } = useToast();
   const [sublocality, setSublocality] = useState('All');
   const [messageType, setMessageType] = useState('All');
   const [selectedUser, setSelectedUser] = useState('all');
@@ -30,7 +34,16 @@ export default function NewMessagesPage() {
   const [search, setSearch] = useState('');
   const [previewMsg, setPreviewMsg] = useState<Message | null>(null);
 
-  const { data: messages = [], isLoading } = useGenericQuery<Message[]>('messages', companyId ?? undefined);
+  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<MessageTemplate | null>(null);
+  const [templateTitle, setTemplateTitle] = useState('');
+  const [templateMessage, setTemplateMessage] = useState('');
+  const [templateParams, setTemplateParams] = useState('');
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  const [previewTemplate, setPreviewTemplate] = useState<MessageTemplate | null>(null);
+
+  const { data: messages = [], isLoading } = useGenericQuery<Message>('messages', companyId ?? undefined);
+  const { data: templates = [], refetch: refetchTemplates } = useGenericQuery<MessageTemplate>('messages/templates', companyId ?? undefined);
 
   const filteredData = useMemo(() => {
     const newMsgs = messages.filter(m => m.status === 'new' || m.status === 'outbox');
@@ -47,6 +60,66 @@ export default function NewMessagesPage() {
   );
 
   const uniqueRecipients = useMemo(() => new Set(filteredData.map(m => m.name)).size, [filteredData]);
+
+  const openAddTemplate = () => {
+    setEditingTemplate(null);
+    setTemplateTitle('');
+    setTemplateMessage('');
+    setTemplateParams('');
+    setShowTemplateDialog(true);
+  };
+
+  const openEditTemplate = (template: MessageTemplate) => {
+    setEditingTemplate(template);
+    setTemplateTitle(template.title);
+    setTemplateMessage(template.message);
+    setTemplateParams(template.parameters || '');
+    setShowTemplateDialog(true);
+  };
+
+  const handleTemplateSave = async () => {
+    if (!templateTitle.trim() || !templateMessage.trim()) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Title and message are required.' });
+      return;
+    }
+    setIsSavingTemplate(true);
+    try {
+      if (editingTemplate) {
+        await api.put(`/messages/templates/${editingTemplate.id}`, {
+          ...editingTemplate,
+          title: templateTitle.trim(),
+          message: templateMessage.trim(),
+          parameters: templateParams.trim(),
+        });
+        toast({ title: 'Updated', description: 'Message template updated.' });
+      } else {
+        await api.post('/messages/templates', {
+          title: templateTitle.trim(),
+          message: templateMessage.trim(),
+          parameters: templateParams.trim(),
+        });
+        toast({ title: 'Added', description: 'Message template added.' });
+      }
+      setShowTemplateDialog(false);
+      refetchTemplates();
+    } catch (error: any) {
+      const serverMsg = error.response?.data?.message || error.response?.data?.error || '';
+      toast({ variant: 'destructive', title: 'Error', description: serverMsg || 'Failed to save template.' });
+    } finally {
+      setIsSavingTemplate(false);
+    }
+  };
+
+  const handleDeleteTemplate = async (template: MessageTemplate) => {
+    if (!confirm(`Delete template "${template.title}"?`)) return;
+    try {
+      await api.delete(`/messages/templates/${template.id}`);
+      toast({ title: 'Deleted', description: 'Message template deleted.' });
+      refetchTemplates();
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete template.' });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -108,6 +181,86 @@ export default function NewMessagesPage() {
           </div>
         </div>
       </div>
+
+      {/* Message Templates */}
+      <Card className="transition-all duration-300 hover:shadow-md">
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="rounded-lg bg-gradient-to-br from-blue-500 to-cyan-600 p-2 text-white shadow-sm">
+                <FileText className="h-4 w-4" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">Message Templates</h2>
+                <p className="text-xs text-muted-foreground">Dynamic parameters inside curly braces e.g. {`{name}, {balance}`} are filled when sending</p>
+              </div>
+            </div>
+            <Button onClick={openAddTemplate} className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white hover:from-blue-600 hover:to-cyan-700 shadow-sm transition-all duration-300 hover:shadow-md">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Template
+            </Button>
+          </div>
+
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-16">ID</TableHead>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Message</TableHead>
+                  <TableHead>Parameters</TableHead>
+                  <TableHead className="w-28">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {templates.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-32 text-center">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <div className="rounded-full bg-blue-100 p-3 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400">
+                          <FileText className="h-6 w-6" />
+                        </div>
+                        <p className="text-sm font-medium text-muted-foreground">No message templates found</p>
+                        <p className="text-xs text-muted-foreground/60">Click Add Template to create one.</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  templates.map((template) => (
+                    <TableRow key={template.id} className="transition-all duration-300 hover:bg-muted/50">
+                      <TableCell className="font-medium text-muted-foreground">{template.id.slice(0, 6).toUpperCase()}</TableCell>
+                      <TableCell className="font-medium">{template.title}</TableCell>
+                      <TableCell className="max-w-[360px]">
+                        <p className="truncate text-xs text-muted-foreground" title={template.message}>{template.message}</p>
+                      </TableCell>
+                      <TableCell>
+                        {template.parameters
+                          ? template.parameters.split(',').map((p) => p.trim()).filter(Boolean).map((p) => (
+                              <span key={p} className="mr-1 inline-block rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-mono text-blue-700 dark:bg-blue-950/30 dark:text-blue-400">{"{" + p + "}"}</span>
+                            ))
+                          : <span className="text-xs text-muted-foreground">-</span>}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-950/30" onClick={() => setPreviewTemplate(template)}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:hover:bg-amber-950/30" onClick={() => openEditTemplate(template)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30" onClick={() => handleDeleteTemplate(template)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="transition-all duration-300 hover:shadow-md">
         <CardContent className="pt-6">
@@ -272,6 +425,82 @@ export default function NewMessagesPage() {
               <div className="rounded-md bg-muted p-3 text-sm">
                 <p className="text-muted-foreground text-xs mb-1">Message</p>
                 <p>{previewMsg.messageText || 'No message content'}</p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add/Edit Template Dialog */}
+      <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingTemplate ? 'Edit Message Template' : 'Add Message Template'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <Label>Title</Label>
+              <Input
+                value={templateTitle}
+                onChange={(e) => setTemplateTitle(e.target.value)}
+                placeholder="e.g. COLLECTION, UsersCredentail"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Message</Label>
+              <Textarea
+                value={templateMessage}
+                onChange={(e) => setTemplateMessage(e.target.value)}
+                placeholder="e.g. Dear {name}, Thanks for payment, Cable:{cableAmount} Internet:{internetAmount}..."
+                rows={6}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Parameters</Label>
+              <Input
+                value={templateParams}
+                onChange={(e) => setTemplateParams(e.target.value)}
+                placeholder="e.g. name, cableAmount, internetAmount, received, balance, date, bill"
+              />
+              <p className="text-xs text-muted-foreground">Comma-separated parameter names used inside curly braces in the message.</p>
+            </div>
+            <Button
+              onClick={handleTemplateSave}
+              disabled={isSavingTemplate}
+              className="w-full bg-gradient-to-r from-blue-500 to-cyan-600 text-white hover:from-blue-600 hover:to-cyan-700 shadow-sm transition-all duration-300 hover:shadow-md"
+            >
+              {isSavingTemplate && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {editingTemplate ? 'Save Changes' : 'Add'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Template Preview Dialog */}
+      <Dialog open={!!previewTemplate} onOpenChange={() => setPreviewTemplate(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Template Preview</DialogTitle>
+          </DialogHeader>
+          {previewTemplate && (
+            <div className="space-y-3">
+              <div>
+                <span className="text-muted-foreground text-xs">Title</span>
+                <p className="font-semibold">{previewTemplate.title}</p>
+              </div>
+              {previewTemplate.parameters && (
+                <div>
+                  <span className="text-muted-foreground text-xs">Parameters</span>
+                  <div className="mt-1">
+                    {previewTemplate.parameters.split(',').map((p) => p.trim()).filter(Boolean).map((p) => (
+                      <span key={p} className="mr-1 inline-block rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-mono text-blue-700 dark:bg-blue-950/30 dark:text-blue-400">{"{" + p + "}"}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="rounded-md bg-muted p-3 text-sm">
+                <p className="text-muted-foreground text-xs mb-1">Message</p>
+                <p>{previewTemplate.message || 'No message content'}</p>
               </div>
             </div>
           )}

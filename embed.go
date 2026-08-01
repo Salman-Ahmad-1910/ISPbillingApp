@@ -84,6 +84,15 @@ func serveFrontend() gin.HandlerFunc {
 			return
 		}
 
+		// Hashed static assets can be cached forever (content-addressed names).
+		// Everything else (HTML) must never be cached so the browser always
+		// picks up newly deployed bundles.
+		if strings.HasPrefix(path, "/_next/static/") {
+			c.Header("Cache-Control", "public, max-age=31536000, immutable")
+		} else {
+			c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+		}
+
 		fileServer.ServeHTTP(c.Writer, c.Request)
 	}
 }
