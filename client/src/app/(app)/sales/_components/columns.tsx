@@ -58,6 +58,11 @@ export function getColumns(onDelete?: (id: string) => void): ColumnDef<Sale>[] {
     {
       accessorKey: 'subscriberName',
       header: 'Customer',
+      cell: ({ row }) => (
+        <div className="truncate font-medium">
+          {row.original.subscriberName || 'Walk-in'}
+        </div>
+      ),
     },
     {
       accessorKey: 'paymentMethod',

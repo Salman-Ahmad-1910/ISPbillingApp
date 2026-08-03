@@ -122,7 +122,7 @@ export function AreaForm({ area, onSave, onCancel }: AreaFormProps) {
           <Button type="button" variant="outline" onClick={onCancel} className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:border-rose-800 dark:hover:bg-rose-950/30 transition-all duration-300">
             Cancel
           </Button>
-          <Button type="submit" className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md">
+          <Button type="submit" className="bg-gradient-to-r from-green-800 to-green-500 text-white hover:from-green-700 hover:to-green-400 shadow-sm transition-all duration-300 hover:shadow-md">
             Save Area
           </Button>
         </div>

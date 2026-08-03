@@ -170,9 +170,9 @@ export function ClientPage({ data }: ClientPageProps) {
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-3">
           <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
-            <div className="absolute inset-0 opacity-[0.03] bg-gradient-to-br from-emerald-500 to-green-600" />
+            <div className="absolute inset-0 opacity-[0.03] bg-gradient-to-br from-green-800 to-green-500" />
             <CardContent className="p-4 flex items-center gap-4 relative">
-              <div className="rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 p-2.5 text-white shadow-sm transition-transform duration-300 group-hover:scale-110">
+              <div className="rounded-xl bg-gradient-to-br from-green-800 to-green-500 p-2.5 text-white shadow-sm transition-transform duration-300 group-hover:scale-110">
                 <MapPin className="h-5 w-5" />
               </div>
               <div>
@@ -182,9 +182,9 @@ export function ClientPage({ data }: ClientPageProps) {
             </CardContent>
           </Card>
           <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
-            <div className="absolute inset-0 opacity-[0.03] bg-gradient-to-br from-blue-500 to-cyan-500" />
+            <div className="absolute inset-0 opacity-[0.03] bg-gradient-to-br from-blue-800 to-blue-500" />
             <CardContent className="p-4 flex items-center gap-4 relative">
-              <div className="rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 p-2.5 text-white shadow-sm transition-transform duration-300 group-hover:scale-110">
+              <div className="rounded-xl bg-gradient-to-br from-blue-800 to-blue-500 p-2.5 text-white shadow-sm transition-transform duration-300 group-hover:scale-110">
                 <Building2 className="h-5 w-5" />
               </div>
               <div>
@@ -194,9 +194,9 @@ export function ClientPage({ data }: ClientPageProps) {
             </CardContent>
           </Card>
           <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
-            <div className="absolute inset-0 opacity-[0.03] bg-gradient-to-br from-amber-500 to-orange-600" />
+            <div className="absolute inset-0 opacity-[0.03] bg-gradient-to-br from-amber-700 to-orange-400" />
             <CardContent className="p-4 flex items-center gap-4 relative">
-              <div className="rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 p-2.5 text-white shadow-sm transition-transform duration-300 group-hover:scale-110">
+              <div className="rounded-xl bg-gradient-to-br from-amber-700 to-orange-400 p-2.5 text-white shadow-sm transition-transform duration-300 group-hover:scale-110">
                 <Layers className="h-5 w-5" />
               </div>
               <div>
@@ -221,7 +221,7 @@ export function ClientPage({ data }: ClientPageProps) {
             <DialogTrigger asChild>
               <Button
                 onClick={() => setSelectedArea(null)}
-                className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 shadow-sm transition-all duration-200 hover:shadow-md"
+                className="bg-gradient-to-r from-green-800 to-green-500 hover:from-green-700 hover:to-green-400 shadow-sm transition-all duration-200 hover:shadow-md"
               >
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Add New Area
@@ -230,7 +230,7 @@ export function ClientPage({ data }: ClientPageProps) {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
-                  <div className="rounded-md bg-gradient-to-br from-emerald-500 to-green-600 p-1 text-white">
+                  <div className="rounded-md bg-gradient-to-br from-green-800 to-green-500 p-1 text-white">
                     <MapPin className="h-4 w-4" />
                   </div>
                   {selectedArea ? 'Edit' : 'Add'} Area

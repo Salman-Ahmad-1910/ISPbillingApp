@@ -6,8 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCompany } from '@/context/company-context';
-  import api from '@/lib/api';
-  import { smartMatch } from '@/lib/search';
+import api from '@/lib/api';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
@@ -117,9 +116,14 @@ export function ClientPage({ data }: ClientPageProps) {
     return () => { cancelled = true; };
   }, [viewSale?.id, viewSale?.isInstallment, viewSale?.subscriberId, companyId]);
 
-  const filteredData = useMemo(() => data.filter(sale =>
-    smartMatch(filter, [], [sale.subscriberName, sale.paymentMethod])
-  ), [data, filter]);
+  const filteredData = useMemo(() => {
+    if (!filter.trim()) return data;
+    const q = filter.trim().toLowerCase();
+    return data.filter((sale) =>
+      String(sale.id || '').toLowerCase().startsWith(q) ||
+      String(sale.subscriberName || '').toLowerCase().startsWith(q)
+    );
+  }, [data, filter]);
 
   const toReceipt = (s: Sale): SaleReceiptData => ({
     id: s.id,
@@ -265,7 +269,7 @@ export function ClientPage({ data }: ClientPageProps) {
         <CardContent className="p-0">
           <div className="p-4 pb-0">
             <Input
-              placeholder="Filter by customer or payment method..."
+              placeholder="Search by sales ID or customer name..."
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               className="max-w-sm"

@@ -26,7 +26,7 @@ export default function BoxesPage() {
     <>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="rounded-lg bg-gradient-to-br from-teal-500 to-cyan-600 p-2 text-white shadow-sm">
+          <div className="rounded-lg bg-gradient-to-br from-green-800 to-green-500 p-2 text-white shadow-sm">
             <Package className="h-5 w-5" />
           </div>
           <div>
@@ -36,7 +36,7 @@ export default function BoxesPage() {
         </div>
       </div>
 
-      <div className="h-0.5 bg-gradient-to-r from-teal-500/50 via-cyan-500/30 to-transparent mb-6" />
+      <div className="h-0.5 bg-gradient-to-r from-green-800/50 via-green-500/30 to-transparent mb-6" />
 
       <Card>
         <CardContent className="p-0">

@@ -37,7 +37,7 @@ export const PERMISSION_DEFS: PermissionDef[] = [
   { id: '13348', name: 'Sent Messages', module: 'Messages' },
   { id: '13359', name: 'Whatsapp Draft Message', module: 'Messages' },
   { id: '13346', name: 'Other Messages', module: 'Messages' },
-  { id: '13345', name: 'Expire Messages', module: 'Messages' },
+  { id: '13345', name: 'Expiry Messages', module: 'Messages' },
   { id: '13344', name: 'New Messages', module: 'Messages' },
   { id: '13322', name: 'Account Heads', module: 'Accounts' },
   { id: '13323', name: 'Account Entry', module: 'Accounts' },

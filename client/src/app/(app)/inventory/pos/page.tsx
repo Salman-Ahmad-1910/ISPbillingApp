@@ -269,11 +269,11 @@ export default function POSPage() {
 
     const selectedName = useMemo(() => {
         if (!customerId || !customerType) return '';
-        if (customerType === 'subscriber') return subscriberList.find(s => s.id === customerId)?.name || '';
+        if (customerType === 'subscriber') return (Array.isArray(subscribersData) ? subscribersData.find((s: any) => s.id === customerId)?.name : '') || '';
         if (customerType === 'customer') return customerList.find(c => c.id === customerId)?.name || '';
         if (customerType === 'dealer') return dealerList.find(d => d.id === customerId)?.name || '';
         return '';
-    }, [customerId, customerType, subscriberList, customerList, dealerList]);
+    }, [customerId, customerType, subscribersData, customerList, dealerList]);
 
     const posProducts = useMemo(() => {
         if (!purchasedProducts) return [];

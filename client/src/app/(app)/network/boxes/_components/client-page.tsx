@@ -52,6 +52,10 @@ export function ClientPage({ data }: ClientPageProps) {
     setCurrentPage(1);
   }, [filter]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [pageSize]);
+
   const filteredData = useMemo(() => boxes.filter(
     (box) => prefixMatch(filter, box.name)
   ), [boxes, filter]);
@@ -119,7 +123,7 @@ export function ClientPage({ data }: ClientPageProps) {
       <div className="p-6 pb-0">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:w-1/3">
           <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-gradient-to-br from-teal-500 to-cyan-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
+            <div className="rounded-lg bg-gradient-to-br from-green-800 to-green-500 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
               <Package className="h-5 w-5" />
             </div>
             <div>
@@ -145,7 +149,7 @@ export function ClientPage({ data }: ClientPageProps) {
             <DialogTrigger asChild>
               <Button
                 onClick={() => setSelectedBox(null)}
-                className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105"
+                className="bg-gradient-to-r from-green-800 to-green-500 text-white hover:from-green-700 hover:to-green-400 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105"
               >
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Add Box Number
@@ -165,43 +169,42 @@ export function ClientPage({ data }: ClientPageProps) {
         </div>
         <DataTable columns={columns} data={paginatedData} />
         <div className="flex items-center justify-between mt-4">
+          <div className="text-sm text-muted-foreground">
+            Showing <span className="font-medium text-foreground">{((currentPage - 1) * pageSize) + 1}</span> to <span className="font-medium text-foreground">{Math.min(currentPage * pageSize, filteredData.length)}</span> of <span className="font-medium text-foreground">{filteredData.length}</span> boxes
+          </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Show entries</span>
-            <Select value={pageSize.toString()} onValueChange={(v) => { setPageSize(parseInt(v)); setCurrentPage(1); }}>
-              <SelectTrigger className="w-20">
+            <Select value={pageSize.toString()} onValueChange={(v) => setPageSize(parseInt(v))}>
+              <SelectTrigger className="w-20 h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="5">5</SelectItem>
                 <SelectItem value="10">10</SelectItem>
+                <SelectItem value="20">20</SelectItem>
                 <SelectItem value="50">50</SelectItem>
                 <SelectItem value="100">100</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">
-              Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredData.length)} of {filteredData.length} entries
-            </span>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline" size="sm"
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="transition-all duration-300 hover:scale-105"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Previous
-              </Button>
-              <Button
-                variant="outline" size="sm"
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages || totalPages === 0}
-                className="transition-all duration-300 hover:scale-105"
-              >
-                Next
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="h-8"
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages || totalPages === 0}
+              className="h-8"
+            >
+              Next
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
           </div>
         </div>
       </div>

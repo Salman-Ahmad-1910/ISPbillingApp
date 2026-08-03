@@ -109,7 +109,7 @@ const navItems: NavItemGroup[] = [
       { title: 'Other Messages', href: '/messages/other', icon: MailQuestion, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
       { title: 'Draft Messages', href: '/messages/draft', icon: FileEdit, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
       { title: 'Sent Messages', href: '/messages/sent', icon: Send, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
-      { title: 'Expired Messages', href: '/messages/expired', icon: Clock, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
+      { title: 'Expiry Messages', href: '/messages/expired', icon: Clock, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
       { title: 'WhatsApp Drafts', href: '/messages/whatsapp-draft', icon: MessageCircle, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
     ],
   },

@@ -241,6 +241,7 @@ type Message struct {
 	MessageText string `gorm:"type:text" json:"messageText"`
 	SentBy      string `gorm:"type:varchar(100)" json:"sentBy"`
 	SendedAt    string `gorm:"type:varchar(50)" json:"sendedAt"`
+	SendTo      string `gorm:"type:varchar(50)" json:"sendTo"` // Subscriber, Dealer, Inquiry, Staff, Admin, Other
 }
 
 // TableName specifies the exact table name

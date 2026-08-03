@@ -131,6 +131,7 @@ func RunMigrations() {
 		&models.AccountSubHead{},
 		&models.AccountEntry{},
 		&models.SubscriberInstallment{},
+		&models.Message{},
 		&models.MessageTemplate{},
 		&models.SerialNumberPool{},
 	)

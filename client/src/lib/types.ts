@@ -804,6 +804,7 @@ export type Message = {
   messageText?: string;
   sentBy?: string;
   sendedAt?: string;
+  sendTo?: string;
   createdAt: string;
   updatedAt: string;
   companyId: string;

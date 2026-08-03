@@ -5,34 +5,99 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
-import { Inbox, CalendarIcon, Search, ChevronLeft, ChevronRight, Mail, Clock, Users, Loader2, Send, Eye, Plus, Pencil, Trash2, FileText } from 'lucide-react';
-import type { Message, MessageTemplate } from '@/lib/types';
+import { Inbox, FileText, Plus, Eye, Pencil, Trash2, Loader2, X, MoreHorizontal, Send, Search, MessageCircle, Bell } from 'lucide-react';
+import type { MessageTemplate, Connection, Dealer, RecoveryOfficer, Staff } from '@/lib/types';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
-import { smartMatch } from '@/lib/search';
+import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import api from '@/lib/api';
-import { useToast } from '@/hooks/use-toast';
+
+const DEFAULT_PARAMS = ['name', 'cableAmount', 'internetAmount', 'received', 'balance', 'date', 'bill'];
+
+const SEND_CATEGORIES = [
+  { value: 'subscribers', label: 'Subscribers', sendTo: 'Subscriber' },
+  { value: 'dealers', label: 'Dealers', sendTo: 'Dealer' },
+  { value: 'recovery', label: 'Recovery Officers', sendTo: 'Recovery Officer' },
+  { value: 'staff', label: 'Staff', sendTo: 'Staff' },
+];
+
+function formatVal(v: any): string {
+  if (v === null || v === undefined) return '';
+  if (typeof v === 'number') return Number.isNaN(v) ? '' : v.toLocaleString();
+  if (typeof v === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}/.test(v.trim())) {
+      const d = new Date(v.trim());
+      if (!Number.isNaN(d.getTime())) return format(d, 'dd MMM yyyy');
+    }
+    return v;
+  }
+  return String(v);
+}
+
+function getEntityPhone(entity: any): string {
+  return entity.mobileNo || entity.mobile || entity.cell || entity.phone || entity.contactPhone || entity.secondaryPhone || '';
+}
+
+function buildValues(entity: any, category: string): Record<string, string> {
+  const map: Record<string, string> = {};
+  Object.entries(entity).forEach(([k, v]) => {
+    const val = formatVal(v);
+    map[k] = val;
+    map[k.toLowerCase()] = val;
+  });
+  const name = map['name'] || '';
+  map['name'] = name;
+  const phone = getEntityPhone(entity);
+  map['phone'] = phone;
+  map['mobile'] = phone;
+  map['mobileNo'] = phone;
+  map['cnic'] = map['cnic'] || map['nic'] || '';
+  map['address'] = map['address'] || map['installationAddress'] || '';
+
+  if (category === 'subscribers') {
+    map['cableAmount'] = formatVal(entity.amount);
+    map['internetAmount'] = formatVal(entity.packageInternet);
+    map['received'] = formatVal(entity.amount);
+    map['balance'] = formatVal(entity.remainingAmount ?? entity.amount);
+    map['bill'] = formatVal(entity.amount);
+    map['date'] = map['date'] || formatVal(entity.rechargeDate || entity.lastPaymentDate || entity.createdAt);
+  } else if (category === 'dealers') {
+    map['amount'] = formatVal(entity.walletBalance);
+    map['received'] = formatVal(entity.walletBalance);
+    map['balance'] = formatVal(entity.remainingAmount ?? entity.walletBalance);
+    map['bill'] = formatVal(entity.walletBalance);
+    map['date'] = map['date'] || formatVal(entity.lastPaymentDate || entity.createdAt);
+  } else if (category === 'recovery') {
+    map['amount'] = formatVal(entity.collected);
+    map['received'] = formatVal(entity.collected);
+    map['balance'] = formatVal(entity.target);
+    map['bill'] = formatVal(entity.target);
+    map['date'] = map['date'] || formatVal(entity.createdAt);
+  } else if (category === 'staff') {
+    map['date'] = map['date'] || formatVal(entity.appointedDate || entity.createdAt);
+  }
+  return map;
+}
+
+function fillTemplate(message: string, entity: any, category: string): string {
+  const values = buildValues(entity, category);
+  return message.replace(/\{([^}]+)\}/g, (_, p: string) => values[p] ?? values[p.toLowerCase()] ?? '');
+}
 
 export default function NewMessagesPage() {
   const { companyId } = useCompany();
   const { toast } = useToast();
-  const [sublocality, setSublocality] = useState('All');
-  const [messageType, setMessageType] = useState('All');
-  const [selectedUser, setSelectedUser] = useState('all');
-  const [date, setDate] = useState<Date | undefined>(undefined);
-  const [dateOpen, setDateOpen] = useState(false);
-  const [pageSize, setPageSize] = useState('10');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [search, setSearch] = useState('');
-  const [previewMsg, setPreviewMsg] = useState<Message | null>(null);
+  const queryClient = useQueryClient();
 
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<MessageTemplate | null>(null);
@@ -42,30 +107,29 @@ export default function NewMessagesPage() {
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const [previewTemplate, setPreviewTemplate] = useState<MessageTemplate | null>(null);
 
-  const { data: messages = [], isLoading } = useGenericQuery<Message>('messages', companyId ?? undefined);
-  const { data: templates = [], refetch: refetchTemplates } = useGenericQuery<MessageTemplate>('messages/templates', companyId ?? undefined);
+  const [availableParams, setAvailableParams] = useState<string[]>(DEFAULT_PARAMS);
+  const [paramsDialogOpen, setParamsDialogOpen] = useState(false);
+  const [newParamInput, setNewParamInput] = useState('');
 
-  const filteredData = useMemo(() => {
-    const newMsgs = messages.filter(m => m.status === 'new' || m.status === 'outbox');
-    if (!search) return newMsgs;
-    return newMsgs.filter(item =>
-      smartMatch(search, [item.entityId, item.mobileNo], [item.name, item.messageType])
-    );
-  }, [messages, search]);
+  const [sendTarget, setSendTarget] = useState<MessageTemplate | null>(null);
+  const [sendCategory, setSendCategory] = useState('');
+  const [sendSearch, setSendSearch] = useState('');
+  const [sendSelectedIds, setSendSelectedIds] = useState<Set<string>>(new Set());
+  const [sendViaWhatsApp, setSendViaWhatsApp] = useState(false);
+  const [isSendingNow, setIsSendingNow] = useState(false);
 
-  const totalPages = Math.ceil(filteredData.length / parseInt(pageSize));
-  const paginatedData = filteredData.slice(
-    (currentPage - 1) * parseInt(pageSize),
-    currentPage * parseInt(pageSize)
-  );
-
-  const uniqueRecipients = useMemo(() => new Set(filteredData.map(m => m.name)).size, [filteredData]);
+  const { data: templates = [], isLoading, refetch: refetchTemplates } = useGenericQuery<MessageTemplate>('messages/templates', companyId ?? undefined);
+  const { data: connections = [] } = useGenericQuery<Connection>('admin/connections', companyId ?? undefined);
+  const { data: dealers = [] } = useGenericQuery<Dealer>('dealers', companyId ?? undefined);
+  const { data: recoveryOfficers = [] } = useGenericQuery<RecoveryOfficer>('admin/recovery-officers', companyId ?? undefined);
+  const { data: staff = [] } = useGenericQuery<Staff>('hr/staff', companyId ?? undefined);
 
   const openAddTemplate = () => {
     setEditingTemplate(null);
     setTemplateTitle('');
     setTemplateMessage('');
     setTemplateParams('');
+    setAvailableParams(DEFAULT_PARAMS);
     setShowTemplateDialog(true);
   };
 
@@ -74,7 +138,44 @@ export default function NewMessagesPage() {
     setTemplateTitle(template.title);
     setTemplateMessage(template.message);
     setTemplateParams(template.parameters || '');
+    const existing = (template.parameters || '').split(',').map(p => p.trim()).filter(Boolean);
+    setAvailableParams(Array.from(new Set([...DEFAULT_PARAMS, ...existing])));
     setShowTemplateDialog(true);
+  };
+
+  const selectedParams = useMemo(
+    () => templateParams.split(',').map(p => p.trim()).filter(Boolean),
+    [templateParams]
+  );
+
+  const handleSelectParam = (value: string) => {
+    if (value && !selectedParams.includes(value)) {
+      setTemplateParams(prev => prev ? `${prev}, ${value}` : value);
+    }
+  };
+
+  const removeSelectedParam = (param: string) => {
+    setTemplateParams(
+      prev => prev.split(',').map(p => p.trim()).filter(Boolean).filter(p => p !== param).join(', ')
+    );
+  };
+
+  const addAvailableParam = () => {
+    const p = newParamInput.trim();
+    if (!p) return;
+    if (availableParams.includes(p)) {
+      toast({ variant: 'destructive', title: 'Error', description: `Parameter "${p}" already exists.` });
+      return;
+    }
+    setAvailableParams(prev => [...prev, p]);
+    setNewParamInput('');
+  };
+
+  const removeAvailableParam = (param: string) => {
+    setAvailableParams(prev => prev.filter(p => p !== param));
+    setTemplateParams(
+      prev => prev.split(',').map(p => p.trim()).filter(Boolean).filter(p => p !== param).join(', ')
+    );
   };
 
   const handleTemplateSave = async () => {
@@ -121,66 +222,120 @@ export default function NewMessagesPage() {
     }
   };
 
+  const entityList = useMemo(() => {
+    if (sendCategory === 'subscribers') return connections;
+    if (sendCategory === 'dealers') return dealers;
+    if (sendCategory === 'recovery') return recoveryOfficers;
+    if (sendCategory === 'staff') return staff;
+    return [];
+  }, [sendCategory, connections, dealers, recoveryOfficers, staff]);
+
+  const currentCategory = SEND_CATEGORIES.find((c) => c.value === sendCategory);
+
+  const visibleEntities = useMemo(() => {
+    if (!sendSearch.trim()) return entityList;
+    const q = sendSearch.trim().toLowerCase();
+    if (/^[0-9]/.test(q)) {
+      return entityList.filter((e) =>
+        String(e.id || '').toLowerCase().startsWith(q) ||
+        String((e as any).internetId || '').toLowerCase().startsWith(q)
+      );
+    }
+    return entityList.filter((e) => String(e.name || '').toLowerCase().startsWith(q));
+  }, [entityList, sendSearch]);
+
+  const allVisibleSelected = visibleEntities.length > 0 && visibleEntities.every((e) => sendSelectedIds.has(e.id));
+
+  const toggleAllVisible = (checked: boolean) => {
+    setSendSelectedIds((prev) => {
+      const next = new Set(prev);
+      visibleEntities.forEach((e) => (checked ? next.add(e.id) : next.delete(e.id)));
+      return next;
+    });
+  };
+
+  const toggleEntity = (id: string) => {
+    setSendSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const openSendDialog = (template: MessageTemplate) => {
+    setSendTarget(template);
+    setSendCategory('');
+    setSendSearch('');
+    setSendSelectedIds(new Set());
+    setSendViaWhatsApp(false);
+  };
+
+  const closeSendDialog = () => {
+    setSendTarget(null);
+    setSendCategory('');
+    setSendSearch('');
+    setSendSelectedIds(new Set());
+    setSendViaWhatsApp(false);
+  };
+
+  const handleSendTemplate = async (template: MessageTemplate) => {
+    const cat = SEND_CATEGORIES.find((c) => c.value === sendCategory);
+    if (!cat) return;
+    const targets = entityList.filter((e) => sendSelectedIds.has(e.id));
+    if (targets.length === 0) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Please select at least one recipient.' });
+      return;
+    }
+    setIsSendingNow(true);
+    try {
+      for (const ent of targets) {
+        const filled = fillTemplate(template.message || '', ent, cat.value);
+        await api.post(`/messages?companyId=${companyId}`, {
+          entityId: ent.id,
+          name: ent.name,
+          mobileNo: getEntityPhone(ent),
+          messageType: template.title,
+          messageText: filled,
+          sendTo: cat.sendTo,
+          status: sendViaWhatsApp ? 'whatsapp_draft' : 'draft',
+          companyId,
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ['messages', companyId] });
+      toast({ title: 'Success', description: `${targets.length} message(s) added to ${sendViaWhatsApp ? 'WhatsApp Draft' : 'Draft'} Messages.` });
+      closeSendDialog();
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.response?.data?.message || 'Failed to send messages.' });
+    } finally {
+      setIsSendingNow(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground animate-pulse">Loading new messages...</p>
+          <p className="text-sm text-muted-foreground animate-pulse">Loading message templates...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="flex w-full min-w-0 max-w-full flex-col gap-6 p-4 md:p-6">
       <div className="flex items-center gap-3">
         <div className="rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 p-2.5 text-white shadow-sm">
           <Inbox className="h-5 w-5" />
         </div>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">New Messages</h1>
-          <p className="text-sm text-muted-foreground">View and manage incoming new messages</p>
+          <p className="text-sm text-muted-foreground">Create and manage message templates</p>
         </div>
       </div>
 
       <div className="h-0.5 bg-gradient-to-r from-emerald-500/50 via-teal-500/30 to-transparent" />
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
-              <Inbox className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">New Messages</p>
-              <p className="text-2xl font-bold">{filteredData.length}</p>
-            </div>
-          </div>
-        </div>
-        <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-gradient-to-br from-blue-500 to-cyan-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
-              <Users className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">Recipients</p>
-              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{uniqueRecipients}</p>
-            </div>
-          </div>
-        </div>
-        <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
-              <Clock className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">Pending Action</p>
-              <p className="text-lg font-bold text-violet-600 dark:text-violet-400">{filteredData.length}</p>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Message Templates */}
       <Card className="transition-all duration-300 hover:shadow-md">
@@ -201,24 +356,24 @@ export default function NewMessagesPage() {
             </Button>
           </div>
 
-          <div className="rounded-md border">
-            <Table>
+          <div className="min-w-0 overflow-x-auto rounded-md border [&_th]:px-2 [&_th]:py-2.5 [&_td]:px-2 [&_td]:py-2.5">
+            <Table className="w-full table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-16">ID</TableHead>
+                  <TableHead className="w-14">ID</TableHead>
                   <TableHead>Title</TableHead>
                   <TableHead>Message</TableHead>
                   <TableHead>Parameters</TableHead>
-                  <TableHead className="w-28">Action</TableHead>
+                  <TableHead className="w-16">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {templates.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-32 text-center">
-                      <div className="flex flex-col items-center justify-center gap-2">
-                        <div className="rounded-full bg-blue-100 p-3 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400">
-                          <FileText className="h-6 w-6" />
+                    <TableCell colSpan={5} className="h-48 text-center">
+                      <div className="flex flex-col items-center justify-center gap-3">
+                        <div className="rounded-full bg-blue-100 p-3 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400 transition-all duration-300 hover:scale-110 hover:shadow-lg">
+                          <FileText className="h-8 w-8" />
                         </div>
                         <p className="text-sm font-medium text-muted-foreground">No message templates found</p>
                         <p className="text-xs text-muted-foreground/60">Click Add Template to create one.</p>
@@ -227,9 +382,9 @@ export default function NewMessagesPage() {
                   </TableRow>
                 ) : (
                   templates.map((template) => (
-                    <TableRow key={template.id} className="transition-all duration-300 hover:bg-muted/50">
+                    <TableRow key={template.id} className="transition-all duration-300 hover:bg-muted/50 hover:shadow-sm">
                       <TableCell className="font-medium text-muted-foreground">{template.id.slice(0, 6).toUpperCase()}</TableCell>
-                      <TableCell className="font-medium">{template.title}</TableCell>
+                      <TableCell className="font-medium truncate" title={template.title}>{template.title}</TableCell>
                       <TableCell className="max-w-[360px]">
                         <p className="truncate text-xs text-muted-foreground" title={template.message}>{template.message}</p>
                       </TableCell>
@@ -241,17 +396,27 @@ export default function NewMessagesPage() {
                           : <span className="text-xs text-muted-foreground">-</span>}
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-950/30" onClick={() => setPreviewTemplate(template)}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:hover:bg-amber-950/30" onClick={() => openEditTemplate(template)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30" onClick={() => handleDeleteTemplate(template)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 transition-all duration-300 hover:scale-110">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem className="data-[highlighted]:text-emerald-600" onClick={() => openSendDialog(template)}>
+                              <Send className="mr-2 h-4 w-4 text-emerald-600" /> Send
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setPreviewTemplate(template)}>
+                              <Eye className="mr-2 h-4 w-4 text-blue-600" /> Preview
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openEditTemplate(template)}>
+                              <Pencil className="mr-2 h-4 w-4 text-amber-600" /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive data-[highlighted]:text-red-600" onClick={() => handleDeleteTemplate(template)}>
+                              <Trash2 className="mr-2 h-4 w-4" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))
@@ -261,175 +426,6 @@ export default function NewMessagesPage() {
           </div>
         </CardContent>
       </Card>
-
-      <Card className="transition-all duration-300 hover:shadow-md">
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <Label>Sublocality</Label>
-              <Select value={sublocality} onValueChange={setSublocality}>
-                <SelectTrigger className="border-muted-foreground/20">
-                  <SelectValue placeholder="Select sublocality" />
-                </SelectTrigger>
-                <SelectContent portal={false}>
-                  {['All', 'Gulshan', 'Saddar', 'Clifton', 'Defence', 'Korangi', 'Landhi', 'Malir'].map((loc) => (
-                    <SelectItem key={loc} value={loc}>{loc}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Message Type</Label>
-              <Select value={messageType} onValueChange={setMessageType}>
-                <SelectTrigger className="border-muted-foreground/20">
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent portal={false}>
-                  {['All', 'User Cradentials', 'Defaulter', 'Internet Card', 'Promotion', 'New User', 'Internet Recharge'].map((t) => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>User</Label>
-              <Select value={selectedUser} onValueChange={setSelectedUser}>
-                <SelectTrigger className="border-muted-foreground/20">
-                  <SelectValue placeholder="Select user" />
-                </SelectTrigger>
-                <SelectContent portal={false}>
-                  {[{ id: 'all', name: 'All Users' }, { id: '1', name: 'Ahmed Khan' }, { id: '2', name: 'Fatima Ali' }].map((u) => (
-                    <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Date</Label>
-              <Popover open={dateOpen} onOpenChange={setDateOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className={cn('w-full justify-start text-left font-normal border-muted-foreground/20', !date && 'text-muted-foreground')}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {date ? format(date, 'PPP') : 'Pick date'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar mode="single" selected={date} onSelect={(d) => { setDate(d); setDateOpen(false); }} initialFocus />
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="transition-all duration-300 hover:shadow-md">
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Show</span>
-              <Select value={pageSize} onValueChange={(v) => { setPageSize(v); setCurrentPage(1); }}>
-                <SelectTrigger className="w-16 border-muted-foreground/20">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent portal={false}>
-                  {['5', '10', '25', '50', '100'].map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <span className="text-sm text-muted-foreground">entries</span>
-            </div>
-            <div className="relative max-w-sm">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search by name, ID or mobile..." value={search} onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }} className="pl-8 border-muted-foreground/20" />
-            </div>
-          </div>
-
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Mobile No</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="w-20">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedData.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-48 text-center">
-                      <div className="flex flex-col items-center justify-center gap-3">
-                        <div className="rounded-full bg-emerald-100 p-3 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400 transition-all duration-300 hover:scale-110 hover:shadow-lg">
-                          <Inbox className="h-8 w-8" />
-                        </div>
-                        <p className="text-sm font-medium text-muted-foreground">No new messages found</p>
-                        <p className="text-xs text-muted-foreground/60">New messages will appear here.</p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  paginatedData.map((item) => (
-                    <TableRow key={item.id} className="transition-all duration-300 hover:bg-muted/50 hover:shadow-sm">
-                      <TableCell className="font-medium">{item.entityId || item.id}</TableCell>
-                      <TableCell>{item.name}</TableCell>
-                      <TableCell>{item.mobileNo || '-'}</TableCell>
-                      <TableCell>{item.messageType || '-'}</TableCell>
-                      <TableCell>{item.createdAt ? new Date(item.createdAt).toLocaleString() : '-'}</TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-950/30 transition-all duration-300 hover:scale-110" onClick={() => setPreviewMsg(item)}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
-          {filteredData.length > parseInt(pageSize) && (
-            <div className="flex items-center justify-between mt-4">
-              <div className="text-sm text-muted-foreground">
-                Showing {((currentPage - 1) * parseInt(pageSize)) + 1} to {Math.min(currentPage * parseInt(pageSize), filteredData.length)} of {filteredData.length} entries
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1} className="transition-all duration-300 hover:scale-105">
-                  <ChevronLeft className="h-4 w-4" /> Previous
-                </Button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <Button key={page} variant={currentPage === page ? 'default' : 'outline'} size="sm" onClick={() => setCurrentPage(page)} className="w-8 h-8 p-0 transition-all duration-300 hover:scale-110">{page}</Button>
-                ))}
-                <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className="transition-all duration-300 hover:scale-105">
-                  Next <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Dialog open={!!previewMsg} onOpenChange={() => setPreviewMsg(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Message Preview</DialogTitle>
-          </DialogHeader>
-          {previewMsg && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div><span className="text-muted-foreground">Name:</span> <span className="font-medium">{previewMsg.name}</span></div>
-                <div><span className="text-muted-foreground">Mobile:</span> <span className="font-medium">{previewMsg.mobileNo || '-'}</span></div>
-                <div><span className="text-muted-foreground">Type:</span> <span className="font-medium">{previewMsg.messageType || '-'}</span></div>
-                <div><span className="text-muted-foreground">Date:</span> <span className="font-medium">{previewMsg.createdAt ? new Date(previewMsg.createdAt).toLocaleString() : '-'}</span></div>
-              </div>
-              <div className="rounded-md bg-muted p-3 text-sm">
-                <p className="text-muted-foreground text-xs mb-1">Message</p>
-                <p>{previewMsg.messageText || 'No message content'}</p>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* Add/Edit Template Dialog */}
       <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
@@ -457,12 +453,37 @@ export default function NewMessagesPage() {
             </div>
             <div className="space-y-1">
               <Label>Parameters</Label>
-              <Input
-                value={templateParams}
-                onChange={(e) => setTemplateParams(e.target.value)}
-                placeholder="e.g. name, cableAmount, internetAmount, received, balance, date, bill"
-              />
-              <p className="text-xs text-muted-foreground">Comma-separated parameter names used inside curly braces in the message.</p>
+              <div className="flex gap-2">
+                <Select value="" onValueChange={handleSelectParam}>
+                  <SelectTrigger className="w-full border-muted-foreground/20">
+                    <SelectValue placeholder="Select parameters..." />
+                  </SelectTrigger>
+                  <SelectContent portal={false}>
+                    {availableParams.filter(p => !selectedParams.includes(p)).map((p) => (
+                      <SelectItem key={p} value={p}>{"{" + p + "}"}</SelectItem>
+                    ))}
+                    {availableParams.filter(p => !selectedParams.includes(p)).length === 0 && (
+                      <SelectItem value="__none__" disabled>No parameters available</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+                <Button type="button" variant="outline" onClick={() => setParamsDialogOpen(true)}>
+                  <Plus className="mr-1 h-4 w-4" /> Add Parameters
+                </Button>
+              </div>
+              {selectedParams.length > 0 && (
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {selectedParams.map((p) => (
+                    <span key={p} className="inline-flex items-center gap-1 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-mono text-blue-700 dark:bg-blue-950/30 dark:text-blue-400">
+                      {"{" + p + "}"}
+                      <button type="button" onClick={() => removeSelectedParam(p)} className="hover:text-red-600">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">Select parameters from the dropdown or manage the list via Add Parameters.</p>
             </div>
             <Button
               onClick={handleTemplateSave}
@@ -473,6 +494,130 @@ export default function NewMessagesPage() {
               {editingTemplate ? 'Save Changes' : 'Add'}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manage Parameters Dialog */}
+      <Dialog open={paramsDialogOpen} onOpenChange={setParamsDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Manage Parameters</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                value={newParamInput}
+                onChange={(e) => setNewParamInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addAvailableParam(); } }}
+                placeholder="e.g. name, balance, bill"
+              />
+              <Button type="button" variant="outline" onClick={addAvailableParam}>Add</Button>
+            </div>
+            <div>
+              <p className="mb-2 text-xs text-muted-foreground">Parameters shown in the dropdown</p>
+              {availableParams.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No parameters yet. Add one above.</p>
+              ) : (
+                <div className="flex flex-wrap gap-1">
+                  {availableParams.map((p) => (
+                    <span key={p} className="inline-flex items-center gap-1 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-mono text-blue-700 dark:bg-blue-950/30 dark:text-blue-400">
+                      {"{" + p + "}"}
+                      <button type="button" onClick={() => removeAvailableParam(p)} className="hover:text-red-600">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+            <Button type="button" variant="outline" className="w-full" onClick={() => setParamsDialogOpen(false)}>
+              Done
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Send Message Dialog */}
+      <Dialog open={!!sendTarget} onOpenChange={(open) => { if (!open && !isSendingNow) closeSendDialog(); }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Send Message</DialogTitle>
+          </DialogHeader>
+          {sendTarget && (
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm"><span className="text-muted-foreground">Template:</span> <span className="font-medium">{sendTarget.title}</span></p>
+                <p className="mt-1 rounded-md bg-muted p-2 text-xs text-muted-foreground">{sendTarget.message}</p>
+              </div>
+              <div className="flex items-center justify-between rounded-md border border-muted-foreground/20 bg-muted/40 p-3">
+                <div className="flex items-center gap-2">
+                  {sendViaWhatsApp
+                    ? <MessageCircle className="h-5 w-5 text-green-600" />
+                    : <Bell className="h-5 w-5 text-blue-600" />}
+                  <div>
+                    <p className="text-sm font-medium">{sendViaWhatsApp ? 'Send via WhatsApp' : 'Send as Notification (SMS)'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {sendViaWhatsApp ? 'Messages will be added to WhatsApp Draft Messages' : 'Messages will be added to Draft Messages'}
+                    </p>
+                  </div>
+                </div>
+                <Switch checked={sendViaWhatsApp} onCheckedChange={setSendViaWhatsApp} />
+              </div>
+              <div className="space-y-2">
+                <Label>Send To</Label>
+                <Select value={sendCategory} onValueChange={(value) => { setSendCategory(value); setSendSearch(''); setSendSelectedIds(new Set()); }}>
+                  <SelectTrigger className="w-full max-w-[260px] border-muted-foreground/20">
+                    <SelectValue placeholder="Select recipients" />
+                  </SelectTrigger>
+                  <SelectContent portal={false}>
+                    {SEND_CATEGORIES.map((c) => (
+                      <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {sendCategory && (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Checkbox checked={allVisibleSelected} onCheckedChange={toggleAllVisible} aria-label="Select all" />
+                      <span className="text-sm">Select All ({visibleEntities.length})</span>
+                    </div>
+                    <span className="text-sm text-muted-foreground">{sendSelectedIds.size} selected</span>
+                  </div>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input value={sendSearch} onChange={(e) => setSendSearch(e.target.value)} placeholder={`Search ${currentCategory?.label.toLowerCase() || 'recipients'}...`} className="pl-8 border-muted-foreground/20" />
+                  </div>
+                  <ScrollArea className="h-[300px] rounded-md border">
+                    {visibleEntities.length === 0 ? (
+                      <p className="p-4 text-center text-sm text-muted-foreground">No {currentCategory?.label.toLowerCase() || 'recipients'} found.</p>
+                    ) : (
+                      <div className="divide-y">
+                        {visibleEntities.map((ent) => (
+                          <div key={ent.id} className="flex items-center gap-3 px-3 py-2 transition-colors hover:bg-muted/50">
+                            <Checkbox checked={sendSelectedIds.has(ent.id)} onCheckedChange={() => toggleEntity(ent.id)} aria-label={`Select ${ent.name}`} />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-medium">{ent.name}</p>
+                              <p className="truncate text-xs text-muted-foreground">{getEntityPhone(ent) || '-'}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </ScrollArea>
+                </div>
+              )}
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={closeSendDialog} disabled={isSendingNow}>Cancel</Button>
+                <Button onClick={() => handleSendTemplate(sendTarget)} disabled={sendSelectedIds.size === 0 || isSendingNow} className="gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:from-emerald-600 hover:to-teal-700 shadow-sm transition-all duration-300 hover:shadow-md">
+                  {isSendingNow && <Loader2 className="h-4 w-4 animate-spin" />}
+                  <Send className="h-4 w-4" />
+                  Send ({sendSelectedIds.size})
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

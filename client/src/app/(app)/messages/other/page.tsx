@@ -1,155 +1,272 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { MailQuestion, Eye, Send, Loader2, Users, Globe, CheckCircle2 } from 'lucide-react';
+import { MailQuestion, ChevronLeft, ChevronRight, Eye, Loader2, RefreshCw, MessageCircle, Trash2 } from 'lucide-react';
+import type { Connection, Area, Message } from '@/lib/types';
 import { useCompany } from '@/context/company-context';
+import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 const messageTitles = [
   'Select the Message',
   'User Cradentials',
-  'Defaulter',
   'Internet Card',
   'Promotion',
   'New User',
   'Internet Recharge',
 ];
 
-const sublocalities = ['All', 'Gulshan', 'Saddar', 'Clifton', 'Defence', 'Korangi', 'Landhi', 'Malir'];
-const statuses = ['All', 'Active', 'Inactive', 'Suspended', 'Deactivated'];
-const types = ['Both', 'TV Cable', 'Internet', 'Box Number', 'Package', 'Connection Provider'];
-const connectionProviders = ['All', 'PTCL', 'Transworld', 'StormFiber', 'Nayatel', 'Optix', 'ConnectComm'];
+const EXPIRY_TITLE = 'Defaulter';
+
+function waNumber(phone?: string): string {
+  if (!phone) return '';
+  let digits = phone.replace(/\D/g, '');
+  if (digits.startsWith('0')) digits = '92' + digits.slice(1);
+  return digits;
+}
+
+function messageBody(m: Message): string {
+  return m.messageText || `Dear ${m.name}, your monthly subscription fee is due. Please pay your dues to continue uninterrupted services. Thank you.`;
+}
 
 export default function OtherMessagesPage() {
-  const { companyId } = useCompany();
-  const { toast } = useToast();
+  const { companyId, companies } = useCompany();
   const queryClient = useQueryClient();
-  const [messageTitle, setMessageTitle] = useState('');
-  const [sublocality, setSublocality] = useState('All');
-  const [status, setStatus] = useState('All');
-  const [type, setType] = useState('Both');
-  const [connectionProvider, setConnectionProvider] = useState('All');
-  const [showPreview, setShowPreview] = useState(false);
-  const [sending, setSending] = useState(false);
+  const { toast } = useToast();
 
-  // For composing a new outbox message
-  const [recipientName, setRecipientName] = useState('');
-  const [recipientMobile, setRecipientMobile] = useState('');
-  const [recipientAddress, setRecipientAddress] = useState('');
-  const [messageText, setMessageText] = useState('');
+  const { data: messages = [], isLoading } = useGenericQuery<Message>('messages', companyId ?? undefined);
+  const { data: connections = [] } = useGenericQuery<Connection>('admin/connections', companyId ?? undefined);
+  const { data: areas = [] } = useGenericQuery<Area>('network/areas', companyId ?? undefined);
 
-  const handleSendToOutbox = async () => {
-    if (!recipientName || !recipientMobile) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Recipient name and mobile are required.' });
-      return;
+  const [draftTitle, setDraftTitle] = useState('Select the Message');
+  const [draftSublocality, setDraftSublocality] = useState('all');
+  const [draftStatus, setDraftStatus] = useState('all');
+  const [draftType, setDraftType] = useState('all');
+  const [draftBox, setDraftBox] = useState('all');
+  const [draftPackage, setDraftPackage] = useState('all');
+  const [draftCompany, setDraftCompany] = useState('all');
+
+  const [title, setTitle] = useState('Select the Message');
+  const [sublocality, setSublocality] = useState('all');
+  const [status, setStatus] = useState('all');
+  const [type, setType] = useState('all');
+  const [box, setBox] = useState('all');
+  const [pkg, setPkg] = useState('all');
+  const [company, setCompany] = useState('all');
+
+  const [pageSize, setPageSize] = useState('10');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [preview, setPreview] = useState<Message | null>(null);
+
+  const connectionMap = useMemo(() => {
+    const map = new Map<string, Connection>();
+    connections.forEach((c) => map.set(c.id, c));
+    return map;
+  }, [connections]);
+
+  const areaName = (c?: Connection): string => {
+    if (!c) return '';
+    const area = areas.find((a) => a.id === c.sublocalityId);
+    return area ? (area.subLocality || area.locality || '') : '';
+  };
+
+  const sublocalities = useMemo(() => {
+    const set = new Set<string>();
+    areas.forEach((a) => { if (a.subLocality) set.add(a.subLocality); });
+    return Array.from(set);
+  }, [areas]);
+
+  const statuses = useMemo(() => {
+    const set = new Set<string>();
+    connections.forEach((c) => { if (c.status) set.add(c.status); });
+    return Array.from(set);
+  }, [connections]);
+
+  const types = useMemo(() => {
+    const set = new Set<string>();
+    connections.forEach((c) => { if (c.connectionType) set.add(c.connectionType); });
+    return Array.from(set);
+  }, [connections]);
+
+  const boxes = useMemo(() => {
+    const set = new Set<string>();
+    connections.forEach((c) => { if (c.boxNumber) set.add(c.boxNumber); });
+    return Array.from(set);
+  }, [connections]);
+
+  const packages = useMemo(() => {
+    const set = new Set<string>();
+    connections.forEach((c) => {
+      if (c.packageInternet) set.add(c.packageInternet);
+      if (c.packageCable) set.add(c.packageCable);
+    });
+    return Array.from(set);
+  }, [connections]);
+
+  const sentMessages = useMemo(() => {
+    return messages.filter((m) => {
+      if (m.status !== 'sent') return false;
+      if (m.messageType === EXPIRY_TITLE) return false;
+      if (m.messageText?.startsWith(`${EXPIRY_TITLE}:`)) return false;
+      return true;
+    });
+  }, [messages]);
+
+  const filteredData = useMemo(() => {
+    return sentMessages.filter((m) => {
+      if (title !== 'Select the Message') {
+        const matchType = m.messageType === title;
+        const matchText = m.messageText?.startsWith(`${title}:`) ?? false;
+        if (!matchType && !matchText) return false;
+      }
+      const conn = m.entityId ? connectionMap.get(m.entityId) : undefined;
+      if (sublocality !== 'all' && areaName(conn) !== sublocality) return false;
+      if (status !== 'all' && (conn?.status || '') !== status) return false;
+      if (type !== 'all' && (conn?.connectionType || '') !== type) return false;
+      if (box !== 'all' && (conn?.boxNumber || '') !== box) return false;
+      if (pkg !== 'all' && conn?.packageInternet !== pkg && conn?.packageCable !== pkg) return false;
+      if (company !== 'all' && (conn?.companyId || m.companyId) !== company) return false;
+      return true;
+    });
+  }, [sentMessages, connectionMap, areas, title, sublocality, status, type, box, pkg, company]);
+
+  const applyFilters = () => {
+    setTitle(draftTitle);
+    setSublocality(draftSublocality);
+    setStatus(draftStatus);
+    setType(draftType);
+    setBox(draftBox);
+    setPkg(draftPackage);
+    setCompany(draftCompany);
+    setCurrentPage(1);
+  };
+
+  const resetFilters = () => {
+    setDraftTitle('Select the Message');
+    setDraftSublocality('all');
+    setDraftStatus('all');
+    setDraftType('all');
+    setDraftBox('all');
+    setDraftPackage('all');
+    setDraftCompany('all');
+    setTitle('Select the Message');
+    setSublocality('all');
+    setStatus('all');
+    setType('all');
+    setBox('all');
+    setPkg('all');
+    setCompany('all');
+    setCurrentPage(1);
+  };
+
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / parseInt(pageSize)));
+  const paginatedData = filteredData.slice(
+    (currentPage - 1) * parseInt(pageSize),
+    currentPage * parseInt(pageSize)
+  );
+
+  const pageNumbers = useMemo(() => {
+    const total = totalPages;
+    const current = currentPage;
+    const set = new Set<number>();
+    set.add(1);
+    set.add(total);
+    for (let p = current - 1; p <= current + 1; p++) {
+      if (p >= 1 && p <= total) set.add(p);
     }
-    setSending(true);
+    const sorted = Array.from(set).sort((a, b) => a - b);
+    const result: (number | '...')[] = [];
+    let prev = 0;
+    for (const p of sorted) {
+      if (prev && p - prev > 1) result.push('...');
+      result.push(p);
+      prev = p;
+    }
+    return result;
+  }, [totalPages, currentPage]);
+
+  const waPhone = (m: Message): string => {
+    const conn = m.entityId ? connectionMap.get(m.entityId) : undefined;
+    return m.mobileNo || m.phone || conn?.cell || conn?.mobile || '';
+  };
+
+  const handleWhatsApp = (m: Message) => {
+    const num = waNumber(waPhone(m));
+    if (!num) return;
+    const text = encodeURIComponent(messageBody(m));
+    window.open(`https://wa.me/${num}?text=${text}`, '_blank');
+  };
+
+  const handleDelete = async (m: Message) => {
+    if (!confirm(`Delete the message sent to "${m.name}"? This cannot be undone.`)) return;
     try {
-      await api.post(`/messages?companyId=${companyId}`, {
-        name: recipientName,
-        mobileNo: recipientMobile,
-        address: recipientAddress,
-        messageType: messageTitle || 'General',
-        messageText,
-        status: 'outbox',
-        companyId,
-      });
+      await api.delete(`/messages/${m.id}?companyId=${companyId}`);
       queryClient.invalidateQueries({ queryKey: ['messages', companyId] });
-      toast({ title: 'Success', description: 'Message sent to outbox.' });
-      setRecipientName('');
-      setRecipientMobile('');
-      setRecipientAddress('');
-      setMessageText('');
-      setMessageTitle('');
+      toast({ title: 'Success', description: 'Message deleted.' });
     } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to send message.' });
-    } finally {
-      setSending(false);
+      toast({ variant: 'destructive', title: 'Error', description: error.response?.data?.message || 'Failed to delete message.' });
     }
   };
 
-  const messageTypesCount = messageTitles.filter(t => t !== 'Select the Message').length;
+  if (isLoading) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground animate-pulse">Loading sent messages...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="flex w-full min-w-0 max-w-full flex-col gap-6 p-4 md:p-6">
       <div className="flex items-center gap-3">
         <div className="rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 p-2.5 text-white shadow-sm">
           <MailQuestion className="h-5 w-5" />
         </div>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Other Messages</h1>
-          <p className="text-sm text-muted-foreground">Compose and send messages to subscribers</p>
+          <p className="text-sm text-muted-foreground">View messages sent to subscribers</p>
         </div>
       </div>
 
       <div className="h-0.5 bg-gradient-to-r from-violet-500/50 via-purple-500/30 to-transparent" />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
-              <MailQuestion className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">Message Types</p>
-              <p className="text-2xl font-bold">{messageTypesCount}</p>
-            </div>
-          </div>
-        </div>
-        <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
-              <Send className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">New Message</p>
-              <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">Compose</p>
-            </div>
-          </div>
-        </div>
-        <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
-              <Globe className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">Localities</p>
-              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{sublocalities.length - 1}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
+      {/* Filters */}
       <Card className="transition-all duration-300 hover:shadow-md">
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 [&>*]:min-w-0">
             <div className="space-y-2">
               <Label>Message Title</Label>
-              <Select value={messageTitle} onValueChange={setMessageTitle}>
-                <SelectTrigger className="border-muted-foreground/20">
+              <Select value={draftTitle} onValueChange={setDraftTitle}>
+                <SelectTrigger className="w-full max-w-[220px] border-muted-foreground/20">
                   <SelectValue placeholder="Select message title" />
                 </SelectTrigger>
                 <SelectContent portal={false}>
-                  {messageTitles.map((title) => (
-                    <SelectItem key={title} value={title}>{title}</SelectItem>
+                  {messageTitles.map((t) => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label>Sublocality</Label>
-              <Select value={sublocality} onValueChange={setSublocality}>
-                <SelectTrigger className="border-muted-foreground/20">
+              <Select value={draftSublocality} onValueChange={setDraftSublocality}>
+                <SelectTrigger className="w-full max-w-[220px] border-muted-foreground/20">
                   <SelectValue placeholder="Select sublocality" />
                 </SelectTrigger>
                 <SelectContent portal={false}>
+                  <SelectItem value="all">All</SelectItem>
                   {sublocalities.map((loc) => (
                     <SelectItem key={loc} value={loc}>{loc}</SelectItem>
                   ))}
@@ -158,11 +275,12 @@ export default function OtherMessagesPage() {
             </div>
             <div className="space-y-2">
               <Label>Status</Label>
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger className="border-muted-foreground/20">
+              <Select value={draftStatus} onValueChange={setDraftStatus}>
+                <SelectTrigger className="w-full max-w-[220px] border-muted-foreground/20">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent portal={false}>
+                  <SelectItem value="all">All</SelectItem>
                   {statuses.map((s) => (
                     <SelectItem key={s} value={s}>{s}</SelectItem>
                   ))}
@@ -171,11 +289,12 @@ export default function OtherMessagesPage() {
             </div>
             <div className="space-y-2">
               <Label>Type</Label>
-              <Select value={type} onValueChange={setType}>
-                <SelectTrigger className="border-muted-foreground/20">
+              <Select value={draftType} onValueChange={setDraftType}>
+                <SelectTrigger className="w-full max-w-[220px] border-muted-foreground/20">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent portal={false}>
+                  <SelectItem value="all">All</SelectItem>
                   {types.map((t) => (
                     <SelectItem key={t} value={t}>{t}</SelectItem>
                   ))}
@@ -183,58 +302,216 @@ export default function OtherMessagesPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Connection Provider</Label>
-              <Select value={connectionProvider} onValueChange={setConnectionProvider}>
-                <SelectTrigger className="border-muted-foreground/20">
-                  <SelectValue placeholder="Select provider" />
+              <Label>Box Number</Label>
+              <Select value={draftBox} onValueChange={setDraftBox}>
+                <SelectTrigger className="w-full max-w-[220px] border-muted-foreground/20">
+                  <SelectValue placeholder="Select box" />
                 </SelectTrigger>
                 <SelectContent portal={false}>
-                  {connectionProviders.map((p) => (
+                  <SelectItem value="all">All</SelectItem>
+                  {boxes.map((b) => (
+                    <SelectItem key={b} value={b}>{b}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Package</Label>
+              <Select value={draftPackage} onValueChange={setDraftPackage}>
+                <SelectTrigger className="w-full max-w-[220px] border-muted-foreground/20">
+                  <SelectValue placeholder="Select package" />
+                </SelectTrigger>
+                <SelectContent portal={false}>
+                  <SelectItem value="all">All</SelectItem>
+                  {packages.map((p) => (
                     <SelectItem key={p} value={p}>{p}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label>Company</Label>
+              <Select value={draftCompany} onValueChange={setDraftCompany}>
+                <SelectTrigger className="w-full max-w-[220px] border-muted-foreground/20">
+                  <SelectValue placeholder="Select company" />
+                </SelectTrigger>
+                <SelectContent portal={false}>
+                  <SelectItem value="all">All</SelectItem>
+                  {companies.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-        </CardContent>
-      </Card>
 
-      <Card className="transition-all duration-300 hover:shadow-md">
-        <CardContent className="pt-6">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <Send className="h-5 w-5 text-violet-500" />
-            Compose New Message
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Recipient Name</Label>
-              <input value={recipientName} onChange={e => setRecipientName(e.target.value)} placeholder="e.g., Ahmed Khan" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 border-muted-foreground/20" />
-            </div>
-            <div className="space-y-2">
-              <Label>Mobile Number</Label>
-              <input value={recipientMobile} onChange={e => setRecipientMobile(e.target.value)} placeholder="e.g., 0300-1234567" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 border-muted-foreground/20" />
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label>Address</Label>
-              <input value={recipientAddress} onChange={e => setRecipientAddress(e.target.value)} placeholder="e.g., House 12, Block A, Gulshan" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 border-muted-foreground/20" />
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label>Message</Label>
-              <textarea value={messageText} onChange={e => setMessageText(e.target.value)} placeholder="Type your message..." className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 border-muted-foreground/20" />
-            </div>
-          </div>
-          <div className="flex mt-6">
-            <Button
-              onClick={handleSendToOutbox}
-              disabled={sending}
-              className="w-48 bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105 disabled:hover:scale-100"
-            >
-              {sending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-              {sending ? 'Sending...' : 'Send to Outbox'}
+          <div className="flex flex-wrap items-center justify-end gap-3 mt-6">
+            <Button variant="outline" onClick={resetFilters} className="gap-2 transition-all duration-300 hover:scale-105">
+              <RefreshCw className="h-4 w-4" />
+              Reset
+            </Button>
+            <Button onClick={applyFilters} className="gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white hover:from-violet-600 hover:to-purple-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
+              Show
             </Button>
           </div>
         </CardContent>
       </Card>
+
+      {/* Main table */}
+      <Card className="transition-all duration-300 hover:shadow-md">
+        <CardContent className="pt-6">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-semibold">Sent Messages</h2>
+              <p className="text-xs text-muted-foreground">
+                {filteredData.length} message(s)
+              </p>
+            </div>
+            {title !== 'Select the Message' && (
+              <span className="text-sm text-muted-foreground">
+                Message: <span className="font-medium text-foreground">{title}</span>
+              </span>
+            )}
+          </div>
+
+          <div className="min-w-0 overflow-x-auto rounded-md border [&_th]:px-2 [&_th]:py-2.5 [&_td]:px-2 [&_td]:py-2.5">
+            <Table className="w-full table-fixed">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">ID</TableHead>
+                  <TableHead>Subscriber ID</TableHead>
+                  <TableHead>Internet ID</TableHead>
+                  <TableHead>Subscriber Name</TableHead>
+                  <TableHead>Address</TableHead>
+                  <TableHead>WhatsApp Number</TableHead>
+                  <TableHead className="w-24">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedData.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-48 text-center">
+                      <div className="flex flex-col items-center justify-center gap-3">
+                        <div className="rounded-full bg-violet-100 p-3 text-violet-600 dark:bg-violet-950/30 dark:text-violet-400 transition-all duration-300 hover:scale-110 hover:shadow-lg">
+                          <MailQuestion className="h-8 w-8" />
+                        </div>
+                        <p className="text-sm font-medium text-muted-foreground">No messages found</p>
+                        <p className="text-xs text-muted-foreground/60">Adjust the filters and press Show.</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedData.map((item, i) => {
+                    const conn = item.entityId ? connectionMap.get(item.entityId) : undefined;
+                    const phone = waPhone(item);
+                    const address = item.address || conn?.address || '-';
+                    return (
+                      <TableRow key={item.id} className="transition-all duration-300 hover:bg-muted/50 hover:shadow-sm">
+                        <TableCell className="font-mono text-xs text-muted-foreground">{(currentPage - 1) * parseInt(pageSize) + i + 1}</TableCell>
+                        <TableCell className="min-w-0 font-mono text-xs truncate" title={item.entityId}>{item.entityId ? item.entityId.slice(0, 8) : '-'}</TableCell>
+                        <TableCell className="min-w-0 font-medium truncate" title={item.internetId}>{item.internetId || '-'}</TableCell>
+                        <TableCell className="min-w-0">
+                          {item.entityId ? (
+                            <Link
+                              href={`/crm/subscriber-detail?connectionId=${item.entityId}`}
+                              className="text-blue-600 hover:underline dark:text-blue-400 truncate"
+                              title={item.name}
+                            >
+                              {item.name}
+                            </Link>
+                          ) : (
+                            <span className="truncate" title={item.name}>{item.name}</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground truncate" title={address}>{address}</TableCell>
+                        <TableCell className="min-w-0">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="truncate font-medium" title={phone}>{phone || '-'}</span>
+                            {phone && (
+                              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-950/30 transition-all duration-300 hover:scale-110" title="Send via WhatsApp" onClick={() => handleWhatsApp(item)}>
+                                <MessageCircle className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-950/30 transition-all duration-300 hover:scale-110" title="Preview" onClick={() => setPreview(item)}>
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30 transition-all duration-300 hover:scale-110" title="Delete" onClick={() => handleDelete(item)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Show</span>
+              <Select value={pageSize} onValueChange={(v) => { setPageSize(v); setCurrentPage(1); }}>
+                <SelectTrigger className="w-16 border-muted-foreground/20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent portal={false}>
+                  {['5', '10', '25', '50', '100'].map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-muted-foreground">entries</span>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <div className="text-sm text-muted-foreground mr-2">
+                Showing {filteredData.length === 0 ? 0 : ((currentPage - 1) * parseInt(pageSize)) + 1} to {Math.min(currentPage * parseInt(pageSize), filteredData.length)} of {filteredData.length} entries
+              </div>
+              <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1} className="transition-all duration-300 hover:scale-105">
+                <ChevronLeft className="h-4 w-4" /> Previous
+              </Button>
+              {pageNumbers.map((page, idx) =>
+                page === '...' ? (
+                  <span key={`ellipsis-${idx}`} className="px-1 text-sm text-muted-foreground">...</span>
+                ) : (
+                  <Button key={page} variant={currentPage === page ? 'default' : 'outline'} size="sm" onClick={() => setCurrentPage(page)} className="w-8 h-8 p-0 transition-all duration-300 hover:scale-110">{page}</Button>
+                )
+              )}
+              <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className="transition-all duration-300 hover:scale-105">
+                Next <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Preview Dialog */}
+      <Dialog open={!!preview} onOpenChange={() => setPreview(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Message Preview</DialogTitle>
+          </DialogHeader>
+          {preview && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div><span className="text-muted-foreground">Name:</span> <span className="font-medium">{preview.name}</span></div>
+                <div><span className="text-muted-foreground">Internet ID:</span> <span className="font-medium">{preview.internetId || '-'}</span></div>
+                <div><span className="text-muted-foreground">WhatsApp:</span> <span className="font-medium">{waPhone(preview) || '-'}</span></div>
+                <div><span className="text-muted-foreground">Status:</span> <span className="font-medium capitalize">{preview.status || '-'}</span></div>
+                <div><span className="text-muted-foreground">Message Type:</span> <span className="font-medium">{preview.messageType || '-'}</span></div>
+                <div><span className="text-muted-foreground">Sent At:</span> <span className="font-medium">{preview.sendedAt || preview.createdAt || '-'}</span></div>
+              </div>
+              <div className="rounded-md bg-muted p-3 text-sm">
+                <p className="text-muted-foreground text-xs mb-1">Message body</p>
+                <p>{messageBody(preview)}</p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

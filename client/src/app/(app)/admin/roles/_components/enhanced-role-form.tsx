@@ -101,7 +101,7 @@ const AVAILABLE_PERMISSIONS = [
   { id: 'messages_other_view', label: 'Other Messages', category: 'Messages' },
   { id: 'messages_draft_view', label: 'Draft Messages', category: 'Messages' },
   { id: 'messages_sent_view', label: 'Sent Messages', category: 'Messages' },
-  { id: 'messages_expired_view', label: 'Expired Messages', category: 'Messages' },
+  { id: 'messages_expired_view', label: 'Expiry Messages', category: 'Messages' },
   { id: 'messages_whatsapp_view', label: 'WhatsApp Drafts', category: 'Messages' },
   
   // Accounts
