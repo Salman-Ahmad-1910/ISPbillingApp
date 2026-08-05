@@ -39,7 +39,7 @@ func GetDashboardData(c *gin.Context) {
 		SELECT COUNT(*)
 		FROM connections
 		WHERE company_id = ? AND deleted_at IS NULL
-		AND GREATEST(remaining_amount, 0) + amount * GREATEST(0,
+		AND GREATEST(remaining_amount, 0) + (amount + same_amount) * GREATEST(0,
 			EXTRACT(YEAR FROM age(CURRENT_DATE, COALESCE(last_payment_date, recharge_date, created_at::text)::date)) * 12 +
 			EXTRACT(MONTH FROM age(CURRENT_DATE, COALESCE(last_payment_date, recharge_date, created_at::text)::date))
 		) > 0
@@ -57,7 +57,7 @@ func GetDashboardData(c *gin.Context) {
 		), 0)
 		FROM connections
 		WHERE company_id = ? AND deleted_at IS NULL
-		AND GREATEST(remaining_amount, 0) + amount * GREATEST(0,
+		AND GREATEST(remaining_amount, 0) + (amount + same_amount) * GREATEST(0,
 			EXTRACT(YEAR FROM age(CURRENT_DATE, COALESCE(last_payment_date, recharge_date, created_at::text)::date)) * 12 +
 			EXTRACT(MONTH FROM age(CURRENT_DATE, COALESCE(last_payment_date, recharge_date, created_at::text)::date))
 		) > 0

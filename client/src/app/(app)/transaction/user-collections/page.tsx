@@ -217,15 +217,12 @@ export default function SubscriberCollectionsPage() {
     return area?.subLocality || area?.locality || '';
   }, [selectedSubscriber, areas]);
 
-  const subscriberFeeToPay = useMemo(
-    () => (selectedSubscriber ? getPackagePrice(selectedSubscriber) : 0),
-    [selectedSubscriber],
-  );
-
   const subscriberRemaining = useMemo(
     () => (selectedSubscriber ? getTotalOwed(selectedSubscriber) : 0),
     [selectedSubscriber],
   );
+
+  const remainingAfterPayment = Math.max(0, subscriberRemaining - receiveAmount);
 
   const handlePromiseSave = async () => {
     if (!selectedSubscriber || !user) return;
@@ -740,20 +737,15 @@ export default function SubscriberCollectionsPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label>Fee to Pay</Label>
-                <Input value={`PKR ${subscriberFeeToPay.toLocaleString()}`} readOnly />
-              </div>
-              <div className="space-y-1">
                 <Label>Remaining Amount</Label>
                 <Input
-                  value={`PKR ${subscriberRemaining.toLocaleString()}`}
+                  value={`PKR ${remainingAfterPayment.toLocaleString()}`}
                   readOnly
                   className={subscriberRemaining > 0 ? 'text-destructive font-semibold' : 'text-green-600 font-semibold'}
                 />
               </div>
-            </div>
-            <div className="space-y-1">
-              <Label>Amount (PKR)</Label>
+              <div className="space-y-1">
+                <Label>Amount (PKR)</Label>
               <Input
                 type="number"
                 value={receiveAmount}
@@ -768,6 +760,7 @@ export default function SubscriberCollectionsPage() {
                   Payment amount cannot exceed the remaining amount of PKR {subscriberRemaining.toLocaleString()}.
                 </p>
               )}
+            </div>
             </div>
             <div className="space-y-1">
               <Label>Pay Date</Label>

@@ -212,7 +212,14 @@ func CreatePayment(c *gin.Context) {
 			if months < 0 {
 				months = 0
 			}
-			actualOwed := max(0, conn.RemainingAmount) + conn.Amount*float64(months)
+			monthlyFee := conn.Amount
+			switch conn.ConnectionType {
+			case "internet":
+				monthlyFee = conn.SameAmount
+			case "both", "tv_cable":
+				monthlyFee = conn.Amount + conn.SameAmount
+			}
+			actualOwed := max(0, conn.RemainingAmount) + monthlyFee*float64(months)
 			newRemaining := max(0, actualOwed-payment.Amount)
 			config.DB.Model(&models.Connection{}).
 				Where("id = ?", *payment.SubscriberID).
