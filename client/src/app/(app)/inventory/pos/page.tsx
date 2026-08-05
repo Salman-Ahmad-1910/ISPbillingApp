@@ -831,6 +831,11 @@ export default function POSPage() {
                                             <Image src={backendImageUrl(item.product.image) || `https://picsum.photos/seed/${item.product.id}/50/50`} width={50} height={50} alt={item.product.name} className="rounded-md object-cover" unoptimized />
                                             <div className="flex-1 mx-3">
                                                 <p className="font-medium">{item.product.name}</p>
+                                                {item.product.serialNumber && (
+                                                    <p className="text-[10px] font-mono text-muted-foreground truncate" title={item.product.serialNumber}>
+                                                        SN / MAC: {item.product.serialNumber}
+                                                    </p>
+                                                )}
                                                 <p className="text-sm text-muted-foreground">PKR {item.product.price.toLocaleString()}</p>
                                                 <Input
                                                     type="number"

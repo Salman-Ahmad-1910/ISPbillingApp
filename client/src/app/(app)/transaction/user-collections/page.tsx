@@ -36,7 +36,7 @@ import { useToast } from '@/hooks/use-toast';
 import { smartMatch } from '@/lib/search';
 import api from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
-import { Loader2, MoreHorizontal, Wallet, DollarSign, UserCheck, Trash2, Pencil, Copy, FileText, Users, CalendarClock } from 'lucide-react';
+import { Loader2, MoreHorizontal, Wallet, DollarSign, UserCheck, Trash2, Pencil, Copy, FileText, Users, CalendarClock, AlertCircle } from 'lucide-react';
 
 import type { Connection, Payment, Area, RecoveryOfficer, TransactionType, PromiseEntry } from '@/lib/types';
 import { SubscriberPrintDialog } from './_components/subscriber-print-dialog';
@@ -117,7 +117,7 @@ export default function SubscriberCollectionsPage() {
   const filteredSubscribers = useMemo(() => {
     if (!subscriberSearch.trim()) return [];
     return (connections as Connection[]).filter(c =>
-      smartMatch(subscriberSearch, [c.id, c.internetId, c.cell, c.mobile, c.cnic], [c.name, c.address])
+      smartMatch(subscriberSearch, [c.id], [c.name])
     ).slice(0, 20);
   }, [connections, subscriberSearch]);
 
@@ -216,6 +216,16 @@ export default function SubscriberCollectionsPage() {
     const area = (areas as Area[]).find(a => a.id === selectedSubscriber.sublocalityId);
     return area?.subLocality || area?.locality || '';
   }, [selectedSubscriber, areas]);
+
+  const subscriberFeeToPay = useMemo(
+    () => (selectedSubscriber ? getPackagePrice(selectedSubscriber) : 0),
+    [selectedSubscriber],
+  );
+
+  const subscriberRemaining = useMemo(
+    () => (selectedSubscriber ? getTotalOwed(selectedSubscriber) : 0),
+    [selectedSubscriber],
+  );
 
   const handlePromiseSave = async () => {
     if (!selectedSubscriber || !user) return;
@@ -728,6 +738,20 @@ export default function SubscriberCollectionsPage() {
               <Label>Received By</Label>
               <Input value={recoveryOfficerName} readOnly />
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label>Fee to Pay</Label>
+                <Input value={`PKR ${subscriberFeeToPay.toLocaleString()}`} readOnly />
+              </div>
+              <div className="space-y-1">
+                <Label>Remaining Amount</Label>
+                <Input
+                  value={`PKR ${subscriberRemaining.toLocaleString()}`}
+                  readOnly
+                  className={subscriberRemaining > 0 ? 'text-destructive font-semibold' : 'text-green-600 font-semibold'}
+                />
+              </div>
+            </div>
             <div className="space-y-1">
               <Label>Amount (PKR)</Label>
               <Input
@@ -735,7 +759,15 @@ export default function SubscriberCollectionsPage() {
                 value={receiveAmount}
                 onChange={(e) => setReceiveAmount(parseFloat(e.target.value) || 0)}
                 placeholder="Enter amount"
+                max={subscriberRemaining}
+                className={receiveAmount > subscriberRemaining ? 'border-destructive focus-visible:ring-destructive' : ''}
               />
+              {receiveAmount > subscriberRemaining && (
+                <p className="text-xs font-medium text-destructive flex items-center gap-1">
+                  <AlertCircle className="h-3.5 w-3.5" />
+                  Payment amount cannot exceed the remaining amount of PKR {subscriberRemaining.toLocaleString()}.
+                </p>
+              )}
             </div>
             <div className="space-y-1">
               <Label>Pay Date</Label>
@@ -780,7 +812,7 @@ export default function SubscriberCollectionsPage() {
             </div>
             <Button
               onClick={handleReceive}
-              disabled={isSaving || !receiveAmount}
+              disabled={isSaving || !receiveAmount || receiveAmount > subscriberRemaining}
               className="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md"
             >
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
