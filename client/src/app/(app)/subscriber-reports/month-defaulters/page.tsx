@@ -30,6 +30,13 @@ interface MonthDefaulterRecord {
   status: string;
 }
 
+function resolveAreaName(areas: any[], sublocalityId?: string): string {
+  if (!sublocalityId) return '';
+  const area = areas.find((a: any) => a.id === sublocalityId);
+  if (!area) return '';
+  return [area.city, area.zone, area.locality].filter(Boolean).join(', ');
+}
+
 const months = [
   { value: '1', label: 'January' },
   { value: '2', label: 'February' },
@@ -48,7 +55,9 @@ const months = [
 export default function MonthDefaultersPage() {
   const { companyId } = useCompany();
 
-  const { data: subscribers = [], isLoading: loading } = useGenericQuery<any>('subscribers', companyId ?? undefined);
+  const { data: invoices = [], isLoading: loading } = useGenericQuery<any>('billing/invoices', companyId ?? undefined);
+  const { data: connections = [] } = useGenericQuery<any>('admin/connections', companyId ?? undefined);
+  const { data: areas = [] } = useGenericQuery<any>('network/areas', companyId ?? undefined);
 
   const [month, setMonth] = useState('');
   const [sublocality, setSublocality] = useState('all');
@@ -67,30 +76,35 @@ export default function MonthDefaultersPage() {
 
   const allSublocalities = useMemo(() => {
     const set = new Set<string>();
-    subscribers.forEach((s: any) => { if (s.areaName) set.add(s.areaName); });
+    invoices.forEach((inv: any) => {
+      const conn = connections.find((c: any) => c.id === inv.subscriberId);
+      const areaName = resolveAreaName(areas, conn?.sublocalityId);
+      if (areaName) set.add(areaName);
+    });
     return Array.from(set);
-  }, [subscribers]);
+  }, [invoices, connections, areas]);
 
   const allRecords: MonthDefaulterRecord[] = useMemo(() => {
-    return subscribers
-      .filter((s: any) => Number(s.balance) > 0)
-      .map((s: any) => {
-        const connectionDate = s.connectionDate || s.updatedAt || '';
-        const recordMonth = connectionDate ? String(new Date(connectionDate).getMonth() + 1) : '';
+    return invoices
+      .filter((inv: any) => Number(inv.remainingAmount) > 0)
+      .map((inv: any) => {
+        const conn = connections.find((c: any) => c.id === inv.subscriberId);
+        const monthName = String(inv.billingPeriod || '').split(' ')[0];
+        const monthValue = months.find((m) => m.label.toLowerCase() === monthName.toLowerCase())?.value || '';
         return {
-          id: s.id,
-          subscriberName: s.name || '',
-          subscriberId: s.subscriber_identity || '',
-          phone: s.phone || '',
-          address: s.installationAddress || '',
-          sublocality: s.areaName || '',
-          connectionType: s.connectionType || 'internet',
-          month: recordMonth,
-          amount: Number(s.balance) || 0,
-          status: s.status || 'active',
+          id: inv.id,
+          subscriberName: inv.subscriberName || conn?.name || '',
+          subscriberId: conn?.internetId || '',
+          phone: conn?.cell || conn?.mobile || '',
+          address: conn?.address || '',
+          sublocality: resolveAreaName(areas, conn?.sublocalityId),
+          connectionType: conn?.connectionType || 'internet',
+          month: monthValue,
+          amount: Number(inv.remainingAmount) || 0,
+          status: conn?.status || inv.status || 'active',
         };
       });
-  }, [subscribers]);
+  }, [invoices, connections, areas]);
 
   const filteredData = useMemo(() => allRecords.filter((item) => {
     const monthMatch = !month || item.month === month;

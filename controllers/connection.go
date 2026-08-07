@@ -167,6 +167,13 @@ func createConnection(c *gin.Context) {
 	}
 	conn.CompanyID = companyID
 
+	// Track which staff member created this subscriber
+	if userID, exists := c.Get("userID"); exists {
+		if uid, ok := userID.(uuid.UUID); ok {
+			conn.CreatedBy = &uid
+		}
+	}
+
 	if err := tx.Create(&conn).Error; err != nil {
 		tx.Rollback()
 		utils.ErrorResponse(c, 500, "Failed to create connection", err.Error())

@@ -67,27 +67,40 @@ export default function UnpaidCollectionsPage() {
   }, [connections, areas]);
 
   const unpaidRecords: UnpaidRecord[] = useMemo(() => {
-    const recs: UnpaidRecord[] = [];
+    const map = new Map<string, UnpaidRecord>();
     invoices.forEach(inv => {
+      if (inv.status === 'paid' || Number(inv.remainingAmount) <= 0) return;
+      const conn = connMap[inv.subscriberId] || {};
       const amount = Number(inv.amount) || 0;
       const paid = Number(inv.paidAmount) || 0;
       const remaining = Number(inv.remainingAmount) || 0;
-      if (inv.status === 'paid' || remaining <= 0) return;
-      const conn = connMap[inv.subscriberId] || {};
-      recs.push({
-        id: inv.id,
-        subscriberId: inv.subscriberId,
-        subscriberName: inv.subscriberName || '',
-        amount,
-        paidAmount: paid,
-        remainingAmount: remaining,
-        dueDate: inv.dueDate || '',
-        billingPeriod: inv.billingPeriod || '',
-        sublocality: conn.sublocality || '',
-        connectionType: conn.connectionType || '',
-      });
+      const period = inv.billingPeriod || '';
+      const due = inv.dueDate || '';
+      const existing = map.get(inv.subscriberId);
+      if (existing) {
+        existing.amount += amount;
+        existing.paidAmount += paid;
+        existing.remainingAmount += remaining;
+        if (period && !existing.billingPeriod.includes(period)) {
+          existing.billingPeriod = existing.billingPeriod ? `${existing.billingPeriod}, ${period}` : period;
+        }
+        if (!existing.dueDate || (due && new Date(due) < new Date(existing.dueDate))) existing.dueDate = due;
+      } else {
+        map.set(inv.subscriberId, {
+          id: inv.subscriberId,
+          subscriberId: inv.subscriberId,
+          subscriberName: inv.subscriberName || '',
+          amount,
+          paidAmount: paid,
+          remainingAmount: remaining,
+          dueDate: due,
+          billingPeriod: period,
+          sublocality: conn.sublocality || '',
+          connectionType: conn.connectionType || '',
+        });
+      }
     });
-    return recs;
+    return Array.from(map.values());
   }, [invoices, connMap]);
 
   const allSublocalities = useMemo(() => {
@@ -128,7 +141,7 @@ export default function UnpaidCollectionsPage() {
     return filteredData.slice(start, start + pageSize);
   }, [filteredData, safePage, pageSize, showAll]);
 
-  const totalRecords = filteredData.length;
+  const totalRecords = showReport ? filteredData.length : unpaidRecords.length;
   const totalAmount = filteredData.reduce((sum, item) => sum + item.remainingAmount, 0);
 
   const exportExcel = () => {

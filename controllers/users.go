@@ -676,9 +676,13 @@ func GetAllUsers(c *gin.Context) {
 	fmt.Printf("DEBUG: GetAllUsers called with companyID: %v\n", companyID)
 
 	var users []models.User
-	if err := config.DB.Joins("JOIN user_companies ON users.id = user_companies.user_id").
-		Where("user_companies.company_id = ? AND users.role != ?", companyID, "admin").
-		Find(&users).Error; err != nil {
+	includeAdmin := c.Query("includeAdmin") == "true"
+	query := config.DB.Joins("JOIN user_companies ON users.id = user_companies.user_id").
+		Where("user_companies.company_id = ?", companyID)
+	if !includeAdmin {
+		query = query.Where("users.role != ?", "admin")
+	}
+	if err := query.Find(&users).Error; err != nil {
 		utils.ErrorResponse(c, 500, "Failed to fetch users", err.Error())
 		return
 	}

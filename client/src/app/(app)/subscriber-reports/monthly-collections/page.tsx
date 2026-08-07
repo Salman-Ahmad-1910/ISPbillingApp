@@ -53,6 +53,7 @@ export default function MonthlyCollectionsPage() {
   const { companyId } = useCompany();
 
   const { data: payments = [], isLoading: loading } = useGenericQuery<any>('billing/payments', companyId ?? undefined);
+  const { data: connections = [] } = useGenericQuery<any>('admin/connections', companyId ?? undefined);
 
   const [sortBy, setSortBy] = useState('bill_id');
   const [generatedMonth, setGeneratedMonth] = useState('');
@@ -76,25 +77,25 @@ export default function MonthlyCollectionsPage() {
     return payments.map((p: any) => {
       const paymentDate = p.paymentDate || p.createdAt || '';
       const pm = paymentDate ? String(new Date(paymentDate).getMonth() + 1) : '';
-      const gm = p.invoiceMonth || pm;
+      const conn = connections.find((c: any) => c.id === p.subscriberId);
       return {
         id: p.id,
-        subscriberName: p.subscriberName || p.subscriber?.name || '',
-        subscriberId: p.subscriberId || '',
-        connectionId: p.connectionId || p.subscriberId || '',
-        billId: p.invoiceId || p.id?.slice(0, 8) || '',
+        subscriberName: p.subscriberName || conn?.name || '',
+        subscriberId: conn?.internetId || '',
+        connectionId: p.subscriberId || '',
+        billId: String(p.billNo || '') || p.id?.slice(0, 8) || '',
         amount: Number(p.amount) || 0,
-        generatedMonth: gm,
+        generatedMonth: pm,
         collectionMonth: pm,
         collectionDate: paymentDate,
-        address: p.subscriber?.installationAddress || '',
-        sublocality: p.subscriber?.areaName || '',
-        connectionType: p.subscriber?.connectionType || 'internet',
-        collectedBy: p.collectorId || p.method || '',
-        status: p.status || 'paid',
+        address: p.address || conn?.address || '',
+        sublocality: p.areaName || '',
+        connectionType: conn?.connectionType || 'internet',
+        collectedBy: p.collectedByName || '',
+        status: 'paid',
       };
     });
-  }, [payments]);
+  }, [payments, connections]);
 
   const allSublocalities = useMemo(() => {
     const set = new Set<string>();
@@ -126,12 +127,15 @@ export default function MonthlyCollectionsPage() {
     const connectionMatch = connectionType === 'both' || item.connectionType === connectionType;
     const userMatch = selectedUser === 'all' || item.collectedBy === selectedUser;
 
+    // When a month is selected, show exactly that month's collections. The
+    // date range only applies when no month filter is active.
+    const monthActive = !!generatedMonth || !!collectionMonth;
     const itemDate = new Date(item.collectionDate);
     const from = new Date(historyFromDate);
     from.setHours(0, 0, 0, 0);
     const to = new Date(historyToDate);
     to.setHours(23, 59, 59, 999);
-    const dateMatch = itemDate >= from && itemDate <= to;
+    const dateMatch = monthActive || (itemDate >= from && itemDate <= to);
 
     return gmMatch && cmMatch && typeMatch && sublocalityMatch && connectionMatch && userMatch && dateMatch;
   }), [sortedRecords, generatedMonth, collectionMonth, reportType, sublocality, connectionType, selectedUser, historyFromDate, historyToDate]);

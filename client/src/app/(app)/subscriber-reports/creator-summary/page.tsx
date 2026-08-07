@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { UserPlus, Download, Printer, Loader2, Search } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
-import type { User } from '@/lib/types';
+import type { User, Connection } from '@/lib/types';
 import { smartMatch } from '@/lib/search';
 import { format } from 'date-fns';
 import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
@@ -23,43 +23,43 @@ interface CreatorSummary {
   creatorEmail: string;
   creatorRole: string;
   creatorStatus: string;
-  createdUsers: User[];
+  createdConnections: Connection[];
   totalCreated: number;
 }
 
 export default function CreatorSummaryPage() {
   const { companyId } = useCompany();
 
-  const { data: users = [], isLoading: loading } = useGenericQuery<User>('admin/users', companyId ?? undefined);
+  const { data: users = [], isLoading: loading } = useGenericQuery<User>('admin/users', companyId ?? undefined, { includeAdmin: true });
+  const { data: connections = [], isLoading: loadingConnections } = useGenericQuery<Connection>('admin/connections', companyId ?? undefined);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [showInvoice, setShowInvoice] = useState(false);
 
   const creatorSummaries: CreatorSummary[] = useMemo(() => {
-    const creatorsMap = new Map<string, User[]>();
+    const creatorsMap = new Map<string, Connection[]>();
 
-    users.forEach((user) => {
-      if (user.createdBy) {
-        const existing = creatorsMap.get(user.createdBy) || [];
-        existing.push(user);
-        creatorsMap.set(user.createdBy, existing);
+    connections.forEach((conn) => {
+      if (conn.createdBy) {
+        const existing = creatorsMap.get(conn.createdBy) || [];
+        existing.push(conn);
+        creatorsMap.set(conn.createdBy, existing);
       }
     });
 
-    const creatorIds = new Set(creatorsMap.keys());
-    return Array.from(creatorIds)
+    return Array.from(creatorsMap.keys())
       .map((creatorId) => {
         const creator = users.find((u) => u.id === creatorId);
-        const createdUsers = creatorsMap.get(creatorId) || [];
+        const createdConnections = creatorsMap.get(creatorId) || [];
         return {
           creatorId,
           creatorName: creator?.name || 'Unknown',
           creatorEmail: creator?.email || '',
           creatorRole: creator?.role || '',
           creatorStatus: creator?.status || 'inactive',
-          createdUsers,
-          totalCreated: createdUsers.length,
+          createdConnections,
+          totalCreated: createdConnections.length,
         };
       })
       .filter((summary) => {
@@ -68,7 +68,7 @@ export default function CreatorSummaryPage() {
         return matchSearch && matchRole;
       })
       .sort((a, b) => b.totalCreated - a.totalCreated);
-  }, [users, searchTerm, roleFilter]);
+  }, [connections, users, searchTerm, roleFilter]);
 
   const uniqueRoles = useMemo(() => {
     const set = new Set<string>();
@@ -83,7 +83,7 @@ export default function CreatorSummaryPage() {
   const exportExcel = () => {
     if (creatorSummaries.length === 0) return;
 
-    const headers = ['Creator Name', 'Email', 'Role', 'Status', 'Total Created Users'];
+    const headers = ['Creator Name', 'Email', 'Role', 'Status', 'Subscribers Created'];
     const rows = creatorSummaries.map((item) => [
       item.creatorName, item.creatorEmail, item.creatorRole, item.creatorStatus, item.totalCreated.toString(),
     ]);
@@ -93,7 +93,7 @@ export default function CreatorSummaryPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `creator-summary-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    link.setAttribute('download', `subscribers-creator-summary-${format(new Date(), 'yyyy-MM-dd')}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -112,14 +112,14 @@ export default function CreatorSummaryPage() {
       { header: 'Email', render: (r) => r.creatorEmail || '-' },
       { header: 'Role', render: (r) => r.creatorRole || '-' },
       { header: 'Status', render: (r) => <span className="capitalize">{r.creatorStatus}</span> },
-      { header: 'Users Created', align: 'right', render: (r) => <span className="font-bold">{r.totalCreated}</span> },
+      { header: 'Subscribers Created', align: 'right', render: (r) => <span className="font-bold">{r.totalCreated}</span> },
     ];
 
     return (
       <div className="p-6">
         <SubscriberReportInvoice<CreatorSummary>
-          title="USER CREATOR SUMMARY"
-          subtitle="All creator records"
+          title="SUBSCRIBERS CREATOR SUMMARY"
+          subtitle="Subscribers grouped by the staff member who created them"
           accent={accent}
           data={creatorSummaries}
           columns={columns}
@@ -138,8 +138,8 @@ export default function CreatorSummaryPage() {
           <UserPlus className="h-5 w-5 text-white" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">User Creator Summary</h1>
-          <p className="text-sm text-muted-foreground">Overview of users grouped by their creator</p>
+          <h1 className="text-2xl font-bold tracking-tight">Subscribers Creator Summary</h1>
+          <p className="text-sm text-muted-foreground">Subscribers created by each staff member</p>
         </div>
       </div>
       <div className="h-0.5 bg-gradient-to-r from-purple-500/50 via-pink-500/30 to-transparent no-print" />
@@ -160,7 +160,7 @@ export default function CreatorSummaryPage() {
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-medium text-muted-foreground">Total Created Users</p>
+              <p className="text-xs font-medium text-muted-foreground">Total Subscribers Created</p>
               <p className="text-2xl font-bold mt-1">{totalCreatedUsers}</p>
             </div>
             <div className="rounded-lg bg-gradient-to-br from-purple-500 to-pink-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
@@ -171,7 +171,7 @@ export default function CreatorSummaryPage() {
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-medium text-muted-foreground">Avg Users / Creator</p>
+                <p className="text-xs font-medium text-muted-foreground">Avg Subscribers / Creator</p>
               <p className="text-2xl font-bold mt-1">{avgUsersPerCreator}</p>
             </div>
             <div className="rounded-lg bg-gradient-to-br from-purple-500 to-pink-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
@@ -225,8 +225,8 @@ export default function CreatorSummaryPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="text-xl font-bold">Creator Summary</h2>
-                <p className="text-sm text-muted-foreground mt-1">All creator records</p>
+                <h2 className="text-xl font-bold">Subscribers Creator Summary</h2>
+                <p className="text-sm text-muted-foreground mt-1">Subscribers created by each staff member</p>
               </div>
               <div className="flex gap-2 no-print">
                 <Button variant="outline" size="sm" onClick={handlePrint}>
@@ -236,7 +236,7 @@ export default function CreatorSummaryPage() {
               </div>
             </div>
 
-            {loading ? (
+            {loading || loadingConnections ? (
               <div className="flex items-center justify-center h-32">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
@@ -254,7 +254,7 @@ export default function CreatorSummaryPage() {
                       <TableHead>Email</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Users Created</TableHead>
+                      <TableHead>Subscribers Created</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

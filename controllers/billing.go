@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"math"
+	"sort"
 	"time"
 
 	"awesomeProject/config"
@@ -230,7 +232,54 @@ func CreatePayment(c *gin.Context) {
 		}
 	}
 
+	// Allocate the payment against the connection's unpaid invoices
+	// (oldest billing period first) so the Unpaid Collections report stays in sync.
+	if payment.SubscriberID != nil {
+		var unpaidInvoices []models.Invoice
+		config.DB.Where("subscriber_id = ? AND status <> ? AND remaining_amount > 0", *payment.SubscriberID, "paid").
+			Find(&unpaidInvoices)
+
+		sort.SliceStable(unpaidInvoices, func(i, j int) bool {
+			return invoicePeriodKey(unpaidInvoices[i]) < invoicePeriodKey(unpaidInvoices[j])
+		})
+
+		remainingToAllocate := payment.Amount
+		for i := range unpaidInvoices {
+			if remainingToAllocate <= 0 {
+				break
+			}
+			inv := &unpaidInvoices[i]
+			if inv.RemainingAmount <= 0 {
+				continue
+			}
+			pay := math.Min(inv.RemainingAmount, remainingToAllocate)
+			inv.PaidAmount += pay
+			inv.RemainingAmount -= pay
+			remainingToAllocate -= pay
+			if inv.RemainingAmount <= 0 {
+				inv.RemainingAmount = 0
+				inv.Status = "paid"
+			}
+			config.DB.Model(&models.Invoice{}).
+				Where("id = ?", inv.ID).
+				UpdateColumns(map[string]interface{}{
+					"paid_amount":      inv.PaidAmount,
+					"remaining_amount": inv.RemainingAmount,
+					"status":           inv.Status,
+				})
+		}
+	}
+
 	utils.CreatedResponse(c, "Payment created successfully", payment)
+}
+
+// invoicePeriodKey returns a sortable key for an invoice's billing period
+// (e.g. "2025-04") so invoices are allocated oldest-first.
+func invoicePeriodKey(inv models.Invoice) string {
+	if t, err := time.Parse("January 2006", inv.BillingPeriod); err == nil {
+		return t.Format("2006-01")
+	}
+	return inv.DueDate
 }
 
 // UpdatePayment handles updating a payment

@@ -39,6 +39,8 @@ type Connection struct {
 	DeactivationReason  string  `gorm:"type:varchar(255)" json:"deactivationReason"`
 	Comments            string  `gorm:"type:text" json:"comments"`
 	BadDebt             bool    `gorm:"default:false" json:"badDebt"`
+	CreatedBy           *uuid.UUID `gorm:"type:uuid;index" json:"createdBy"`
+	Creator             *User      `gorm:"foreignKey:CreatedBy" json:"creator,omitempty"`
 }
 
 // ConnectionStatusChange logs every status transition for accurate historical tracking

@@ -29,10 +29,18 @@ interface RechargeRecord {
   status: string;
 }
 
+function resolveAreaName(areas: any[], sublocalityId?: string): string {
+  if (!sublocalityId) return '';
+  const area = areas.find((a: any) => a.id === sublocalityId);
+  if (!area) return '';
+  return [area.city, area.zone, area.locality].filter(Boolean).join(', ');
+}
+
 export default function ExpiryDefaultersPage() {
   const { companyId } = useCompany();
 
-  const { data: subscribers = [], isLoading: loading } = useGenericQuery<any>('subscribers', companyId ?? undefined);
+  const { data: connections = [], isLoading: loading } = useGenericQuery<any>('admin/connections', companyId ?? undefined);
+  const { data: areas = [] } = useGenericQuery<any>('network/areas', companyId ?? undefined);
 
   const [filterFromDate, setFilterFromDate] = useState<Date>(() => {
     const d = new Date();
@@ -48,25 +56,28 @@ export default function ExpiryDefaultersPage() {
 
   const allSublocalities = useMemo(() => {
     const set = new Set<string>();
-    subscribers.forEach((s: any) => { if (s.areaName) set.add(s.areaName); });
+    connections.forEach((c: any) => {
+      const areaName = resolveAreaName(areas, c.sublocalityId);
+      if (areaName) set.add(areaName);
+    });
     return Array.from(set);
-  }, [subscribers]);
+  }, [connections, areas]);
 
   const allRecords: RechargeRecord[] = useMemo(() => {
-    return subscribers
-      .filter((s: any) => Number(s.balance) > 0)
-      .map((s: any) => ({
-        id: s.id,
-        subscriberName: s.name || '',
-        subscriberId: s.subscriber_identity || '',
-        phone: s.phone || '',
-        address: s.installationAddress || '',
-        sublocality: s.areaName || '',
-        rechargeDate: s.updatedAt || s.connectionDate || '',
-        amount: Number(s.balance) || 0,
-        status: s.status || 'active',
+    return connections
+      .filter((c: any) => Number(c.remainingAmount) > 0)
+      .map((c: any) => ({
+        id: c.id,
+        subscriberName: c.name || '',
+        subscriberId: c.internetId || '',
+        phone: c.cell || c.mobile || '',
+        address: c.address || '',
+        sublocality: resolveAreaName(areas, c.sublocalityId),
+        rechargeDate: c.updatedAt || c.rechargeDate || '',
+        amount: Number(c.remainingAmount) || 0,
+        status: c.status || 'active',
       }));
-  }, [subscribers]);
+  }, [connections, areas]);
 
   const filteredData = useMemo(() => allRecords.filter((item) => {
     const sublocalityMatch = sublocality === 'all' || item.sublocality === sublocality;

@@ -31,9 +31,9 @@ var grantedPermissionModules = map[string][]string{
 	"13311": {"network"},
 	"13312": {"network"},
 
-	// Users Profile -> subscribers / crm
-	"13313": {"billing", "crm"}, // Package
-	"13314": {"network"},        // Box/Media
+	// Users Profile -> billing / crm / network
+	"13313": {"billing", "crm"}, // Package (billing/packages)
+	"13314": {"network"},        // Box/Media (network/boxes)
 	"13315": {"crm", "subscribers"},
 	"13316": {"subscribers"},
 	"13351": {"crm"},
@@ -41,8 +41,8 @@ var grantedPermissionModules = map[string][]string{
 	// Dealers Profile -> dealers
 	"13318": {"dealers"},
 
-	// Recovery Officer -> hr
-	"13317": {"hr"},
+	// Recovery Officer -> hr / network (officers page loads network/areas)
+	"13317": {"hr", "network"},
 	"13319": {"hr"},
 
 	// Complaints -> support
@@ -57,31 +57,36 @@ var grantedPermissionModules = map[string][]string{
 	"15328": {"logs"},
 	"13335": {"logs"},
 
-	// User Reports -> reports
-	"13307": {"reports"},
-	"13325": {"reports"},
-	"13326": {"reports"},
-	"13328": {"reports"},
-	"13329": {"reports"},
-	"13330": {"reports"},
-	"13355": {"reports"},
-	"13349": {"reports"},
-	"13356": {"reports"},
-	"13354": {"reports"},
-	"13358": {"reports"},
-	"13306": {"reports"},
-	"13353": {"reports"},
-	"13327": {"reports"},
-	"15327": {"reports"},
+	// User Reports. Several report pages read from billing/network APIs, so they
+	// also unlock those modules.
+	"13307": {"reports"},   // Allocated Defaulters (subscribers)
+	"13325": {"reports"},   // Users Defaulter (subscribers)
+	"13326": {"reports", "billing"}, // New Users List -> billing/payments
+	"13328": {"reports", "billing"}, // Package Wise List -> billing/packages
+	"13329": {"reports", "billing"}, // Promise Date Report -> billing/promises
+	"13330": {"reports", "billing"}, // Allocated Collections -> billing/payments
+	"13355": {"reports", "billing"}, // Month Wise Collection -> billing/payments
+	"13349": {"reports", "network"}, // Expiry Wise Defaulter -> network/areas
+	"13356": {"reports", "billing", "network"}, // Collection Not Generated -> billing/bills, network/areas
+	"13354": {"reports", "billing"}, // Monthly Collection Month Wise -> billing/payments
+	"13358": {"reports", "billing", "network"}, // Unpaid Collection -> billing/invoices, network/areas
+	"13306": {"reports", "billing"}, // User Collections -> billing/payments
+	"13353": {"reports", "billing", "network"}, // Month Wise Defaulter -> billing/invoices, network/areas
+	"13327": {"reports"},   // Deactivate User List (admin/connections)
+	"15327": {"reports"},   // Subscribers Creator Summary (admin/users + admin/connections)
+	"15329": {"reports", "network"}, // New Subscribers List (admin/connections + network/areas)
+	"15330": {"reports", "network"}, // Subscribers Defaulters (admin/connections + network/areas)
+	"15331": {"reports", "network"}, // Allocated Collections (billing/payments + admin/connections + network/areas + admin/users)
+	"15332": {"reports", "network"}, // Month Wise Collection Monthly (billing/payments + admin/connections)
 
-	// Dealers Reports -> reports
-	"13331": {"reports"},
-	"13333": {"reports"},
-	"13350": {"reports"},
-	"13332": {"reports"},
+	// Dealers Reports -> reports + the APIs their pages load
+	"13331": {"reports", "network"}, // Dealers Collection -> network/areas
+	"13333": {"reports", "network"}, // New Dealers List -> network/areas
+	"13350": {"reports", "billing"}, // Dealer Invoice List -> billing/subscribers, billing/invoices
+	"13332": {"reports", "network"}, // Dealers Defaulter -> network/areas
 
 	// Settings -> roles / system
-	"13338": {"roles"}, // User Rights
+	"13338": {"roles"},  // User Rights
 	"13337": {"system"}, // Configurations
 
 	// Inventory -> inventory
@@ -93,8 +98,8 @@ var grantedPermissionModules = map[string][]string{
 	"15321": {"inventory"},
 	"15314": {"inventory"},
 
-	// Point Of Sale -> pos
-	"15315": {"pos", "sales"},
+	// Point Of Sale / Sales -> pos, sales, billing (sales page records via billing/payments)
+	"15315": {"pos", "sales", "billing"},
 }
 
 // checkUserGrantedPermission verifies whether the user has been granted, via the
