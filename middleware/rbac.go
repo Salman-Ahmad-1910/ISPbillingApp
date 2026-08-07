@@ -10,6 +10,136 @@ import (
 	"gorm.io/gorm"
 )
 
+// grantedPermissionModules maps permission IDs stored in the `user_permissions`
+// table (granted via the web Roles & Permissions page) to the backend modules
+// they unlock. When a user has been granted any of these permissions, the RBAC
+// middleware treats them as authorized for the mapped module(s).
+var grantedPermissionModules = map[string][]string{
+	// Transactions -> billing
+	"13304": {"billing"}, // Users Collections
+	"14079": {"billing"}, // New Collection
+	"13305": {"billing"}, // Allocated Collection
+	"13321": {"billing"}, // Dealers Collections
+	"13357": {"billing"}, // Baddebt Collection
+	"13324": {"billing"}, // Transaction Type
+	"13308": {"billing"}, // Reprint Slip
+	"13320": {"billing"}, // Bills Creator
+
+	// Area -> network
+	"13309": {"network"},
+	"13310": {"network"},
+	"13311": {"network"},
+	"13312": {"network"},
+
+	// Users Profile -> subscribers / crm
+	"13313": {"billing", "crm"}, // Package
+	"13314": {"network"},        // Box/Media
+	"13315": {"crm", "subscribers"},
+	"13316": {"subscribers"},
+	"13351": {"crm"},
+
+	// Dealers Profile -> dealers
+	"13318": {"dealers"},
+
+	// Recovery Officer -> hr
+	"13317": {"hr"},
+	"13319": {"hr"},
+
+	// Complaints -> support
+	"15323": {"support"},
+	"15325": {"support"},
+	"15326": {"support"},
+	"13342": {"support"},
+	"13343": {"support"},
+
+	// Logs -> logs
+	"13334": {"logs"},
+	"15328": {"logs"},
+	"13335": {"logs"},
+
+	// User Reports -> reports
+	"13307": {"reports"},
+	"13325": {"reports"},
+	"13326": {"reports"},
+	"13328": {"reports"},
+	"13329": {"reports"},
+	"13330": {"reports"},
+	"13355": {"reports"},
+	"13349": {"reports"},
+	"13356": {"reports"},
+	"13354": {"reports"},
+	"13358": {"reports"},
+	"13306": {"reports"},
+	"13353": {"reports"},
+	"13327": {"reports"},
+	"15327": {"reports"},
+
+	// Dealers Reports -> reports
+	"13331": {"reports"},
+	"13333": {"reports"},
+	"13350": {"reports"},
+	"13332": {"reports"},
+
+	// Settings -> roles / system
+	"13338": {"roles"}, // User Rights
+	"13337": {"system"}, // Configurations
+
+	// Inventory -> inventory
+	"15313": {"inventory"},
+	"15312": {"inventory"},
+	"15309": {"inventory"},
+	"15311": {"inventory"},
+	"15310": {"inventory"},
+	"15321": {"inventory"},
+	"15314": {"inventory"},
+
+	// Point Of Sale -> pos
+	"15315": {"pos", "sales"},
+}
+
+// checkUserGrantedPermission verifies whether the user has been granted, via the
+// web Roles & Permissions page, a permission that unlocks the given module.
+func checkUserGrantedPermission(db *gorm.DB, userID, companyID uuid.UUID, module string) (bool, error) {
+	// Resolve the entity IDs permissions may be saved against: the user record
+	// itself plus any staff / recovery officer / dealer record sharing the email.
+	entityIDs := []string{userID.String()}
+
+	var user models.User
+	if err := db.Select("email").Where("id = ?", userID).First(&user).Error; err == nil && user.Email != "" {
+		var staffIDs []string
+		if err := db.Model(&models.Staff{}).Where("email = ? AND company_id = ?", user.Email, companyID).Pluck("id", &staffIDs).Error; err == nil {
+			entityIDs = append(entityIDs, staffIDs...)
+		}
+
+		var officerIDs []string
+		if err := db.Model(&models.RecoveryOfficer{}).Where("email = ? AND company_id = ?", user.Email, companyID).Pluck("id", &officerIDs).Error; err == nil {
+			entityIDs = append(entityIDs, officerIDs...)
+		}
+
+		var dealerIDs []string
+		if err := db.Model(&models.Dealer{}).Where("email = ? AND company_id = ?", user.Email, companyID).Pluck("id", &dealerIDs).Error; err == nil {
+			entityIDs = append(entityIDs, dealerIDs...)
+		}
+	}
+
+	var perms []models.UserPermission
+	if err := db.Where("user_id IN ? AND company_id = ? AND web_enabled = ?", entityIDs, companyID, true).Find(&perms).Error; err != nil {
+		return false, err
+	}
+
+	for _, p := range perms {
+		if modules, ok := grantedPermissionModules[p.PermissionID]; ok {
+			for _, m := range modules {
+				if m == module {
+					return true, nil
+				}
+			}
+		}
+	}
+
+	return false, nil
+}
+
 // RBACMiddleware checks if user has permission for specific module and action
 func RBACMiddleware(db *gorm.DB, module, action string) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -79,15 +209,23 @@ func checkUserPermission(db *gorm.DB, userID, companyID uuid.UUID, module, actio
 	var rolePermission models.RolePermission
 	err = db.Joins("JOIN roles ON roles.id = role_permissions.role_id").
 		Joins("JOIN permissions ON permissions.id = role_permissions.permission_id").
-		Where("role_permissions.company_id = ? AND roles.name = ? AND permissions.module = ? AND permissions.action = ?",
-			companyID, userCompany.UserRole, module, action).
+		Where("roles.name = ? AND permissions.module = ? AND permissions.action = ?",
+			userCompany.UserRole, module, action).
+		Where("role_permissions.company_id = ? OR role_permissions.company_id = ?",
+			companyID, uuid.UUID{}).
 		First(&rolePermission).Error
 
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return false, nil // No permission found
+		if err != gorm.ErrRecordNotFound {
+			return false, err
 		}
-		return false, err
+		// No role-based permission found. Fall back to permissions granted
+		// directly to the user via the web Roles & Permissions page.
+		hasGranted, grantErr := checkUserGrantedPermission(db, userID, companyID, module)
+		if grantErr != nil {
+			return false, grantErr
+		}
+		return hasGranted, nil
 	}
 
 	return true, nil

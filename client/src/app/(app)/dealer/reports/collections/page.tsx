@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { CalendarIcon, Download, Printer, Wallet, Loader2, MoreHorizontal, Pencil, Trash2, FileText, Copy, Receipt } from 'lucide-react';
+import { CalendarIcon, Download, Printer, Wallet, Loader2, MoreHorizontal, Pencil, Trash2, FileText, Copy, Receipt, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
@@ -35,6 +35,7 @@ import {
   SearchableSelect,
 } from '@/components/ui/searchable-select';
 import { CollectionPrintDialog } from '@/app/(app)/transaction/dealers-collections/_components/collection-print-dialog';
+import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
 import type { DealerCollection } from '@/lib/types';
 
 interface CollectionRecord {
@@ -61,6 +62,8 @@ const STATUS_OPTIONS = [
   { id: 'settled', name: 'Paid' },
 ];
 
+const PAGE_SIZE_OPTIONS = [10, 50, 100] as const;
+
 export default function DealersCollectionsPage() {
   const { companyId, companies } = useCompany();
   const { toast } = useToast();
@@ -83,6 +86,10 @@ export default function DealersCollectionsPage() {
   const [selectedLocality, setSelectedLocality] = useState<string>('all');
   const [selectedTransactionType, setSelectedTransactionType] = useState<string>('all');
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [showAll, setShowAll] = useState(false);
+
   const currentCompany = companies.find((c: any) => c.id === companyId) as Company | undefined;
 
   // Edit state
@@ -97,6 +104,7 @@ export default function DealersCollectionsPage() {
   const [printCollection, setPrintCollection] = useState<DealerCollection | null>(null);
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
   const [printFormatChoice, setPrintFormatChoice] = useState<'a4' | 'thermal'>('a4');
+  const [showInvoice, setShowInvoice] = useState(false);
 
   const fetchData = async () => {
     if (!companyId) return;
@@ -139,6 +147,17 @@ export default function DealersCollectionsPage() {
 
     return afterFrom && beforeTo && typeMatch && txMatch;
   });
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [fromDate, toDate, reportType, selectedTransactionType, pageSize, showAll]);
+
+  const totalPages = showAll ? 1 : Math.max(1, Math.ceil(filteredData.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+
+  const paginatedData = showAll
+    ? filteredData
+    : filteredData.slice((safePage - 1) * pageSize, (safePage - 1) * pageSize + pageSize);
 
   const totalConnection = filteredData.length;
   const totalAmount = filteredData.reduce((sum, item) => sum + item.amount, 0);
@@ -235,8 +254,49 @@ export default function DealersCollectionsPage() {
     toast({ title: 'Success', description: 'Report exported successfully.' });
   };
 
+  const handlePrintReport = () => {
+    setShowInvoice(true);
+  };
+
+  if (showInvoice) {
+    const accent = { title: 'text-teal-600', border: 'border-teal-600', headerBg: 'bg-teal-600', rowHover: 'hover:bg-teal-50/50' };
+    const columns: InvoiceColumn<CollectionRecord>[] = [
+      { header: '#', render: (_: CollectionRecord, i: number) => <span className="font-mono text-xs text-gray-500">{i + 1}</span> },
+      { header: 'Dealer Name', render: (r) => <span className="font-semibold">{r.dealerName}</span> },
+      { header: 'Address', render: (r) => r.dealerAddress || '-' },
+      { header: 'Amount (PKR)', align: 'right', render: (r) => r.amount.toLocaleString() },
+      { header: 'Transaction Type', render: (r) => <span className="capitalize">{r.transactionType || 'cash'}</span> },
+      { header: 'Collection Date', render: (r) => (r.collectionDate ? format(new Date(r.collectionDate), 'dd MMM yyyy') : '-') },
+      { header: 'Status', render: (r) => (r.settlementStatus === 'settled' ? 'Paid' : 'Unpaid') },
+      { header: 'Received By', render: (r) => r.receivedByName || '-' },
+    ];
+
+    return (
+      <div className="p-6">
+        <SubscriberReportInvoice<CollectionRecord>
+          title="DEALERS COLLECTION REPORT"
+          subtitle={`From: ${format(fromDate, 'dd MMM yyyy')} — To: ${format(toDate, 'dd MMM yyyy')}`}
+          accent={accent}
+          data={paginatedData}
+          columns={columns}
+          emptyMessage="No collection records found for the selected criteria."
+          onBack={() => setShowInvoice(false)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6 p-6">
+
+      <style jsx global>{`
+        @media print {
+          body * { visibility: hidden; }
+          .print-report, .print-report * { visibility: visible; }
+          .print-report { position: absolute; left: 0; top: 0; width: 100%; }
+          .no-print { display: none !important; }
+        }
+      `}</style>
 
       {/* Header */}
       <div className="flex items-center gap-3 no-print">
@@ -423,7 +483,7 @@ export default function DealersCollectionsPage() {
       </div>
 
       {/* Printable Report Section */}
-      <div>
+      <div className="print-report">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-6">
@@ -435,7 +495,11 @@ export default function DealersCollectionsPage() {
                 </p>
               </div>
               <div className="flex gap-2 no-print">
-                <Button variant="outline" onClick={exportExcel}>
+                <Button variant="outline" size="sm" onClick={handlePrintReport}>
+                  <Printer className="mr-2 h-4 w-4" />
+                  Print
+                </Button>
+                <Button variant="outline" size="sm" onClick={exportExcel}>
                   <Download className="mr-2 h-4 w-4" />
                   Excel
                 </Button>
@@ -454,80 +518,135 @@ export default function DealersCollectionsPage() {
                 No collection records found for the selected criteria.
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>#</TableHead>
-                    <TableHead>Dealer Name</TableHead>
-                    <TableHead>Address</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Transaction Type</TableHead>
-                    <TableHead>Collection Date</TableHead>
-                    <TableHead>Received By</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="w-[40px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredData.map((item, i) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="text-muted-foreground">{i + 1}</TableCell>
-                      <TableCell className="font-medium">{item.dealerName}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground max-w-[120px] truncate">{item.dealerAddress || '---'}</TableCell>
-                      <TableCell>PKR {item.amount.toLocaleString()}</TableCell>
-                      <TableCell>
-                        <Badge variant={
-                          item.transactionType === 'easypaisa' ? 'default' :
-                          item.transactionType === 'jazzcash' ? 'secondary' :
-                          item.transactionType === 'bank' ? 'outline' : 'default'
-                        }>
-                          {item.transactionType || 'cash'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{item.collectionDate}</TableCell>
-                      <TableCell className="text-xs">{item.receivedByName || '---'}</TableCell>
-                      <TableCell>
-                        <Badge variant={item.settlementStatus === 'settled' ? 'default' : 'secondary'}>
-                          {item.settlementStatus === 'settled' ? 'Paid' : 'Unpaid'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleEditOpen(item)}>
-                              <Pencil className="mr-2 h-4 w-4" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleToggleStatus(item)}>
-                              <Receipt className="mr-2 h-4 w-4" />
-                              {item.settlementStatus === 'settled' ? 'Mark Unpaid' : 'Mark Paid'}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handlePrint(item, 'a4')}>
-                              <FileText className="mr-2 h-4 w-4" />
-                              Print Bill
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handlePrint(item, 'thermal')}>
-                              <Copy className="mr-2 h-4 w-4" />
-                              Duplicate Print
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleDelete(item.id)} className="text-red-600">
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>#</TableHead>
+                      <TableHead>Dealer Name</TableHead>
+                      <TableHead>Address</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Transaction Type</TableHead>
+                      <TableHead>Collection Date</TableHead>
+                      <TableHead>Received By</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="w-[40px] no-print"></TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedData.map((item, i) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="text-muted-foreground">{showAll ? i + 1 : (safePage - 1) * pageSize + i + 1}</TableCell>
+                        <TableCell className="font-medium">{item.dealerName}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground max-w-[120px] truncate">{item.dealerAddress || '---'}</TableCell>
+                        <TableCell>PKR {item.amount.toLocaleString()}</TableCell>
+                        <TableCell>
+                          <Badge variant={
+                            item.transactionType === 'easypaisa' ? 'default' :
+                            item.transactionType === 'jazzcash' ? 'secondary' :
+                            item.transactionType === 'bank' ? 'outline' : 'default'
+                          }>
+                            {item.transactionType || 'cash'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{item.collectionDate}</TableCell>
+                        <TableCell className="text-xs">{item.receivedByName || '---'}</TableCell>
+                        <TableCell>
+                          <Badge variant={item.settlementStatus === 'settled' ? 'default' : 'secondary'}>
+                            {item.settlementStatus === 'settled' ? 'Paid' : 'Unpaid'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="no-print">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleEditOpen(item)}>
+                                <Pencil className="mr-2 h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleToggleStatus(item)}>
+                                <Receipt className="mr-2 h-4 w-4" />
+                                {item.settlementStatus === 'settled' ? 'Mark Unpaid' : 'Mark Paid'}
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handlePrint(item, 'a4')}>
+                                <FileText className="mr-2 h-4 w-4" />
+                                Print Bill
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handlePrint(item, 'thermal')}>
+                                <Copy className="mr-2 h-4 w-4" />
+                                Duplicate Print
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleDelete(item.id)} className="text-red-600">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+
+                {/* Pagination */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 no-print">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {paginatedData.length === 0 ? 0 : (showAll ? 1 : (safePage - 1) * pageSize + 1)} to {Math.min(safePage * pageSize, filteredData.length)} of {filteredData.length} records
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm text-muted-foreground">Show</Label>
+                      <Select
+                        value={showAll ? 'all' : String(pageSize)}
+                        onValueChange={(value) => {
+                          if (value === 'all') {
+                            setShowAll(true);
+                          } else {
+                            setShowAll(false);
+                            setPageSize(parseInt(value));
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+                        <SelectContent portal={false}>
+                          {PAGE_SIZE_OPTIONS.map((size) => (
+                            <SelectItem key={size} value={String(size)}>{size}</SelectItem>
+                          ))}
+                          <SelectItem value="all">All</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Label className="text-sm text-muted-foreground">entries</Label>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                        disabled={safePage === 1}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <span className="px-2 text-sm text-muted-foreground">
+                        Page {safePage} of {totalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                        disabled={safePage === totalPages}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>

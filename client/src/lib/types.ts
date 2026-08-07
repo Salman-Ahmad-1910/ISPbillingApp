@@ -393,7 +393,7 @@ export type Complaint = {
   deadline?: string;
   category: 'network' | 'billing' | 'service';
   description: string;
-  status: 'open' | 'in-progress' | 'resolved' | 'closed';
+  status: 'open' | 'done' | 'on-hold' | 'reject' | 'closed';
   assignedToId?: string;
   createdAt: string;
   resolvedAt?: string;

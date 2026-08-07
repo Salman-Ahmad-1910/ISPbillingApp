@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import api from '@/lib/api';
 import { useCompany } from '@/context/company-context';
 import { useToast } from '@/hooks/use-toast';
+import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
 
 interface CollectionRecord {
   id: string;
@@ -63,6 +64,7 @@ export default function DealersDefaultersPage() {
   const [reportType, setReportType] = useState<string>('defaulters');
   const [selectedCompany, setSelectedCompany] = useState<string>('all');
   const [selectedLocality, setSelectedLocality] = useState<string>('all');
+  const [showInvoice, setShowInvoice] = useState(false);
 
   const fetchData = async () => {
     if (!companyId) return;
@@ -160,8 +162,35 @@ export default function DealersDefaultersPage() {
   };
 
   const handlePrint = () => {
-    window.print();
+    setShowInvoice(true);
   };
+
+  if (showInvoice) {
+    const accent = { title: 'text-red-600', border: 'border-red-600', headerBg: 'bg-red-600', rowHover: 'hover:bg-red-50/50' };
+    const columns: InvoiceColumn<DefaulterRecord>[] = [
+      { header: '#', render: (_: DefaulterRecord, i: number) => <span className="font-mono text-xs text-gray-500">{i + 1}</span> },
+      { header: 'Dealer Name', render: (r) => <span className="font-semibold">{r.dealerName}</span> },
+      { header: 'Subscriber Name', render: (r) => r.subscriberName || '-' },
+      { header: 'Amount (PKR)', align: 'right', render: (r) => r.amount.toLocaleString() },
+      { header: 'Due Date', render: (r) => (r.dueDate ? format(new Date(r.dueDate), 'dd MMM yyyy') : '-') },
+      { header: 'Days Overdue', render: (r) => (r.daysOverdue >= 90 ? <span className="font-bold text-red-600">{r.daysOverdue}</span> : <span className="font-medium text-amber-600">{r.daysOverdue}</span>) },
+      { header: 'Status', render: (r) => (r.category === 'Bad Debt' ? <span className="font-semibold text-red-600">Bad Debt</span> : 'Defaulter') },
+    ];
+
+    return (
+      <div className="p-6">
+        <SubscriberReportInvoice<DefaulterRecord>
+          title="DEALERS DEFAULTING REPORT"
+          subtitle={`From: ${format(fromDate, 'dd MMM yyyy')} — To: ${format(toDate, 'dd MMM yyyy')}`}
+          accent={accent}
+          data={filteredData}
+          columns={columns}
+          emptyMessage="No defaulter records found for the selected criteria."
+          onBack={() => setShowInvoice(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 p-6">

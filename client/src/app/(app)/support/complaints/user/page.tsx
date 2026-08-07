@@ -20,13 +20,19 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Ticket, MoreHorizontal, Edit3, Trash2, Search, ListTodo, CircleCheck, Clock, Loader2, PlusCircle, AlertCircle } from 'lucide-react';
+import { Ticket, MoreHorizontal, Edit3, Trash2, Search, ListTodo, CircleCheck, CheckCircle2, Clock, Loader2, PlusCircle, AlertCircle, CircleDot } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import type { Connection, Area, Complaint } from '@/lib/types';
 import { smartMatch } from '@/lib/search';
+import {
+  STATUS_COLORS,
+  STATUS_LABELS,
+  ComplaintStatusSelect,
+  ComplaintStatusDialog,
+} from '../_components/complaint-status';
 
 const DEPARTMENTS = [
   'Technical', 'CRO Support', 'Technician', 'Subscriber Support Desk', 'Subscriber Care Support', 'Finance',
@@ -65,12 +71,16 @@ export default function SubscriberComplaintPage() {
   const [showEdit, setShowEdit] = useState(false);
   const [deleteComplaint, setDeleteComplaint] = useState<Complaint | null>(null);
   const [showDelete, setShowDelete] = useState(false);
+  const [statusComplaint, setStatusComplaint] = useState<Complaint | null>(null);
+  const [showStatus, setShowStatus] = useState(false);
 
   const kpiData = useMemo(() => [
     { title: 'Total Complaints', value: complaints.length, icon: ListTodo, gradient: 'from-blue-500 to-cyan-600' },
-    { title: 'Open', value: complaints.filter(c => c.status === 'open').length, icon: Clock, gradient: 'from-amber-500 to-orange-600' },
-    { title: 'In Progress', value: complaints.filter(c => c.status === 'in-progress').length, icon: Loader2, gradient: 'from-violet-500 to-purple-600' },
-    { title: 'Resolved', value: complaints.filter(c => c.status === 'resolved' || c.status === 'closed').length, icon: CircleCheck, gradient: 'from-emerald-500 to-green-600' },
+    { title: 'Open', value: complaints.filter(c => c.status === 'open').length, icon: CircleCheck, gradient: 'from-emerald-500 to-green-600' },
+    { title: 'Done', value: complaints.filter(c => c.status === 'done').length, icon: CheckCircle2, gradient: 'from-blue-500 to-cyan-600' },
+    { title: 'On Hold', value: complaints.filter(c => c.status === 'on-hold').length, icon: Clock, gradient: 'from-amber-500 to-orange-600' },
+    { title: 'Rejected', value: complaints.filter(c => c.status === 'reject').length, icon: AlertCircle, gradient: 'from-red-500 to-rose-600' },
+    { title: 'Closed', value: complaints.filter(c => c.status === 'closed').length, icon: CircleCheck, gradient: 'from-gray-500 to-slate-600' },
   ], [complaints]);
 
   const filteredData = useMemo(() => {
@@ -325,13 +335,8 @@ export default function SubscriberComplaintPage() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
-                          item.status === 'open' ? 'bg-yellow-100 text-yellow-800' :
-                          item.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
-                          item.status === 'resolved' ? 'bg-green-100 text-green-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {item.status}
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_COLORS[item.status] || 'bg-gray-100 text-gray-800'}`}>
+                          {STATUS_LABELS[item.status] || item.status}
                         </span>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{new Date(item.createdAt).toLocaleDateString()}</TableCell>
@@ -343,6 +348,10 @@ export default function SubscriberComplaintPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem className="data-[highlighted]:text-blue-600" onClick={() => { setStatusComplaint(item); setShowStatus(true); }}>
+                              <CircleDot className="mr-2 h-4 w-4" />
+                              Status
+                            </DropdownMenuItem>
                             <DropdownMenuItem className="data-[highlighted]:text-emerald-600" onClick={() => { setEditComplaint(item); setEditDescription(item.description); setEditStatus(item.status); setShowEdit(true); }}>
                               <Edit3 className="mr-2 h-4 w-4" />
                               Edit
@@ -548,17 +557,7 @@ export default function SubscriberComplaintPage() {
             </div>
             <div className="space-y-1">
               <Label>Status</Label>
-              <Select value={editStatus} onValueChange={setEditStatus}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="open">Open</SelectItem>
-                  <SelectItem value="in-progress">In Progress</SelectItem>
-                  <SelectItem value="resolved">Resolved</SelectItem>
-                  <SelectItem value="closed">Closed</SelectItem>
-                </SelectContent>
-              </Select>
+              <ComplaintStatusSelect value={editStatus} onValueChange={setEditStatus} />
             </div>
             <div className="space-y-1">
               <Label>Description</Label>
@@ -587,6 +586,13 @@ export default function SubscriberComplaintPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ComplaintStatusDialog
+        complaint={statusComplaint}
+        open={showStatus}
+        onOpenChange={(open) => { setShowStatus(open); if (!open) setStatusComplaint(null); }}
+        onUpdated={refetch}
+      />
     </div>
   );
 }

@@ -362,7 +362,7 @@ func Register(c *gin.Context) {
 		TenantModel: models.TenantModel{
 			CompanyID: company.ID,
 		},
-		Name:        "Admin",
+		Name:        "admin",
 		Description: "Full administrative access",
 		Permissions: "all", // Temporary fix for legacy schema
 	}
@@ -375,26 +375,26 @@ func Register(c *gin.Context) {
 	}
 
 	// 2.1. Create basic permissions for the admin role
-	permissions := []string{
-		"users_read", "users_add", "users_edit", "users_delete",
-		"subscribers_read", "subscribers_add", "subscribers_edit", "subscribers_delete",
-		"billing_read", "billing_add", "billing_edit", "billing_delete",
-		"network_read", "network_add", "network_edit", "network_delete",
-		"dealers_read", "dealers_add", "dealers_edit", "dealers_delete",
-		"companies_read", "companies_add", "companies_edit", "companies_delete",
-		"reports_read", "logs_read",
-		"hr_read", "hr_add", "hr_edit", "hr_delete",
-		"crm_read", "crm_add", "crm_edit", "crm_delete",
-		"support_read", "support_add", "support_edit", "support_delete",
-		"inventory_read", "inventory_add", "inventory_edit", "inventory_delete",
-		"sales_read", "sales_add", "sales_edit", "sales_delete",
+	permissions := []struct{ Module, Action string }{
+		{"users", "read"}, {"users", "add"}, {"users", "edit"}, {"users", "delete"},
+		{"subscribers", "read"}, {"subscribers", "add"}, {"subscribers", "edit"}, {"subscribers", "delete"},
+		{"billing", "read"}, {"billing", "add"}, {"billing", "edit"}, {"billing", "delete"},
+		{"network", "read"}, {"network", "add"}, {"network", "edit"}, {"network", "delete"},
+		{"dealers", "read"}, {"dealers", "add"}, {"dealers", "edit"}, {"dealers", "delete"},
+		{"companies", "read"}, {"companies", "add"}, {"companies", "edit"}, {"companies", "delete"},
+		{"reports", "read"}, {"logs", "read"},
+		{"hr", "read"}, {"hr", "add"}, {"hr", "edit"}, {"hr", "delete"},
+		{"crm", "read"}, {"crm", "add"}, {"crm", "edit"}, {"crm", "delete"},
+		{"support", "read"}, {"support", "add"}, {"support", "edit"}, {"support", "delete"},
+		{"inventory", "read"}, {"inventory", "add"}, {"inventory", "edit"}, {"inventory", "delete"},
+		{"sales", "read"}, {"sales", "add"}, {"sales", "edit"}, {"sales", "delete"},
 	}
 
-	for _, permName := range permissions {
+	for _, perm := range permissions {
 		permission := models.Permission{
-			Module: "system", // All permissions are system-level for admin
-			Action: permName,
-			Name:   fmt.Sprintf("Admin %s", permName),
+			Module: perm.Module,
+			Action: perm.Action,
+			Name:   fmt.Sprintf("Admin %s_%s", perm.Module, perm.Action),
 		}
 		if err := tx.Create(&permission).Error; err != nil {
 			tx.Rollback()

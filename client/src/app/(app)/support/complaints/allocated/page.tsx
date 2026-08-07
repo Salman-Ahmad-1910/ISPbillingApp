@@ -20,20 +20,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { AlertCircle, ClipboardPen, MoreHorizontal, Edit3, Trash2, Search, ListTodo, CheckCircle2, Clock, Loader2, UserPlus } from 'lucide-react';
+import { AlertCircle, ClipboardPen, MoreHorizontal, Edit3, Trash2, Search, ListTodo, CheckCircle2, CircleCheck, Clock, Loader2, CircleDot } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
+import { useUser } from '@/hooks/use-user';
 import api from '@/lib/api';
-import type { Complaint, Staff } from '@/lib/types';
+import type { Complaint, Staff, Subscriber, Connection } from '@/lib/types';
 import { smartMatch } from '@/lib/search';
-
-const statusColors: Record<string, string> = {
-  'open': 'bg-yellow-100 text-yellow-800',
-  'in-progress': 'bg-blue-100 text-blue-800',
-  'resolved': 'bg-green-100 text-green-800',
-  'closed': 'bg-gray-100 text-gray-800',
-};
+import {
+  STATUS_COLORS,
+  STATUS_LABELS,
+  ComplaintStatusSelect,
+  ComplaintStatusDialog,
+} from '../_components/complaint-status';
 
 const categoryColors: Record<string, string> = {
   'network': 'bg-blue-100 text-blue-800',
@@ -44,9 +44,12 @@ const categoryColors: Record<string, string> = {
 export default function AllocatedComplaintPage() {
   const { companyId } = useCompany();
   const { toast } = useToast();
+  const { user } = useUser();
 
   const { data: complaints = [], isLoading, refetch } = useGenericQuery<Complaint>('support/complaints', companyId ?? undefined);
   const { data: staff = [] } = useGenericQuery<Staff>('hr/staff', companyId ?? undefined);
+  const { data: subscribers = [] } = useGenericQuery<Subscriber>('subscribers', companyId ?? undefined);
+  const { data: connections = [] } = useGenericQuery<Connection>('admin/connections', companyId ?? undefined);
 
   const [category, setCategory] = useState('All');
   const [status, setStatus] = useState('All');
@@ -55,16 +58,15 @@ export default function AllocatedComplaintPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [search, setSearch] = useState('');
 
-  const [showAllocate, setShowAllocate] = useState(false);
-  const [allocateComplaintId, setAllocateComplaintId] = useState('');
-  const [allocateOperatorId, setAllocateOperatorId] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
   const [editComplaint, setEditComplaint] = useState<Complaint | null>(null);
   const [editDescription, setEditDescription] = useState('');
   const [editStatus, setEditStatus] = useState('');
   const [showEdit, setShowEdit] = useState(false);
   const [deleteComplaint, setDeleteComplaint] = useState<Complaint | null>(null);
   const [showDelete, setShowDelete] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [statusComplaint, setStatusComplaint] = useState<Complaint | null>(null);
+  const [showStatus, setShowStatus] = useState(false);
 
   const operatorMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -72,9 +74,32 @@ export default function AllocatedComplaintPage() {
     return map;
   }, [staff]);
 
-  const unallocatedComplaints = useMemo(() => {
-    return (complaints as Complaint[]).filter(c => !c.assignedToId);
-  }, [complaints]);
+  // Map subscriber/connection id -> allocated area id so complaints can be scoped
+  // to the area allocated to the currently logged-in staff member.
+  const entityAreaMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    (subscribers as Subscriber[]).forEach(s => { if (s.areaId) map[s.id] = s.areaId; });
+    (connections as Connection[]).forEach(c => { if (c.sublocalityId) map[c.id] = c.sublocalityId; });
+    return map;
+  }, [subscribers, connections]);
+
+  const currentStaff = useMemo(() => {
+    if (!user?.id) return undefined;
+    return (staff as Staff[]).find(s => s.id === user.id);
+  }, [staff, user]);
+
+  const myAreaId = currentStaff?.areaId;
+
+  // Staff/operators only see complaints raised from subscribers of their own
+  // allocated area. Admins (no staff record) continue to see everything.
+  const areaScopedComplaints = useMemo(() => {
+    if (!currentStaff) return complaints as Complaint[];
+    if (!myAreaId) return [];
+    return (complaints as Complaint[]).filter(c => {
+      const area = entityAreaMap[c.subscriberId];
+      return !!area && area === myAreaId;
+    });
+  }, [complaints, entityAreaMap, currentStaff, myAreaId]);
 
   const handleEdit = async () => {
     if (!editComplaint) return;
@@ -113,37 +138,17 @@ export default function AllocatedComplaintPage() {
     }
   };
 
-  const handleAllocate = async () => {
-    if (!allocateComplaintId || !allocateOperatorId) return;
-    const complaint = (complaints as Complaint[]).find(c => c.id === allocateComplaintId);
-    if (!complaint) return;
-    setIsSaving(true);
-    try {
-      await api.put(`/support/complaints/${allocateComplaintId}`, {
-        ...complaint,
-        assignedToId: allocateOperatorId,
-      });
-      toast({ title: 'Success', description: 'Operator allocated successfully.' });
-      setShowAllocate(false);
-      setAllocateComplaintId('');
-      setAllocateOperatorId('');
-      refetch();
-    } catch (err: any) {
-      toast({ variant: 'destructive', title: 'Error', description: err.response?.data?.message || 'Failed to allocate operator' });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const kpiData = useMemo(() => [
-    { title: 'Total Complaints', value: complaints.length, icon: ListTodo, gradient: 'from-blue-500 to-cyan-600' },
-    { title: 'Open', value: complaints.filter(c => c.status === 'open').length, icon: Clock, gradient: 'from-amber-500 to-orange-600' },
-    { title: 'Resolved', value: complaints.filter(c => c.status === 'resolved' || c.status === 'closed').length, icon: CheckCircle2, gradient: 'from-emerald-500 to-green-600' },
-    { title: 'In Progress', value: complaints.filter(c => c.status === 'in-progress').length, icon: Loader2, gradient: 'from-violet-500 to-purple-600' },
-  ], [complaints]);
+    { title: 'Total Complaints', value: areaScopedComplaints.length, icon: ListTodo, gradient: 'from-blue-500 to-cyan-600' },
+    { title: 'Open', value: areaScopedComplaints.filter(c => c.status === 'open').length, icon: CircleCheck, gradient: 'from-emerald-500 to-green-600' },
+    { title: 'Done', value: areaScopedComplaints.filter(c => c.status === 'done').length, icon: CheckCircle2, gradient: 'from-blue-500 to-cyan-600' },
+    { title: 'On Hold', value: areaScopedComplaints.filter(c => c.status === 'on-hold').length, icon: Clock, gradient: 'from-amber-500 to-orange-600' },
+    { title: 'Rejected', value: areaScopedComplaints.filter(c => c.status === 'reject').length, icon: AlertCircle, gradient: 'from-red-500 to-rose-600' },
+    { title: 'Closed', value: areaScopedComplaints.filter(c => c.status === 'closed').length, icon: CheckCircle2, gradient: 'from-gray-500 to-slate-600' },
+  ], [areaScopedComplaints]);
 
   const filteredData = useMemo(() => {
-    return complaints.filter((c) => {
+    return areaScopedComplaints.filter((c) => {
       if (category !== 'All' && c.category !== category) return false;
       if (status !== 'All' && c.status !== status) return false;
       if (search && !smartMatch(search, [c.id], [c.subscriberName, c.description])) {
@@ -151,7 +156,7 @@ export default function AllocatedComplaintPage() {
       }
       return true;
     });
-  }, [complaints, category, status, search]);
+  }, [areaScopedComplaints, category, status, search]);
 
   const totalPages = Math.ceil(filteredData.length / parseInt(pageSize));
   const paginatedData = filteredData.slice(
@@ -168,7 +173,7 @@ export default function AllocatedComplaintPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Allocated Complaint</h1>
-            <p className="text-sm text-muted-foreground">View complaints allocated to departments</p>
+            <p className="text-sm text-muted-foreground">View complaints from subscribers of your allocated area</p>
           </div>
         </div>
         <div className="h-0.5 bg-gradient-to-r from-emerald-500/50 via-green-500/30 to-transparent" />
@@ -190,7 +195,7 @@ export default function AllocatedComplaintPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Allocated Complaint</h1>
-            <p className="text-sm text-muted-foreground">View complaints allocated to departments</p>
+            <p className="text-sm text-muted-foreground">View complaints from subscribers of your allocated area</p>
           </div>
         </div>
         <div className="h-0.5 bg-gradient-to-r from-emerald-500/50 via-green-500/30 to-transparent" />
@@ -214,7 +219,7 @@ export default function AllocatedComplaintPage() {
         </div>
         <div>
             <h1 className="text-2xl font-bold tracking-tight">Allocated Complaint</h1>
-            <p className="text-sm text-muted-foreground">Manage all complaints and allocate operators</p>
+            <p className="text-sm text-muted-foreground">View complaints from subscribers of your allocated area</p>
         </div>
       </div>
 
@@ -263,8 +268,9 @@ export default function AllocatedComplaintPage() {
                 <SelectContent portal={false}>
                   <SelectItem value="All">All Status</SelectItem>
                   <SelectItem value="open">Open</SelectItem>
-                  <SelectItem value="in-progress">In Progress</SelectItem>
-                  <SelectItem value="resolved">Resolved</SelectItem>
+                  <SelectItem value="done">Done</SelectItem>
+                  <SelectItem value="on-hold">On Hold</SelectItem>
+                  <SelectItem value="reject">Reject</SelectItem>
                   <SelectItem value="closed">Closed</SelectItem>
                 </SelectContent>
               </Select>
@@ -302,10 +308,6 @@ export default function AllocatedComplaintPage() {
                   className="pl-8"
                 />
               </div>
-              <Button onClick={() => setShowAllocate(true)} className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white hover:from-blue-600 hover:to-cyan-700 shadow-sm">
-                <UserPlus className="mr-2 h-4 w-4" />
-                Allocate Operator
-              </Button>
             </div>
           </div>
 
@@ -342,8 +344,8 @@ export default function AllocatedComplaintPage() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${statusColors[item.status] || 'bg-gray-100 text-gray-800'}`}>
-                          {item.status}
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_COLORS[item.status] || 'bg-gray-100 text-gray-800'}`}>
+                          {STATUS_LABELS[item.status] || item.status}
                         </span>
                       </TableCell>
                       <TableCell className="text-sm">{item.assignedToId ? (operatorMap[item.assignedToId] || 'Unknown') : '---'}</TableCell>
@@ -356,6 +358,10 @@ export default function AllocatedComplaintPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem className="data-[highlighted]:text-blue-600" onClick={() => { setStatusComplaint(item); setShowStatus(true); }}>
+                              <CircleDot className="mr-2 h-4 w-4" />
+                              Status
+                            </DropdownMenuItem>
                             <DropdownMenuItem className="data-[highlighted]:text-emerald-600" onClick={() => { setEditComplaint(item); setEditDescription(item.description); setEditStatus(item.status); setShowEdit(true); }}>
                               <Edit3 className="mr-2 h-4 w-4" />
                               Edit
@@ -391,61 +397,6 @@ export default function AllocatedComplaintPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={showAllocate} onOpenChange={(open) => { setShowAllocate(open); if (!open) { setAllocateComplaintId(''); setAllocateOperatorId(''); } }}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Allocate Operator to Complaint</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <Label>Select Complaint</Label>
-              <Select value={allocateComplaintId} onValueChange={setAllocateComplaintId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a complaint" />
-                </SelectTrigger>
-                <SelectContent>
-                  {unallocatedComplaints.length === 0 ? (
-                    <SelectItem value="" disabled>No unallocated complaints</SelectItem>
-                  ) : (
-                    unallocatedComplaints.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.id.slice(0, 8)} - {c.subscriberName} - {c.description.slice(0, 30)}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Select Operator</Label>
-              <Select value={allocateOperatorId} onValueChange={setAllocateOperatorId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose an operator" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(staff as Staff[]).map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{s.name} - {s.department}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" onClick={() => { setShowAllocate(false); setAllocateComplaintId(''); setAllocateOperatorId(''); }}>
-                Cancel
-              </Button>
-              <Button
-                onClick={handleAllocate}
-                disabled={isSaving || !allocateComplaintId || !allocateOperatorId}
-                className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700"
-              >
-                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Allocate
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       <Dialog open={showEdit} onOpenChange={(open) => { setShowEdit(open); if (!open) setEditComplaint(null); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -458,17 +409,7 @@ export default function AllocatedComplaintPage() {
             </div>
             <div className="space-y-1">
               <Label>Status</Label>
-              <Select value={editStatus} onValueChange={setEditStatus}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="open">Open</SelectItem>
-                  <SelectItem value="in-progress">In Progress</SelectItem>
-                  <SelectItem value="resolved">Resolved</SelectItem>
-                  <SelectItem value="closed">Closed</SelectItem>
-                </SelectContent>
-              </Select>
+              <ComplaintStatusSelect value={editStatus} onValueChange={setEditStatus} />
             </div>
             <div className="space-y-1">
               <Label>Description</Label>
@@ -497,6 +438,13 @@ export default function AllocatedComplaintPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ComplaintStatusDialog
+        complaint={statusComplaint}
+        open={showStatus}
+        onOpenChange={(open) => { setShowStatus(open); if (!open) setStatusComplaint(null); }}
+        onUpdated={refetch}
+      />
     </div>
   );
 }

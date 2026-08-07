@@ -88,10 +88,11 @@ export default function StaffSalaryPage() {
     );
 
     const kpis = useMemo(() => {
-        const totalSalary = filteredStaff.reduce((sum, s) => sum + (s.salary || 0), 0);
-        const unpaidSalary = unpaidStaff.reduce((sum, s) => sum + (s.salary || 0), 0);
+        const baseSalary = (s: Staff) => (s.basicPay || s.salary || 0);
+        const totalSalary = filteredStaff.reduce((sum, s) => sum + baseSalary(s), 0);
+        const unpaidSalary = unpaidStaff.reduce((sum, s) => sum + baseSalary(s), 0);
         const totalDeduction = payments.reduce((sum, p) => sum + (p.deduction || 0), 0);
-        const otherAllowance = filteredStaff.reduce((sum, s) => sum + (s.leaveAllow || 0), 0);
+        const otherAllowance = payments.reduce((sum, p) => sum + (p.otherAllowance || 0), 0);
         return {
             totalStaff: filteredStaff.length,
             totalSalary,
@@ -296,7 +297,7 @@ export default function StaffSalaryPage() {
                                     <Badge variant="secondary">{paidStaff.length}</Badge>
                                 </div>
                                 <span className="text-sm text-muted-foreground">
-                                    {formatPKR(paidStaff.reduce((sum, s) => sum + (s.salary || 0), 0))}
+                                    {formatPKR(payments.reduce((sum, p) => sum + (p.netPay || p.salary || 0), 0))}
                                 </span>
                             </div>
                             <CardContent className="p-0">

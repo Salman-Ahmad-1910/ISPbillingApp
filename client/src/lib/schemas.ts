@@ -347,7 +347,7 @@ export const complaintSchema = z.object({
   subscriberId: z.string().min(1, 'Subscriber is required'),
   category: z.enum(['network', 'billing', 'service']),
   description: z.string().min(1, 'Description is required'),
-  status: z.enum(['open', 'in-progress', 'resolved', 'closed']),
+  status: z.enum(['open', 'done', 'on-hold', 'reject', 'closed']),
   assignedToId: z.string().optional().or(z.literal('unassigned')),
   companyId: z.string().optional(),
 });
