@@ -55,6 +55,7 @@ func RunMigrations() {
 	DB.Exec(`ALTER TABLE invoices ALTER COLUMN subscriber_id DROP NOT NULL`)
 	DB.Exec(`ALTER TABLE payments ALTER COLUMN subscriber_id DROP NOT NULL`)
 	DB.Exec(`ALTER TABLE payments ALTER COLUMN invoice_id DROP NOT NULL`)
+	DB.Exec(`ALTER TABLE inquiries ALTER COLUMN phone DROP NOT NULL`)
 	log.Println("FK constraints dropped")
 
 	err := DB.AutoMigrate(
