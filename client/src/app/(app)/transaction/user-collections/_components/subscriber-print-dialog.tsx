@@ -48,8 +48,8 @@ export function SubscriberPrintDialog({ isOpen, onClose, payment, promise, compa
       .join('\n');
 
     const pageStyle = format === 'thermal'
-      ? `@page { size: 80mm auto; margin: 3mm; }`
-      : `@page { size: A4; margin: 15mm; }`;
+      ? `@page { size: 80mm auto; margin: 3mm; } body { color: #000 !important; } * { color: #000 !important; }`
+      : `@page { size: A4; margin: 15mm; } body { color: #000 !important; } * { color: #000 !important; }`;
 
     const contentHTML = format === 'thermal'
       ? `<div style="width:74mm; margin:0 auto; font-family:monospace; font-size:11px;">${printContent.innerHTML}</div>`
@@ -248,7 +248,7 @@ function ThermalInvoice({ payment, company, logoUrl, subscriberName, collectorNa
       </div>
 
       <div className="flex justify-center">
-        <div className="print-area bg-white border rounded-lg p-4 w-[300px] font-mono text-xs" id="print-thermal">
+        <div className="print-area bg-white border rounded-lg p-4 w-[300px] font-mono text-xs text-gray-900" style={{ forcedColorAdjust: 'none' }} id="print-thermal">
 
           <div className="text-center mb-3 pb-2 border-b border-dashed border-gray-400">
             {logoUrl && (
@@ -433,7 +433,7 @@ function ThermalPromiseInvoice({ promise, company, logoUrl, subscriberName, coll
       </div>
 
       <div className="flex justify-center">
-        <div className="print-area bg-white border rounded-lg p-4 w-[300px] font-mono text-xs" id="print-thermal">
+        <div className="print-area bg-white border rounded-lg p-4 w-[300px] font-mono text-xs text-gray-900" style={{ forcedColorAdjust: 'none' }} id="print-thermal">
 
           <div className="text-center mb-3 pb-2 border-b border-dashed border-gray-400">
             {logoUrl && (

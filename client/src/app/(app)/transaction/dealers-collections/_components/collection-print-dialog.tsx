@@ -254,7 +254,7 @@ function ThermalInvoice({ collection, company, logoUrl, receivedByName, onPrint 
       </div>
 
       <div className="flex justify-center">
-        <div className="print-area bg-white border rounded-lg p-4 w-[300px] font-mono text-xs" id="print-thermal">
+        <div className="print-area bg-white border rounded-lg p-4 w-[300px] font-mono text-xs text-gray-900" style={{ forcedColorAdjust: 'none' }} id="print-thermal">
 
           {/* Header */}
           <div className="text-center mb-3 pb-2 border-b border-dashed border-gray-400">
