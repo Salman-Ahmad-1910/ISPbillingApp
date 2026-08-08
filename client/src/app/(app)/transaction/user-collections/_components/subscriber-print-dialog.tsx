@@ -248,28 +248,28 @@ function ThermalInvoice({ payment, company, logoUrl, subscriberName, collectorNa
       </div>
 
       <div className="flex justify-center">
-        <div className="print-area bg-white border rounded-lg p-4 w-[300px] font-mono text-xs text-gray-900" style={{ forcedColorAdjust: 'none' }} id="print-thermal">
+        <div className="print-area bg-white border rounded-lg p-4 w-[300px] font-mono text-sm text-gray-900" style={{ forcedColorAdjust: 'none' }} id="print-thermal">
 
           <div className="text-center mb-3 pb-2 border-b border-dashed border-gray-400">
             {logoUrl && (
-              <img src={logoUrl} alt="Logo" style={{ width: '40px', height: '40px', objectFit: 'contain', margin: '0 auto 8px' }} />
+              <img src={logoUrl} alt="Logo" style={{ width: '80px', height: '80px', objectFit: 'contain', margin: '0 auto 8px' }} />
             )}
-            <p className="font-bold text-sm">{company?.name || 'Company'}</p>
-            <p className="text-[10px] text-gray-500">{company?.address}</p>
-            {company?.contact1 && <p className="text-[10px] text-gray-500">{company.contact1}</p>}
+            <p className="font-bold text-base">{company?.name || 'Company'}</p>
+            <p className="text-xs text-gray-500">{company?.address}</p>
+            {company?.contact1 && <p className="text-xs text-gray-500">{company.contact1}</p>}
           </div>
 
           <div className="mb-3 pb-2 border-b border-dashed border-gray-400">
             <div className="flex justify-between mb-1">
-              <span className="text-gray-500">Bill ID:</span>
+              <span className="text-gray-700 font-bold">Bill ID:</span>
               <span className="font-bold">{payment.id}</span>
             </div>
             <div className="flex justify-between mb-1">
-              <span className="text-gray-500">Date:</span>
+              <span className="text-gray-700 font-bold">Date:</span>
               <span className="font-bold">{payment.paymentDate}</span>
             </div>
             <div className="flex justify-between mb-1">
-              <span className="text-gray-500">Month:</span>
+              <span className="text-gray-700 font-bold">Month:</span>
               <span className="font-bold">
                 {new Date(payment.paymentDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
               </span>
@@ -278,29 +278,29 @@ function ThermalInvoice({ payment, company, logoUrl, subscriberName, collectorNa
 
           <div className="mb-3 pb-2 border-b border-dashed border-gray-400">
             <div className="flex justify-between mb-1">
-              <span className="text-gray-500">Subscriber:</span>
+              <span className="text-gray-700 font-bold">Subscriber:</span>
               <span className="font-bold">{subscriberName || payment.subscriberName}</span>
             </div>
             <div className="flex justify-between mb-1">
-              <span className="text-gray-500">Method:</span>
+              <span className="text-gray-700 font-bold">Method:</span>
               <span className="font-bold capitalize">{payment.method || 'Cash'}</span>
             </div>
             <div className="flex justify-between mb-1">
-              <span className="text-gray-500">Received By:</span>
+              <span className="text-gray-700 font-bold">Received By:</span>
               <span className="font-bold">{collectorName || payment.collectorId?.slice(0, 8) || '---'}</span>
             </div>
           </div>
 
           <div className="mb-3 pb-2 border-b border-dashed border-gray-400">
             <div className="flex justify-between mb-1">
-              <span className="text-gray-500">Amount:</span>
+              <span className="text-gray-700 font-bold">Amount:</span>
               <span className="font-bold">PKR {payment.amount.toLocaleString()}</span>
             </div>
           </div>
 
           <div className="text-center border-t border-dashed border-gray-400 pt-2">
-            <p className="font-bold text-[10px]">{company?.name || 'Company'}</p>
-            <p className="text-[9px] text-gray-500">Computer generated receipt</p>
+            <p className="font-bold text-xs">{company?.name || 'Company'}</p>
+            <p className="text-xs text-gray-500">Computer generated receipt</p>
           </div>
         </div>
       </div>
@@ -433,15 +433,15 @@ function ThermalPromiseInvoice({ promise, company, logoUrl, subscriberName, coll
       </div>
 
       <div className="flex justify-center">
-        <div className="print-area bg-white border rounded-lg p-4 w-[300px] font-mono text-xs text-gray-900" style={{ forcedColorAdjust: 'none' }} id="print-thermal">
+        <div className="print-area bg-white border rounded-lg p-4 w-[300px] font-mono text-sm text-gray-900" style={{ forcedColorAdjust: 'none' }} id="print-thermal">
 
           <div className="text-center mb-3 pb-2 border-b border-dashed border-gray-400">
             {logoUrl && (
-              <img src={logoUrl} alt="Logo" style={{ width: '40px', height: '40px', objectFit: 'contain', margin: '0 auto 8px' }} />
+              <img src={logoUrl} alt="Logo" style={{ width: '80px', height: '80px', objectFit: 'contain', margin: '0 auto 8px' }} />
             )}
-            <p className="font-bold text-sm">{company?.name || 'Company'}</p>
-            <p className="text-[10px] text-gray-500">{company?.address}</p>
-            {company?.contact1 && <p className="text-[10px] text-gray-500">{company.contact1}</p>}
+            <p className="font-bold text-base">{company?.name || 'Company'}</p>
+            <p className="text-xs text-gray-500">{company?.address}</p>
+            {company?.contact1 && <p className="text-xs text-gray-500">{company.contact1}</p>}
           </div>
 
           <div className="text-center mb-3 pb-2 border-b border-dashed border-gray-400">
@@ -450,51 +450,51 @@ function ThermalPromiseInvoice({ promise, company, logoUrl, subscriberName, coll
 
           <div className="mb-3 pb-2 border-b border-dashed border-gray-400">
             <div className="flex justify-between mb-1">
-              <span className="text-gray-500">Promise ID:</span>
+              <span className="text-gray-700 font-bold">Promise ID:</span>
               <span className="font-bold">{promise.id.slice(0, 8)}</span>
             </div>
             <div className="flex justify-between mb-1">
-              <span className="text-gray-500">Date:</span>
+              <span className="text-gray-700 font-bold">Date:</span>
               <span className="font-bold">{promise.promiseDate}</span>
             </div>
             <div className="flex justify-between mb-1">
-              <span className="text-gray-500">Status:</span>
+              <span className="text-gray-700 font-bold">Status:</span>
               <span className="font-bold text-amber-600">PENDING</span>
             </div>
           </div>
 
           <div className="mb-3 pb-2 border-b border-dashed border-gray-400">
             <div className="flex justify-between mb-1">
-              <span className="text-gray-500">Subscriber:</span>
+              <span className="text-gray-700 font-bold">Subscriber:</span>
               <span className="font-bold">{subscriberName || promise.subscriberName}</span>
             </div>
             <div className="flex justify-between mb-1">
-              <span className="text-gray-500">Type:</span>
+              <span className="text-gray-700 font-bold">Type:</span>
               <span className="font-bold capitalize">{promise.connectionType || 'internet'}</span>
             </div>
             <div className="flex justify-between mb-1">
-              <span className="text-gray-500">Promised By:</span>
+              <span className="text-gray-700 font-bold">Promised By:</span>
               <span className="font-bold">{collectorName || promise.collectorName || '---'}</span>
             </div>
           </div>
 
           <div className="mb-3 pb-2 border-b border-dashed border-gray-400">
             <div className="mb-1">
-              <span className="text-gray-500">Description:</span>
+              <span className="text-gray-700 font-bold">Description:</span>
               <p className="font-bold mt-0.5">{promise.description || '---'}</p>
             </div>
           </div>
 
           <div className="mb-3 pb-2 border-b border-dashed border-gray-400">
             <div className="flex justify-between mb-1">
-              <span className="text-gray-500">Amount:</span>
+              <span className="text-gray-700 font-bold">Amount:</span>
               <span className="font-bold">PKR {promise.amount.toLocaleString()}</span>
             </div>
           </div>
 
           <div className="text-center border-t border-dashed border-gray-400 pt-2">
-            <p className="font-bold text-[10px]">{company?.name || 'Company'}</p>
-            <p className="text-[9px] text-gray-500">Computer generated slip</p>
+            <p className="font-bold text-xs">{company?.name || 'Company'}</p>
+            <p className="text-xs text-gray-500">Computer generated slip</p>
           </div>
         </div>
       </div>

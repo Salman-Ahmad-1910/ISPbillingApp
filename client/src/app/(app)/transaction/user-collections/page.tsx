@@ -222,6 +222,18 @@ export default function SubscriberCollectionsPage() {
     [selectedSubscriber],
   );
 
+  const packageFee = useMemo(
+    () => (selectedSubscriber ? getPackagePrice(selectedSubscriber) : 0),
+    [selectedSubscriber],
+  );
+
+  const remainingDues = useMemo(
+    () => (selectedSubscriber ? Number(selectedSubscriber.remainingAmount) || 0 : 0),
+    [selectedSubscriber],
+  );
+
+  const isAmountLocked = remainingDues === 0 && !selectedPromiseId;
+
   const remainingAfterPayment = Math.max(0, subscriberRemaining - receiveAmount);
 
   const handlePromiseSave = async () => {
@@ -531,7 +543,7 @@ export default function SubscriberCollectionsPage() {
                 <CalendarClock className="mr-2 h-4 w-4" />
                 Make Promise
               </Button>
-              <Button onClick={() => { setSelectedPromiseId(null); setReceiveAmount(subscriberRemaining); setShowReceiveDialog(true); }} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
+              <Button onClick={() => { setSelectedPromiseId(null); setReceiveAmount(packageFee); setShowReceiveDialog(true); }} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
                 <DollarSign className="mr-2 h-4 w-4" />
                 Receive Payment
               </Button>
@@ -745,22 +757,39 @@ export default function SubscriberCollectionsPage() {
                 />
               </div>
               <div className="space-y-1">
-                <Label>Amount (PKR)</Label>
+                <Label>Package Fee (PKR)</Label>
+                <Input
+                  value={`PKR ${packageFee.toLocaleString()}`}
+                  readOnly
+                  className="font-semibold"
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Amount (PKR)</Label>
               <Input
                 type="number"
                 value={receiveAmount}
                 onChange={(e) => setReceiveAmount(parseFloat(e.target.value) || 0)}
                 placeholder="Enter amount"
-                max={subscriberRemaining}
-                className={receiveAmount > subscriberRemaining ? 'border-destructive focus-visible:ring-destructive' : ''}
+                readOnly={isAmountLocked}
+                max={isAmountLocked ? packageFee : subscriberRemaining}
+                className={isAmountLocked
+                  ? 'font-semibold cursor-not-allowed'
+                  : receiveAmount > subscriberRemaining ? 'border-destructive focus-visible:ring-destructive' : ''}
               />
-              {receiveAmount > subscriberRemaining && (
+              {isAmountLocked && (
+                <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                  <AlertCircle className="h-3.5 w-3.5" />
+                  Remaining amount is settled. Only the package fee can be received.
+                </p>
+              )}
+              {!isAmountLocked && receiveAmount > subscriberRemaining && (
                 <p className="text-xs font-medium text-destructive flex items-center gap-1">
                   <AlertCircle className="h-3.5 w-3.5" />
                   Payment amount cannot exceed the remaining amount of PKR {subscriberRemaining.toLocaleString()}.
                 </p>
               )}
-            </div>
             </div>
             <div className="space-y-1">
               <Label>Pay Date</Label>
@@ -805,7 +834,7 @@ export default function SubscriberCollectionsPage() {
             </div>
             <Button
               onClick={handleReceive}
-              disabled={isSaving || !receiveAmount || receiveAmount > subscriberRemaining}
+              disabled={isSaving || !receiveAmount || receiveAmount > (isAmountLocked ? packageFee : subscriberRemaining)}
               className="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md"
             >
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

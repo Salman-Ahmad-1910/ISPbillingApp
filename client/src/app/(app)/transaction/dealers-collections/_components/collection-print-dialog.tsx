@@ -254,30 +254,30 @@ function ThermalInvoice({ collection, company, logoUrl, receivedByName, onPrint 
       </div>
 
       <div className="flex justify-center">
-        <div className="print-area bg-white border rounded-lg p-4 w-[300px] font-mono text-xs text-gray-900" style={{ forcedColorAdjust: 'none' }} id="print-thermal">
+        <div className="print-area bg-white border rounded-lg p-4 w-[300px] font-mono text-sm text-gray-900" style={{ forcedColorAdjust: 'none' }} id="print-thermal">
 
           {/* Header */}
           <div className="text-center mb-3 pb-2 border-b border-dashed border-gray-400">
             {logoUrl && (
-              <img src={logoUrl} alt="Logo" style={{ width: '40px', height: '40px', objectFit: 'contain', margin: '0 auto 8px' }} />
+              <img src={logoUrl} alt="Logo" style={{ width: '80px', height: '80px', objectFit: 'contain', margin: '0 auto 8px' }} />
             )}
-            <p className="font-bold text-sm">{company?.name || 'Company'}</p>
-            <p className="text-[10px] text-gray-500">{company?.address}</p>
-            {company?.contact1 && <p className="text-[10px] text-gray-500">{company.contact1}</p>}
+            <p className="font-bold text-base">{company?.name || 'Company'}</p>
+            <p className="text-xs text-gray-500">{company?.address}</p>
+            {company?.contact1 && <p className="text-xs text-gray-500">{company.contact1}</p>}
           </div>
 
           {/* Bill Info */}
           <div className="mb-3 pb-2 border-b border-dashed border-gray-400">
             <div className="flex justify-between mb-1">
-              <span className="text-gray-500">Bill ID:</span>
+              <span className="text-gray-700 font-bold">Bill ID:</span>
               <span className="font-bold">{collection.id}</span>
             </div>
             <div className="flex justify-between mb-1">
-              <span className="text-gray-500">Date:</span>
+              <span className="text-gray-700 font-bold">Date:</span>
               <span className="font-bold">{collection.collectionDate}</span>
             </div>
             <div className="flex justify-between mb-1">
-              <span className="text-gray-500">Month:</span>
+              <span className="text-gray-700 font-bold">Month:</span>
               <span className="font-bold">
                 {collection.collectionDate ? new Date(collection.collectionDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'N/A'}
               </span>
@@ -287,23 +287,23 @@ function ThermalInvoice({ collection, company, logoUrl, receivedByName, onPrint 
           {/* Details */}
           <div className="mb-3 pb-2 border-b border-dashed border-gray-400">
             <div className="flex justify-between mb-1">
-              <span className="text-gray-500">Dealer ID:</span>
+              <span className="text-gray-700 font-bold">Dealer ID:</span>
               <span className="font-bold font-mono">{collection.dealerId?.slice(0, 8) || '---'}</span>
             </div>
             <div className="flex justify-between mb-1">
-              <span className="text-gray-500">Dealer:</span>
+              <span className="text-gray-700 font-bold">Dealer:</span>
               <span className="font-bold">{collection.dealerName}</span>
             </div>
             <div className="flex justify-between mb-1">
-              <span className="text-gray-500">Address:</span>
+              <span className="text-gray-700 font-bold">Address:</span>
               <span className="font-bold text-right max-w-[160px] truncate">{collection.dealerAddress || '---'}</span>
             </div>
             <div className="flex justify-between mb-1">
-              <span className="text-gray-500">Type:</span>
+              <span className="text-gray-700 font-bold">Type:</span>
               <span className="font-bold capitalize">{collection.transactionType || 'Cash'}</span>
             </div>
             <div className="flex justify-between mb-1">
-              <span className="text-gray-500">Received By:</span>
+              <span className="text-gray-700 font-bold">Received By:</span>
               <span className="font-bold">{collection.receivedByName || receivedByName || '---'}</span>
             </div>
           </div>
@@ -311,7 +311,7 @@ function ThermalInvoice({ collection, company, logoUrl, receivedByName, onPrint 
           {/* Comment */}
           {collection.comment && (
             <div className="mb-3 pb-2 border-b border-dashed border-gray-400">
-              <span className="text-gray-500">Comment:</span>
+              <span className="text-gray-700 font-bold">Comment:</span>
               <p className="font-bold mt-1">{collection.comment}</p>
             </div>
           )}
@@ -319,7 +319,7 @@ function ThermalInvoice({ collection, company, logoUrl, receivedByName, onPrint 
           {/* Amount */}
           <div className="mb-3 pb-2 border-b border-dashed border-gray-400">
             <div className="flex justify-between mb-1">
-              <span className="text-gray-500">Amount:</span>
+              <span className="text-gray-700 font-bold">Amount:</span>
               <span className="font-bold">PKR {collection.amount.toLocaleString()}</span>
             </div>
           </div>
@@ -333,8 +333,8 @@ function ThermalInvoice({ collection, company, logoUrl, receivedByName, onPrint 
 
           {/* Footer */}
           <div className="text-center border-t border-dashed border-gray-400 pt-2">
-            <p className="font-bold text-[10px]">{company?.name || 'Company'}</p>
-            <p className="text-[9px] text-gray-500">Computer generated receipt</p>
+            <p className="font-bold text-xs">{company?.name || 'Company'}</p>
+            <p className="text-xs text-gray-500">Computer generated receipt</p>
           </div>
         </div>
       </div>
