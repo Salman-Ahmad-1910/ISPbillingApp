@@ -142,7 +142,11 @@ export function ClientPage({ data, areas, boxes, packages }: ClientPageProps) {
                 await api.put(`/subscribers/inquiries/${selectedInquiry.id}?companyId=${companyId}`, formData);
                 toast({ title: "Success", description: "Inquiry updated successfully." });
             } else {
-                await api.post(`/subscribers/inquiries?companyId=${companyId}`, { ...formData, companyId });
+                const response = await api.post(`/subscribers/inquiries?companyId=${companyId}`, { ...formData, companyId });
+                const created = response.data?.data;
+                if (created) {
+                    queryClient.setQueryData<Inquiry[]>(['subscribers/inquiries', companyId], (old = []) => [created, ...old]);
+                }
                 toast({ title: "Success", description: "Inquiry added successfully." });
             }
             queryClient.invalidateQueries({ queryKey: ['subscribers/inquiries', companyId] });

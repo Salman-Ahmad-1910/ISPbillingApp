@@ -64,7 +64,11 @@ export function ClientPage({ data }: ClientPageProps) {
         return response.data;
       }
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
+      const created = data?.data;
+      if (created && !selectedPurchase) {
+        queryClient.setQueryData<Purchase[]>(['inventory/purchases', companyId], (old = []) => [created, ...old]);
+      }
       queryClient.invalidateQueries({ queryKey: ['inventory/purchases', companyId] });
       queryClient.invalidateQueries({ queryKey: ['inventory/purchased-products', companyId] });
       setIsFormOpen(false);
