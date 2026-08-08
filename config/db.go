@@ -125,6 +125,7 @@ func RunMigrations() {
 		&models.DistributionBox{},
 		&models.Connection{},
 		&models.ConnectionStatusChange{},
+		&models.ConnectionLog{},
 		&models.TransactionType{},
 		&models.BillRecord{},
 		&models.AccountHead{},

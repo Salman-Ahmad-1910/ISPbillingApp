@@ -172,6 +172,30 @@ export type POP = {
   companyId: string;
 };
 
+export type ConnectionLog = {
+  id: string;
+  companyId: string;
+  connectionId: string;
+  subscriberName?: string;
+  internetId?: string;
+  connectionType?: string;
+  actionType?: string;
+  fieldName?: string;
+  oldValue?: string;
+  newValue?: string;
+  reason?: string;
+  remarks?: string;
+  updatedBy?: string;
+  updatedByName?: string;
+  userRole?: string;
+  branch?: string;
+  ipAddress?: string;
+  deviceName?: string;
+  logDate?: string;
+  logTime?: string;
+  createdAt: string;
+};
+
 // Subscriber Management
 export type Subscriber = {
   id: string;

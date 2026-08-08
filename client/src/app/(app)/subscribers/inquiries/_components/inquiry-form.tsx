@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -78,8 +79,27 @@ export function InquiryForm({ inquiry, areas, boxes, packages, onSave, onCancel,
   });
 
   function onSubmit(values: InquiryFormValues) {
+    const selectedPkg = packages.find((pkg: any) => pkg.name === values.packageCable);
+    const price = selectedPkg ? (selectedPkg.salePrice > 0 ? selectedPkg.salePrice : selectedPkg.price) : 0;
+    if (price > 0 && values.discount >= price) {
+      form.setError('discount', {
+        type: 'manual',
+        message: 'Discount must be less than the package selling price',
+      });
+      return;
+    }
     onSave(values);
   }
+
+  const selectedPackage = packages.find((pkg: any) => pkg.name === form.watch('packageCable'));
+  const packagePrice = selectedPackage && (selectedPackage.salePrice > 0 ? selectedPackage.salePrice : selectedPackage.price);
+  const discount = form.watch('discount') || 0;
+
+  useEffect(() => {
+    if (selectedPackage && packagePrice > 0) {
+      form.setValue('amount', Math.max(0, packagePrice - discount), { shouldValidate: true });
+    }
+  }, [selectedPackage, packagePrice, discount, form]);
 
   return (
     <Form {...form}>

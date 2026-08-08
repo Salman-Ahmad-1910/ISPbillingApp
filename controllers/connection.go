@@ -6,6 +6,8 @@ import (
 	"awesomeProject/models"
 	"awesomeProject/utils"
 	"fmt"
+	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -37,6 +39,7 @@ func RegisterConnectionRoutes(admin *gin.RouterGroup) {
 	connections := admin.Group("/connections")
 	connections.Use(middleware.AuditMiddleware())
 	connections.GET("", findConnections)
+	connections.GET("/logs", getConnectionLogs)
 	connections.POST("", createConnection)
 	connections.PUT("/:id", updateConnection)
 	connections.DELETE("/:id", deleteConnection)
@@ -94,6 +97,7 @@ type connectionInput struct {
 	LeavingDate         string  `json:"leavingDate"`
 	DeactivationReason  string  `json:"deactivationReason"`
 	Comments            string  `json:"comments"`
+	Reason              string  `json:"reason"`
 	BadDebt             *bool   `json:"badDebt"`
 }
 
@@ -184,6 +188,13 @@ func createConnection(c *gin.Context) {
 		utils.ErrorResponse(c, 500, "Failed to commit", err.Error())
 		return
 	}
+
+	createConnectionLogs(c, conn, []connChange{{
+		FieldName:  "connection",
+		ActionType: "New Connection Installed",
+		Old:        "",
+		New:        fmt.Sprintf("%s (%s)", conn.Name, conn.InternetID),
+	}}, input.Reason, input.Comments)
 
 	utils.CreatedResponse(c, "Connection created", conn)
 }
@@ -328,13 +339,24 @@ func updateConnection(c *gin.Context) {
 		return
 	}
 
+	var updated models.Connection
+	if err := tx.First(&updated, "id = ?", id).Error; err != nil {
+		tx.Rollback()
+		utils.ErrorResponse(c, 500, "Failed to reload connection", err.Error())
+		return
+	}
+
 	if err := tx.Commit().Error; err != nil {
 		utils.ErrorResponse(c, 500, "Failed to commit", err.Error())
 		return
 	}
 
-	var updated models.Connection
-	config.DB.First(&updated, "id = ?", id)
+	reason := input.Reason
+	if reason == "" {
+		reason = input.DeactivationReason
+	}
+	createConnectionLogs(c, updated, connectionFieldChanges(old, input), reason, input.Comments)
+
 	utils.SuccessResponse(c, "Connection updated", updated)
 }
 
@@ -373,5 +395,250 @@ func deleteConnection(c *gin.Context) {
 		return
 	}
 
+	createConnectionLogs(c, conn, []connChange{{
+		FieldName:  "connection",
+		ActionType: "Connection Deleted",
+		Old:        fmt.Sprintf("%s (%s)", conn.Name, conn.InternetID),
+		New:        "",
+	}}, "", "")
+
 	utils.SuccessResponse(c, "Connection deleted", nil)
+}
+
+// connChange represents one field-level change on a connection.
+type connChange struct {
+	FieldName  string
+	ActionType string
+	Old        string
+	New        string
+}
+
+func fmtNum(v float64) string {
+	return strconv.FormatFloat(v, 'f', 2, 64)
+}
+
+func fmtInt(v int) string {
+	return strconv.Itoa(v)
+}
+
+func fmtBool(v bool) string {
+	if v {
+		return "true"
+	}
+	return "false"
+}
+
+// connectionFieldChanges diffs the previous connection against the incoming
+// input and returns one connChange per modified field.
+func connectionFieldChanges(old models.Connection, input connectionInput) []connChange {
+	var changes []connChange
+
+	add := func(field, action, oldV, newV string) {
+		if newV == "" || newV == oldV {
+			return
+		}
+		changes = append(changes, connChange{FieldName: field, ActionType: action, Old: oldV, New: newV})
+	}
+
+	add("internetId", "Subscriber ID Changed", old.InternetID, input.InternetID)
+	add("name", "Subscriber Name Changed", old.Name, input.Name)
+	add("address", "Address Changed", old.Address, input.Address)
+	add("cell", "Contact Number Changed", old.Cell, input.Cell)
+	add("mobile", "Contact Number Changed", old.Mobile, input.Mobile)
+	add("connectionProvider", "Provider Changed", old.ConnectionProvider, input.ConnectionProvider)
+	add("connectionType", "Connection Type Changed", old.ConnectionType, input.ConnectionType)
+	add("boxNumber", "Box Number Changed", old.BoxNumber, input.BoxNumber)
+	add("packageCable", "Cable Package Changed", old.PackageCable, input.PackageCable)
+	add("packageInternet", "Internet Package Changed", old.PackageInternet, input.PackageInternet)
+	add("discount", "Discount Updated", old.Discount, input.Discount)
+	add("sameDiscount", "Internet Discount Updated", old.SameDiscount, input.SameDiscount)
+	add("installationDate", "Installation Date Changed", old.InstallationDate, input.InstallationDate)
+	add("rechargeDate", "Recharge Date Updated", old.RechargeDate, input.RechargeDate)
+	add("leavingDate", "Leaving Date Updated", old.LeavingDate, input.LeavingDate)
+	add("deactivationReason", "Deactivation Reason Updated", old.DeactivationReason, input.DeactivationReason)
+	add("comments", "Remarks Updated", old.Comments, input.Comments)
+
+	if input.InstallationAmount != 0 {
+		add("installationAmount", "Installation Charges Updated", fmtNum(old.InstallationAmount), fmtNum(input.InstallationAmount))
+	}
+	if input.OtherAmount != 0 {
+		add("otherAmount", "Other Charges Updated", fmtNum(old.OtherAmount), fmtNum(input.OtherAmount))
+	}
+	if input.Amount != 0 {
+		add("amount", "Cable Price Changed", fmtNum(old.Amount), fmtNum(input.Amount))
+	}
+	if input.SameAmount != 0 {
+		add("sameAmount", "Internet Price Changed", fmtNum(old.SameAmount), fmtNum(input.SameAmount))
+	}
+	if input.BalanceDays != 0 {
+		add("balanceDays", "Balance Days Updated", fmtInt(old.BalanceDays), fmtInt(input.BalanceDays))
+	}
+	if input.CreateBalance != old.CreateBalance {
+		add("createBalance", "Balance Setting Updated", fmtBool(old.CreateBalance), fmtBool(input.CreateBalance))
+	}
+	if input.SplitterPort != 0 && input.SplitterPort != old.SplitterPort {
+		add("splitterPort", "Splitter Port Changed", fmtInt(old.SplitterPort), fmtInt(input.SplitterPort))
+	}
+	if input.SublocalityID != "" && input.SublocalityID != old.SublocalityID {
+		add("sublocalityId", "Area Changed", old.SublocalityID, input.SublocalityID)
+	}
+	if input.BadDebt != nil && *input.BadDebt != old.BadDebt {
+		add("badDebt", "Bad Debt Flag Updated", fmtBool(old.BadDebt), fmtBool(*input.BadDebt))
+	}
+
+	newSplitter := input.SplitterID
+	if newSplitter == "" {
+		newSplitter = old.SplitterID
+	}
+	if newSplitter != old.SplitterID {
+		add("splitterId", "Splitter Changed", old.SplitterID, newSplitter)
+	}
+
+	if input.Status != "" && input.Status != old.Status {
+		action := "Connection Status Changed"
+		switch input.Status {
+		case "active":
+			if old.Status == "suspended" {
+				action = "Connection Resumed"
+			} else {
+				action = "Connection Activated"
+			}
+		case "suspended":
+			action = "Connection Suspended"
+		case "deactivated", "inactive":
+			action = "Connection Disconnected"
+		}
+		add("status", action, old.Status, input.Status)
+	}
+
+	return changes
+}
+
+// connectionLogContext extracts the acting user, role, branch, IP and device
+// from the Gin context for connection log entries.
+func connectionLogContext(c *gin.Context) (userID *uuid.UUID, role, ip, device, branch string) {
+	ip = c.ClientIP()
+	device = c.GetHeader("User-Agent")
+
+	if v, ok := c.Get("userID"); ok {
+		if uid, ok2 := v.(uuid.UUID); ok2 {
+			userID = &uid
+			var user models.User
+			if err := config.DB.First(&user, "id = ?", uid).Error; err == nil {
+				role = user.Role
+			}
+		}
+	}
+	if v, ok := c.Get("userRoleInCompany"); ok {
+		if s, ok2 := v.(string); ok2 && s != "" {
+			role = s
+		}
+	}
+	if v, ok := c.Get("companyID"); ok {
+		if cid, ok2 := v.(uuid.UUID); ok2 {
+			var company models.Company
+			if err := config.DB.First(&company, "id = ?", cid).Error; err == nil {
+				branch = company.Name
+			}
+		}
+	}
+	return
+}
+
+// createConnectionLogs writes one ConnectionLog row per change using the shared
+// DB connection AFTER the main operation has committed. This guarantees a log
+// write failure (e.g. missing table) can never abort the subscriber update.
+func createConnectionLogs(c *gin.Context, conn models.Connection, changes []connChange, reason, remarks string) {
+	if len(changes) == 0 {
+		return
+	}
+	userID, role, ip, device, branch := connectionLogContext(c)
+	now := time.Now()
+	for _, ch := range changes {
+		logEntry := models.ConnectionLog{
+			TenantModel:    models.TenantModel{CompanyID: conn.CompanyID},
+			ConnectionID:   conn.ID,
+			SubscriberName: conn.Name,
+			InternetID:     conn.InternetID,
+			ConnectionType: conn.ConnectionType,
+			ActionType:     ch.ActionType,
+			FieldName:      ch.FieldName,
+			OldValue:       ch.Old,
+			NewValue:       ch.New,
+			Reason:         reason,
+			Remarks:        remarks,
+			UpdatedBy:      userID,
+			UserRole:       role,
+			Branch:         branch,
+			IPAddress:      ip,
+			DeviceName:     device,
+			LogDate:        now.Format("2006-01-02"),
+			LogTime:        now.Format("15:04:05"),
+		}
+		if err := config.DB.Create(&logEntry).Error; err != nil {
+			fmt.Printf("Failed to create connection log: %v\n", err)
+		}
+	}
+}
+
+func getConnectionLogs(c *gin.Context) {
+	companyID := c.MustGet("companyID").(uuid.UUID)
+
+	db := config.DB.Scopes(models.TenantScope(companyID))
+
+	if s := c.Query("search"); s != "" {
+		db = db.Where("subscriber_name ILIKE ? OR internet_id ILIKE ?", "%"+s+"%", "%"+s+"%")
+	}
+	if a := c.Query("actionType"); a != "" {
+		db = db.Where("action_type = ?", a)
+	}
+	if u := c.Query("updatedBy"); u != "" {
+		db = db.Where("updated_by = ?", u)
+	}
+	if t := c.Query("connectionType"); t != "" && t != "both" {
+		db = db.Where("connection_type = ?", t)
+	}
+	if from := c.Query("from"); from != "" {
+		db = db.Where("log_date >= ?", from)
+	}
+	if to := c.Query("to"); to != "" {
+		db = db.Where("log_date <= ?", to)
+	}
+
+	var logs []models.ConnectionLog
+	if err := db.Order("created_at DESC").Find(&logs).Error; err != nil {
+		utils.ErrorResponse(c, 500, "Failed to fetch connection logs", err.Error())
+		return
+	}
+
+	userMap := map[string]string{}
+	var users []models.User
+	if err := config.DB.Find(&users).Error; err == nil {
+		for _, u := range users {
+			userMap[u.ID.String()] = u.Name
+		}
+	}
+
+	branch := ""
+	if v, ok := c.Get("companyID"); ok {
+		if cid, ok2 := v.(uuid.UUID); ok2 {
+			var company models.Company
+			if err := config.DB.First(&company, "id = ?", cid).Error; err == nil {
+				branch = company.Name
+			}
+		}
+	}
+
+	for i := range logs {
+		if logs[i].UpdatedBy != nil {
+			if n, ok := userMap[logs[i].UpdatedBy.String()]; ok {
+				logs[i].UpdatedByName = n
+			}
+		}
+		if logs[i].Branch == "" {
+			logs[i].Branch = branch
+		}
+	}
+
+	utils.SuccessResponse(c, "Connection logs retrieved", logs)
 }

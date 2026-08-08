@@ -98,6 +98,13 @@ export function PurchaseForm({
           if (existing) {
             existing.quantity += item.quantity;
             existing.subtotal = existing.quantity * existing.purchasePrice;
+            if (item.serialNumber && existing.serialNumber !== item.serialNumber) {
+              const serials = existing.serialNumber ? existing.serialNumber.split(', ').filter(Boolean) : [];
+              if (!serials.includes(item.serialNumber)) {
+                serials.push(item.serialNumber);
+                existing.serialNumber = serials.join(', ');
+              }
+            }
           } else {
             const product = products.find((p: any) => p.id === item.productId);
             const purchasePrice = item.unitPrice || 0;
@@ -109,6 +116,7 @@ export function PurchaseForm({
               sellingPrice: product?.salePrice || product?.price || 0,
               unitType: item.unitType || 'piece',
               focNormal: 'normal',
+              serialNumber: item.serialNumber || '',
               subtotal: item.subtotal || purchasePrice * item.quantity,
             });
           }
