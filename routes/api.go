@@ -26,6 +26,15 @@ func SetupRoutes(r *gin.Engine) {
 
 	api := r.Group("/api/v1")
 
+	// API responses must never be cached so refetches after mutations
+	// always return fresh data from the server.
+	api.Use(func(c *gin.Context) {
+		c.Header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+		c.Header("Pragma", "no-cache")
+		c.Header("Expires", "0")
+		c.Next()
+	})
+
 	// Accounts routes (temporarily public for testing)
 	accounts := api.Group("/accounts")
 	accounts.Use(func(c *gin.Context) {
