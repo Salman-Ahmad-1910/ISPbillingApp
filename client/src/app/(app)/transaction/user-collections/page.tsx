@@ -531,7 +531,7 @@ export default function SubscriberCollectionsPage() {
                 <CalendarClock className="mr-2 h-4 w-4" />
                 Make Promise
               </Button>
-              <Button onClick={() => { setSelectedPromiseId(null); setShowReceiveDialog(true); }} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
+              <Button onClick={() => { setSelectedPromiseId(null); setReceiveAmount(subscriberRemaining); setShowReceiveDialog(true); }} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
                 <DollarSign className="mr-2 h-4 w-4" />
                 Receive Payment
               </Button>

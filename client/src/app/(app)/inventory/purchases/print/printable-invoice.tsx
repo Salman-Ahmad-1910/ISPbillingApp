@@ -48,7 +48,7 @@ export function PrintablePurchaseInvoice({ purchase, company, size = 'a4', open,
           print-color-adjust: exact;
         }
         html, body { overflow: hidden !important; }
-        @page { size: ${size === 'a4' ? 'A4' : '80mm 200mm'}; margin: ${size === 'a4' ? '15mm' : '5mm'}; }
+        @page { size: ${size === 'a4' ? 'A4' : '80mm 200mm'}; margin: ${size === 'a4' ? '15mm' : '3mm'}; }
         * { box-shadow: none !important; text-shadow: none !important; }
         table, th, td { border: 1px solid #d1d5db !important; }
       }

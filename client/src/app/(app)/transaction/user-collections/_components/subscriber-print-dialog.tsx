@@ -48,11 +48,11 @@ export function SubscriberPrintDialog({ isOpen, onClose, payment, promise, compa
       .join('\n');
 
     const pageStyle = format === 'thermal'
-      ? `@page { size: 80mm auto; margin: 3mm; } body { width: 80mm; }`
+      ? `@page { size: 80mm auto; margin: 3mm; }`
       : `@page { size: A4; margin: 15mm; }`;
 
     const contentHTML = format === 'thermal'
-      ? `<div style="width:80mm; padding:4mm; font-family:monospace; font-size:11px; margin:0 auto;">${printContent.innerHTML}</div>`
+      ? `<div style="width:74mm; margin:0 auto; font-family:monospace; font-size:11px;">${printContent.innerHTML}</div>`
       : printContent.innerHTML;
 
     printWindow.document.write(`
@@ -62,9 +62,12 @@ export function SubscriberPrintDialog({ isOpen, onClose, payment, promise, compa
           <title>Print</title>
           ${styles}
           <style>
-            body { margin: 0; padding: 0; background: #fff; }
+            body { margin: 0; padding: 0; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             ${pageStyle}
-            @media print { body { margin: 0; } }
+            @media print {
+              body { margin: 0; }
+              #print-thermal { width: 100% !important; box-sizing: border-box; }
+            }
           </style>
         </head>
         <body>
