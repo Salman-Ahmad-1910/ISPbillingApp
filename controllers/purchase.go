@@ -448,9 +448,11 @@ func GetPurchasedProducts(c *gin.Context) {
 			p.purchase_number                             AS purchase_number,
 			p.vendor_name                                 AS vendor_name,
 			p.purchase_date                               AS purchase_date,
-			p.batch                                       AS batch
+			p.batch                                       AS batch,
+			pr.image                                      AS image
 		FROM purchase_items pi
 		JOIN purchases p ON p.id = pi.purchase_id AND p.deleted_at IS NULL
+		LEFT JOIN products pr ON pr.id = pi.product_id AND pr.deleted_at IS NULL
 		WHERE pi.company_id = ?
 			AND pi.deleted_at IS NULL
 		ORDER BY pi.product_name

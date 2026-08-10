@@ -25,12 +25,12 @@ const AVAILABLE_PERMISSIONS = [
   // Dashboard & Overview
   { id: 'dashboard_view', label: 'View Dashboard', category: 'Dashboard' },
   
-  // Users Management
-  { id: 'users_view', label: 'View Users', category: 'Users' },
-  { id: 'users_add', label: 'Add Users', category: 'Users' },
-  { id: 'users_edit', label: 'Edit Users', category: 'Users' },
-  { id: 'users_delete', label: 'Delete Users', category: 'Users' },
-  { id: 'users_change_status', label: 'Change User Status', category: 'Users' },
+  // Subscribers Management
+  { id: 'users_view', label: 'View Subscribers', category: 'Subscribers' },
+  { id: 'users_add', label: 'Add Subscribers', category: 'Subscribers' },
+  { id: 'users_edit', label: 'Edit Subscribers', category: 'Subscribers' },
+  { id: 'users_delete', label: 'Delete Subscribers', category: 'Subscribers' },
+  { id: 'users_change_status', label: 'Change Subscriber Status', category: 'Subscribers' },
   
   // Companies Management
   { id: 'companies_view', label: 'View Companies', category: 'Companies' },
@@ -65,7 +65,7 @@ const AVAILABLE_PERMISSIONS = [
   { id: 'subscribers_delete', label: 'Delete Subscribers', category: 'Subscribers' },
   { id: 'subscribers_packages_view', label: 'Packages', category: 'Subscribers' },
   { id: 'subscribers_inquiries_view', label: 'New Inquiries', category: 'Subscribers' },
-  { id: 'subscribers_location_view', label: 'User Location', category: 'Subscribers' },
+  { id: 'subscribers_location_view', label: 'Subscriber Location', category: 'Subscribers' },
   
   // Dealers Management
   { id: 'dealers_view', label: 'View Dealers', category: 'Dealers' },
@@ -80,7 +80,7 @@ const AVAILABLE_PERMISSIONS = [
   { id: 'hr_recovery_officers_allocate', label: 'Area Allocation', category: 'Recovery Officers' },
   
   // Transactions
-  { id: 'transactions_user_collections_view', label: 'User Collections', category: 'Transactions' },
+  { id: 'transactions_user_collections_view', label: 'Subscriber Collections', category: 'Transactions' },
   { id: 'transactions_dealers_collections_view', label: 'Dealers Collections', category: 'Transactions' },
   { id: 'transactions_allocated_view', label: 'Allocated Collection', category: 'Transactions' },
   { id: 'transactions_reprint', label: 'Reprint Slip', category: 'Transactions' },
@@ -90,7 +90,7 @@ const AVAILABLE_PERMISSIONS = [
   { id: 'transactions_bad_debt_view', label: 'Bad Debt Collection', category: 'Transactions' },
   
   // Complaints
-  { id: 'complaints_users_view', label: 'Users Complain', category: 'Complaints' },
+  { id: 'complaints_users_view', label: 'Subscribers Complain', category: 'Complaints' },
   { id: 'complaints_allocated_view', label: 'Allocated Complains', category: 'Complaints' },
   { id: 'complaints_subjects_view', label: 'Subject Type', category: 'Complaints' },
   { id: 'complaints_types_view', label: 'Complain Type', category: 'Complaints' },
@@ -133,27 +133,27 @@ const AVAILABLE_PERMISSIONS = [
   { id: 'hr_salary_view', label: 'Employee Salary', category: 'HR' },
   { id: 'hr_advances_view', label: 'Advances & Loans', category: 'HR' },
   { id: 'hr_attendance_day_view', label: 'Day Wise Attendance', category: 'HR' },
-  { id: 'hr_attendance_user_view', label: 'User Wise Attendance', category: 'HR' },
+  { id: 'hr_attendance_user_view', label: 'Subscriber Wise Attendance', category: 'HR' },
   
   // Logs
   { id: 'logs_connections_view', label: 'Update Connections Log', category: 'Logs' },
   { id: 'logs_deleted_collection_view', label: 'Deleted Collection', category: 'Logs' },
-  { id: 'logs_deleted_users_view', label: 'Deleted Users', category: 'Logs' },
+  { id: 'logs_deleted_users_view', label: 'Deleted Subscribers', category: 'Logs' },
   
   // Reports & Analytics
   { id: 'reports_view', label: 'View Reports', category: 'Reports' },
   { id: 'reports_financial', label: 'Financial Reports', category: 'Reports' },
   { id: 'reports_usage', label: 'Usage Reports', category: 'Reports' },
   { id: 'reports_collections', label: 'Collections Reports', category: 'Reports' },
-  { id: 'reports_users_defaulter', label: 'Users Defaulter', category: 'Reports' },
+  { id: 'reports_users_defaulter', label: 'Subscribers Defaulter', category: 'Reports' },
   { id: 'reports_allocated_defaulters', label: 'Allocated Defaulters', category: 'Reports' },
-  { id: 'reports_new_users', label: 'New Users List', category: 'Reports' },
+  { id: 'reports_new_users', label: 'New Subscribers List', category: 'Reports' },
   { id: 'reports_monthly_collection_month_wise', label: 'Monthly Collection Month Wise', category: 'Reports' },
   { id: 'reports_month_wise_collection', label: 'Month Wise Collection', category: 'Reports' },
   { id: 'reports_unpaid_collection', label: 'Unpaid Collection', category: 'Reports' },
   { id: 'reports_allocated_collections', label: 'Allocated Collections', category: 'Reports' },
   { id: 'reports_promise_date', label: 'Promise Date Report', category: 'Reports' },
-  { id: 'reports_user_collections', label: 'User Collections Report', category: 'Reports' },
+  { id: 'reports_user_collections', label: 'Subscriber Collections Report', category: 'Reports' },
   { id: 'reports_expiry_defaulters', label: 'Expiry Wise Defaulter', category: 'Reports' },
   { id: 'reports_month_defaulters', label: 'Month Wise Defaulter', category: 'Reports' },
   { id: 'reports_collection_not_generated', label: 'Collection Not Generated', category: 'Reports' },
@@ -163,7 +163,7 @@ const AVAILABLE_PERMISSIONS = [
   { id: 'reports_allocated_collections', label: 'Allocated Collections', category: 'Reports' },
   { id: 'reports_monthwise_collection_monthly', label: 'Month Wise Collection Monthly', category: 'Reports' },
   { id: 'reports_package_wise', label: 'Package Wise List', category: 'Reports' },
-  { id: 'reports_deactivated_users', label: 'Deactivate User List', category: 'Reports' },
+  { id: 'reports_deactivated_users', label: 'Deactivate Subscriber List', category: 'Reports' },
   { id: 'reports_dealer_invoices', label: 'Dealer Invoice List', category: 'Reports' },
   { id: 'reports_new_dealers', label: 'New Dealers List', category: 'Reports' },
   { id: 'reports_dealers_collection', label: 'Dealers Collection', category: 'Reports' },
@@ -176,7 +176,7 @@ const AVAILABLE_PERMISSIONS = [
   { id: 'system_config', label: 'System Configuration', category: 'System' },
   { id: 'system_logs', label: 'View System Logs', category: 'System' },
   { id: 'system_backup', label: 'System Backup', category: 'System' },
-  { id: 'system_user_rights', label: 'User Rights', category: 'System' },
+  { id: 'system_user_rights', label: 'Subscriber Rights', category: 'System' },
   { id: 'system_change_password', label: 'Change Username/Password', category: 'System' },
 ];
 

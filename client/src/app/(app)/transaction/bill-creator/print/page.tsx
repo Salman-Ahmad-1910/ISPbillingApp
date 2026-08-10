@@ -190,7 +190,6 @@ export default function PrintBillPage() {
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{currentCompany?.name}</h1>
               <p className="text-gray-600 text-sm mt-1">{currentCompany?.address}</p>
-              <p className="text-gray-600 text-sm">Email: {currentCompany?.email}</p>
               <p className="text-gray-600 text-sm">Phone: {currentCompany?.contact1}</p>
             </div>
           </div>
@@ -279,7 +278,7 @@ export default function PrintBillPage() {
           </div>
           <div className="text-center text-gray-600 mt-6">
             <p className="font-bold text-lg text-gray-900">{currentCompany?.name}</p>
-            <p className="text-sm mt-1">Phone: {currentCompany?.contact1} | Email: {currentCompany?.email}</p>
+            <p className="text-sm mt-1">Phone: {currentCompany?.contact1}</p>
             <p className="text-xs text-gray-400 mt-2">This is a computer-generated bill and does not require a signature</p>
           </div>
         </footer>

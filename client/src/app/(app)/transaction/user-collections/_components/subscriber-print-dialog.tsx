@@ -150,14 +150,13 @@ function A4Invoice({ payment, company, logoUrl, stampUrl, subscriberName, collec
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{company?.name || 'Company Name'}</h1>
               <p className="text-gray-600 text-sm mt-1">{company?.address}</p>
-              {company?.email && <p className="text-gray-600 text-sm">Email: {company.email}</p>}
               {company?.contact1 && <p className="text-gray-600 text-sm">Phone: {company.contact1}</p>}
             </div>
           </div>
           <div className="text-right">
             <h2 className="text-4xl font-extrabold tracking-wider text-blue-600">RECEIPT</h2>
             <div className="mt-3 space-y-1 text-sm">
-              <p className="text-gray-500">Bill ID: <span className="text-gray-900 font-semibold font-mono">{payment.id}</span></p>
+              <p className="text-gray-500">Bill ID: <span className="text-gray-900 font-semibold font-mono">{payment.billNo || '---'}</span></p>
               <p className="text-gray-500">Date: <span className="text-gray-900 font-semibold">{payment.paymentDate}</span></p>
               <p className="text-gray-500">Status:
                 <span className="ml-1 px-2 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-800">PAID</span>
@@ -228,7 +227,7 @@ function A4Invoice({ payment, company, logoUrl, stampUrl, subscriberName, collec
           </div>
           <div className="text-center text-gray-600 mt-6">
             <p className="font-bold text-lg text-gray-900">{company?.name || 'Company Name'}</p>
-            <p className="text-sm mt-1">Phone: {company?.contact1} | Email: {company?.email}</p>
+            <p className="text-sm mt-1">Phone: {company?.contact1}</p>
             <p className="text-xs text-gray-400 mt-2">This is a computer-generated receipt and does not require a signature</p>
           </div>
         </footer>
@@ -262,7 +261,7 @@ function ThermalInvoice({ payment, company, logoUrl, subscriberName, collectorNa
           <div className="mb-3 pb-2 border-b border-dashed border-gray-400">
             <div className="flex justify-between mb-1">
               <span className="text-gray-700 font-bold">Bill ID:</span>
-              <span className="font-bold">{payment.id}</span>
+              <span className="font-bold">{payment.billNo || '---'}</span>
             </div>
             <div className="flex justify-between mb-1">
               <span className="text-gray-700 font-bold">Date:</span>
@@ -328,7 +327,6 @@ function A4PromiseInvoice({ promise, company, logoUrl, stampUrl, subscriberName,
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{company?.name || 'Company Name'}</h1>
               <p className="text-gray-600 text-sm mt-1">{company?.address}</p>
-              {company?.email && <p className="text-gray-600 text-sm">Email: {company.email}</p>}
               {company?.contact1 && <p className="text-gray-600 text-sm">Phone: {company.contact1}</p>}
             </div>
           </div>
@@ -413,7 +411,7 @@ function A4PromiseInvoice({ promise, company, logoUrl, stampUrl, subscriberName,
           </div>
           <div className="text-center text-gray-600 mt-6">
             <p className="font-bold text-lg text-gray-900">{company?.name || 'Company Name'}</p>
-            <p className="text-sm mt-1">Phone: {company?.contact1} | Email: {company?.email}</p>
+            <p className="text-sm mt-1">Phone: {company?.contact1}</p>
             <p className="text-xs text-gray-400 mt-2">This is a computer-generated slip and does not require a signature</p>
           </div>
         </footer>

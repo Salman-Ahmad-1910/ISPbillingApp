@@ -14,10 +14,11 @@ interface CollectionPrintDialogProps {
   collection: DealerCollection | null;
   company: Company | undefined;
   receivedByName?: string;
+  billNo?: number;
   initialTab?: 'a4' | 'thermal';
 }
 
-export function CollectionPrintDialog({ isOpen, onClose, collection, company, receivedByName, initialTab = 'a4' }: CollectionPrintDialogProps) {
+export function CollectionPrintDialog({ isOpen, onClose, collection, company, receivedByName, billNo, initialTab = 'a4' }: CollectionPrintDialogProps) {
   const [activeTab, setActiveTab] = useState<string>(initialTab);
 
   useEffect(() => {
@@ -107,11 +108,11 @@ export function CollectionPrintDialog({ isOpen, onClose, collection, company, re
 
           <div className="overflow-y-auto max-h-[calc(90vh-10rem)]">
             <TabsContent value="a4" className="m-0">
-              <A4Invoice collection={collection} company={company} logoUrl={logoUrl} stampUrl={stampUrl} receivedByName={receivedByName} onPrint={() => handlePrint('print-a4', 'a4')} />
+              <A4Invoice collection={collection} company={company} logoUrl={logoUrl} stampUrl={stampUrl} receivedByName={receivedByName} billNo={billNo} onPrint={() => handlePrint('print-a4', 'a4')} />
             </TabsContent>
 
             <TabsContent value="thermal" className="m-0">
-              <ThermalInvoice collection={collection} company={company} logoUrl={logoUrl} receivedByName={receivedByName} onPrint={() => handlePrint('print-thermal', 'thermal')} />
+              <ThermalInvoice collection={collection} company={company} logoUrl={logoUrl} receivedByName={receivedByName} billNo={billNo} onPrint={() => handlePrint('print-thermal', 'thermal')} />
             </TabsContent>
           </div>
         </Tabs>
@@ -120,7 +121,7 @@ export function CollectionPrintDialog({ isOpen, onClose, collection, company, re
   );
 }
 
-function A4Invoice({ collection, company, logoUrl, stampUrl, receivedByName, onPrint }: { collection: DealerCollection; company: Company | undefined; logoUrl: string | null; stampUrl: string | null; receivedByName?: string; onPrint: () => void }) {
+function A4Invoice({ collection, company, logoUrl, stampUrl, receivedByName, billNo, onPrint }: { collection: DealerCollection; company: Company | undefined; logoUrl: string | null; stampUrl: string | null; receivedByName?: string; billNo?: number; onPrint: () => void }) {
   return (
     <div className="space-y-4">
       <div className="flex justify-end no-print">
@@ -141,14 +142,13 @@ function A4Invoice({ collection, company, logoUrl, stampUrl, receivedByName, onP
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{company?.name || 'Company Name'}</h1>
               <p className="text-gray-600 text-sm mt-1">{company?.address}</p>
-              {company?.email && <p className="text-gray-600 text-sm">Email: {company.email}</p>}
               {company?.contact1 && <p className="text-gray-600 text-sm">Phone: {company.contact1}</p>}
             </div>
           </div>
           <div className="text-right">
             <h2 className="text-4xl font-extrabold tracking-wider text-emerald-600">RECEIPT</h2>
             <div className="mt-3 space-y-1 text-sm">
-              <p className="text-gray-500">Bill ID: <span className="text-gray-900 font-semibold font-mono">{collection.id}</span></p>
+              <p className="text-gray-500">Bill ID: <span className="text-gray-900 font-semibold font-mono">{billNo ?? '---'}</span></p>
               <p className="text-gray-500">Date: <span className="text-gray-900 font-semibold">{collection.collectionDate}</span></p>
               <p className="text-gray-500">Status:
                 <span className={`ml-1 px-2 py-0.5 rounded text-xs font-semibold ${collection.settlementStatus === 'settled' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
@@ -234,7 +234,7 @@ function A4Invoice({ collection, company, logoUrl, stampUrl, receivedByName, onP
           </div>
           <div className="text-center text-gray-600 mt-6">
             <p className="font-bold text-lg text-gray-900">{company?.name || 'Company Name'}</p>
-            <p className="text-sm mt-1">Phone: {company?.contact1} | Email: {company?.email}</p>
+            <p className="text-sm mt-1">Phone: {company?.contact1}</p>
             <p className="text-xs text-gray-400 mt-2">This is a computer-generated receipt and does not require a signature</p>
           </div>
         </footer>
@@ -243,7 +243,7 @@ function A4Invoice({ collection, company, logoUrl, stampUrl, receivedByName, onP
   );
 }
 
-function ThermalInvoice({ collection, company, logoUrl, receivedByName, onPrint }: { collection: DealerCollection; company: Company | undefined; logoUrl: string | null; receivedByName?: string; onPrint: () => void }) {
+function ThermalInvoice({ collection, company, logoUrl, receivedByName, billNo, onPrint }: { collection: DealerCollection; company: Company | undefined; logoUrl: string | null; receivedByName?: string; billNo?: number; onPrint: () => void }) {
   return (
     <div className="space-y-4">
       <div className="flex justify-end no-print">
@@ -270,7 +270,7 @@ function ThermalInvoice({ collection, company, logoUrl, receivedByName, onPrint 
           <div className="mb-3 pb-2 border-b border-dashed border-gray-400">
             <div className="flex justify-between mb-1">
               <span className="text-gray-700 font-bold">Bill ID:</span>
-              <span className="font-bold">{collection.id}</span>
+              <span className="font-bold">{billNo ?? '---'}</span>
             </div>
             <div className="flex justify-between mb-1">
               <span className="text-gray-700 font-bold">Date:</span>

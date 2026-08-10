@@ -157,7 +157,7 @@ export default function ClientPage() {
       {/* User Selector */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Select User</CardTitle>
+          <CardTitle className="text-base">Select Subscriber</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4">

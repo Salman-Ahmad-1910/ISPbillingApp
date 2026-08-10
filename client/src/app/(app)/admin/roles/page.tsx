@@ -17,7 +17,7 @@ export default function RolesPage() {
 
   const kpiData = useMemo(() => [
     { label: 'Total Roles', value: roles.length, icon: ShieldCheck, color: 'text-blue-600', bg: 'bg-blue-100' },
-    { label: 'With Users', value: roles.filter(r => (r as any)._count?.users || 0).length, icon: Users, color: 'text-emerald-600', bg: 'bg-emerald-100' },
+    { label: 'With Subscribers', value: roles.filter(r => (r as any)._count?.users || 0).length, icon: Users, color: 'text-emerald-600', bg: 'bg-emerald-100' },
     { label: 'Permissions', value: new Set(roles.flatMap(r => (r as any).permissions || [])).size, icon: KeyRound, color: 'text-purple-600', bg: 'bg-purple-100' },
   ], [roles]);
 

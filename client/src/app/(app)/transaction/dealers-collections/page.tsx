@@ -74,10 +74,12 @@ export default function DealersCollectionsPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   const [printCollection, setPrintCollection] = useState<DealerCollection | null>(null);
+  const [printBillNo, setPrintBillNo] = useState<number>(0);
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
   const [printFormatChoice, setPrintFormatChoice] = useState<'a4' | 'thermal'>('a4');
 
   const [editCollection, setEditCollection] = useState<DealerCollection | null>(null);
+  const [editBillNo, setEditBillNo] = useState(0);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editAmount, setEditAmount] = useState(0);
   const [editComment, setEditComment] = useState('');
@@ -208,8 +210,9 @@ export default function DealersCollectionsPage() {
     }
   };
 
-  const handleEditOpen = (col: DealerCollection) => {
+  const handleEditOpen = (col: DealerCollection, billNo: number) => {
     setEditCollection(col);
+    setEditBillNo(billNo);
     setEditAmount(col.amount);
     setEditComment(col.comment || '');
     setEditStatus(col.settlementStatus as 'pending' | 'settled');
@@ -443,7 +446,7 @@ export default function DealersCollectionsPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleEditOpen(col)}>
+                                <DropdownMenuItem onClick={() => handleEditOpen(col, index + 1)}>
                                   <Pencil className="mr-2 h-4 w-4" />
                                   Edit
                                 </DropdownMenuItem>
@@ -453,6 +456,7 @@ export default function DealersCollectionsPage() {
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => {
                                   setPrintCollection(col);
+                                  setPrintBillNo(index + 1);
                                   setPrintFormatChoice('a4');
                                   setIsPrintDialogOpen(true);
                                 }}>
@@ -461,6 +465,7 @@ export default function DealersCollectionsPage() {
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => {
                                   setPrintCollection(col);
+                                  setPrintBillNo(index + 1);
                                   setPrintFormatChoice('thermal');
                                   setIsPrintDialogOpen(true);
                                 }}>
@@ -593,7 +598,7 @@ export default function DealersCollectionsPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label>Bill #</Label>
-                <Input value={editCollection?.id?.slice(0, 8).toUpperCase() || ''} readOnly />
+                <Input value={editBillNo || '---'} readOnly />
               </div>
               <div className="space-y-1">
                 <Label>Dealer</Label>
@@ -642,10 +647,11 @@ export default function DealersCollectionsPage() {
 
       <CollectionPrintDialog
         isOpen={isPrintDialogOpen}
-        onClose={() => { setIsPrintDialogOpen(false); setPrintCollection(null); }}
+        onClose={() => { setIsPrintDialogOpen(false); setPrintCollection(null); setPrintBillNo(0); }}
         collection={printCollection}
         company={currentCompany}
         receivedByName={recoveryOfficerName}
+        billNo={printBillNo}
         initialTab={printFormatChoice}
       />
     </div>

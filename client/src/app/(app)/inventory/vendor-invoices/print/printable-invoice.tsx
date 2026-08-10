@@ -103,7 +103,6 @@ export function PrintableVendorInvoice({ invoice, company, vendor, size }: Print
               <p className="font-semibold">{vendor.name}</p>
               {vendor.address && <p className="text-gray-500">{vendor.address}</p>}
               {vendor.phone && <p className="text-gray-500">Phone: {vendor.phone}</p>}
-              {vendor.email && <p className="text-gray-500">Email: {vendor.email}</p>}
             </div>
           </div>
 
@@ -179,7 +178,7 @@ export function PrintableVendorInvoice({ invoice, company, vendor, size }: Print
             </div>
             <div className="text-center text-gray-600 mt-6">
               <p className="font-bold text-lg text-gray-900">{company.name}</p>
-              <p className="text-sm mt-1">Phone: {company.contact1} | Email: {company.email}</p>
+              <p className="text-sm mt-1">Phone: {company.contact1}</p>
               <p className="text-xs text-gray-400 mt-2">Thank you for your business!</p>
             </div>
           </footer>

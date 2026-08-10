@@ -277,12 +277,28 @@ export default function POSPage() {
 
     const posProducts = useMemo(() => {
         if (!purchasedProducts) return [];
-        return (purchasedProducts as any[]).map(p => ({
-            ...p,
-            stock: Number(p.stock) || 0,
-            price: Number(p.price) || 0,
-            taxPercent: Number(p.taxPercent) || 0,
-        }));
+        const byId = new Map<string, any>();
+        for (const p of purchasedProducts as any[]) {
+            const normalized = {
+                ...p,
+                stock: Number(p.stock) || 0,
+                price: Number(p.price) || 0,
+                taxPercent: Number(p.taxPercent) || 0,
+            };
+            const existing = byId.get(p.id);
+            if (!existing) {
+                byId.set(p.id, normalized);
+                continue;
+            }
+            const serials = [existing.serialNumber, normalized.serialNumber].filter(Boolean).join(', ');
+            byId.set(p.id, {
+                ...existing,
+                stock: existing.stock + normalized.stock,
+                serialNumber: serials || existing.serialNumber,
+                image: existing.image || normalized.image,
+            });
+        }
+        return Array.from(byId.values());
     }, [purchasedProducts]);
 
     const filteredProducts = useMemo(() => {

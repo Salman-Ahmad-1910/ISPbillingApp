@@ -103,7 +103,6 @@ export function PrintablePurchaseInvoice({ purchase, company, size = 'a4', open,
                   <h1 className="text-2xl font-bold text-gray-900">{company.name || 'Company Name'}</h1>
                   {company.address && <p className="text-gray-600 text-sm mt-1">{company.address}</p>}
                   {company.contact1 && <p className="text-gray-600 text-sm">Phone: {company.contact1}</p>}
-                  {company.email && <p className="text-gray-600 text-sm">Email: {company.email}</p>}
                 </div>
               </div>
               <div className="text-right">
@@ -209,7 +208,7 @@ export function PrintablePurchaseInvoice({ purchase, company, size = 'a4', open,
               </div>
               <div className="text-center text-gray-600 mt-6">
                 <p className="font-bold text-lg text-gray-900">{company.name}</p>
-                <p className="text-sm mt-1">Phone: {company.contact1} | Email: {company.email}</p>
+                <p className="text-sm mt-1">Phone: {company.contact1}</p>
                 <p className="text-xs text-gray-400 mt-2">Thank you for your business!</p>
               </div>
             </footer>

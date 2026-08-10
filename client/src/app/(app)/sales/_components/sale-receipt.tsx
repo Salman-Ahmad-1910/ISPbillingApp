@@ -81,7 +81,6 @@ async function buildReceiptHtml(
   const companyName = company?.name || 'Your Company';
   const companyAddress = company?.address || '';
   const companyPhone = company?.contact1 || '';
-  const companyEmail = company?.email || '';
 
   const logoUrl = company?.logo
     ? `${api?.defaults?.baseURL}/uploads/company_images/${company.id}`
@@ -92,7 +91,7 @@ async function buildReceiptHtml(
 
   return size === 'thermal'
     ? buildThermalReceipt(sale, companyName, companyAddress, companyPhone, logoUrl)
-    : buildA4Receipt(sale, companyName, companyAddress, companyPhone, companyEmail, logoUrl, stampUrl);
+    : buildA4Receipt(sale, companyName, companyAddress, companyPhone, logoUrl, stampUrl);
 }
 
 /* ------------------------------------------------------------------ */
@@ -103,7 +102,6 @@ function buildA4Receipt(
   companyName: string,
   address: string,
   phone: string,
-  email: string,
   logoUrl: string | null,
   stampUrl: string | null
 ): string {
@@ -179,7 +177,6 @@ function buildA4Receipt(
         <div class="name">${escapeHtml(companyName)}</div>
         ${address ? `<div class="meta">${escapeHtml(address)}</div>` : ''}
         ${phone ? `<div class="meta">Phone: ${escapeHtml(phone)}</div>` : ''}
-        ${email ? `<div class="meta">Email: ${escapeHtml(email)}</div>` : ''}
       </div>
     </div>
     <div class="doc">
@@ -253,7 +250,7 @@ function buildA4Receipt(
     </div>
     <div class="foot-text">
       <div class="co">${escapeHtml(companyName)}</div>
-      ${phone || email ? `<div class="sub">Phone: ${escapeHtml(phone)} | Email: ${escapeHtml(email)}</div>` : ''}
+      ${phone ? `<div class="sub">Phone: ${escapeHtml(phone)}</div>` : ''}
       <div class="thanks">Thank you for your business!</div>
     </div>
   </footer>
@@ -340,7 +337,6 @@ function buildA4Receipt(
         <div class="name">${escapeHtml(companyName)}</div>
         ${address ? `<div class="meta">${escapeHtml(address)}</div>` : ''}
         ${phone ? `<div class="meta">Phone: ${escapeHtml(phone)}</div>` : ''}
-        ${email ? `<div class="meta">Email: ${escapeHtml(email)}</div>` : ''}
       </div>
     </div>
     <div class="doc">
@@ -397,7 +393,7 @@ function buildA4Receipt(
     </div>
     <div class="foot-text">
       <div class="co">${escapeHtml(companyName)}</div>
-      ${phone || email ? `<div class="sub">Phone: ${escapeHtml(phone)} | Email: ${escapeHtml(email)}</div>` : ''}
+      ${phone ? `<div class="sub">Phone: ${escapeHtml(phone)}</div>` : ''}
       <div class="thanks">Thank you for your business!</div>
     </div>
   </footer>

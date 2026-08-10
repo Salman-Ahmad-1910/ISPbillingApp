@@ -900,7 +900,7 @@ export default function SubscriberCollectionsPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label>Bill #</Label>
-                <Input value={editPayment?.id?.slice(0, 8).toUpperCase() || ''} readOnly />
+                <Input value={editPayment?.billNo?.toString() || '---'} readOnly />
               </div>
               <div className="space-y-1">
                 <Label>Subscriber</Label>
