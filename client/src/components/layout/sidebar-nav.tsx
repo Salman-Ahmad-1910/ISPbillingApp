@@ -47,6 +47,7 @@ import {
   FileCog,
   FileClock,
   FileText,
+  ReceiptText,
   Headphones,
   Settings,
   LogOut,
@@ -131,6 +132,12 @@ const navItems: NavItemGroup[] = [
       { title: 'Customers', href: '/sales/customers', icon: UserRound, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
       { title: 'Installment Plans', href: '/sales/installment-plans', icon: FileCog, allowedRoles: ['admin', 'manager'] },
       { title: 'Point of Sale', href: '/inventory/pos', icon: ShoppingCart, allowedRoles: ['admin', 'manager', 'dealer'] },
+    ],
+  },
+  {
+    title: 'Billing',
+    items: [
+      { title: 'Invoices', href: '/billing/invoices', icon: ReceiptText, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
     ],
   },
   {

@@ -106,11 +106,20 @@ export function getColumns(onDelete?: (id: string) => void): ColumnDef<Sale>[] {
       header: 'SN / MAC',
       cell: ({ row }) => {
         const items = row.original.items || [];
-        const serials = items.map(i => i.serialNumber).filter(Boolean);
+        const serials = items
+          .map(i => i.serialNumber)
+          .filter(Boolean)
+          .flatMap(s =>
+            String(s)
+              .split(',')
+              .map(x => x.trim())
+              .filter(Boolean),
+          );
         const uniqueSerials = [...new Set(serials)];
+        const serial = uniqueSerials[0] || '';
         return (
-          <div className="text-xs font-mono max-w-[140px]" title={uniqueSerials.join(', ')}>
-            {uniqueSerials.length > 0 ? uniqueSerials.join(', ') : '—'}
+          <div className="text-xs font-mono max-w-[140px] truncate" title={uniqueSerials.join(', ')}>
+            {serial || '—'}
           </div>
         );
       },
