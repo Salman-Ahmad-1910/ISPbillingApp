@@ -352,6 +352,8 @@ export type Payment = {
   amount: number;
   paymentDate: string;
   method: 'cash' | 'bank' | 'online' | 'dealer';
+  transactionId?: string;
+  transactionType?: string;
   collectorId?: string;
   companyId: string;
   address?: string;

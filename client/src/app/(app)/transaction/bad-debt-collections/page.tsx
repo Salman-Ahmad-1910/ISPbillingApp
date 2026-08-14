@@ -128,7 +128,7 @@ export default function BadDebtCollectionsPage() {
     if (!subscriberSearch.trim()) return [];
     return overdueConnections.filter(c =>
       smartMatch(subscriberSearch, [c.id, c.internetId, c.cell, c.mobile], [c.name])
-    ).slice(0, 20);
+    );
   }, [overdueConnections, subscriberSearch]);
 
   const selectedSubscriber = useMemo(() => {

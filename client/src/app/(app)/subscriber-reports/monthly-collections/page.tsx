@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
+import { SUBSCRIBER_REPORT_TYPE_OPTIONS, matchesReportType, type ReportTypeConn } from '@/lib/subscriber-report-types';
 
 interface MonthCollectionRecord {
   id: string;
@@ -119,10 +120,15 @@ export default function MonthlyCollectionsPage() {
     return sorted;
   }, [allRecords, sortBy]);
 
+  const connById = useMemo(() => {
+    const map = new Map<string, ReportTypeConn>();
+    connections.forEach((c: any) => map.set(c.id, c));
+    return map;
+  }, [connections]);
+
   const filteredData = useMemo(() => sortedRecords.filter((item) => {
     const gmMatch = !generatedMonth || item.generatedMonth === generatedMonth;
     const cmMatch = !collectionMonth || item.collectionMonth === collectionMonth;
-    const typeMatch = reportType === 'all' || item.status === reportType;
     const sublocalityMatch = sublocality === 'all' || item.sublocality === sublocality;
     const connectionMatch = connectionType === 'both' || item.connectionType === connectionType;
     const userMatch = selectedUser === 'all' || item.collectedBy === selectedUser;
@@ -131,14 +137,20 @@ export default function MonthlyCollectionsPage() {
     // date range only applies when no month filter is active.
     const monthActive = !!generatedMonth || !!collectionMonth;
     const itemDate = new Date(item.collectionDate);
+    if (isNaN(itemDate.getTime())) return false;
     const from = new Date(historyFromDate);
     from.setHours(0, 0, 0, 0);
     const to = new Date(historyToDate);
     to.setHours(23, 59, 59, 999);
     const dateMatch = monthActive || (itemDate >= from && itemDate <= to);
+    if (!dateMatch) return false;
 
-    return gmMatch && cmMatch && typeMatch && sublocalityMatch && connectionMatch && userMatch && dateMatch;
-  }), [sortedRecords, generatedMonth, collectionMonth, reportType, sublocality, connectionType, selectedUser, historyFromDate, historyToDate]);
+    const typeFrom = monthActive ? new Date(0) : from;
+    const typeTo = monthActive ? new Date('9999-12-31') : to;
+    const typeMatch = matchesReportType({ reportType, itemDate, conn: connById.get(item.connectionId), from: typeFrom, to: typeTo });
+
+    return gmMatch && cmMatch && typeMatch && sublocalityMatch && connectionMatch && userMatch;
+  }), [sortedRecords, generatedMonth, collectionMonth, reportType, sublocality, connectionType, selectedUser, historyFromDate, historyToDate, connById]);
 
   const totalConnections = filteredData.length;
   const totalAmount = filteredData.reduce((sum, item) => sum + item.amount, 0);
@@ -322,10 +334,9 @@ export default function MonthlyCollectionsPage() {
               <Select value={reportType} onValueChange={setReportType}>
                 <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                 <SelectContent portal={false}>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="paid">Paid</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="overdue">Overdue</SelectItem>
+                  {SUBSCRIBER_REPORT_TYPE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

@@ -247,6 +247,30 @@ func seedInitialData() {
 		log.Println("✓ Unit types seeded")
 	}
 
+	// Seed default transaction types for every company
+	var companies []models.Company
+	DB.Find(&companies)
+	seedTransactionTypes := []models.TransactionType{
+		{Transaction: "Cash", PaymentChannel: "Cash"},
+		{Transaction: "Easypaisa", PaymentChannel: "Easypaisa"},
+		{Transaction: "JazzCash", PaymentChannel: "JazzCash"},
+		{Transaction: "Bank Al-Habib", PaymentChannel: "Bank Al-Habib"},
+		{Transaction: "Meezan Bank", PaymentChannel: "Meezan Bank"},
+	}
+	for _, comp := range companies {
+		for _, tt := range seedTransactionTypes {
+			var existing int64
+			DB.Model(&models.TransactionType{}).
+				Where("company_id = ? AND transaction = ?", comp.ID, tt.Transaction).
+				Count(&existing)
+			if existing == 0 {
+				tt.CompanyID = comp.ID
+				DB.Create(&tt)
+			}
+		}
+	}
+	log.Println("✓ Transaction types seeded")
+
 	// Seed inventory statuses
 	var statusCount int64
 	DB.Model(&models.InventoryStatus{}).Count(&statusCount)

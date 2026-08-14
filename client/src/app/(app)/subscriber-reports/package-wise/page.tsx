@@ -48,7 +48,7 @@ export default function PackageWiseReportsPage() {
 
       return {
         packageName: pkgName,
-        amount: Number(pkg.price) || 0,
+        amount: Number(pkg.salePrice) || Number(pkg.price) || 0,
         subscriberCount: count,
       };
     }).filter((p: PackageData) => p.packageName);

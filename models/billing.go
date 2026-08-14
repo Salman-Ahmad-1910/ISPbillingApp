@@ -25,8 +25,10 @@ type Payment struct {
 	SubscriberName string     `gorm:"type:varchar(255)" json:"subscriberName"`
 	Amount         float64    `gorm:"type:decimal(10,2);not null" json:"amount"`
 	PaymentDate    string     `gorm:"type:varchar(50);not null" json:"paymentDate"`
-	Method         string     `gorm:"type:varchar(50);not null" json:"method"` // cash, bank, online, dealer
-	CollectorID    *uuid.UUID `gorm:"type:uuid" json:"collectorId"`
+	Method          string     `gorm:"type:varchar(50);not null" json:"method"` // cash, bank, online, dealer
+	TransactionID   string     `gorm:"type:varchar(100)" json:"transactionId"` // bank/easypaisa/online transaction reference
+	TransactionType string     `gorm:"type:varchar(100)" json:"transactionType"` // cash, easypaisa, jazzcash, bank, etc.
+	CollectorID     *uuid.UUID `gorm:"type:uuid" json:"collectorId"`
 
 	// Transient enrichment fields (not stored in DB)
 	Address         string `gorm:"-" json:"address"`

@@ -33,7 +33,6 @@ import { useCompany } from '@/context/company-context';
 import { useQueryClient } from '@tanstack/react-query';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
-import { smartMatch } from '@/lib/search';
 import api from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
 import { Loader2, MoreHorizontal, Wallet, DollarSign, UserCheck, Trash2, Pencil, Copy, FileText, Users, CalendarClock, AlertCircle } from 'lucide-react';
@@ -94,6 +93,7 @@ export default function SubscriberCollectionsPage() {
   const [receiveDate, setReceiveDate] = useState(new Date().toISOString().split('T')[0]);
   const [receiveMethod, setReceiveMethod] = useState<string>('cash');
   const [receiveComment, setReceiveComment] = useState('');
+  const [receiveTransactionId, setReceiveTransactionId] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [selectedTransactionTypeId, setSelectedTransactionTypeId] = useState('');
 
@@ -108,6 +108,8 @@ export default function SubscriberCollectionsPage() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editAmount, setEditAmount] = useState(0);
   const [editComment, setEditComment] = useState('');
+  const [editTransactionId, setEditTransactionId] = useState('');
+  const [editTransactionType, setEditTransactionType] = useState('');
 
   const { data: connections = [], isLoading: isLoadingSubscribers } = useGenericQuery<Connection>(
     'admin/connections',
@@ -115,10 +117,19 @@ export default function SubscriberCollectionsPage() {
   );
 
   const filteredSubscribers = useMemo(() => {
-    if (!subscriberSearch.trim()) return [];
-    return (connections as Connection[]).filter(c =>
-      smartMatch(subscriberSearch, [c.id], [c.name])
-    ).slice(0, 20);
+    const q = subscriberSearch.trim();
+    if (!q) return [];
+    const ql = q.toLowerCase();
+    const all = connections as Connection[];
+    // Search both the alphanumeric ID (e.g. INT-123) and the name with the
+    // same substring matching, plus phone numbers.
+    const match = (c: Connection) =>
+      String(c.internetId || '').toLowerCase().includes(ql) ||
+      String(c.id || '').toLowerCase().includes(ql) ||
+      String(c.name || '').toLowerCase().includes(ql) ||
+      String(c.cell || '').toLowerCase().includes(ql) ||
+      String(c.mobile || '').toLowerCase().includes(ql);
+    return all.filter(match);
   }, [connections, subscriberSearch]);
 
   const selectedSubscriber = useMemo(() => {
@@ -180,9 +191,14 @@ export default function SubscriberCollectionsPage() {
 
   const filteredTransactionTypes = useMemo(() => {
     const all = transactionTypes as TransactionType[];
-    if (!receiveMethod || receiveMethod === 'cash') return [];
-    return all.filter(t => t.paymentChannel && t.paymentChannel !== 'Cash');
-  }, [transactionTypes, receiveMethod]);
+    const seen = new Set<string>();
+    return all.filter(t => {
+      const name = t.paymentChannel || t.transaction;
+      if (!name || seen.has(name)) return false;
+      seen.add(name);
+      return true;
+    });
+  }, [transactionTypes]);
 
   // Resolve the recovery officer assigned to the selected subscriber's area.
   // Chain: connection.sublocalityId (which is an Area ID) -> area -> recoveryOfficer
@@ -282,6 +298,10 @@ export default function SubscriberCollectionsPage() {
 
   const handleReceive = async () => {
     if (!selectedSubscriber || !user) return;
+    if (!selectedTransactionTypeId) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Please select a transaction type (Cash, Easypaisa, JazzCash, or a bank name).' });
+      return;
+    }
     setIsSaving(true);
     try {
       await api.post('/billing/payments', {
@@ -290,10 +310,9 @@ export default function SubscriberCollectionsPage() {
         amount: receiveAmount,
         paymentDate: receiveDate,
         method: receiveMethod,
+        transactionId: receiveTransactionId.trim(),
+        transactionType: selectedTransactionTypeId,
         collectorId: user.id,
-        transactionType: receiveMethod !== 'cash' && selectedTransactionTypeId
-          ? (transactionTypes as TransactionType[]).find(t => t.id === selectedTransactionTypeId)?.transaction
-          : undefined,
       });
       if (selectedPromiseId) {
         const linkedPromise = subscriberPromises.find(p => p.id === selectedPromiseId);
@@ -313,6 +332,7 @@ export default function SubscriberCollectionsPage() {
       setReceiveDate(new Date().toISOString().split('T')[0]);
       setReceiveMethod('cash');
       setReceiveComment('');
+      setReceiveTransactionId('');
       setSelectedTransactionTypeId('');
       setSelectedPromiseId(null);
     } catch (error: any) {
@@ -355,6 +375,7 @@ export default function SubscriberCollectionsPage() {
     setReceiveDate(new Date().toISOString().split('T')[0]);
     setReceiveMethod('cash');
     setReceiveComment('');
+    setReceiveTransactionId('');
     setSelectedTransactionTypeId('');
     setShowReceiveDialog(true);
   };
@@ -363,6 +384,8 @@ export default function SubscriberCollectionsPage() {
     setEditPayment(payment);
     setEditAmount(payment.amount);
     setEditComment('');
+    setEditTransactionId(payment.transactionId || '');
+    setEditTransactionType(payment.transactionType || payment.method || '');
     setShowEditDialog(true);
   };
 
@@ -373,6 +396,8 @@ export default function SubscriberCollectionsPage() {
       await api.put(`/billing/payments/${editPayment.id}`, {
         ...editPayment,
         amount: editAmount,
+        transactionId: editTransactionId.trim(),
+        transactionType: editTransactionType || editPayment.method,
       });
       toast({ title: 'Updated', description: 'Payment entry updated.' });
       setShowEditDialog(false);
@@ -471,7 +496,7 @@ export default function SubscriberCollectionsPage() {
                         setSubscriberSearch('');
                       }}
                     >
-                      <span className="font-mono font-medium">{c.id?.slice(0, 8)}</span>
+                      <span className="font-mono font-medium">{c.internetId || c.id?.slice(0, 8)}</span>
                       <span className="ml-2 text-muted-foreground">{c.name}</span>
                       {(c.cell || c.mobile) && (
                         <span className="ml-2 text-xs text-muted-foreground">• {c.cell || c.mobile}</span>
@@ -484,7 +509,7 @@ export default function SubscriberCollectionsPage() {
             {selectedSubscriber && (
               <div className="flex items-center gap-2 text-sm">
                 <Badge variant="secondary" className="gap-1">
-                  <span className="font-mono">{selectedSubscriber.id?.slice(0, 8)}</span>
+                  <span className="font-mono">{selectedSubscriber.internetId || selectedSubscriber.id?.slice(0, 8)}</span>
                   <span className="text-muted-foreground">•</span>
                   <span>{selectedSubscriber.name}</span>
                   <button
@@ -568,6 +593,7 @@ export default function SubscriberCollectionsPage() {
                         <TableHead className="py-1 px-1.5 whitespace-nowrap">Address</TableHead>
                         <TableHead className="py-1 px-1.5 whitespace-nowrap">Month/Year</TableHead>
                         <TableHead className="py-1 px-1.5 whitespace-nowrap">Payment Type</TableHead>
+                        <TableHead className="py-1 px-1.5 whitespace-nowrap">Transaction ID</TableHead>
                         <TableHead className="py-1 px-1.5 whitespace-nowrap">Amount</TableHead>
                         <TableHead className="py-1 px-1.5 whitespace-nowrap">Date</TableHead>
                         <TableHead className="py-1 px-1.5 whitespace-nowrap">Comment</TableHead>
@@ -591,6 +617,7 @@ export default function SubscriberCollectionsPage() {
                           <TableCell className="py-1.5 px-1.5 whitespace-nowrap">
                             <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-300 text-amber-700">Promise</Badge>
                           </TableCell>
+                          <TableCell className="py-1.5 px-1.5 whitespace-nowrap text-muted-foreground">---</TableCell>
                           <TableCell className="py-1.5 px-1.5 font-medium whitespace-nowrap">PKR {promise.amount.toLocaleString()}</TableCell>
                           <TableCell className="py-1.5 px-1.5 whitespace-nowrap">
                             {promise.promiseDate ? new Date(promise.promiseDate).toLocaleDateString() : '---'}
@@ -651,6 +678,7 @@ export default function SubscriberCollectionsPage() {
                             {payment.paymentDate ? new Date(payment.paymentDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '---'}
                           </TableCell>
                           <TableCell className="py-1.5 px-1.5 capitalize whitespace-nowrap">{payment.method || 'cash'}</TableCell>
+                          <TableCell className="py-1.5 px-1.5 font-mono whitespace-nowrap">{payment.transactionId || '---'}</TableCell>
                           <TableCell className="py-1.5 px-1.5 font-medium whitespace-nowrap">PKR {payment.amount.toLocaleString()}</TableCell>
                           <TableCell className="py-1.5 px-1.5 whitespace-nowrap">
                             {payment.paymentDate ? new Date(payment.paymentDate).toLocaleDateString() : '---'}
@@ -810,16 +838,24 @@ export default function SubscriberCollectionsPage() {
                 allowClear={false}
               />
             </div>
+            <div className="space-y-1">
+              <Label>Transaction Type</Label>
+              <SearchableSelect
+                value={selectedTransactionTypeId}
+                onValueChange={(v) => { if (v) setSelectedTransactionTypeId(v); }}
+                options={filteredTransactionTypes.map(t => ({ id: t.paymentChannel || t.transaction, name: t.paymentChannel || t.transaction }))}
+                placeholder="Select transaction type (Cash, Easypaisa, etc.)..."
+                searchPlaceholder="Search transaction type..."
+                allowClear={false}
+              />
+            </div>
             {receiveMethod !== 'cash' && (
               <div className="space-y-1">
-                <Label>Transaction Type</Label>
-                <SearchableSelect
-                  value={selectedTransactionTypeId}
-                  onValueChange={(v) => { if (v) setSelectedTransactionTypeId(v); }}
-                  options={filteredTransactionTypes.map(t => ({ id: t.id, name: t.paymentChannel }))}
-                  placeholder="Select transaction type..."
-                  searchPlaceholder="Search transaction type..."
-                  allowClear={false}
+                <Label>Transaction ID</Label>
+                <Input
+                  value={receiveTransactionId}
+                  onChange={(e) => setReceiveTransactionId(e.target.value)}
+                  placeholder="Enter transaction ID / reference number"
                 />
               </div>
             )}
@@ -834,7 +870,7 @@ export default function SubscriberCollectionsPage() {
             </div>
             <Button
               onClick={handleReceive}
-              disabled={isSaving || !receiveAmount || receiveAmount > (isAmountLocked ? packageFee : subscriberRemaining)}
+              disabled={isSaving || !receiveAmount || !selectedTransactionTypeId || receiveAmount > (isAmountLocked ? packageFee : subscriberRemaining)}
               className="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md"
             >
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -915,9 +951,28 @@ export default function SubscriberCollectionsPage() {
                 onChange={(e) => setEditAmount(parseFloat(e.target.value) || 0)}
               />
             </div>
+            <div className="space-y-1">
+              <Label>Transaction ID</Label>
+              <Input
+                value={editTransactionId}
+                onChange={(e) => setEditTransactionId(e.target.value)}
+                placeholder="Enter transaction ID / reference number"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Transaction Type</Label>
+              <SearchableSelect
+                value={editTransactionType}
+                onValueChange={(v) => { if (v) setEditTransactionType(v); }}
+                options={filteredTransactionTypes.map(t => ({ id: t.paymentChannel || t.transaction, name: t.paymentChannel || t.transaction }))}
+                placeholder="Select transaction type (Cash, Easypaisa, or bank name)..."
+                searchPlaceholder="Search transaction type..."
+                allowClear={false}
+              />
+            </div>
             <Button
               onClick={handleEditSave}
-              disabled={isSaving || !editAmount}
+              disabled={isSaving || !editAmount || !editTransactionType}
               className="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md"
             >
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

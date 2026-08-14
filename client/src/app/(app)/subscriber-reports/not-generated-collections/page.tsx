@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
+import { SUBSCRIBER_REPORT_TYPE_OPTIONS, matchesReportType, type ReportTypeConn } from '@/lib/subscriber-report-types';
 import type { Connection, Area } from '@/lib/types';
 
 interface NotGeneratedRecord {
@@ -153,25 +154,31 @@ export default function NotGeneratedCollectionsPage() {
     return Array.from(set).sort();
   }, [allRecords]);
 
+  const connById = useMemo(() => {
+    const map = new Map<string, ReportTypeConn>();
+    connections.forEach(c => map.set(c.id, c));
+    return map;
+  }, [connections]);
+
   const filteredData = useMemo(() => {
     if (!showReport) return [];
 
+    const from = new Date(historyFromDate);
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(historyToDate);
+    to.setHours(23, 59, 59, 999);
+
     return allRecords.filter((item) => {
-      const typeMatch = reportType === 'all' || item.connectionType === reportType;
       const connectionMatch = connectionType === 'both' || item.connectionType === connectionType;
       const sublocalityMatch = sublocality === 'all' || item.sublocality === sublocality;
 
       const parsed = new Date(item.rechargeDate);
       if (isNaN(parsed.getTime())) return false;
-      const from = new Date(historyFromDate);
-      from.setHours(0, 0, 0, 0);
-      const to = new Date(historyToDate);
-      to.setHours(23, 59, 59, 999);
-      const dateMatch = parsed >= from && parsed <= to;
+      const typeMatch = matchesReportType({ reportType, itemDate: parsed, conn: connById.get(item.id), from, to });
 
-      return typeMatch && connectionMatch && sublocalityMatch && dateMatch;
+      return typeMatch && connectionMatch && sublocalityMatch;
     });
-  }, [allRecords, reportType, sublocality, connectionType, historyFromDate, historyToDate, showReport]);
+  }, [allRecords, reportType, sublocality, connectionType, historyFromDate, historyToDate, showReport, connById]);
 
   useEffect(() => {
     setCurrentPage(1);

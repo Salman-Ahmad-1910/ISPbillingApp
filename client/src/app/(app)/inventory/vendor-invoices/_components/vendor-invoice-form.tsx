@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { VendorInvoice, VendorInvoiceItem, Vendor, Product } from '@/lib/types';
 import { vendorInvoiceSchema } from '@/lib/schemas';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus, Trash2 } from 'lucide-react';
 
 type VendorInvoiceFormValues = z.infer<typeof vendorInvoiceSchema>;
 
@@ -144,8 +144,6 @@ export function VendorInvoiceForm({
     }
   }
 
-  const singleItem = items[0];
-
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit, onValidationError)} className="space-y-6">
@@ -204,81 +202,124 @@ export function VendorInvoiceForm({
           )}
         />
 
-        {/* Product Section — each field stacked vertically */}
-        {singleItem && (
+        {/* Product Section — multiple products per invoice */}
+        {items.length > 0 && (
           <div className="space-y-4 border-t pt-4">
-            <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Product Details</p>
-
-            <div className="space-y-4">
-              <div>
-                <FormLabel className="text-sm">Product *</FormLabel>
-                <Select 
-                  value={singleItem.productId || undefined} 
-                  onValueChange={(value) => updateItem(0, 'productId', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select product" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {products.map((product) => (
-                      <SelectItem key={product.id} value={product.id}>
-                        {product.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <FormLabel className="text-sm">Unit Type</FormLabel>
-                <Input
-                  readOnly
-                  value={singleItem.unitType === 'piece' ? 'Per Piece' : singleItem.unitType === 'meter' ? 'Per Meter' : singleItem.unitType === 'kilogram' ? 'Per Kg' : singleItem.unitType === 'liter' ? 'Per Liter' : singleItem.unitType || '—'}
-                  className="bg-muted"
-                />
-              </div>
-
-              <div>
-                <FormLabel className="text-sm">Quantity *</FormLabel>
-                <Input
-                  type="number"
-                  min="1"
-                  value={singleItem.quantity}
-                  onChange={(e) => updateItem(0, 'quantity', parseInt(e.target.value) || 1)}
-                />
-              </div>
-
-              <div>
-                <FormLabel className="text-sm">Unit Price *</FormLabel>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={singleItem.unitPrice}
-                  onChange={(e) => updateItem(0, 'unitPrice', parseFloat(e.target.value) || 0)}
-                  placeholder={singleItem.productId ? "Auto from product" : "Select product first"}
-                />
-              </div>
-
-              <div>
-                <FormLabel className="text-sm">Subtotal</FormLabel>
-                <Input
-                  readOnly
-                  value={`PKR ${singleItem.subtotal.toFixed(2)}`}
-                  className="bg-muted font-semibold"
-                />
-              </div>
-
-              <div>
-                <FormLabel className="text-sm">SN / MAC</FormLabel>
-                <Input
-                  readOnly
-                  value={singleItem.serialNumber || ''}
-                  className="bg-muted"
-                  placeholder="Auto-filled from product"
-                />
-              </div>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Product Details</p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const currentItems = form.getValues('items');
+                  form.setValue('items', [...currentItems, {
+                    productId: '',
+                    productName: '',
+                    quantity: 1,
+                    unitPrice: 0,
+                    unitType: 'piece',
+                    subtotal: 0,
+                  }]);
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add Product
+              </Button>
             </div>
+
+            {items.map((item, index) => (
+              <div key={index} className="space-y-4 rounded-lg border p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-muted-foreground">Product #{index + 1}</p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                    disabled={items.length <= 1}
+                    onClick={() => {
+                      const currentItems = form.getValues('items');
+                      form.setValue('items', currentItems.filter((_, i) => i !== index));
+                    }}
+                    title="Remove product"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <div>
+                  <FormLabel className="text-sm">Product *</FormLabel>
+                  <Select
+                    value={item.productId || undefined}
+                    onValueChange={(value) => updateItem(index, 'productId', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select product" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {products.map((product) => (
+                        <SelectItem key={product.id} value={product.id}>
+                          {product.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <FormLabel className="text-sm">Unit Type</FormLabel>
+                    <Input
+                      readOnly
+                      value={item.unitType === 'piece' ? 'Per Piece' : item.unitType === 'meter' ? 'Per Meter' : item.unitType === 'kilogram' ? 'Per Kg' : item.unitType === 'liter' ? 'Per Liter' : item.unitType || '—'}
+                      className="bg-muted"
+                    />
+                  </div>
+
+                  <div>
+                    <FormLabel className="text-sm">SN / MAC</FormLabel>
+                    <Input
+                      readOnly
+                      value={item.serialNumber || ''}
+                      className="bg-muted"
+                      placeholder="Auto-filled from product"
+                    />
+                  </div>
+
+                  <div>
+                    <FormLabel className="text-sm">Quantity *</FormLabel>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={item.quantity}
+                      onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
+                    />
+                  </div>
+
+                  <div>
+                    <FormLabel className="text-sm">Unit Price *</FormLabel>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={item.unitPrice}
+                      onChange={(e) => updateItem(index, 'unitPrice', parseFloat(e.target.value) || 0)}
+                      placeholder={item.productId ? "Auto from product" : "Select product first"}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <FormLabel className="text-sm">Subtotal</FormLabel>
+                  <Input
+                    readOnly
+                    value={`PKR ${item.subtotal.toFixed(2)}`}
+                    className="bg-muted font-semibold"
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         )}
 

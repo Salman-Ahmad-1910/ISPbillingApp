@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
+import { SUBSCRIBER_REPORT_TYPE_OPTIONS, matchesReportType, type ReportTypeConn } from '@/lib/subscriber-report-types';
 import type { PromiseEntry } from '@/lib/types';
 
 interface PromiseRecord {
@@ -40,6 +41,11 @@ export default function PromiseDateReportsPage() {
 
   const { data: promises = [], isLoading: loading } = useGenericQuery<PromiseEntry>(
     'billing/promises',
+    companyId ?? undefined,
+  );
+
+  const { data: connections = [] } = useGenericQuery<any>(
+    'admin/connections',
     companyId ?? undefined,
   );
 
@@ -83,22 +89,27 @@ export default function PromiseDateReportsPage() {
     }));
   }, [promises]);
 
-  const filteredData = useMemo(() => promiseData.filter((item) => {
-    const itemDate = new Date(item.promiseDate);
+  const filteredData = useMemo(() => {
+    const connById = new Map<string, ReportTypeConn>();
+    connections.forEach((c: any) => connById.set(c.id, c));
+
     const from = new Date(filterFromDate);
     from.setHours(0, 0, 0, 0);
     const to = new Date(filterToDate);
     to.setHours(23, 59, 59, 999);
 
-    const afterFrom = itemDate >= from;
-    const beforeTo = itemDate <= to;
-    const sublocalityMatch = sublocality === 'all' || item.sublocality === sublocality;
-    const promiseTypeMatch = promiseType === 'all' || item.promiseType === promiseType;
-    const typeMatch = reportType === 'all' || item.status === reportType;
-    const connectionMatch = connectionType === 'both' || item.connectionType === connectionType;
+    return promiseData.filter((item) => {
+      const itemDate = new Date(item.promiseDate);
+      if (isNaN(itemDate.getTime())) return false;
 
-    return afterFrom && beforeTo && sublocalityMatch && promiseTypeMatch && typeMatch && connectionMatch;
-  }), [promiseData, filterFromDate, filterToDate, sublocality, promiseType, reportType, connectionType]);
+      const sublocalityMatch = sublocality === 'all' || item.sublocality === sublocality;
+      const promiseTypeMatch = promiseType === 'all' || item.promiseType === promiseType;
+      const connectionMatch = connectionType === 'both' || item.connectionType === connectionType;
+      const typeMatch = matchesReportType({ reportType, itemDate, conn: connById.get(item.subscriberId), from, to });
+
+      return sublocalityMatch && promiseTypeMatch && connectionMatch && typeMatch;
+    });
+  }, [promiseData, filterFromDate, filterToDate, sublocality, promiseType, reportType, connectionType, connections]);
 
   const totalReceivable = filteredData.reduce((sum, item) => sum + item.amount, 0);
   const totalDefaulters = filteredData.length;
@@ -274,10 +285,9 @@ export default function PromiseDateReportsPage() {
               <Select value={reportType} onValueChange={setReportType}>
                 <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                 <SelectContent portal={false}>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="overdue">Overdue</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
+                  {SUBSCRIBER_REPORT_TYPE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

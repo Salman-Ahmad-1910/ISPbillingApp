@@ -111,6 +111,11 @@ func main() {
 		log.Printf("Warning: password migration error (non-fatal): %v", err)
 	}
 
+	// Remove duplicate area rows created by a previous assignment bug
+	if err := utils.DedupeAreas(); err != nil {
+		log.Printf("Warning: area deduplication error (non-fatal): %v", err)
+	}
+
 	if *migrateOnly {
 		log.Println("Migration completed successfully. Exiting...")
 		os.Exit(0)

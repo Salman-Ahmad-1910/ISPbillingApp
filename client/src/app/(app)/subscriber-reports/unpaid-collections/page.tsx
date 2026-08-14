@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
+import { SUBSCRIBER_REPORT_TYPE_OPTIONS, matchesReportType, type ReportTypeConn } from '@/lib/subscriber-report-types';
 import type { Invoice, Connection, Area } from '@/lib/types';
 
 interface UnpaidRecord {
@@ -57,11 +58,22 @@ export default function UnpaidCollectionsPage() {
   const [showAll, setShowAll] = useState(false);
 
   const connMap = useMemo(() => {
-    const map: Record<string, { sublocality: string; connectionType: string }> = {};
+    const map: Record<string, ReportTypeConn & { sublocality: string; connectionType: string }> = {};
     connections.forEach(c => {
       const area = areas.find(a => a.id === (c.sublocalityId || ''));
       const sub = area ? (area.subLocality || area.locality || c.sublocalityId || '') : '';
-      map[c.id] = { sublocality: sub, connectionType: c.connectionType || '' };
+      map[c.id] = {
+        sublocality: sub,
+        connectionType: c.connectionType || '',
+        remainingAmount: c.remainingAmount ?? c.amount,
+        installationDate: c.installationDate,
+        rechargeDate: c.rechargeDate,
+        discount: c.discount,
+        sameDiscount: c.sameDiscount,
+        sameAmount: c.sameAmount,
+        packageInternet: c.packageInternet,
+        packageCable: c.packageCable,
+      };
     });
     return map;
   }, [connections, areas]);
@@ -112,21 +124,21 @@ export default function UnpaidCollectionsPage() {
   const filteredData = useMemo(() => {
     if (!showReport) return [];
 
+    const from = new Date(filterFromDate);
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(filterToDate);
+    to.setHours(23, 59, 59, 999);
+
     return unpaidRecords.filter((item) => {
       const itemDate = new Date(item.dueDate);
       if (isNaN(itemDate.getTime())) return false;
-      const from = new Date(filterFromDate);
-      from.setHours(0, 0, 0, 0);
-      const to = new Date(filterToDate);
-      to.setHours(23, 59, 59, 999);
 
-      const dateMatch = itemDate >= from && itemDate <= to;
       const sublocalityMatch = sublocality === 'all' || item.sublocality === sublocality;
-      const typeMatch = reportType === 'all' || item.connectionType === reportType;
+      const typeMatch = matchesReportType({ reportType, itemDate, conn: connMap[item.subscriberId], from, to });
 
-      return dateMatch && sublocalityMatch && typeMatch;
+      return typeMatch && sublocalityMatch;
     });
-  }, [unpaidRecords, filterFromDate, filterToDate, sublocality, reportType, showReport]);
+  }, [unpaidRecords, filterFromDate, filterToDate, sublocality, reportType, showReport, connMap]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -305,9 +317,9 @@ export default function UnpaidCollectionsPage() {
               <Select value={reportType} onValueChange={setReportType}>
                 <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                 <SelectContent portal={false}>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="internet">Internet</SelectItem>
-                  <SelectItem value="tv_cable">TV Cable</SelectItem>
+                  {SUBSCRIBER_REPORT_TYPE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

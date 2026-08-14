@@ -54,9 +54,21 @@ func Login(c *gin.Context) {
 
 	// Compare hashed password with provided password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		log.Printf("Password mismatch for user %s (id=%s): %v | stored len=%d", req.Email, user.ID, err, len(user.Password))
-		utils.ErrorResponse(c, 401, "Invalid credentials", nil)
-		return
+		// Fallback for legacy plaintext passwords (self-healing migration).
+		// Only matches when the stored value is the raw password, then upgrades it.
+		if user.Password != req.Password {
+			log.Printf("Password mismatch for user %s (id=%s): %v | stored len=%d", req.Email, user.ID, err, len(user.Password))
+			utils.ErrorResponse(c, 401, "Invalid credentials", nil)
+			return
+		}
+		hashedPassword, herr := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+		if herr == nil {
+			if uerr := config.DB.Model(&models.User{}).Where("id = ?", user.ID).Update("password", string(hashedPassword)).Error; uerr != nil {
+				log.Printf("Failed to upgrade plaintext password for user %s: %v", req.Email, uerr)
+			} else {
+				user.Password = string(hashedPassword)
+			}
+		}
 	}
 
 	// Set user status back to active when logging in

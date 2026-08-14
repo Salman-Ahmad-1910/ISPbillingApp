@@ -112,6 +112,16 @@ func (g GenericCRUD[T]) Update(c *gin.Context) {
 		}
 	}
 
+	// Set the primary key from the URL param. The request body does not include
+	// the id, so without this GORM's Save() treats the entity as a new record and
+	// INSERTs a duplicate instead of UPDATEing the existing one.
+	if parsedID, err := uuid.Parse(id); err == nil {
+		idField := reflect.ValueOf(&entity).Elem().FieldByName("ID")
+		if idField.IsValid() && idField.CanSet() && idField.Type() == reflect.TypeOf(parsedID) {
+			idField.Set(reflect.ValueOf(parsedID))
+		}
+	}
+
 	db := config.DB.Model(new(T))
 	if g.IsScoped {
 		db = db.Scopes(models.TenantScope(companyID))

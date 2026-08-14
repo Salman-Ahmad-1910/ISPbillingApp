@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
+import { SUBSCRIBER_REPORT_TYPE_OPTIONS, matchesReportType, type ReportTypeConn } from '@/lib/subscriber-report-types';
 
 interface MonthDefaulterRecord {
   id: string;
@@ -26,6 +27,7 @@ interface MonthDefaulterRecord {
   sublocality: string;
   connectionType: string;
   month: string;
+  recordDate: string;
   amount: number;
   status: string;
 }
@@ -51,6 +53,15 @@ const months = [
   { value: '11', label: 'November' },
   { value: '12', label: 'December' },
 ];
+
+function parseBillingPeriod(billingPeriod?: string): Date | null {
+  if (!billingPeriod) return null;
+  const match = billingPeriod.match(/^([a-zA-Z]+)\s+(\d{4})/);
+  if (!match) return null;
+  const monthIdx = months.findIndex((m) => m.label.toLowerCase() === match[1].toLowerCase());
+  if (monthIdx === -1) return null;
+  return new Date(Number(match[2]), monthIdx, 1);
+}
 
 export default function MonthDefaultersPage() {
   const { companyId } = useCompany();
@@ -91,6 +102,7 @@ export default function MonthDefaultersPage() {
         const conn = connections.find((c: any) => c.id === inv.subscriberId);
         const monthName = String(inv.billingPeriod || '').split(' ')[0];
         const monthValue = months.find((m) => m.label.toLowerCase() === monthName.toLowerCase())?.value || '';
+        const periodDate = parseBillingPeriod(inv.billingPeriod);
         return {
           id: inv.id,
           subscriberName: inv.subscriberName || conn?.name || '',
@@ -100,20 +112,37 @@ export default function MonthDefaultersPage() {
           sublocality: resolveAreaName(areas, conn?.sublocalityId),
           connectionType: conn?.connectionType || 'internet',
           month: monthValue,
+          recordDate: periodDate ? periodDate.toISOString() : '',
           amount: Number(inv.remainingAmount) || 0,
           status: conn?.status || inv.status || 'active',
         };
       });
   }, [invoices, connections, areas]);
 
-  const filteredData = useMemo(() => allRecords.filter((item) => {
-    const monthMatch = !month || item.month === month;
-    const sublocalityMatch = sublocality === 'all' || item.sublocality === sublocality;
-    const typeMatch = reportType === 'all' || item.status === reportType;
-    const connectionMatch = connectionType === 'both' || item.connectionType === connectionType;
+  const connById = useMemo(() => {
+    const map = new Map<string, ReportTypeConn>();
+    connections.forEach((c: any) => map.set(c.id, c));
+    return map;
+  }, [connections]);
 
-    return monthMatch && sublocalityMatch && typeMatch && connectionMatch;
-  }), [allRecords, month, sublocality, reportType, connectionType]);
+  const filteredData = useMemo(() => {
+    const from = new Date(historyFromDate);
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(historyToDate);
+    to.setHours(23, 59, 59, 999);
+
+    return allRecords.filter((item) => {
+      const monthMatch = !month || item.month === month;
+      const sublocalityMatch = sublocality === 'all' || item.sublocality === sublocality;
+      const connectionMatch = connectionType === 'both' || item.connectionType === connectionType;
+
+      const itemDate = item.recordDate ? new Date(item.recordDate) : new Date(0);
+      if (isNaN(itemDate.getTime())) return false;
+      const typeMatch = matchesReportType({ reportType, itemDate, conn: connById.get(item.id), from, to });
+
+      return monthMatch && sublocalityMatch && typeMatch && connectionMatch;
+    });
+  }, [allRecords, month, sublocality, reportType, connectionType, historyFromDate, historyToDate, connById]);
 
   const totalConnections = filteredData.length;
   const totalAmount = filteredData.reduce((sum, item) => sum + item.amount, 0);
@@ -287,10 +316,9 @@ export default function MonthDefaultersPage() {
               <Select value={reportType} onValueChange={setReportType}>
                 <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                 <SelectContent portal={false}>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="suspended">Suspended</SelectItem>
-                  <SelectItem value="deactivated">Deactivated</SelectItem>
+                  {SUBSCRIBER_REPORT_TYPE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
