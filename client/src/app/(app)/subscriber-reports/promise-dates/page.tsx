@@ -16,6 +16,9 @@ import { cn } from '@/lib/utils';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
+import SubscriberSystemDatesTable, { systemDatesExcel, systemDatesInvoiceColumns, type SystemDateRow } from '@/components/shared/subscriber-system-dates';
+import SubscriberInternetPackageTable, { internetPackageExcel, internetPackageInvoiceColumns, type InternetPackageRow } from '@/components/shared/subscriber-internet-package';
+import SubscriberPackageWiseTable, { packageWiseExcel, packageWiseInvoiceColumns, withPackageExcel, withPackageInvoiceColumns, SubscriberWithPackageTable, buildPackageWiseReport, packageSubscriberCounts, connectionPackageName, type PackageWiseRow } from '@/components/shared/subscriber-package-wise';
 import { SUBSCRIBER_REPORT_TYPE_OPTIONS, matchesReportType, type ReportTypeConn } from '@/lib/subscriber-report-types';
 import type { PromiseEntry } from '@/lib/types';
 
@@ -31,9 +34,34 @@ interface PromiseRecord {
   promiseDate: string;
   promiseType: string;
   amount: number;
+  packageAmount: number;
+  packageName: string;
   status: string;
   description: string;
   promisedBy: string;
+}
+
+function toSystemDateRow(item: PromiseRecord): SystemDateRow {
+  return {
+    id: item.key,
+    connectionId: item.id || undefined,
+    internetId: item.subscriberId || undefined,
+    name: item.subscriberName,
+    address: item.address,
+    amount: item.amount,
+  };
+}
+
+function toInternetPackageRow(item: PromiseRecord): InternetPackageRow {
+  return {
+    id: item.key,
+    connectionId: item.id || undefined,
+    internetId: item.subscriberId || undefined,
+    name: item.subscriberName,
+    address: item.address,
+    amount: item.amount,
+    packageAmount: item.packageAmount,
+  };
 }
 
 export default function PromiseDateReportsPage() {
@@ -83,6 +111,8 @@ export default function PromiseDateReportsPage() {
       promiseDate: p.promiseDate || '',
       promiseType: 'payment',
       amount: Number(p.amount) || 0,
+      packageAmount: 0,
+      packageName: 'No Package',
       status: p.status || 'pending',
       description: p.description || '',
       promisedBy: p.collectorName || '',
@@ -98,24 +128,97 @@ export default function PromiseDateReportsPage() {
     const to = new Date(filterToDate);
     to.setHours(23, 59, 59, 999);
 
-    return promiseData.filter((item) => {
-      const itemDate = new Date(item.promiseDate);
-      if (isNaN(itemDate.getTime())) return false;
+    return promiseData
+      .filter((item) => {
+        const itemDate = new Date(item.promiseDate);
+        if (isNaN(itemDate.getTime())) return false;
 
-      const sublocalityMatch = sublocality === 'all' || item.sublocality === sublocality;
-      const promiseTypeMatch = promiseType === 'all' || item.promiseType === promiseType;
-      const connectionMatch = connectionType === 'both' || item.connectionType === connectionType;
-      const typeMatch = matchesReportType({ reportType, itemDate, conn: connById.get(item.subscriberId), from, to });
+        const sublocalityMatch = sublocality === 'all' || item.sublocality === sublocality;
+        const promiseTypeMatch = promiseType === 'all' || item.promiseType === promiseType;
+        const connectionMatch = connectionType === 'both' || item.connectionType === connectionType;
+        const typeMatch = matchesReportType({ reportType, itemDate, conn: connById.get(item.id), from, to });
 
-      return sublocalityMatch && promiseTypeMatch && connectionMatch && typeMatch;
-    });
+        return sublocalityMatch && promiseTypeMatch && connectionMatch && typeMatch;
+      })
+      .map((item) => ({
+        ...item,
+        packageAmount: Number(connById.get(item.id)?.sameAmount) || 0,
+        packageName: connectionPackageName(connById.get(item.id)),
+      }));
   }, [promiseData, filterFromDate, filterToDate, sublocality, promiseType, reportType, connectionType, connections]);
+
+  const packageCounts = useMemo(() => {
+    const base = (connections as any[]).filter((c: any) => connectionType === 'both' || c.connectionType === connectionType);
+    return packageSubscriberCounts(base);
+  }, [connections, connectionType]);
+
+  const packageWiseData = useMemo(() => buildPackageWiseReport(packageCounts, filteredData), [packageCounts, filteredData]);
 
   const totalReceivable = filteredData.reduce((sum, item) => sum + item.amount, 0);
   const totalDefaulters = filteredData.length;
 
   const exportExcel = () => {
     if (filteredData.length === 0) return;
+
+    if (reportType === 'system-dates') {
+      const excel = systemDatesExcel(filteredData.map(toSystemDateRow));
+      const csvContent = [excel.headers.join(','), ...excel.rows.map((r) => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `promise-date-reports-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    if (reportType === 'internet-package-amount') {
+      const excel = internetPackageExcel(filteredData.map(toInternetPackageRow));
+      const csvContent = [excel.headers.join(','), ...excel.rows.map((r) => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `promise-date-reports-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    if (reportType === 'package-wise') {
+      const excel = packageWiseExcel(packageWiseData);
+      const csvContent = [excel.headers.join(','), ...excel.rows.map((r) => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `promise-date-reports-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    if (reportType === 'with-package') {
+      const excel = withPackageExcel(packageWiseData);
+      const csvContent = [excel.headers.join(','), ...excel.rows.map((r) => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `promise-date-reports-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      return;
+    }
 
     const headers = ['Subscriber Name', 'Subscriber ID', 'Phone', 'Address', 'Sublocality', 'Connection Type', 'Promise Date', 'Amount', 'Status', 'Description', 'Promised By'];
     const rows = filteredData.map((item) => [
@@ -141,6 +244,71 @@ export default function PromiseDateReportsPage() {
 
   if (showInvoice) {
     const accent = { title: 'text-cyan-600', border: 'border-cyan-600', headerBg: 'bg-cyan-600', rowHover: 'hover:bg-cyan-50/50' };
+
+    if (reportType === 'system-dates') {
+      return (
+        <div className="p-6">
+          <SubscriberReportInvoice<SystemDateRow>
+            title="PROMISE DATE REPORT"
+            subtitle={`From: ${format(filterFromDate, 'dd MMM yyyy')} — To: ${format(filterToDate, 'dd MMM yyyy')}`}
+            accent={accent}
+            data={filteredData.map(toSystemDateRow)}
+            columns={systemDatesInvoiceColumns()}
+            emptyMessage="No promise date records found for the selected criteria."
+            onBack={() => setShowInvoice(false)}
+          />
+        </div>
+      );
+    }
+
+    if (reportType === 'internet-package-amount') {
+      return (
+        <div className="p-6">
+          <SubscriberReportInvoice<InternetPackageRow>
+            title="PROMISE DATE REPORT"
+            subtitle={`From: ${format(filterFromDate, 'dd MMM yyyy')} — To: ${format(filterToDate, 'dd MMM yyyy')}`}
+            accent={accent}
+            data={filteredData.map(toInternetPackageRow)}
+            columns={internetPackageInvoiceColumns()}
+            emptyMessage="No promise date records found for the selected criteria."
+            onBack={() => setShowInvoice(false)}
+          />
+        </div>
+      );
+    }
+
+    if (reportType === 'package-wise') {
+      return (
+        <div className="p-6">
+          <SubscriberReportInvoice<PackageWiseRow>
+            title="PROMISE DATE REPORT"
+            subtitle={`From: ${format(filterFromDate, 'dd MMM yyyy')} — To: ${format(filterToDate, 'dd MMM yyyy')}`}
+            accent={accent}
+            data={packageWiseData}
+            columns={packageWiseInvoiceColumns()}
+            emptyMessage="No promise date records found for the selected criteria."
+            onBack={() => setShowInvoice(false)}
+          />
+        </div>
+      );
+    }
+
+    if (reportType === 'with-package') {
+      return (
+        <div className="p-6">
+          <SubscriberReportInvoice<PackageWiseRow>
+            title="PROMISE DATE REPORT"
+            subtitle={`From: ${format(filterFromDate, 'dd MMM yyyy')} — To: ${format(filterToDate, 'dd MMM yyyy')}`}
+            accent={accent}
+            data={packageWiseData}
+            columns={withPackageInvoiceColumns()}
+            emptyMessage="No promise date records found for the selected criteria."
+            onBack={() => setShowInvoice(false)}
+          />
+        </div>
+      );
+    }
+
     const columns: InvoiceColumn<PromiseRecord>[] = [
       { header: '#', render: (_: PromiseRecord, i: number) => <span className="font-mono text-xs text-gray-500">{i + 1}</span> },
       { header: 'Subscriber Name', render: (r) => <span className="font-semibold">{r.subscriberName}</span> },
@@ -340,6 +508,15 @@ export default function PromiseDateReportsPage() {
               </div>
             ) : (
               <div className="min-w-0 overflow-x-auto">
+                {reportType === 'system-dates' ? (
+                  <SubscriberSystemDatesTable rows={filteredData.map(toSystemDateRow)} />
+                ) : reportType === 'internet-package-amount' ? (
+                  <SubscriberInternetPackageTable rows={filteredData.map(toInternetPackageRow)} />
+                ) : reportType === 'package-wise' ? (
+                  <SubscriberPackageWiseTable rows={packageWiseData} />
+                ) : reportType === 'with-package' ? (
+                  <SubscriberWithPackageTable rows={packageWiseData} />
+                ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -389,6 +566,7 @@ export default function PromiseDateReportsPage() {
                     ))}
                   </TableBody>
                 </Table>
+                )}
               </div>
             )}
           </CardContent>

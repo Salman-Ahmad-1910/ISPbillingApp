@@ -7,9 +7,26 @@ export const SUBSCRIBER_REPORT_TYPE_OPTIONS = [
   { value: 'internet-package-amount', label: 'Collected with internet package amount' },
   { value: 'with-package', label: 'Collected with package' },
   { value: 'sublocality-wise', label: 'Sublocality wise collection' },
+  { value: 'package-wise', label: 'Collected Package Wise' },
   { value: 'transaction-wise', label: 'Transaction wise collection' },
   { value: 'balance', label: 'Collected-2 Balance' },
 ] as const;
+
+export function formatDateTime(value?: string | null): string {
+  if (!value) return '-';
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return value || '-';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const ampm = d.getHours() >= 12 ? 'PM' : 'AM';
+  const h = d.getHours() % 12 || 12;
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${pad(d.getDate())}-${months[d.getMonth()]}-${String(d.getFullYear()).slice(2)} ${pad(h)}:${pad(d.getMinutes())}:${pad(d.getSeconds())} ${ampm}`;
+}
+
+export function paymentChannel(method?: string | null): string {
+  const m = String(method || '').toLowerCase();
+  return m === 'mobile' ? 'Mobile' : 'Web';
+}
 
 export type ReportTypeConn = {
   remainingAmount?: number | string | null;
@@ -65,7 +82,7 @@ export function matchesReportType(opts: {
     case 'discount':
       return inDateRange(itemDate, from, to) && !!conn && hasDiscount(conn);
     case 'internet-package-amount':
-      return inDateRange(itemDate, from, to) && !!conn && (Number(conn.sameAmount) || 0) > 0;
+      return inDateRange(itemDate, from, to);
     case 'with-package':
       return inDateRange(itemDate, from, to) && !!conn && Boolean(conn.packageInternet || conn.packageCable);
     default:

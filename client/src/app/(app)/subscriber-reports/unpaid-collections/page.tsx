@@ -15,6 +15,9 @@ import { cn } from '@/lib/utils';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
+import SubscriberSystemDatesTable, { systemDatesExcel, systemDatesInvoiceColumns, type SystemDateRow } from '@/components/shared/subscriber-system-dates';
+import SubscriberInternetPackageTable, { internetPackageExcel, internetPackageInvoiceColumns, type InternetPackageRow } from '@/components/shared/subscriber-internet-package';
+import SubscriberPackageWiseTable, { packageWiseExcel, packageWiseInvoiceColumns, withPackageExcel, withPackageInvoiceColumns, SubscriberWithPackageTable, buildPackageWiseReport, packageSubscriberCounts, connectionPackageName, type PackageWiseRow } from '@/components/shared/subscriber-package-wise';
 import { SUBSCRIBER_REPORT_TYPE_OPTIONS, matchesReportType, type ReportTypeConn } from '@/lib/subscriber-report-types';
 import type { Invoice, Connection, Area } from '@/lib/types';
 
@@ -22,7 +25,11 @@ interface UnpaidRecord {
   id: string;
   subscriberId: string;
   subscriberName: string;
+  internetId: string;
+  address: string;
   amount: number;
+  packageAmount: number;
+  packageName: string;
   paidAmount: number;
   remainingAmount: number;
   dueDate: string;
@@ -32,6 +39,29 @@ interface UnpaidRecord {
 }
 
 const PAGE_SIZE_OPTIONS = [10, 50, 100] as const;
+
+function toSystemDateRow(item: UnpaidRecord): SystemDateRow {
+  return {
+    id: item.id,
+    connectionId: item.subscriberId || undefined,
+    internetId: item.internetId || undefined,
+    name: item.subscriberName,
+    address: item.address,
+    amount: item.amount,
+  };
+}
+
+function toInternetPackageRow(item: UnpaidRecord): InternetPackageRow {
+  return {
+    id: item.id,
+    connectionId: item.subscriberId || undefined,
+    internetId: item.internetId || undefined,
+    name: item.subscriberName,
+    address: item.address,
+    amount: item.amount,
+    packageAmount: item.packageAmount,
+  };
+}
 
 export default function UnpaidCollectionsPage() {
   const { companyId } = useCompany();
@@ -58,13 +88,15 @@ export default function UnpaidCollectionsPage() {
   const [showAll, setShowAll] = useState(false);
 
   const connMap = useMemo(() => {
-    const map: Record<string, ReportTypeConn & { sublocality: string; connectionType: string }> = {};
+    const map: Record<string, ReportTypeConn & { sublocality: string; connectionType: string; internetId: string; address: string }> = {};
     connections.forEach(c => {
       const area = areas.find(a => a.id === (c.sublocalityId || ''));
       const sub = area ? (area.subLocality || area.locality || c.sublocalityId || '') : '';
       map[c.id] = {
         sublocality: sub,
         connectionType: c.connectionType || '',
+        internetId: c.internetId || '',
+        address: c.address || '',
         remainingAmount: c.remainingAmount ?? c.amount,
         installationDate: c.installationDate,
         rechargeDate: c.rechargeDate,
@@ -102,7 +134,11 @@ export default function UnpaidCollectionsPage() {
           id: inv.subscriberId,
           subscriberId: inv.subscriberId,
           subscriberName: inv.subscriberName || '',
+          internetId: conn.internetId || '',
+          address: conn.address || '',
           amount,
+          packageAmount: Number(conn.sameAmount) || 0,
+          packageName: connectionPackageName(conn),
           paidAmount: paid,
           remainingAmount: remaining,
           dueDate: due,
@@ -156,8 +192,72 @@ export default function UnpaidCollectionsPage() {
   const totalRecords = showReport ? filteredData.length : unpaidRecords.length;
   const totalAmount = filteredData.reduce((sum, item) => sum + item.remainingAmount, 0);
 
+  const packageCounts = useMemo(() => packageSubscriberCounts(connections as Connection[]), [connections]);
+
+  const packageWiseData = useMemo(() => buildPackageWiseReport(packageCounts, filteredData), [packageCounts, filteredData]);
+
   const exportExcel = () => {
     if (filteredData.length === 0) return;
+
+    if (reportType === 'system-dates') {
+      const excel = systemDatesExcel(filteredData.map(toSystemDateRow));
+      const csvContent = [excel.headers.join(','), ...excel.rows.map((r) => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `unpaid-collections-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    if (reportType === 'internet-package-amount') {
+      const excel = internetPackageExcel(filteredData.map(toInternetPackageRow));
+      const csvContent = [excel.headers.join(','), ...excel.rows.map((r) => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `unpaid-collections-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    if (reportType === 'package-wise') {
+      const excel = packageWiseExcel(packageWiseData);
+      const csvContent = [excel.headers.join(','), ...excel.rows.map((r) => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `unpaid-collections-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    if (reportType === 'with-package') {
+      const excel = withPackageExcel(packageWiseData);
+      const csvContent = [excel.headers.join(','), ...excel.rows.map((r) => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `unpaid-collections-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      return;
+    }
 
     const headers = ['Subscriber Name', 'Billing Period', 'Amount', 'Paid Amount', 'Remaining Amount', 'Due Date', 'Sublocality', 'Connection Type'];
     const rows = filteredData.map((item) => [
@@ -189,6 +289,71 @@ export default function UnpaidCollectionsPage() {
 
   if (showInvoice) {
     const accent = { title: 'text-amber-600', border: 'border-amber-600', headerBg: 'bg-amber-600', rowHover: 'hover:bg-amber-50/50' };
+
+    if (reportType === 'system-dates') {
+      return (
+        <div className="p-6">
+          <SubscriberReportInvoice<SystemDateRow>
+            title="UNPAID COLLECTIONS"
+            subtitle={`From: ${format(filterFromDate, 'dd MMM yyyy')} — To: ${format(filterToDate, 'dd MMM yyyy')}`}
+            accent={accent}
+            data={filteredData.map(toSystemDateRow)}
+            columns={systemDatesInvoiceColumns()}
+            emptyMessage="No unpaid collections found for the selected criteria."
+            onBack={() => setShowInvoice(false)}
+          />
+        </div>
+      );
+    }
+
+    if (reportType === 'internet-package-amount') {
+      return (
+        <div className="p-6">
+          <SubscriberReportInvoice<InternetPackageRow>
+            title="UNPAID COLLECTIONS"
+            subtitle={`From: ${format(filterFromDate, 'dd MMM yyyy')} — To: ${format(filterToDate, 'dd MMM yyyy')}`}
+            accent={accent}
+            data={filteredData.map(toInternetPackageRow)}
+            columns={internetPackageInvoiceColumns()}
+            emptyMessage="No unpaid collections found for the selected criteria."
+            onBack={() => setShowInvoice(false)}
+          />
+        </div>
+      );
+    }
+
+    if (reportType === 'package-wise') {
+      return (
+        <div className="p-6">
+          <SubscriberReportInvoice<PackageWiseRow>
+            title="UNPAID COLLECTIONS"
+            subtitle={`From: ${format(filterFromDate, 'dd MMM yyyy')} — To: ${format(filterToDate, 'dd MMM yyyy')}`}
+            accent={accent}
+            data={packageWiseData}
+            columns={packageWiseInvoiceColumns()}
+            emptyMessage="No unpaid collections found for the selected criteria."
+            onBack={() => setShowInvoice(false)}
+          />
+        </div>
+      );
+    }
+
+    if (reportType === 'with-package') {
+      return (
+        <div className="p-6">
+          <SubscriberReportInvoice<PackageWiseRow>
+            title="UNPAID COLLECTIONS"
+            subtitle={`From: ${format(filterFromDate, 'dd MMM yyyy')} — To: ${format(filterToDate, 'dd MMM yyyy')}`}
+            accent={accent}
+            data={packageWiseData}
+            columns={withPackageInvoiceColumns()}
+            emptyMessage="No unpaid collections found for the selected criteria."
+            onBack={() => setShowInvoice(false)}
+          />
+        </div>
+      );
+    }
+
     const columns: InvoiceColumn<UnpaidRecord>[] = [
       { header: '#', render: (_: UnpaidRecord, i: number) => <span className="font-mono text-xs text-gray-500">{i + 1}</span> },
       { header: 'Subscriber Name', render: (r) => <span className="font-semibold">{r.subscriberName}</span> },
@@ -383,6 +548,15 @@ export default function UnpaidCollectionsPage() {
             ) : (
               <>
                 <div className="min-w-0 overflow-x-auto">
+                  {reportType === 'system-dates' ? (
+                    <SubscriberSystemDatesTable rows={paginatedData.map(toSystemDateRow)} />
+                  ) : reportType === 'internet-package-amount' ? (
+                    <SubscriberInternetPackageTable rows={paginatedData.map(toInternetPackageRow)} />
+                  ) : reportType === 'package-wise' ? (
+                    <SubscriberPackageWiseTable rows={packageWiseData} />
+                  ) : reportType === 'with-package' ? (
+                    <SubscriberWithPackageTable rows={packageWiseData} />
+                  ) : (
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -421,9 +595,10 @@ export default function UnpaidCollectionsPage() {
                           <TableCell>{item.sublocality || '---'}</TableCell>
                           <TableCell className="capitalize">{item.connectionType || '---'}</TableCell>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                    ))}
+                  </TableBody>
+                </Table>
+                  )}
                 </div>
 
                 {/* Pagination */}

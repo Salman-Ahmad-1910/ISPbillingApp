@@ -16,10 +16,14 @@ import { cn } from '@/lib/utils';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
+import SubscriberSystemDatesTable, { systemDatesExcel, systemDatesInvoiceColumns, type SystemDateRow } from '@/components/shared/subscriber-system-dates';
+import SubscriberInternetPackageTable, { internetPackageExcel, internetPackageInvoiceColumns, type InternetPackageRow } from '@/components/shared/subscriber-internet-package';
+import SubscriberPackageWiseTable, { packageWiseExcel, packageWiseInvoiceColumns, withPackageExcel, withPackageInvoiceColumns, SubscriberWithPackageTable, buildPackageWiseReport, packageSubscriberCounts, connectionPackageName, type PackageWiseRow } from '@/components/shared/subscriber-package-wise';
 import { SUBSCRIBER_REPORT_TYPE_OPTIONS, matchesReportType, type ReportTypeConn } from '@/lib/subscriber-report-types';
 
 interface MonthDefaulterRecord {
   id: string;
+  connectionId: string;
   subscriberName: string;
   subscriberId: string;
   phone: string;
@@ -29,7 +33,34 @@ interface MonthDefaulterRecord {
   month: string;
   recordDate: string;
   amount: number;
+  packageAmount: number;
+  packageName: string;
   status: string;
+}
+
+function toSystemDateRow(item: MonthDefaulterRecord): SystemDateRow {
+  return {
+    id: item.id,
+    connectionId: item.connectionId || undefined,
+    billNo: item.id || undefined,
+    internetId: item.subscriberId || undefined,
+    name: item.subscriberName,
+    address: item.address,
+    amount: item.amount,
+  };
+}
+
+function toInternetPackageRow(item: MonthDefaulterRecord): InternetPackageRow {
+  return {
+    id: item.id,
+    connectionId: item.connectionId || undefined,
+    billNo: item.id || undefined,
+    internetId: item.subscriberId || undefined,
+    name: item.subscriberName,
+    address: item.address,
+    amount: item.amount,
+    packageAmount: item.packageAmount,
+  };
 }
 
 function resolveAreaName(areas: any[], sublocalityId?: string): string {
@@ -105,6 +136,7 @@ export default function MonthDefaultersPage() {
         const periodDate = parseBillingPeriod(inv.billingPeriod);
         return {
           id: inv.id,
+          connectionId: conn?.id || '',
           subscriberName: inv.subscriberName || conn?.name || '',
           subscriberId: conn?.internetId || '',
           phone: conn?.cell || conn?.mobile || '',
@@ -114,6 +146,8 @@ export default function MonthDefaultersPage() {
           month: monthValue,
           recordDate: periodDate ? periodDate.toISOString() : '',
           amount: Number(inv.remainingAmount) || 0,
+          packageAmount: Number(conn?.sameAmount) || 0,
+          packageName: connectionPackageName(conn),
           status: conn?.status || inv.status || 'active',
         };
       });
@@ -138,17 +172,84 @@ export default function MonthDefaultersPage() {
 
       const itemDate = item.recordDate ? new Date(item.recordDate) : new Date(0);
       if (isNaN(itemDate.getTime())) return false;
-      const typeMatch = matchesReportType({ reportType, itemDate, conn: connById.get(item.id), from, to });
+      const typeMatch = matchesReportType({ reportType, itemDate, conn: connById.get(item.connectionId), from, to });
 
       return monthMatch && sublocalityMatch && typeMatch && connectionMatch;
     });
   }, [allRecords, month, sublocality, reportType, connectionType, historyFromDate, historyToDate, connById]);
+
+  const packageCounts = useMemo(() => {
+    const base = (connections as any[]).filter((c: any) => connectionType === 'both' || c.connectionType === connectionType);
+    return packageSubscriberCounts(base);
+  }, [connections, connectionType]);
+
+  const packageWiseData = useMemo(() => buildPackageWiseReport(packageCounts, filteredData), [packageCounts, filteredData]);
 
   const totalConnections = filteredData.length;
   const totalAmount = filteredData.reduce((sum, item) => sum + item.amount, 0);
 
   const exportExcel = () => {
     if (filteredData.length === 0) return;
+
+    if (reportType === 'system-dates') {
+      const excel = systemDatesExcel(filteredData.map(toSystemDateRow));
+      const csvContent = [excel.headers.join(','), ...excel.rows.map((r) => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `month-wise-defaulters-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    if (reportType === 'internet-package-amount') {
+      const excel = internetPackageExcel(filteredData.map(toInternetPackageRow));
+      const csvContent = [excel.headers.join(','), ...excel.rows.map((r) => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `month-wise-defaulters-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    if (reportType === 'package-wise') {
+      const excel = packageWiseExcel(packageWiseData);
+      const csvContent = [excel.headers.join(','), ...excel.rows.map((r) => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `month-wise-defaulters-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    if (reportType === 'with-package') {
+      const excel = withPackageExcel(packageWiseData);
+      const csvContent = [excel.headers.join(','), ...excel.rows.map((r) => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `month-wise-defaulters-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      return;
+    }
 
     const headers = ['Subscriber Name', 'Subscriber ID', 'Phone', 'Address', 'Sublocality', 'Connection Type', 'Month', 'Amount', 'Status'];
     const rows = filteredData.map((item) => [
@@ -175,6 +276,71 @@ export default function MonthDefaultersPage() {
 
   if (showInvoice) {
     const accent = { title: 'text-indigo-600', border: 'border-indigo-600', headerBg: 'bg-indigo-600', rowHover: 'hover:bg-indigo-50/50' };
+
+    if (reportType === 'system-dates') {
+      return (
+        <div className="p-6">
+          <SubscriberReportInvoice<SystemDateRow>
+            title="MONTH WISE DEFAULTERS REPORT"
+            subtitle={`From: ${format(historyFromDate, 'dd MMM yyyy')} — To: ${format(historyToDate, 'dd MMM yyyy')}`}
+            accent={accent}
+            data={filteredData.map(toSystemDateRow)}
+            columns={systemDatesInvoiceColumns()}
+            emptyMessage="No month wise defaulters found for the selected criteria."
+            onBack={() => setShowInvoice(false)}
+          />
+        </div>
+      );
+    }
+
+    if (reportType === 'internet-package-amount') {
+      return (
+        <div className="p-6">
+          <SubscriberReportInvoice<InternetPackageRow>
+            title="MONTH WISE DEFAULTERS REPORT"
+            subtitle={`From: ${format(historyFromDate, 'dd MMM yyyy')} — To: ${format(historyToDate, 'dd MMM yyyy')}`}
+            accent={accent}
+            data={filteredData.map(toInternetPackageRow)}
+            columns={internetPackageInvoiceColumns()}
+            emptyMessage="No month wise defaulters found for the selected criteria."
+            onBack={() => setShowInvoice(false)}
+          />
+        </div>
+      );
+    }
+
+    if (reportType === 'package-wise') {
+      return (
+        <div className="p-6">
+          <SubscriberReportInvoice<PackageWiseRow>
+            title="MONTH WISE DEFAULTERS REPORT"
+            subtitle={`From: ${format(historyFromDate, 'dd MMM yyyy')} — To: ${format(historyToDate, 'dd MMM yyyy')}`}
+            accent={accent}
+            data={packageWiseData}
+            columns={packageWiseInvoiceColumns()}
+            emptyMessage="No month wise defaulters found for the selected criteria."
+            onBack={() => setShowInvoice(false)}
+          />
+        </div>
+      );
+    }
+
+    if (reportType === 'with-package') {
+      return (
+        <div className="p-6">
+          <SubscriberReportInvoice<PackageWiseRow>
+            title="MONTH WISE DEFAULTERS REPORT"
+            subtitle={`From: ${format(historyFromDate, 'dd MMM yyyy')} — To: ${format(historyToDate, 'dd MMM yyyy')}`}
+            accent={accent}
+            data={packageWiseData}
+            columns={withPackageInvoiceColumns()}
+            emptyMessage="No month wise defaulters found for the selected criteria."
+            onBack={() => setShowInvoice(false)}
+          />
+        </div>
+      );
+    }
+
     const columns: InvoiceColumn<MonthDefaulterRecord>[] = [
       { header: '#', render: (_: MonthDefaulterRecord, i: number) => <span className="font-mono text-xs text-gray-500">{i + 1}</span> },
       { header: 'Subscriber Name', render: (r) => <span className="font-semibold">{r.subscriberName}</span> },
@@ -371,6 +537,15 @@ export default function MonthDefaultersPage() {
               </div>
             ) : (
               <div className="min-w-0 overflow-x-auto">
+                {reportType === 'system-dates' ? (
+                  <SubscriberSystemDatesTable rows={filteredData.map(toSystemDateRow)} />
+                ) : reportType === 'internet-package-amount' ? (
+                  <SubscriberInternetPackageTable rows={filteredData.map(toInternetPackageRow)} />
+                ) : reportType === 'package-wise' ? (
+                  <SubscriberPackageWiseTable rows={packageWiseData} />
+                ) : reportType === 'with-package' ? (
+                  <SubscriberWithPackageTable rows={packageWiseData} />
+                ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -416,6 +591,7 @@ export default function MonthDefaultersPage() {
                     ))}
                   </TableBody>
                 </Table>
+                )}
               </div>
             )}
           </CardContent>

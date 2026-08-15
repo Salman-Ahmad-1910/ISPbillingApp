@@ -32,7 +32,7 @@ import { useCompany } from '@/context/company-context';
 import { useQueryClient } from '@tanstack/react-query';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
-import { smartMatch } from '@/lib/search';
+import { smartMatchScore } from '@/lib/search';
 import api from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
 import { Loader2, MoreHorizontal, PlusCircle, TriangleAlert, Users, DollarSign, AlertTriangle, UserCheck } from 'lucide-react';
@@ -126,9 +126,12 @@ export default function BadDebtCollectionsPage() {
   // --- Subscriber selection ---
   const filteredSubscribers = useMemo(() => {
     if (!subscriberSearch.trim()) return [];
-    return overdueConnections.filter(c =>
-      smartMatch(subscriberSearch, [c.id, c.internetId, c.cell, c.mobile], [c.name])
-    );
+    const q = subscriberSearch.trim();
+    return overdueConnections
+      .map(c => ({ c, s: smartMatchScore(q, [c.internetId, c.id, c.cell, c.mobile], [c.name]) }))
+      .filter(x => x.s >= 0)
+      .sort((a, b) => a.s - b.s)
+      .map(x => x.c);
   }, [overdueConnections, subscriberSearch]);
 
   const selectedSubscriber = useMemo(() => {
@@ -351,7 +354,7 @@ export default function BadDebtCollectionsPage() {
                             setSubscriberSearch('');
                           }}
                         >
-                          <span className="font-mono font-medium">{c.id}</span>
+                          <span className="font-mono font-medium">{c.internetId || c.id?.slice(0, 8)}</span>
                           <span className="ml-2 text-muted-foreground">{c.name}</span>
                           {(c.cell || c.mobile) && (
                             <span className="ml-2 text-xs text-muted-foreground">• {c.cell || c.mobile}</span>
@@ -364,7 +367,7 @@ export default function BadDebtCollectionsPage() {
                 {selectedSubscriber && (
                   <div className="flex items-center gap-2 text-sm">
                     <Badge variant="secondary" className="gap-1">
-                      <span className="font-mono">{selectedSubscriber.id}</span>
+                      <span className="font-mono">{selectedSubscriber.internetId || selectedSubscriber.id?.slice(0, 8)}</span>
                       <span className="text-muted-foreground">•</span>
                       <span>{selectedSubscriber.name}</span>
                       <button

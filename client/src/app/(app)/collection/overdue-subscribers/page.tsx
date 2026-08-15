@@ -11,7 +11,7 @@ import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { Button } from '@/components/ui/button';
 import type { Connection } from '@/lib/types';
-import { smartMatch } from '@/lib/search';
+import { smartMatchScore } from '@/lib/search';
 
 function getDaysSince(dateStr: string): number {
   if (!dateStr) return 0;
@@ -60,7 +60,12 @@ export default function OverdueSubscribersPage() {
 
   const filteredSubscribers = useMemo(() => {
     if (!search.trim()) return overdueSubscribers;
-    return overdueSubscribers.filter(c => smartMatch(search, [c.id, c.internetId], [c.name]));
+    const q = search.trim();
+    return overdueSubscribers
+      .map(c => ({ c, s: smartMatchScore(q, [c.internetId, c.id, c.cell, c.mobile], [c.name]) }))
+      .filter(x => x.s >= 0)
+      .sort((a, b) => a.s - b.s)
+      .map(x => x.c);
   }, [overdueSubscribers, search]);
 
   const totalPending = filteredSubscribers.reduce((sum, c) => sum + getTotalOwed(c), 0);

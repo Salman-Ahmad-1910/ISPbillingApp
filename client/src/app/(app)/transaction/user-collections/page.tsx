@@ -35,6 +35,7 @@ import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
+import { smartMatchScore } from '@/lib/search';
 import { Loader2, MoreHorizontal, Wallet, DollarSign, UserCheck, Trash2, Pencil, Copy, FileText, Users, CalendarClock, AlertCircle } from 'lucide-react';
 
 import type { Connection, Payment, Area, RecoveryOfficer, TransactionType, PromiseEntry } from '@/lib/types';
@@ -119,17 +120,22 @@ export default function SubscriberCollectionsPage() {
   const filteredSubscribers = useMemo(() => {
     const q = subscriberSearch.trim();
     if (!q) return [];
-    const ql = q.toLowerCase();
     const all = connections as Connection[];
-    // Search both the alphanumeric ID (e.g. INT-123) and the name with the
-    // same substring matching, plus phone numbers.
-    const match = (c: Connection) =>
-      String(c.internetId || '').toLowerCase().includes(ql) ||
-      String(c.id || '').toLowerCase().includes(ql) ||
-      String(c.name || '').toLowerCase().includes(ql) ||
-      String(c.cell || '').toLowerCase().includes(ql) ||
-      String(c.mobile || '').toLowerCase().includes(ql);
-    return all.filter(match);
+    // Ranked, tiered search:
+    //   tier 0 = internetId / id   (highest priority — always checked)
+    //   tier 1 = name              (only once 3+ chars typed and no id match)
+    //   tier 2 = cell / mobile     (only once 3+ chars typed and no id/name match)
+    // Keeping phone numbers in their own, lowest tier stops something like
+    // "502" inside a phone number from tying with (and burying) the real
+    // "INT-502" id match — id matches now always sort to the very top.
+    return all
+      .map((c) => ({
+        c,
+        s: smartMatchScore(q, [c.internetId, c.id], [c.name], [c.cell, c.mobile]),
+      }))
+      .filter((x) => x.s >= 0)
+      .sort((a, b) => a.s - b.s)
+      .map((x) => x.c);
   }, [connections, subscriberSearch]);
 
   const selectedSubscriber = useMemo(() => {
@@ -298,8 +304,8 @@ export default function SubscriberCollectionsPage() {
 
   const handleReceive = async () => {
     if (!selectedSubscriber || !user) return;
-    if (!selectedTransactionTypeId) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Please select a transaction type (Cash, Easypaisa, JazzCash, or a bank name).' });
+    if (receiveMethod !== 'cash' && !selectedTransactionTypeId) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Please select a transaction type (Easypaisa, JazzCash, or a bank name).' });
       return;
     }
     setIsSaving(true);
@@ -311,7 +317,7 @@ export default function SubscriberCollectionsPage() {
         paymentDate: receiveDate,
         method: receiveMethod,
         transactionId: receiveTransactionId.trim(),
-        transactionType: selectedTransactionTypeId,
+        transactionType: receiveMethod === 'cash' ? 'cash' : selectedTransactionTypeId,
         collectorId: user.id,
       });
       if (selectedPromiseId) {
@@ -745,7 +751,7 @@ export default function SubscriberCollectionsPage() {
 
       {/* Receive Payment Dialog */}
       <Dialog open={showReceiveDialog} onOpenChange={(open) => { setShowReceiveDialog(open); if (!open) setSelectedPromiseId(null); }}>
-        <DialogContent className="max-w-md max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Receive Payment</DialogTitle>
           </DialogHeader>
@@ -838,17 +844,19 @@ export default function SubscriberCollectionsPage() {
                 allowClear={false}
               />
             </div>
-            <div className="space-y-1">
-              <Label>Transaction Type</Label>
-              <SearchableSelect
-                value={selectedTransactionTypeId}
-                onValueChange={(v) => { if (v) setSelectedTransactionTypeId(v); }}
-                options={filteredTransactionTypes.map(t => ({ id: t.paymentChannel || t.transaction, name: t.paymentChannel || t.transaction }))}
-                placeholder="Select transaction type (Cash, Easypaisa, etc.)..."
-                searchPlaceholder="Search transaction type..."
-                allowClear={false}
-              />
-            </div>
+            {receiveMethod !== 'cash' && (
+              <div className="space-y-1">
+                <Label>Transaction Type</Label>
+                <SearchableSelect
+                  value={selectedTransactionTypeId}
+                  onValueChange={(v) => { if (v) setSelectedTransactionTypeId(v); }}
+                  options={filteredTransactionTypes.map(t => ({ id: t.paymentChannel || t.transaction, name: t.paymentChannel || t.transaction }))}
+                  placeholder="Select transaction type (Easypaisa, JazzCash, etc.)..."
+                  searchPlaceholder="Search transaction type..."
+                  allowClear={false}
+                />
+              </div>
+            )}
             {receiveMethod !== 'cash' && (
               <div className="space-y-1">
                 <Label>Transaction ID</Label>
@@ -868,9 +876,56 @@ export default function SubscriberCollectionsPage() {
                 rows={2}
               />
             </div>
+
+            <div className="space-y-1">
+              <Label className="text-sm font-semibold">Entry Preview</Label>
+              <div className="overflow-x-auto rounded-md border">
+                <Table className="text-xs">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="py-1 px-1.5 whitespace-nowrap">Bill #</TableHead>
+                      <TableHead className="py-1 px-1.5 whitespace-nowrap">Subscriber ID</TableHead>
+                      <TableHead className="py-1 px-1.5 whitespace-nowrap">Name</TableHead>
+                      <TableHead className="py-1 px-1.5 whitespace-nowrap">Address</TableHead>
+                      <TableHead className="py-1 px-1.5 whitespace-nowrap">Month/Year</TableHead>
+                      <TableHead className="py-1 px-1.5 whitespace-nowrap">Payment Type</TableHead>
+                      <TableHead className="py-1 px-1.5 whitespace-nowrap">Transaction ID</TableHead>
+                      <TableHead className="py-1 px-1.5 whitespace-nowrap">Amount</TableHead>
+                      <TableHead className="py-1 px-1.5 whitespace-nowrap">Date</TableHead>
+                      <TableHead className="py-1 px-1.5 whitespace-nowrap">Comment</TableHead>
+                      <TableHead className="py-1 px-1.5 whitespace-nowrap">Status</TableHead>
+                      <TableHead className="py-1 px-1.5 whitespace-nowrap">Received By</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="py-1.5 px-1.5 font-mono whitespace-nowrap">NEW</TableCell>
+                      <TableCell className="py-1.5 px-1.5 font-mono whitespace-nowrap">{selectedSubscriber?.id?.slice(0, 8) || '---'}</TableCell>
+                      <TableCell className="py-1.5 px-1.5 whitespace-nowrap">{selectedSubscriber?.name || '---'}</TableCell>
+                      <TableCell className="py-1.5 px-1.5 max-w-[100px] truncate" title={selectedSubscriber?.address}>{selectedSubscriber?.address || '---'}</TableCell>
+                      <TableCell className="py-1.5 px-1.5 whitespace-nowrap">
+                        {receiveDate ? new Date(receiveDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '---'}
+                      </TableCell>
+                      <TableCell className="py-1.5 px-1.5 capitalize whitespace-nowrap">{receiveMethod || 'cash'}</TableCell>
+                      <TableCell className="py-1.5 px-1.5 font-mono whitespace-nowrap">{receiveTransactionId || '---'}</TableCell>
+                      <TableCell className="py-1.5 px-1.5 font-medium whitespace-nowrap">PKR {receiveAmount.toLocaleString()}</TableCell>
+                      <TableCell className="py-1.5 px-1.5 whitespace-nowrap">
+                        {receiveDate ? new Date(receiveDate).toLocaleDateString() : '---'}
+                      </TableCell>
+                      <TableCell className="py-1.5 px-1.5 max-w-[80px] truncate" title={receiveComment}>{receiveComment || '---'}</TableCell>
+                      <TableCell className="py-1.5 px-1.5 whitespace-nowrap">
+                        <Badge variant="default" className="bg-green-600 text-[10px] px-1.5 py-0">Paid</Badge>
+                      </TableCell>
+                      <TableCell className="py-1.5 px-1.5 whitespace-nowrap">{recoveryOfficerName}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
             <Button
               onClick={handleReceive}
-              disabled={isSaving || !receiveAmount || !selectedTransactionTypeId || receiveAmount > (isAmountLocked ? packageFee : subscriberRemaining)}
+              disabled={isSaving || !receiveAmount || (receiveMethod !== 'cash' && !selectedTransactionTypeId) || receiveAmount > (isAmountLocked ? packageFee : subscriberRemaining)}
               className="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md"
             >
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

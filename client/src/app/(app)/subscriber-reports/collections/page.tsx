@@ -17,6 +17,9 @@ import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
+import SubscriberSystemDatesTable, { systemDatesExcel, systemDatesInvoiceColumns, type SystemDateRow } from '@/components/shared/subscriber-system-dates';
+import SubscriberInternetPackageTable, { internetPackageExcel, internetPackageInvoiceColumns, type InternetPackageRow } from '@/components/shared/subscriber-internet-package';
+import SubscriberPackageWiseTable, { packageWiseExcel, packageWiseInvoiceColumns, withPackageExcel, withPackageInvoiceColumns, SubscriberWithPackageTable, buildPackageWiseReport, packageSubscriberCounts, connectionPackageName, type PackageWiseRow } from '@/components/shared/subscriber-package-wise';
 import { SUBSCRIBER_REPORT_TYPE_OPTIONS } from '@/lib/subscriber-report-types';
 import type { Connection } from '@/lib/types';
 
@@ -24,10 +27,14 @@ interface CollectionRecord {
   id: string;
   subscriberName: string;
   subscriberId: string;
+  internetId: string;
   connectionId: string;
   billId: number;
   amount: number;
+  packageAmount: number;
+  packageName: string;
   collectionDate: string;
+  systemDate: string;
   address: string;
   sublocality: string;
   connectionType: string;
@@ -75,6 +82,46 @@ function formatConnectionDiscount(record: CollectionRecord): string {
   if (record.discount && record.discount !== 'no_discount') parts.push(`Cable: ${discountLabel(record.discount)}`);
   if (record.internetDiscount && record.internetDiscount !== 'no_discount') parts.push(`Internet: ${discountLabel(record.internetDiscount)}`);
   return parts.join(', ') || 'No Discount';
+}
+
+function toSystemDateRow(item: CollectionRecord): SystemDateRow {
+  return {
+    id: item.id,
+    connectionId: item.connectionId || undefined,
+    billNo: item.billId > 0 ? item.billId : undefined,
+    internetId: item.internetId || undefined,
+    name: item.subscriberName,
+    address: item.address,
+    amount: item.amount,
+    receivingDate: item.collectionDate || undefined,
+    systemDate: item.systemDate || undefined,
+    receivedBy: item.collectedBy || undefined,
+    method: item.method || undefined,
+  };
+}
+
+function toInternetPackageRow(item: CollectionRecord): InternetPackageRow {
+  return {
+    id: item.id,
+    connectionId: item.connectionId || undefined,
+    billNo: item.billId > 0 ? item.billId : undefined,
+    internetId: item.internetId || undefined,
+    name: item.subscriberName,
+    address: item.address,
+    amount: item.amount,
+    receivingDate: item.collectionDate || undefined,
+    receivedBy: item.collectedBy || undefined,
+    packageAmount: item.packageAmount,
+  };
+}
+
+function toPackageWiseRow(item: CollectionRecord): PackageWiseRow {
+  return {
+    id: item.id,
+    packageName: item.subscriberName,
+    subscriberCount: item.billId,
+    totalAmount: item.amount,
+  };
 }
 
 export default function SubscriberReportPage() {
@@ -136,10 +183,14 @@ export default function SubscriberReportPage() {
       id: p.id,
       subscriberName: p.subscriberName || conn?.name || '',
       subscriberId: p.subscriberId || '',
+      internetId: conn?.internetId || '',
       connectionId: p.connectionId || p.subscriberId || '',
       billId: Number(p.billNo) || 0,
       amount: Number(p.amount) || 0,
+      packageAmount: Number(conn?.sameAmount) || 0,
+      packageName: connectionPackageName(conn),
       collectionDate: p.paymentDate || p.createdAt || '',
+      systemDate: p.createdAt || '',
       address: p.address || conn?.address || '',
       sublocality: p.areaName || '',
       connectionType: conn?.connectionType || p.subscriber?.connectionType || 'internet',
@@ -152,6 +203,11 @@ export default function SubscriberReportPage() {
       internetDiscount: conn?.sameDiscount || '',
     };
   }), [payments, connectionMap]);
+
+  const packageCounts = useMemo(() => {
+    const base = (connections as Connection[]).filter((c) => connectionType === 'both' || c.connectionType === connectionType);
+    return packageSubscriberCounts(base);
+  }, [connections, connectionType]);
 
   const filteredData = useMemo(() => {
     if (!showReport) return [];
@@ -190,7 +246,7 @@ export default function SubscriberReportPage() {
         case 'discount':
           return inDateRange(itemDate, from, to) && !!conn && hasDiscount(conn);
         case 'internet-package-amount':
-          return inDateRange(itemDate, from, to) && !!conn && (Number(conn.sameAmount) || 0) > 0;
+          return inDateRange(itemDate, from, to);
         case 'with-package':
           return inDateRange(itemDate, from, to) && !!conn && Boolean(conn.packageInternet || conn.packageCable);
         default:
@@ -212,12 +268,50 @@ export default function SubscriberReportPage() {
           id: `sublocality-${key}`,
           subscriberName: key,
           subscriberId: '',
+          internetId: '',
           connectionId: '',
           billId: g.count,
           amount: g.amount,
+          packageAmount: 0,
+          packageName: '',
           collectionDate: '',
+          systemDate: '',
           address: '',
           sublocality: key,
+          connectionType: '',
+          collectedBy: '',
+          method: '',
+          transactionType: '',
+          transactionId: '',
+          transactionIds: [],
+          discount: '',
+          internetDiscount: '',
+        }))
+        .sort((a, b) => b.amount - a.amount);
+    }
+
+    if (reportType === 'package-wise') {
+      const groups = new Map<string, number>();
+      items.forEach((item) => {
+        const key = item.packageName || 'No Package';
+        groups.set(key, (groups.get(key) || 0) + item.amount);
+      });
+      const names = new Set<string>([...packageCounts.keys(), ...groups.keys()]);
+      return Array.from(names)
+        .map((key): CollectionRecord => ({
+          id: `package-${key}`,
+          subscriberName: key,
+          subscriberId: '',
+          internetId: '',
+          connectionId: '',
+          billId: packageCounts.get(key) || 0,
+          amount: groups.get(key) || 0,
+          packageAmount: 0,
+          packageName: key,
+          collectionDate: '',
+          systemDate: '',
+          address: '',
+          sublocality: '',
           connectionType: '',
           collectedBy: '',
           method: '',
@@ -245,10 +339,14 @@ export default function SubscriberReportPage() {
           id: `transaction-${key}`,
           subscriberName: key,
           subscriberId: '',
+          internetId: '',
           connectionId: '',
           billId: g.subscribers.size,
           amount: g.amount,
+          packageAmount: 0,
+          packageName: '',
           collectionDate: '',
+          systemDate: '',
           address: '',
           sublocality: '',
           connectionType: '',
@@ -266,7 +364,9 @@ export default function SubscriberReportPage() {
     return items;
   }, [data, connectionMap, filterFromDate, filterToDate, reportType, connectionType, sublocality, selectedUser, showReport]);
 
-  const isGroupedReport = reportType === 'sublocality-wise' || reportType === 'transaction-wise';
+  const isGroupedReport = reportType === 'sublocality-wise' || reportType === 'package-wise' || reportType === 'transaction-wise';
+
+  const packageWiseData = useMemo(() => buildPackageWiseReport(packageCounts, filteredData), [packageCounts, filteredData]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -314,6 +414,22 @@ export default function SubscriberReportPage() {
         item.billId,
         item.amount.toFixed(2),
       ]);
+    } else if (reportType === 'system-dates') {
+      const excel = systemDatesExcel(filteredData.map(toSystemDateRow));
+      headers = excel.headers;
+      rows = excel.rows;
+    } else if (reportType === 'internet-package-amount') {
+      const excel = internetPackageExcel(filteredData.map(toInternetPackageRow));
+      headers = excel.headers;
+      rows = excel.rows;
+    } else if (reportType === 'package-wise') {
+      const excel = packageWiseExcel(filteredData.map(toPackageWiseRow));
+      headers = excel.headers;
+      rows = excel.rows;
+    } else if (reportType === 'with-package') {
+      const excel = withPackageExcel(packageWiseData);
+      headers = excel.headers;
+      rows = excel.rows;
     } else {
       headers = ['Subscriber Name', 'Bill ID', 'Amount', 'Collection Date', 'Address', 'Connection Type', 'Discount', 'Received By', 'Collected By'];
       rows = filteredData.map((item) => [
@@ -347,6 +463,71 @@ export default function SubscriberReportPage() {
 
   if (showInvoice) {
     const accent = { title: 'text-blue-600', border: 'border-blue-600', headerBg: 'bg-blue-600', rowHover: 'hover:bg-blue-50/50' };
+
+    if (reportType === 'system-dates') {
+      return (
+        <div className="p-6">
+          <SubscriberReportInvoice<SystemDateRow>
+            title="SUBSCRIBER REPORT"
+            subtitle={`From: ${format(filterFromDate, 'dd MMM yyyy')} — To: ${format(filterToDate, 'dd MMM yyyy')}`}
+            accent={accent}
+            data={filteredData.map(toSystemDateRow)}
+            columns={systemDatesInvoiceColumns()}
+            emptyMessage="No collection records found for the selected criteria."
+            onBack={() => setShowInvoice(false)}
+          />
+        </div>
+      );
+    }
+
+    if (reportType === 'internet-package-amount') {
+      return (
+        <div className="p-6">
+          <SubscriberReportInvoice<InternetPackageRow>
+            title="SUBSCRIBER REPORT"
+            subtitle={`From: ${format(filterFromDate, 'dd MMM yyyy')} — To: ${format(filterToDate, 'dd MMM yyyy')}`}
+            accent={accent}
+            data={filteredData.map(toInternetPackageRow)}
+            columns={internetPackageInvoiceColumns()}
+            emptyMessage="No collection records found for the selected criteria."
+            onBack={() => setShowInvoice(false)}
+          />
+        </div>
+      );
+    }
+
+    if (reportType === 'package-wise') {
+      return (
+        <div className="p-6">
+          <SubscriberReportInvoice<PackageWiseRow>
+            title="SUBSCRIBER REPORT"
+            subtitle={`From: ${format(filterFromDate, 'dd MMM yyyy')} — To: ${format(filterToDate, 'dd MMM yyyy')}`}
+            accent={accent}
+            data={filteredData.map(toPackageWiseRow)}
+            columns={packageWiseInvoiceColumns()}
+            emptyMessage="No collection records found for the selected criteria."
+            onBack={() => setShowInvoice(false)}
+          />
+        </div>
+      );
+    }
+
+    if (reportType === 'with-package') {
+      return (
+        <div className="p-6">
+          <SubscriberReportInvoice<PackageWiseRow>
+            title="SUBSCRIBER REPORT"
+            subtitle={`From: ${format(filterFromDate, 'dd MMM yyyy')} — To: ${format(filterToDate, 'dd MMM yyyy')}`}
+            accent={accent}
+            data={packageWiseData}
+            columns={withPackageInvoiceColumns()}
+            emptyMessage="No collection records found for the selected criteria."
+            onBack={() => setShowInvoice(false)}
+          />
+        </div>
+      );
+    }
+
     const columns: InvoiceColumn<CollectionRecord>[] = reportType === 'transaction-wise'
       ? [
           { header: '#', render: (_: CollectionRecord, i: number) => <span className="font-mono text-xs text-gray-500">{i + 1}</span> },
@@ -576,7 +757,15 @@ export default function SubscriberReportPage() {
             ) : (
               <>
                 <div className="min-w-0 overflow-x-auto">
-                  {reportType === 'transaction-wise' ? (
+                  {reportType === 'system-dates' ? (
+                    <SubscriberSystemDatesTable rows={paginatedData.map(toSystemDateRow)} />
+                  ) : reportType === 'internet-package-amount' ? (
+                    <SubscriberInternetPackageTable rows={paginatedData.map(toInternetPackageRow)} />
+                  ) : reportType === 'package-wise' ? (
+                    <SubscriberPackageWiseTable rows={paginatedData.map(toPackageWiseRow)} />
+                  ) : reportType === 'with-package' ? (
+                    <SubscriberWithPackageTable rows={packageWiseData} />
+                  ) : reportType === 'transaction-wise' ? (
                     <Table>
                       <TableHeader>
                         <TableRow>
