@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CircleDollarSign, Users, Wallet, Clock, CheckCircle2, XCircle, ArrowUpRight, LayoutDashboard, Landmark, CreditCard } from 'lucide-react';
+import { CircleDollarSign, Users, Wallet, Clock, CheckCircle2, XCircle, ArrowUpRight, LayoutDashboard, Landmark, CreditCard, ChevronDown, ChevronUp, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertCircle, Ticket } from 'lucide-react';
@@ -36,6 +36,7 @@ export default function DashboardPage() {
   const currentCompany = companies.find(c => c.id === companyId);
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showSummary, setShowSummary] = useState(false);
   const [targetAmount, setTargetAmount] = useState<number>(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem(`collection_target_${companyId}`);
@@ -183,6 +184,49 @@ export default function DashboardPage() {
           />
         </div>
       </div>
+
+      <button
+        onClick={() => setShowSummary(!showSummary)}
+        className="w-full flex items-center justify-center gap-2 py-2 px-4 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors rounded-lg border border-dashed hover:border-solid hover:bg-muted/50"
+      >
+        {showSummary ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        {showSummary ? 'Hide Summary' : 'Show Summary'}
+      </button>
+
+      {showSummary && (
+        <div className="flex flex-wrap items-stretch gap-3">
+          <Link href="/collection/pending-subscribers" className="block flex-1 min-w-[180px] max-w-[280px]">
+            <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[160px] cursor-pointer h-full">
+              <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-amber-500 to-orange-500" />
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
+                <CardTitle className="text-[11px] font-medium leading-tight">Pending Subscribers</CardTitle>
+                <div className="rounded-lg p-1.5 bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md">
+                  <Clock className="h-3 w-3" />
+                </div>
+              </CardHeader>
+              <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
+                <div className="text-2xl font-bold tracking-tight">{data?.subscribersStats?.pending || 0}</div>
+                <p className="text-xs text-muted-foreground mt-1">paid less than package fee</p>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/collection/advance-subscribers" className="block flex-1 min-w-[180px] max-w-[280px]">
+            <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[160px] cursor-pointer h-full">
+              <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-emerald-500 to-green-500" />
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
+                <CardTitle className="text-[11px] font-medium leading-tight">Advance Subscribers</CardTitle>
+                <div className="rounded-lg p-1.5 bg-gradient-to-br from-emerald-500 to-green-500 text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md">
+                  <TrendingUp className="h-3 w-3" />
+                </div>
+              </CardHeader>
+              <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
+                <div className="text-2xl font-bold tracking-tight">{data?.subscribersStats?.advance || 0}</div>
+                <p className="text-xs text-muted-foreground mt-1">paid more than package fee</p>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
+      )}
 
       <div className="mt-8 grid gap-8 md:grid-cols-2 lg:grid-cols-7">
         <div className="lg:col-span-4 transition-all duration-300 rounded-xl">

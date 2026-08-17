@@ -36,7 +36,7 @@ import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
 import { smartMatchScore } from '@/lib/search';
-import { Loader2, MoreHorizontal, Wallet, DollarSign, UserCheck, Trash2, Pencil, Copy, FileText, Users, CalendarClock, AlertCircle } from 'lucide-react';
+import { Loader2, MoreHorizontal, Wallet, DollarSign, UserCheck, Trash2, Pencil, Copy, FileText, Users, CalendarClock } from 'lucide-react';
 
 import type { Connection, Payment, Area, RecoveryOfficer, TransactionType, PromiseEntry } from '@/lib/types';
 import { SubscriberPrintDialog } from './_components/subscriber-print-dialog';
@@ -62,12 +62,6 @@ function getTotalOwed(c: Connection): number {
   const months = getMonthsSince(activeDate);
   return remaining + getPackagePrice(c) * Math.max(0, months);
 }
-
-const PAYMENT_TYPE_OPTIONS = [
-  { id: 'cash', name: 'Cash' },
-  { id: 'bank', name: 'Bank' },
-  { id: 'online', name: 'Online' },
-];
 
 const STATUS_OPTIONS = [
   { id: 'paid', name: 'Paid' },
@@ -96,7 +90,6 @@ export default function SubscriberCollectionsPage() {
   const [receiveComment, setReceiveComment] = useState('');
   const [receiveTransactionId, setReceiveTransactionId] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [selectedTransactionTypeId, setSelectedTransactionTypeId] = useState('');
 
   const [printPayment, setPrintPayment] = useState<Payment | null>(null);
   const [printPromise, setPrintPromise] = useState<PromiseEntry | null>(null);
@@ -121,14 +114,8 @@ export default function SubscriberCollectionsPage() {
     const q = subscriberSearch.trim();
     if (!q) return [];
     const all = connections as Connection[];
-    // Ranked, tiered search:
-    //   tier 0 = internetId / id   (highest priority — always checked)
-    //   tier 1 = name              (only once 3+ chars typed and no id match)
-    //   tier 2 = cell / mobile     (only once 3+ chars typed and no id/name match)
-    // Keeping phone numbers in their own, lowest tier stops something like
-    // "502" inside a phone number from tying with (and burying) the real
-    // "INT-502" id match — id matches now always sort to the very top.
     return all
+      .filter(c => c.paymentStatus !== 'advance' && getPackagePrice(c) > 0)
       .map((c) => ({
         c,
         s: smartMatchScore(q, [c.internetId, c.id], [c.name], [c.cell, c.mobile]),
@@ -206,6 +193,15 @@ export default function SubscriberCollectionsPage() {
     });
   }, [transactionTypes]);
 
+  const mergedPaymentOptions = useMemo(() => {
+    const cashOption = { id: 'cash', name: 'Cash' };
+    const txOptions = filteredTransactionTypes.map(t => ({
+      id: t.paymentChannel || t.transaction,
+      name: t.paymentChannel || t.transaction,
+    }));
+    return [cashOption, ...txOptions];
+  }, [filteredTransactionTypes]);
+
   // Resolve the recovery officer assigned to the selected subscriber's area.
   // Chain: connection.sublocalityId (which is an Area ID) -> area -> recoveryOfficer
   // Tries both area.recoveryOfficerId and recoveryOfficer.areaId directions.
@@ -239,24 +235,42 @@ export default function SubscriberCollectionsPage() {
     return area?.subLocality || area?.locality || '';
   }, [selectedSubscriber, areas]);
 
-  const subscriberRemaining = useMemo(
-    () => (selectedSubscriber ? getTotalOwed(selectedSubscriber) : 0),
-    [selectedSubscriber],
-  );
-
   const packageFee = useMemo(
     () => (selectedSubscriber ? getPackagePrice(selectedSubscriber) : 0),
     [selectedSubscriber],
   );
 
-  const remainingDues = useMemo(
-    () => (selectedSubscriber ? Number(selectedSubscriber.remainingAmount) || 0 : 0),
-    [selectedSubscriber],
-  );
+  const totalReceivedThisMonth = useMemo(() => {
+    if (!selectedSubscriber) return 0;
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    return subscriberPayments
+      .filter((p: Payment) => {
+        if (!p.paymentDate) return false;
+        const d = new Date(p.paymentDate);
+        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+      })
+      .reduce((sum: number, p: Payment) => sum + (Number(p.amount) || 0), 0);
+  }, [selectedSubscriber, subscriberPayments]);
 
-  const isAmountLocked = remainingDues === 0 && !selectedPromiseId;
+  const remainingAmount = useMemo(() => {
+    if (!selectedSubscriber || !packageFee) return packageFee;
+    return packageFee - totalReceivedThisMonth;
+    // Negative = overpaid (advance), Positive = underpaid (pending), Zero = fully paid
+  }, [selectedSubscriber, packageFee, totalReceivedThisMonth]);
 
-  const remainingAfterPayment = Math.max(0, subscriberRemaining - receiveAmount);
+  const displayRemaining = useMemo(() => {
+    return Math.max(0, remainingAmount);
+  }, [remainingAmount]);
+
+  const advanceAmount = useMemo(() => {
+    return remainingAmount < 0 ? Math.abs(remainingAmount) : 0;
+  }, [remainingAmount]);
+
+  const afterPaymentRemaining = useMemo(() => {
+    return Math.max(0, remainingAmount - receiveAmount);
+  }, [remainingAmount, receiveAmount]);
 
   const handlePromiseSave = async () => {
     if (!selectedSubscriber || !user) return;
@@ -304,8 +318,8 @@ export default function SubscriberCollectionsPage() {
 
   const handleReceive = async () => {
     if (!selectedSubscriber || !user) return;
-    if (receiveMethod !== 'cash' && !selectedTransactionTypeId) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Please select a transaction type (Easypaisa, JazzCash, or a bank name).' });
+    if (!receiveMethod) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Please select a payment type.' });
       return;
     }
     setIsSaving(true);
@@ -317,7 +331,7 @@ export default function SubscriberCollectionsPage() {
         paymentDate: receiveDate,
         method: receiveMethod,
         transactionId: receiveTransactionId.trim(),
-        transactionType: receiveMethod === 'cash' ? 'cash' : selectedTransactionTypeId,
+        transactionType: receiveMethod,
         collectorId: user.id,
       });
       if (selectedPromiseId) {
@@ -339,7 +353,6 @@ export default function SubscriberCollectionsPage() {
       setReceiveMethod('cash');
       setReceiveComment('');
       setReceiveTransactionId('');
-      setSelectedTransactionTypeId('');
       setSelectedPromiseId(null);
     } catch (error: any) {
       const serverMsg = error.response?.data?.message || error.response?.data?.error || '';
@@ -382,7 +395,6 @@ export default function SubscriberCollectionsPage() {
     setReceiveMethod('cash');
     setReceiveComment('');
     setReceiveTransactionId('');
-    setSelectedTransactionTypeId('');
     setShowReceiveDialog(true);
   };
 
@@ -534,7 +546,7 @@ export default function SubscriberCollectionsPage() {
         {selectedSubscriber ? (
           <CardContent className="p-0">
             <div className="p-4 border-b">
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 <div>
                   <Label className="text-xs text-muted-foreground">Subscriber ID</Label>
                   <p className="font-medium font-mono text-sm">{selectedSubscriber.id?.slice(0, 8) || '---'}</p>
@@ -555,11 +567,51 @@ export default function SubscriberCollectionsPage() {
                   <Label className="text-xs text-muted-foreground">Address</Label>
                   <p className="font-medium truncate" title={selectedSubscriber.address}>{selectedSubscriber.address || '---'}</p>
                 </div>
+              </div>
+            </div>
+            <div className="p-4 border-b">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Package Fee</Label>
+                  <p className="font-semibold">PKR {packageFee.toLocaleString()}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Received This Month</Label>
+                  <p className="font-semibold">PKR {totalReceivedThisMonth.toLocaleString()}</p>
+                </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Remaining</Label>
-                  <p className={`font-medium ${getTotalOwed(selectedSubscriber) > 0 ? 'text-destructive' : 'text-green-600'}`}>
-                    PKR {getTotalOwed(selectedSubscriber).toLocaleString()}
+                  <p className="font-semibold">
+                    {displayRemaining === 0 ? (
+                      <span className="text-emerald-600">PKR 0</span>
+                    ) : (
+                      <span className="text-amber-600">PKR {displayRemaining.toLocaleString()}</span>
+                    )}
                   </p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Advance Amount</Label>
+                  <p className="font-semibold">
+                    {advanceAmount > 0 ? (
+                      <span className="text-blue-600">PKR {advanceAmount.toLocaleString()}</span>
+                    ) : (
+                      <span className="text-muted-foreground">PKR 0</span>
+                    )}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Status</Label>
+                  <div>
+                    {advanceAmount > 0 ? (
+                      <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300">Advance</Badge>
+                    ) : remainingAmount > 0 ? (
+                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300">Pending</Badge>
+                    ) : packageFee > 0 ? (
+                      <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300">Full</Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">---</span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -574,7 +626,7 @@ export default function SubscriberCollectionsPage() {
                 <CalendarClock className="mr-2 h-4 w-4" />
                 Make Promise
               </Button>
-              <Button onClick={() => { setSelectedPromiseId(null); setReceiveAmount(packageFee); setShowReceiveDialog(true); }} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
+              <Button onClick={() => { setSelectedPromiseId(null); setReceiveAmount(displayRemaining); setShowReceiveDialog(true); }} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
                 <DollarSign className="mr-2 h-4 w-4" />
                 Receive Payment
               </Button>
@@ -781,23 +833,21 @@ export default function SubscriberCollectionsPage() {
               <Label>Received By</Label>
               <Input value={recoveryOfficerName} readOnly />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label>Remaining Amount</Label>
-                <Input
-                  value={`PKR ${remainingAfterPayment.toLocaleString()}`}
-                  readOnly
-                  className={subscriberRemaining > 0 ? 'text-destructive font-semibold' : 'text-green-600 font-semibold'}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>Package Fee (PKR)</Label>
-                <Input
-                  value={`PKR ${packageFee.toLocaleString()}`}
-                  readOnly
-                  className="font-semibold"
-                />
-              </div>
+            <div className="space-y-1">
+              <Label>Package Fee (PKR)</Label>
+              <Input
+                value={packageFee.toLocaleString()}
+                readOnly
+                className="font-semibold"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Remaining (PKR)</Label>
+              <Input
+                value={displayRemaining.toLocaleString()}
+                readOnly
+                className="font-semibold"
+              />
             </div>
             <div className="space-y-1">
               <Label>Amount (PKR)</Label>
@@ -806,25 +856,24 @@ export default function SubscriberCollectionsPage() {
                 value={receiveAmount}
                 onChange={(e) => setReceiveAmount(parseFloat(e.target.value) || 0)}
                 placeholder="Enter amount"
-                readOnly={isAmountLocked}
-                max={isAmountLocked ? packageFee : subscriberRemaining}
-                className={isAmountLocked
-                  ? 'font-semibold cursor-not-allowed'
-                  : receiveAmount > subscriberRemaining ? 'border-destructive focus-visible:ring-destructive' : ''}
               />
-              {isAmountLocked && (
-                <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                  <AlertCircle className="h-3.5 w-3.5" />
-                  Remaining amount is settled. Only the package fee can be received.
-                </p>
-              )}
-              {!isAmountLocked && receiveAmount > subscriberRemaining && (
-                <p className="text-xs font-medium text-destructive flex items-center gap-1">
-                  <AlertCircle className="h-3.5 w-3.5" />
-                  Payment amount cannot exceed the remaining amount of PKR {subscriberRemaining.toLocaleString()}.
-                </p>
-              )}
             </div>
+            {receiveAmount > 0 && (
+              <div className={`rounded-md border px-3 py-2 text-sm font-medium ${
+                afterPaymentRemaining === 0
+                  ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400'
+                  : receiveAmount > displayRemaining
+                    ? 'border-blue-300 bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400'
+                    : 'border-amber-300 bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400'
+              }`}>
+                {afterPaymentRemaining === 0
+                  ? `Fully Paid — PKR ${receiveAmount.toLocaleString()} covers the remaining`
+                  : receiveAmount > displayRemaining
+                    ? `Advance — PKR ${(receiveAmount - displayRemaining).toLocaleString()} extra will be credited`
+                    : `After Payment — PKR ${afterPaymentRemaining.toLocaleString()} remaining`
+                }
+              </div>
+            )}
             <div className="space-y-1">
               <Label>Pay Date</Label>
               <Input
@@ -838,25 +887,12 @@ export default function SubscriberCollectionsPage() {
               <SearchableSelect
                 value={receiveMethod}
                 onValueChange={(v) => { if (v) setReceiveMethod(v); }}
-                options={PAYMENT_TYPE_OPTIONS}
+                options={mergedPaymentOptions}
                 placeholder="Select payment type..."
                 searchPlaceholder="Search payment type..."
                 allowClear={false}
               />
             </div>
-            {receiveMethod !== 'cash' && (
-              <div className="space-y-1">
-                <Label>Transaction Type</Label>
-                <SearchableSelect
-                  value={selectedTransactionTypeId}
-                  onValueChange={(v) => { if (v) setSelectedTransactionTypeId(v); }}
-                  options={filteredTransactionTypes.map(t => ({ id: t.paymentChannel || t.transaction, name: t.paymentChannel || t.transaction }))}
-                  placeholder="Select transaction type (Easypaisa, JazzCash, etc.)..."
-                  searchPlaceholder="Search transaction type..."
-                  allowClear={false}
-                />
-              </div>
-            )}
             {receiveMethod !== 'cash' && (
               <div className="space-y-1">
                 <Label>Transaction ID</Label>
@@ -925,7 +961,7 @@ export default function SubscriberCollectionsPage() {
 
             <Button
               onClick={handleReceive}
-              disabled={isSaving || !receiveAmount || (receiveMethod !== 'cash' && !selectedTransactionTypeId) || receiveAmount > (isAmountLocked ? packageFee : subscriberRemaining)}
+              disabled={isSaving || !receiveAmount || !receiveMethod}
               className="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md"
             >
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

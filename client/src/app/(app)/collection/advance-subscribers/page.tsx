@@ -1,0 +1,242 @@
+'use client';
+
+import { useMemo, useState } from 'react';
+import Link from 'next/link';
+import { Card, CardContent } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { TrendingUp, ArrowLeft, Users, Wallet, Loader2, Search, Trash2, Printer } from 'lucide-react';
+import { useCompany } from '@/context/company-context';
+import { useQueryClient } from '@tanstack/react-query';
+import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { useToast } from '@/hooks/use-toast';
+import api from '@/lib/api';
+import { Button } from '@/components/ui/button';
+import type { Connection } from '@/lib/types';
+import { smartMatchScore } from '@/lib/search';
+
+function getPackagePrice(c: Connection): number {
+  const cable = Number(c.amount) || 0;
+  const internet = Number(c.sameAmount) || 0;
+  if (c.connectionType === 'tv_cable') return cable;
+  if (c.connectionType === 'internet') return internet;
+  return cable + internet;
+}
+
+export default function AdvanceSubscribersPage() {
+  const { companyId, companies } = useCompany();
+  const currentCompany = companies.find(c => c.id === companyId);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const { data: connections = [], isLoading: loading } = useGenericQuery<Connection>(
+    'admin/connections',
+    companyId ?? undefined,
+  );
+
+  const advanceSubscribers = useMemo(() => {
+    return (connections as Connection[]).filter(c => c.paymentStatus === 'advance');
+  }, [connections]);
+
+  const filteredSubscribers = useMemo(() => {
+    if (!search.trim()) return advanceSubscribers;
+    const q = search.trim();
+    return advanceSubscribers
+      .map(c => ({ c, s: smartMatchScore(q, [c.internetId, c.id, c.cell, c.mobile], [c.name]) }))
+      .filter(x => x.s >= 0)
+      .sort((a, b) => a.s - b.s)
+      .map(x => x.c);
+  }, [advanceSubscribers, search]);
+
+  const handleDelete = async (c: Connection) => {
+    if (!confirm(`Reset payment status for ${c.name}? This will clear their advance status.`)) return;
+    setDeletingId(c.id);
+    try {
+      await api.put(`/admin/connections/${c.id}`, {
+        ...c,
+        paymentStatus: '',
+        remainingAmount: 0,
+      });
+      toast({ title: 'Reset', description: `${c.name} advance status has been cleared.` });
+      queryClient.invalidateQueries({ queryKey: ['admin/connections'] });
+    } catch {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to reset payment status.' });
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handlePrintAll = () => {
+    const params = new URLSearchParams();
+    if (companyId) params.set('companyId', companyId);
+    window.open(`/collection/advance-subscribers/print?${params.toString()}`, '_blank');
+  };
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="icon" asChild className="shrink-0">
+          <Link href="/dashboard">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+        </Button>
+        <div className="rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 p-2.5 text-white shadow-sm">
+          <TrendingUp className="h-5 w-5" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Advance Subscribers</h1>
+          <p className="text-sm text-muted-foreground">Subscribers who paid more than the package fee</p>
+        </div>
+      </div>
+
+      <div className="h-0.5 bg-gradient-to-r from-emerald-500/50 via-green-500/30 to-transparent" />
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Advance</p>
+                <p className="text-3xl font-bold mt-1">{advanceSubscribers.length}</p>
+              </div>
+              <div className="rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 p-2.5 text-white shadow-sm">
+                <Users className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Package Fees</p>
+                <p className="text-3xl font-bold mt-1">
+                  PKR {advanceSubscribers.reduce((sum, c) => sum + getPackagePrice(c), 0).toLocaleString()}
+                </p>
+              </div>
+              <div className="rounded-lg bg-gradient-to-br from-blue-500 to-cyan-600 p-2.5 text-white shadow-sm">
+                <Wallet className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Advanced</p>
+                <p className="text-3xl font-bold mt-1">
+                  PKR {advanceSubscribers.reduce((sum, c) => sum + Math.abs(Number(c.remainingAmount) || 0), 0).toLocaleString()}
+                </p>
+              </div>
+              <div className="rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 p-2.5 text-white shadow-sm">
+                <Wallet className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name, ID, or internet ID..."
+            className="pl-9"
+          />
+        </div>
+        {advanceSubscribers.length > 0 && (
+          <Button onClick={handlePrintAll} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm">
+            <Printer className="mr-2 h-4 w-4" />
+            Print All
+          </Button>
+        )}
+      </div>
+
+      <Card>
+        <CardContent className="pt-6">
+          {loading ? (
+            <div className="flex items-center justify-center h-32">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : filteredSubscribers.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <TrendingUp className="h-10 w-10 opacity-30 mx-auto mb-3" />
+              <p className="text-sm font-medium">No advance subscribers</p>
+              <p className="text-xs mt-1">No subscribers have made advance payments yet.</p>
+            </div>
+          ) : (
+            <div className="min-w-0 overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>#</TableHead>
+                    <TableHead>Subscriber</TableHead>
+                    <TableHead>ID</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Address</TableHead>
+                    <TableHead>Package</TableHead>
+                    <TableHead>Package Fee</TableHead>
+                    <TableHead>Advance Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="w-[80px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredSubscribers.map((c, i) => (
+                    <TableRow key={c.id}>
+                      <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                      <TableCell className="font-medium">
+                        <Link
+                          href={`/crm/subscriber-detail?connectionId=${c.id}`}
+                          className="text-blue-600 hover:underline dark:text-blue-400"
+                        >
+                          {c.name}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{c.id?.slice(0, 8) || '---'}</TableCell>
+                      <TableCell>{c.cell || c.mobile || '---'}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-[150px] truncate" title={c.address}>
+                        {c.address || '---'}
+                      </TableCell>
+                      <TableCell>{c.packageInternet || c.packageCable || '---'}</TableCell>
+                      <TableCell className="font-semibold">
+                        PKR {getPackagePrice(c).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="font-semibold text-blue-600">
+                        PKR {Math.abs(Number(c.remainingAmount) || 0).toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300">Advance</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => handleDelete(c)}
+                          disabled={deletingId === c.id}
+                        >
+                          {deletingId === c.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-3.5 w-3.5" />
+                          )}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

@@ -28,6 +28,12 @@ func GetDashboardData(c *gin.Context) {
 	config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL AND status = 'active'`, companyUUID).Scan(&activeCount)
 	config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL AND status = 'suspended'`, companyUUID).Scan(&suspendedCount)
 
+	var pendingCount int64
+	config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL AND payment_status = 'pending'`, companyUUID).Scan(&pendingCount)
+
+	var advanceCount int64
+	config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL AND payment_status = 'advance'`, companyUUID).Scan(&advanceCount)
+
 	var totalCollectionToday float64
 	config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL AND payment_date = CURRENT_DATE::text`, companyUUID).Scan(&totalCollectionToday)
 
@@ -94,6 +100,8 @@ func GetDashboardData(c *gin.Context) {
 		"subscribersStats": gin.H{
 			"active":    activeCount,
 			"suspended": suspendedCount,
+			"pending":   pendingCount,
+			"advance":   advanceCount,
 		},
 		"totalCollectionToday": totalCollectionToday,
 		"totalCollectionMonth": totalCollectionMonth,

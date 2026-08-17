@@ -186,7 +186,7 @@ func CreatePayment(c *gin.Context) {
 		return
 	}
 
-	// Update Connection's lastPaymentDate and reduce remainingAmount
+	// Update Connection's lastPaymentDate and remainingAmount (current-month model)
 	if payment.SubscriberID != nil {
 		paymentDate := payment.PaymentDate
 		if paymentDate == "" {
@@ -194,40 +194,44 @@ func CreatePayment(c *gin.Context) {
 		}
 		var conn models.Connection
 		if err := config.DB.Where("id = ?", *payment.SubscriberID).First(&conn).Error; err == nil {
-			months := 0
-			if conn.LastPaymentDate != nil && *conn.LastPaymentDate != "" {
-				lastDate, err := time.Parse("2006-01-02", *conn.LastPaymentDate)
-				if err == nil {
-					now := time.Now()
-					months = int(now.Year() - lastDate.Year())*12 + int(now.Month() - lastDate.Month())
-				}
-			} else if conn.RechargeDate != "" {
-				lastDate, err := time.Parse("2006-01-02", conn.RechargeDate)
-				if err == nil {
-					now := time.Now()
-					months = int(now.Year() - lastDate.Year())*12 + int(now.Month() - lastDate.Month())
-				}
-			} else {
-				now := time.Now()
-				months = int(now.Year()-conn.CreatedAt.Year())*12 + int(now.Month()-conn.CreatedAt.Month())
-			}
-			if months < 0 {
-				months = 0
-			}
-			monthlyFee := conn.Amount
+			// Calculate package fee based on connection type
+			packageFee := conn.Amount
 			switch conn.ConnectionType {
 			case "internet":
-				monthlyFee = conn.SameAmount
+				packageFee = conn.SameAmount
 			case "both", "tv_cable":
-				monthlyFee = conn.Amount + conn.SameAmount
+				packageFee = conn.Amount + conn.SameAmount
 			}
-			actualOwed := max(0, conn.RemainingAmount) + monthlyFee*float64(months)
-			newRemaining := max(0, actualOwed-payment.Amount)
+
+			// Sum all payments already made this month (before this new payment)
+			now := time.Now()
+			startOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+			startOfMonthStr := startOfMonth.Format("2006-01-02")
+			var totalReceivedBefore float64
+			config.DB.Raw(
+				"SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE subscriber_id = ? AND payment_date >= ? AND id <> ?",
+				*payment.SubscriberID, startOfMonthStr, payment.ID,
+			).Scan(&totalReceivedBefore)
+
+			// After this payment, total received = previous + this payment
+			totalReceivedAfter := totalReceivedBefore + payment.Amount
+			newRemaining := packageFee - totalReceivedAfter
+			// Negative = overpaid (advance), Positive = underpaid (pending), Zero = fully paid
+
+			// Classify payment status
+			paymentStatus := ""
+			if newRemaining > 0 && packageFee > 0 {
+				paymentStatus = "pending"
+			} else if newRemaining < 0 && packageFee > 0 {
+				paymentStatus = "advance"
+			}
+
 			config.DB.Model(&models.Connection{}).
 				Where("id = ?", *payment.SubscriberID).
 				UpdateColumns(map[string]interface{}{
 					"last_payment_date": paymentDate,
 					"remaining_amount":  newRemaining,
+					"payment_status":    paymentStatus,
 				})
 		}
 	}

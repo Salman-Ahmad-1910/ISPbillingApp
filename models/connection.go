@@ -39,6 +39,7 @@ type Connection struct {
 	DeactivationReason  string  `gorm:"type:varchar(255)" json:"deactivationReason"`
 	Comments            string  `gorm:"type:text" json:"comments"`
 	BadDebt             bool    `gorm:"default:false" json:"badDebt"`
+	PaymentStatus       string  `gorm:"type:varchar(20);default:''" json:"paymentStatus"` // pending, advance, or empty
 	CreatedBy           *uuid.UUID `gorm:"type:uuid;index" json:"createdBy"`
 }
 

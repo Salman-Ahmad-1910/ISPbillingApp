@@ -79,6 +79,7 @@ import {
   MessageCircle,
   BookOpen,
   Layers,
+  TrendingUp,
 } from 'lucide-react';
 import type { NavItem, NavItemGroup } from '@/lib/types';
 import { CircleDollarSign as AppIcon } from 'lucide-react';
@@ -258,6 +259,8 @@ const navItems: NavItemGroup[] = [
     title: 'Subscriber Reports',
     items: [
       { title: 'Subscriber Report', href: '/subscriber-reports/collections', icon: Wallet, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
+      { title: 'Pending Subscribers', href: '/collection/pending-subscribers', icon: Clock, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
+      { title: 'Advance Subscribers', href: '/collection/advance-subscribers', icon: TrendingUp, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
       { title: 'Deactivate Users List', href: '/subscriber-reports/deactivated-users', icon: UserSearch, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
       { title: 'Package Wise List', href: '/subscriber-reports/package-wise', icon: Box, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
       { title: 'Promise Date Reports', href: '/subscriber-reports/promise-dates', icon: FileClock, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },

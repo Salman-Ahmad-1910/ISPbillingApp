@@ -158,6 +158,7 @@ export type Connection = {
   deactivationReason?: string;
   comments?: string;
   badDebt?: boolean;
+  paymentStatus?: string;
   createdBy?: string;
   createdAt: string;
   updatedAt: string;

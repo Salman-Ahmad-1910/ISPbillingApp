@@ -48,6 +48,13 @@ func RegisterConnectionRoutes(admin *gin.RouterGroup) {
 func findConnections(c *gin.Context) {
 	companyID := c.MustGet("companyID").(uuid.UUID)
 
+	// One-time cleanup: fix stale advance entries where remaining >= 0
+	config.DB.Model(&models.Connection{}).
+		Where("company_id = ? AND deleted_at IS NULL AND payment_status = ? AND remaining_amount >= 0", companyID, "advance").
+		UpdateColumns(map[string]interface{}{
+			"payment_status": "",
+		})
+
 	var connections []models.Connection
 	db := config.DB.Scopes(models.TenantScope(companyID))
 
@@ -99,6 +106,8 @@ type connectionInput struct {
 	Comments            string  `json:"comments"`
 	Reason              string  `json:"reason"`
 	BadDebt             *bool   `json:"badDebt"`
+	PaymentStatus       *string `json:"paymentStatus"`
+	RemainingAmount     *float64 `json:"remainingAmount"`
 }
 
 func createConnection(c *gin.Context) {
@@ -303,6 +312,12 @@ func updateConnection(c *gin.Context) {
 	}
 	if input.BadDebt != nil {
 		updates["bad_debt"] = *input.BadDebt
+	}
+	if input.PaymentStatus != nil {
+		updates["payment_status"] = *input.PaymentStatus
+	}
+	if input.RemainingAmount != nil {
+		updates["remaining_amount"] = *input.RemainingAmount
 	}
 
 	// Handle splitter changes
