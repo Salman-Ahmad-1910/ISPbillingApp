@@ -136,6 +136,7 @@ func RunMigrations() {
 		&models.Message{},
 		&models.MessageTemplate{},
 		&models.SerialNumberPool{},
+		&models.SharedFile{},
 	)
 
 	if err != nil {

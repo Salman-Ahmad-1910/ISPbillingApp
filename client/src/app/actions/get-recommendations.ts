@@ -1,3 +1,5 @@
+'use server';
+
 import type { InvoiceProductRecommendationInput, InvoiceProductRecommendationOutput } from '@/ai/flows/invoice-product-recommendation';
 
 export async function getProductRecommendations(

@@ -4,9 +4,11 @@ import { useEffect, useState, useCallback } from 'react';
 
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { CircleDollarSign, Users, Wallet, Clock, CheckCircle2, XCircle, ArrowUpRight, LayoutDashboard, Landmark, CreditCard, ChevronDown, ChevronUp, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertCircle, Ticket } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
 import api from '@/lib/api';
@@ -37,6 +39,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showSummary, setShowSummary] = useState(false);
+  const [timeRange, setTimeRange] = useState<'daily' | 'monthly' | 'yearly' | 'all'>('monthly');
   const [targetAmount, setTargetAmount] = useState<number>(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem(`collection_target_${companyId}`);
@@ -49,36 +52,49 @@ export default function DashboardPage() {
     ? `${api?.defaults?.baseURL}/uploads/company_images/${currentCompany.id}`
     : null;
 
+  const fetchDashboard = useCallback(() => {
+    if (!companyId) return;
+    setLoading(true);
+    api.get(`/dashboard?companyId=${companyId}&range=${timeRange}`)
+      .then(response => {
+        setData(response.data.data);
+        setLoading(false);
+      })
+      .catch(error => {
+        console.error("Failed to fetch dashboard data", error);
+        setLoading(false);
+      });
+  }, [companyId, timeRange]);
+
   useEffect(() => {
-    if (companyId) {
-      setLoading(true);
-      api.get(`/dashboard?companyId=${companyId}`)
-        .then(response => {
-          setData(response.data.data);
-          setLoading(false);
-        })
-        .catch(error => {
-          console.error("Failed to fetch dashboard data", error);
-          setLoading(false);
-        });
-    }
-  }, [companyId]);
+    fetchDashboard();
+  }, [fetchDashboard]);
+
+  // Refresh the dashboard when the user returns to this tab after recording
+  // a payment elsewhere, so the collection / overdue cards stay in sync.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') fetchDashboard();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', fetchDashboard);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', fetchDashboard);
+    };
+  }, [fetchDashboard]);
 
   const handleTargetSave = useCallback((target: number) => {
     setTargetAmount(target);
     localStorage.setItem(`collection_target_${companyId}`, target.toString());
   }, [companyId]);
 
-  const totalCollection = data?.totalCollectionMonth || 0;
+  const totalCollection = data?.totalCollection || 0;
 
   const kpiConfig = [
     { title: 'Active Subscribers', value: data?.subscribersStats?.active || 0, icon: Users, change: `in ${companyName}`, gradient: 'from-blue-500 to-cyan-500', bgLight: 'bg-blue-50 dark:bg-blue-950/30' },
-    { title: 'Total Collection (Month)', value: `PKR ${(data?.totalCollectionMonth || 0).toLocaleString()}`, icon: Wallet, change: 'this month total', gradient: 'from-emerald-500 to-green-500', bgLight: 'bg-emerald-50 dark:bg-emerald-950/30' },
-  ];
-
-  const kpiConfigRight = [
+    { title: 'Total Collection', value: `PKR ${(data?.totalCollection || 0).toLocaleString()}`, icon: Wallet, change: `${timeRange === 'daily' ? 'today' : timeRange === 'monthly' ? 'this month' : timeRange === 'yearly' ? 'this year' : 'all time'} total`, gradient: 'from-emerald-500 to-green-500', bgLight: 'bg-emerald-50 dark:bg-emerald-950/30' },
     { title: 'Overdue Subscribers', value: data?.overdueCount || 0, icon: AlertCircle, change: 'unpaid accounts', gradient: 'from-rose-500 to-pink-500', bgLight: 'bg-rose-50 dark:bg-rose-950/30' },
-    { title: 'Total Overdue', value: `PKR ${(data?.overdueAmount || 0).toLocaleString()}`, icon: AlertCircle, change: 'past due amount', gradient: 'from-red-600 to-rose-500', bgLight: 'bg-red-50 dark:bg-red-950/30' },
   ];
 
   if (loading) {
@@ -144,37 +160,19 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-stretch gap-3">
-            {[...kpiConfig, ...kpiConfigRight].map((kpi) => {
-              const isOverdue = kpi.title === 'Total Overdue';
-              const card = (
-                <Card
-                  key={kpi.title}
-                  className={`group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 flex-1 min-w-[180px] max-w-[280px] min-h-[160px] ${isOverdue ? 'cursor-pointer' : ''}`}
-                >
-                  <div className={`absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br ${kpi.gradient}`} />
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
-                    <CardTitle className="text-[11px] font-medium leading-tight">{kpi.title}</CardTitle>
-                    <div className={`rounded-lg p-1.5 bg-gradient-to-br ${kpi.gradient} text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md`}>
-                      <kpi.icon className="h-3 w-3" />
-                    </div>
-                  </CardHeader>
-                  <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
-                    <div className="text-2xl font-bold tracking-tight">{kpi.value}</div>
-                    <p className="text-xs text-muted-foreground mt-1">{kpi.change}</p>
-                  </CardContent>
-                </Card>
-              );
-              return isOverdue ? (
-                <Link key={kpi.title} href="/collection/overdue-subscribers" className="block">
-                  {card}
-                </Link>
-              ) : (
-                card
-              );
-            })}
+            <div className="flex flex-wrap items-center justify-center gap-3 mt-6 mb-2">
+              <Link href="/drivers">
+                <Button className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700 transition-all duration-300 hover:shadow-md hover:scale-105 px-5 py-2.5 text-sm font-semibold">
+                  Drivers
+                </Button>
+              </Link>
+              <Link href="/applications">
+                <Button className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700 transition-all duration-300 hover:shadow-md hover:scale-105 px-5 py-2.5 text-sm font-semibold">
+                  Download Application
+                </Button>
+              </Link>
+            </div>
           </div>
-        </div>
 
         <div className="flex-shrink-0">
           <GaugeMeter
@@ -194,37 +192,72 @@ export default function DashboardPage() {
       </button>
 
       {showSummary && (
-        <div className="flex flex-wrap items-stretch gap-3">
-          <Link href="/collection/pending-subscribers" className="block flex-1 min-w-[180px] max-w-[280px]">
-            <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[160px] cursor-pointer h-full">
-              <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-amber-500 to-orange-500" />
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
-                <CardTitle className="text-[11px] font-medium leading-tight">Pending Subscribers</CardTitle>
-                <div className="rounded-lg p-1.5 bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md">
-                  <Clock className="h-3 w-3" />
-                </div>
-              </CardHeader>
-              <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
-                <div className="text-2xl font-bold tracking-tight">{data?.subscribersStats?.pending || 0}</div>
-                <p className="text-xs text-muted-foreground mt-1">paid less than package fee</p>
-              </CardContent>
-            </Card>
-          </Link>
-          <Link href="/collection/advance-subscribers" className="block flex-1 min-w-[180px] max-w-[280px]">
-            <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[160px] cursor-pointer h-full">
-              <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-emerald-500 to-green-500" />
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
-                <CardTitle className="text-[11px] font-medium leading-tight">Advance Subscribers</CardTitle>
-                <div className="rounded-lg p-1.5 bg-gradient-to-br from-emerald-500 to-green-500 text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md">
-                  <TrendingUp className="h-3 w-3" />
-                </div>
-              </CardHeader>
-              <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
-                <div className="text-2xl font-bold tracking-tight">{data?.subscribersStats?.advance || 0}</div>
-                <p className="text-xs text-muted-foreground mt-1">paid more than package fee</p>
-              </CardContent>
-            </Card>
-          </Link>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-muted-foreground">Summary</h3>
+            <Select value={timeRange} onValueChange={(v) => setTimeRange(v as typeof timeRange)}>
+              <SelectTrigger className="w-[140px] h-8 text-xs">
+                <SelectValue placeholder="Select range" />
+              </SelectTrigger>
+              <SelectContent portal={false}>
+                <SelectItem value="daily">Daily</SelectItem>
+                <SelectItem value="monthly">Monthly</SelectItem>
+                <SelectItem value="yearly">Yearly</SelectItem>
+                <SelectItem value="all">All</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-wrap items-stretch gap-3">
+            {kpiConfig.map((kpi) => (
+              <Card
+                key={kpi.title}
+                className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 flex-1 min-w-[180px] max-w-[280px] min-h-[160px]"
+              >
+                <div className={`absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br ${kpi.gradient}`} />
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
+                  <CardTitle className="text-[11px] font-medium leading-tight">{kpi.title}</CardTitle>
+                  <div className={`rounded-lg p-1.5 bg-gradient-to-br ${kpi.gradient} text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md`}>
+                    <kpi.icon className="h-3 w-3" />
+                  </div>
+                </CardHeader>
+                <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
+                  <div className="text-2xl font-bold tracking-tight">{kpi.value}</div>
+                  <p className="text-xs text-muted-foreground mt-1">{kpi.change}</p>
+                </CardContent>
+              </Card>
+            ))}
+            <Link href="/collection/pending-subscribers" className="block flex-1 min-w-[180px] max-w-[280px]">
+              <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[160px] cursor-pointer h-full">
+                <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-amber-500 to-orange-500" />
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
+                  <CardTitle className="text-[11px] font-medium leading-tight">Pending Subscribers</CardTitle>
+                  <div className="rounded-lg p-1.5 bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md">
+                    <Clock className="h-3 w-3" />
+                  </div>
+                </CardHeader>
+                <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
+                  <div className="text-2xl font-bold tracking-tight">{data?.subscribersStats?.pending || 0}</div>
+                  <p className="text-xs text-muted-foreground mt-1">paid less than package fee</p>
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href="/collection/advance-subscribers" className="block flex-1 min-w-[180px] max-w-[280px]">
+              <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[160px] cursor-pointer h-full">
+                <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-emerald-500 to-green-500" />
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
+                  <CardTitle className="text-[11px] font-medium leading-tight">Advance Subscribers</CardTitle>
+                  <div className="rounded-lg p-1.5 bg-gradient-to-br from-emerald-500 to-green-500 text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md">
+                    <TrendingUp className="h-3 w-3" />
+                  </div>
+                </CardHeader>
+                <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
+                  <div className="text-2xl font-bold tracking-tight">{data?.subscribersStats?.advance || 0}</div>
+                  <p className="text-xs text-muted-foreground mt-1">paid more than package fee</p>
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
         </div>
       )}
 

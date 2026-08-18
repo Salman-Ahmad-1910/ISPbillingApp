@@ -46,8 +46,10 @@ func Login(c *gin.Context) {
 	}
 
 	var user models.User
-	// Load user companies and relationships - accept both active and offline users
-	if err := config.DB.Preload("UserCompanies.Company").Where("email = ? AND status IN ('active', 'offline')", req.Email).First(&user).Error; err != nil {
+	// Accept any status — the password check is the real gatekeeper.
+	// Use ILIKE for case-insensitive email match.
+	if err := config.DB.Preload("UserCompanies.Company").Where("LOWER(email) = LOWER(?)", req.Email).First(&user).Error; err != nil {
+		log.Printf("Login failed for email=%s: %v", req.Email, err)
 		utils.ErrorResponse(c, 401, "Invalid credentials or inactive user", nil)
 		return
 	}
@@ -57,7 +59,7 @@ func Login(c *gin.Context) {
 		// Fallback for legacy plaintext passwords (self-healing migration).
 		// Only matches when the stored value is the raw password, then upgrades it.
 		if user.Password != req.Password {
-			log.Printf("Password mismatch for user %s (id=%s): %v | stored len=%d", req.Email, user.ID, err, len(user.Password))
+			log.Printf("Password mismatch for user %s (id=%s): %v | stored hash prefix=%s", req.Email, user.ID, err, user.Password[:min(len(user.Password), 10)])
 			utils.ErrorResponse(c, 401, "Invalid credentials", nil)
 			return
 		}

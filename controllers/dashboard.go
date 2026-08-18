@@ -24,6 +24,21 @@ func GetDashboardData(c *gin.Context) {
 	}
 	companyUUID := companyID.(uuid.UUID)
 
+	rangeParam := c.DefaultQuery("range", "monthly")
+	var dateFilter string
+	switch rangeParam {
+	case "daily":
+		dateFilter = "AND payment_date = CURRENT_DATE::text"
+	case "monthly":
+		dateFilter = "AND payment_date >= (DATE_TRUNC('month', CURRENT_DATE))::text"
+	case "yearly":
+		dateFilter = "AND payment_date >= (DATE_TRUNC('year', CURRENT_DATE))::text"
+	case "all":
+		dateFilter = ""
+	default:
+		dateFilter = "AND payment_date >= (DATE_TRUNC('month', CURRENT_DATE))::text"
+	}
+
 	var activeCount, suspendedCount int64
 	config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL AND status = 'active'`, companyUUID).Scan(&activeCount)
 	config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL AND status = 'suspended'`, companyUUID).Scan(&suspendedCount)
@@ -40,15 +55,15 @@ func GetDashboardData(c *gin.Context) {
 	var totalCollectionMonth float64
 	config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL AND payment_date >= (DATE_TRUNC('month', CURRENT_DATE))::text`, companyUUID).Scan(&totalCollectionMonth)
 
+	var totalCollection float64
+	config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL `+dateFilter, companyUUID).Scan(&totalCollection)
+
 	var overdueCount int64
 	config.DB.Raw(`
 		SELECT COUNT(*)
 		FROM connections
 		WHERE company_id = ? AND deleted_at IS NULL
-		AND GREATEST(remaining_amount, 0) + (amount + same_amount) * GREATEST(0,
-			EXTRACT(YEAR FROM age(CURRENT_DATE, COALESCE(last_payment_date, recharge_date, created_at::text)::date)) * 12 +
-			EXTRACT(MONTH FROM age(CURRENT_DATE, COALESCE(last_payment_date, recharge_date, created_at::text)::date))
-		) > 0
+		AND remaining_amount > 0
 	`, companyUUID).Scan(&overdueCount)
 
 	var overdueAmount float64
@@ -105,6 +120,8 @@ func GetDashboardData(c *gin.Context) {
 		},
 		"totalCollectionToday": totalCollectionToday,
 		"totalCollectionMonth": totalCollectionMonth,
+		"totalCollection":      totalCollection,
+		"range":                rangeParam,
 		"overdueCount":         overdueCount,
 		"overdueAmount":        overdueAmount,
 		"payments":             payments,

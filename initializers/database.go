@@ -275,4 +275,13 @@ func ConnectDB() {
 	}
 	log.Println("Account tables migrated successfully!")
 
+	// Shared file metadata table (drivers, application, etc.)
+	log.Println("Attempting to migrate SharedFile table...")
+	err = DB.AutoMigrate(&models.SharedFile{})
+	if err != nil {
+		log.Fatal("Failed to migrate SharedFile DB:", err)
+		return
+	}
+	log.Println("SharedFile table migrated successfully!")
+
 }

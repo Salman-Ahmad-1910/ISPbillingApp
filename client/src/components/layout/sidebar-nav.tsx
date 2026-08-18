@@ -80,6 +80,8 @@ import {
   BookOpen,
   Layers,
   TrendingUp,
+  Cpu,
+  AppWindow,
 } from 'lucide-react';
 import type { NavItem, NavItemGroup } from '@/lib/types';
 import { CircleDollarSign as AppIcon } from 'lucide-react';
@@ -281,6 +283,13 @@ const navItems: NavItemGroup[] = [
     title: 'Reports',
     items: [
       { title: 'Reports', href: '/admin/reports', icon: AreaChart, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
+    ],
+  },
+  {
+    title: 'Downloads',
+    items: [
+      { title: 'Drivers', href: '/drivers', icon: Cpu, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
+      { title: 'Application', href: '/applications', icon: AppWindow, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
     ],
   },
 ];

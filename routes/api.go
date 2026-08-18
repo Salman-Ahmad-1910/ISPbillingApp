@@ -152,15 +152,24 @@ func SetupRoutes(r *gin.Engine) {
 			upload.DELETE("/company-image", controllers.DeleteCompanyImage)
 			upload.POST("/company-stamp", controllers.UploadCompanyStamp)
 			upload.DELETE("/company-stamp", controllers.DeleteCompanyStamp)
-			upload.POST("/product-image/:id", controllers.UploadProductImage)
-		}
+		upload.POST("/product-image/:id", controllers.UploadProductImage)
+		upload.POST("/driver", controllers.UploadDriverFile)
+		upload.POST("/application", controllers.UploadApplicationFile)
+	}
 
-		// Static file serving for company images
-		api.GET("/uploads/company_images/:companyId", controllers.GetCompanyImage)
-		// Static file serving for company stamps
-		api.GET("/uploads/company_stamps/:companyId", controllers.GetCompanyStamp)
-		// Static file serving for product images
-		api.GET("/uploads/product_images/:filename", controllers.GetProductImage)
+	// Static file serving for company images
+	api.GET("/uploads/company_images/:companyId", controllers.GetCompanyImage)
+	// Static file serving for company stamps
+	api.GET("/uploads/company_stamps/:companyId", controllers.GetCompanyStamp)
+	// Static file serving for product images
+	api.GET("/uploads/product_images/:filename", controllers.GetProductImage)
+	// Static file serving for shared files (drivers, application) downloads
+	api.GET("/uploads/files/:filename", controllers.DownloadSharedFile)
+
+	// Shared file management routes
+	protected.GET("/drivers", controllers.ListDriverFiles)
+	protected.GET("/applications", controllers.ListApplications)
+	protected.DELETE("/files/:id", controllers.DeleteSharedFile)
 
 		// Network routes (with RBAC)
 		network := protected.Group("/network")

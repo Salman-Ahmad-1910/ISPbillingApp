@@ -19,9 +19,9 @@ import api from '@/lib/api';
 import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
 import SubscriberSystemDatesTable, { systemDatesExcel, systemDatesInvoiceColumns, type SystemDateRow } from '@/components/shared/subscriber-system-dates';
 import SubscriberInternetPackageTable, { internetPackageExcel, internetPackageInvoiceColumns, type InternetPackageRow } from '@/components/shared/subscriber-internet-package';
-import SubscriberPackageWiseTable, { packageWiseExcel, packageWiseInvoiceColumns, withPackageExcel, withPackageInvoiceColumns, SubscriberWithPackageTable, buildPackageWiseReport, packageSubscriberCounts, connectionPackageName, type PackageWiseRow } from '@/components/shared/subscriber-package-wise';
+import { withPackageExcel, withPackageInvoiceColumns, SubscriberWithPackageTable, buildPackageWiseReport, packageSubscriberCounts, connectionPackageName, type PackageWiseRow } from '@/components/shared/subscriber-package-wise';
 import { SUBSCRIBER_REPORT_TYPE_OPTIONS } from '@/lib/subscriber-report-types';
-import type { Connection } from '@/lib/types';
+import type { Connection, RecoveryOfficer } from '@/lib/types';
 
 interface CollectionRecord {
   id: string;
@@ -84,6 +84,26 @@ function formatConnectionDiscount(record: CollectionRecord): string {
   return parts.join(', ') || 'No Discount';
 }
 
+// For a given base amount and discount type, return the monetary discount granted.
+// quarter = 25% off, half = 50% off, full_free = 100% off, others = no discount.
+function discountValueFor(base: number, discount: string): number {
+  switch (String(discount || '').trim()) {
+    case 'quarter': return base * 0.25;
+    case 'half': return base * 0.5;
+    case 'full_free': return base;
+    default: return 0;
+  }
+}
+
+// Total discount amount granted for a collection record, computed from the
+// connection's cable + internet package fees and their respective discount types.
+function recordDiscountAmount(item: CollectionRecord, conn: Connection | undefined): number {
+  if (!conn) return 0;
+  const cableBase = Number((conn as Connection).amount) || 0;
+  const internetBase = Number((conn as Connection).sameAmount) || 0;
+  return discountValueFor(cableBase, item.discount) + discountValueFor(internetBase, item.internetDiscount);
+}
+
 function toSystemDateRow(item: CollectionRecord): SystemDateRow {
   return {
     id: item.id,
@@ -115,15 +135,6 @@ function toInternetPackageRow(item: CollectionRecord): InternetPackageRow {
   };
 }
 
-function toPackageWiseRow(item: CollectionRecord): PackageWiseRow {
-  return {
-    id: item.id,
-    packageName: item.subscriberName,
-    subscriberCount: item.billId,
-    totalAmount: item.amount,
-  };
-}
-
 export default function SubscriberReportPage() {
   const { companyId } = useCompany();
   const { toast } = useToast();
@@ -131,6 +142,8 @@ export default function SubscriberReportPage() {
   const { data: payments = [], isLoading: loading, refetch: refetchPayments } = useGenericQuery<any>('billing/payments', companyId ?? undefined);
 
   const { data: connections = [] } = useGenericQuery<Connection>('admin/connections', companyId ?? undefined);
+
+  const { data: recoveryOfficers = [] } = useGenericQuery<RecoveryOfficer>('admin/recovery-officers', companyId ?? undefined);
 
   const connectionMap = useMemo(() => {
     const map = new Map<string, Connection>();
@@ -147,7 +160,7 @@ export default function SubscriberReportPage() {
   const [filterToDate, setFilterToDate] = useState<Date>(new Date());
   const [filterToDateOpen, setFilterToDateOpen] = useState(false);
 
-  const [reportType, setReportType] = useState('all');
+  const [reportType, setReportType] = useState('transaction-wise');
   const [sublocality, setSublocality] = useState('all');
   const [connectionType, setConnectionType] = useState('both');
   const [selectedUser, setSelectedUser] = useState('all');
@@ -169,13 +182,11 @@ export default function SubscriberReportPage() {
   }, [payments]);
 
   const allUsers = useMemo(() => {
-    const set = new Set<string>();
-    payments.forEach((p: any) => {
-      const user = p.collectedByName || p.method;
-      if (user) set.add(user);
-    });
-    return Array.from(set);
-  }, [payments]);
+    return (recoveryOfficers as RecoveryOfficer[])
+      .filter((ro) => ro.status === 'active')
+      .map((ro) => ro.name)
+      .sort();
+  }, [recoveryOfficers]);
 
   const data: CollectionRecord[] = useMemo(() => payments.map((p: any) => {
     const conn = connectionMap.get(p.subscriberId || '') || connectionMap.get(p.connectionId || '');
@@ -254,117 +265,62 @@ export default function SubscriberReportPage() {
       }
     });
 
-    if (reportType === 'sublocality-wise') {
-      const groups = new Map<string, { count: number; amount: number }>();
-      items.forEach((item) => {
-        const key = item.sublocality || 'Unknown';
-        const g = groups.get(key) || { count: 0, amount: 0 };
-        g.count += 1;
-        g.amount += item.amount;
-        groups.set(key, g);
-      });
-      return Array.from(groups.entries())
-        .map(([key, g]): CollectionRecord => ({
-          id: `sublocality-${key}`,
-          subscriberName: key,
-          subscriberId: '',
-          internetId: '',
-          connectionId: '',
-          billId: g.count,
-          amount: g.amount,
-          packageAmount: 0,
-          packageName: '',
-          collectionDate: '',
-          systemDate: '',
-          address: '',
-          sublocality: key,
-          connectionType: '',
-          collectedBy: '',
-          method: '',
-          transactionType: '',
-          transactionId: '',
-          transactionIds: [],
-          discount: '',
-          internetDiscount: '',
-        }))
-        .sort((a, b) => b.amount - a.amount);
-    }
-
-    if (reportType === 'package-wise') {
-      const groups = new Map<string, number>();
-      items.forEach((item) => {
-        const key = item.packageName || 'No Package';
-        groups.set(key, (groups.get(key) || 0) + item.amount);
-      });
-      const names = new Set<string>([...packageCounts.keys(), ...groups.keys()]);
-      return Array.from(names)
-        .map((key): CollectionRecord => ({
-          id: `package-${key}`,
-          subscriberName: key,
-          subscriberId: '',
-          internetId: '',
-          connectionId: '',
-          billId: packageCounts.get(key) || 0,
-          amount: groups.get(key) || 0,
-          packageAmount: 0,
-          packageName: key,
-          collectionDate: '',
-          systemDate: '',
-          address: '',
-          sublocality: '',
-          connectionType: '',
-          collectedBy: '',
-          method: '',
-          transactionType: '',
-          transactionId: '',
-          transactionIds: [],
-          discount: '',
-          internetDiscount: '',
-        }))
-        .sort((a, b) => b.amount - a.amount);
-    }
-
-    if (reportType === 'transaction-wise') {
-      const groups = new Map<string, { subscribers: Set<string>; amount: number; transactionIds: Set<string> }>();
-      items.forEach((item) => {
-        const key = item.transactionType || item.method || 'Other';
-        const g = groups.get(key) || { subscribers: new Set<string>(), amount: 0, transactionIds: new Set<string>() };
-        g.subscribers.add(item.subscriberId);
-        g.amount += item.amount;
-        if (item.transactionId) g.transactionIds.add(item.transactionId);
-        groups.set(key, g);
-      });
-      return Array.from(groups.entries())
-        .map(([key, g]): CollectionRecord => ({
-          id: `transaction-${key}`,
-          subscriberName: key,
-          subscriberId: '',
-          internetId: '',
-          connectionId: '',
-          billId: g.subscribers.size,
-          amount: g.amount,
-          packageAmount: 0,
-          packageName: '',
-          collectionDate: '',
-          systemDate: '',
-          address: '',
-          sublocality: '',
-          connectionType: '',
-          collectedBy: '',
-          method: key,
-          transactionType: key,
-          transactionId: '',
-          transactionIds: Array.from(g.transactionIds),
-          discount: '',
-          internetDiscount: '',
-        }))
-        .sort((a, b) => b.amount - a.amount);
+    if (reportType === 'transaction-wise' || reportType === 'package-wise') {
+      return items;
     }
 
     return items;
   }, [data, connectionMap, filterFromDate, filterToDate, reportType, connectionType, sublocality, selectedUser, showReport]);
 
+  const transactionWiseGrouped = useMemo(() => {
+    if (reportType !== 'transaction-wise') return [];
+    const groups = new Map<string, { records: CollectionRecord[]; totalAmount: number; subscribers: Set<string> }>();
+    filteredData.forEach((item) => {
+      const key = item.transactionType || item.method || 'Other';
+      const g = groups.get(key) || { records: [], totalAmount: 0, subscribers: new Set<string>() };
+      g.records.push(item);
+      g.totalAmount += item.amount;
+      g.subscribers.add(item.subscriberId || item.subscriberName);
+      groups.set(key, g);
+    });
+    return Array.from(groups.entries())
+      .map(([key, g]) => ({ key, records: g.records, totalAmount: g.totalAmount, subscriberCount: g.subscribers.size }))
+      .sort((a, b) => b.totalAmount - a.totalAmount);
+  }, [filteredData, reportType]);
+
+  const sublocalityWiseGrouped = useMemo(() => {
+    if (reportType !== 'sublocality-wise') return [];
+    const groups = new Map<string, { records: CollectionRecord[]; totalAmount: number; subscribers: Set<string> }>();
+    filteredData.forEach((item) => {
+      const key = item.sublocality || 'Unknown';
+      const g = groups.get(key) || { records: [], totalAmount: 0, subscribers: new Set<string>() };
+      g.records.push(item);
+      g.totalAmount += item.amount;
+      g.subscribers.add(item.subscriberId || item.subscriberName);
+      groups.set(key, g);
+    });
+    return Array.from(groups.entries())
+      .map(([key, g]) => ({ key, records: g.records, totalAmount: g.totalAmount, subscriberCount: g.subscribers.size }))
+      .sort((a, b) => b.totalAmount - a.totalAmount);
+  }, [filteredData, reportType]);
+
   const isGroupedReport = reportType === 'sublocality-wise' || reportType === 'package-wise' || reportType === 'transaction-wise';
+
+  const packageWiseGrouped = useMemo(() => {
+    if (reportType !== 'package-wise') return [];
+    const groups = new Map<string, { records: CollectionRecord[]; totalAmount: number; subscribers: Set<string> }>();
+    filteredData.forEach((item) => {
+      const key = item.packageName || 'No Package';
+      const g = groups.get(key) || { records: [], totalAmount: 0, subscribers: new Set<string>() };
+      g.records.push(item);
+      g.totalAmount += item.amount;
+      g.subscribers.add(item.subscriberId || item.subscriberName);
+      groups.set(key, g);
+    });
+    return Array.from(groups.entries())
+      .map(([key, g]) => ({ key, records: g.records, totalAmount: g.totalAmount, subscriberCount: g.subscribers.size }))
+      .sort((a, b) => b.totalAmount - a.totalAmount);
+  }, [filteredData, reportType]);
 
   const packageWiseData = useMemo(() => buildPackageWiseReport(packageCounts, filteredData), [packageCounts, filteredData]);
 
@@ -383,6 +339,7 @@ export default function SubscriberReportPage() {
 
   const totalAmount = filteredData.reduce((sum, item) => sum + item.amount, 0);
   const totalRecords = filteredData.length;
+  const totalDiscount = filteredData.reduce((sum, item) => sum + recordDiscountAmount(item, connectionMap.get(item.connectionId)), 0);
 
   const handleDelete = async (item: CollectionRecord) => {
     if (!confirm(`Delete the collection entry for "${item.subscriberName}" (Bill #${item.billId || '-'})? This cannot be undone.`)) return;
@@ -406,13 +363,32 @@ export default function SubscriberReportPage() {
     let rows: (string | number)[][];
 
     if (reportType === 'transaction-wise') {
-      headers = ['#', 'Transaction Type', 'Transaction ID', 'Subscribers', 'Total Amount'];
-      rows = filteredData.map((item, i) => [
-        i + 1,
+      headers = ['Transaction Type', 'Subscriber Name', 'Bill ID', 'Amount', 'Collection Date', 'Address', 'Connection Type', 'Received By', 'Collected By', 'Transaction ID'];
+      rows = filteredData.map((item) => [
         item.transactionType,
-        item.transactionIds.length ? item.transactionIds.join(', ') : '-',
-        item.billId,
+        item.subscriberName,
+        item.billId || '',
         item.amount.toFixed(2),
+        item.collectionDate ? format(new Date(item.collectionDate), 'dd MMM yyyy') : '',
+        item.address || '',
+        item.connectionType,
+        item.method || '',
+        item.collectedBy || '',
+        item.transactionId || '-',
+      ]);
+    } else if (reportType === 'sublocality-wise') {
+      headers = ['Sublocality', 'Subscriber Name', 'Bill ID', 'Amount', 'Collection Date', 'Address', 'Connection Type', 'Received By', 'Collected By', 'Transaction ID'];
+      rows = filteredData.map((item) => [
+        item.sublocality,
+        item.subscriberName,
+        item.billId || '',
+        item.amount.toFixed(2),
+        item.collectionDate ? format(new Date(item.collectionDate), 'dd MMM yyyy') : '',
+        item.address || '',
+        item.connectionType,
+        item.method || '',
+        item.collectedBy || '',
+        item.transactionId || '-',
       ]);
     } else if (reportType === 'system-dates') {
       const excel = systemDatesExcel(filteredData.map(toSystemDateRow));
@@ -423,9 +399,19 @@ export default function SubscriberReportPage() {
       headers = excel.headers;
       rows = excel.rows;
     } else if (reportType === 'package-wise') {
-      const excel = packageWiseExcel(filteredData.map(toPackageWiseRow));
-      headers = excel.headers;
-      rows = excel.rows;
+      headers = ['Package', 'Subscriber Name', 'Bill ID', 'Amount', 'Collection Date', 'Address', 'Connection Type', 'Received By', 'Collected By', 'Transaction ID'];
+      rows = filteredData.map((item) => [
+        item.packageName,
+        item.subscriberName,
+        item.billId || '',
+        item.amount.toFixed(2),
+        item.collectionDate ? format(new Date(item.collectionDate), 'dd MMM yyyy') : '',
+        item.address || '',
+        item.connectionType,
+        item.method || '',
+        item.collectedBy || '',
+        item.transactionId || '-',
+      ]);
     } else if (reportType === 'with-package') {
       const excel = withPackageExcel(packageWiseData);
       headers = excel.headers;
@@ -496,22 +482,6 @@ export default function SubscriberReportPage() {
       );
     }
 
-    if (reportType === 'package-wise') {
-      return (
-        <div className="p-6">
-          <SubscriberReportInvoice<PackageWiseRow>
-            title="SUBSCRIBER REPORT"
-            subtitle={`From: ${format(filterFromDate, 'dd MMM yyyy')} — To: ${format(filterToDate, 'dd MMM yyyy')}`}
-            accent={accent}
-            data={filteredData.map(toPackageWiseRow)}
-            columns={packageWiseInvoiceColumns()}
-            emptyMessage="No collection records found for the selected criteria."
-            onBack={() => setShowInvoice(false)}
-          />
-        </div>
-      );
-    }
-
     if (reportType === 'with-package') {
       return (
         <div className="p-6">
@@ -532,9 +502,43 @@ export default function SubscriberReportPage() {
       ? [
           { header: '#', render: (_: CollectionRecord, i: number) => <span className="font-mono text-xs text-gray-500">{i + 1}</span> },
           { header: 'Transaction Type', render: (r) => <span className="font-semibold capitalize">{r.transactionType}</span> },
-          { header: 'Transaction ID', render: (r) => (r.transactionIds.length ? r.transactionIds.join(', ') : '-') },
-          { header: 'Subscribers', render: (r) => r.billId },
-          { header: 'Total Amount (PKR)', align: 'right', render: (r) => r.amount.toLocaleString() },
+          { header: 'Subscriber Name', render: (r) => <span className="font-semibold">{r.subscriberName}</span> },
+          { header: 'Bill ID', render: (r) => (r.billId > 0 ? r.billId : '-') },
+          { header: 'Amount (PKR)', align: 'right', render: (r) => r.amount.toLocaleString() },
+          { header: 'Collection Date', render: (r) => (r.collectionDate ? format(new Date(r.collectionDate), 'dd MMM yyyy') : '-') },
+          { header: 'Address', render: (r) => r.address || '-' },
+          { header: 'Connection Type', render: (r) => <span className="capitalize">{r.connectionType}</span> },
+          { header: 'Received By', render: (r) => r.method || '-' },
+          { header: 'Collected By', render: (r) => r.collectedBy || '-' },
+          { header: 'Transaction ID', render: (r) => r.transactionId || '-' },
+        ]
+      : reportType === 'sublocality-wise'
+      ? [
+          { header: '#', render: (_: CollectionRecord, i: number) => <span className="font-mono text-xs text-gray-500">{i + 1}</span> },
+          { header: 'Sublocality', render: (r) => <span className="font-semibold capitalize">{r.sublocality}</span> },
+          { header: 'Subscriber Name', render: (r) => <span className="font-semibold">{r.subscriberName}</span> },
+          { header: 'Bill ID', render: (r) => (r.billId > 0 ? r.billId : '-') },
+          { header: 'Amount (PKR)', align: 'right', render: (r) => r.amount.toLocaleString() },
+          { header: 'Collection Date', render: (r) => (r.collectionDate ? format(new Date(r.collectionDate), 'dd MMM yyyy') : '-') },
+          { header: 'Address', render: (r) => r.address || '-' },
+          { header: 'Connection Type', render: (r) => <span className="capitalize">{r.connectionType}</span> },
+          { header: 'Received By', render: (r) => r.method || '-' },
+          { header: 'Collected By', render: (r) => r.collectedBy || '-' },
+          { header: 'Transaction ID', render: (r) => r.transactionId || '-' },
+        ]
+      : reportType === 'package-wise'
+      ? [
+          { header: '#', render: (_: CollectionRecord, i: number) => <span className="font-mono text-xs text-gray-500">{i + 1}</span> },
+          { header: 'Package', render: (r) => <span className="font-semibold capitalize">{r.packageName}</span> },
+          { header: 'Subscriber Name', render: (r) => <span className="font-semibold">{r.subscriberName}</span> },
+          { header: 'Bill ID', render: (r) => (r.billId > 0 ? r.billId : '-') },
+          { header: 'Amount (PKR)', align: 'right', render: (r) => r.amount.toLocaleString() },
+          { header: 'Collection Date', render: (r) => (r.collectionDate ? format(new Date(r.collectionDate), 'dd MMM yyyy') : '-') },
+          { header: 'Address', render: (r) => r.address || '-' },
+          { header: 'Connection Type', render: (r) => <span className="capitalize">{r.connectionType}</span> },
+          { header: 'Received By', render: (r) => r.method || '-' },
+          { header: 'Collected By', render: (r) => r.collectedBy || '-' },
+          { header: 'Transaction ID', render: (r) => r.transactionId || '-' },
         ]
       : [
           { header: '#', render: (_: CollectionRecord, i: number) => <span className="font-mono text-xs text-gray-500">{i + 1}</span> },
@@ -589,7 +593,7 @@ export default function SubscriberReportPage() {
       <div className="h-0.5 bg-gradient-to-r from-blue-500/50 via-cyan-500/30 to-transparent no-print" />
 
       {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-2 no-print">
+      <div className="grid gap-4 md:grid-cols-3 no-print">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center justify-between">
             <div>
@@ -612,6 +616,19 @@ export default function SubscriberReportPage() {
             </div>
           </div>
         </div>
+        {reportType === 'discount' && (
+          <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Total Discount Given</p>
+                <p className="text-2xl font-bold mt-1 text-emerald-600 dark:text-emerald-400">PKR {totalDiscount.toLocaleString()}</p>
+              </div>
+              <div className="rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
+                <Wallet className="h-5 w-5" />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Filter Card */}
@@ -761,34 +778,99 @@ export default function SubscriberReportPage() {
                     <SubscriberSystemDatesTable rows={paginatedData.map(toSystemDateRow)} />
                   ) : reportType === 'internet-package-amount' ? (
                     <SubscriberInternetPackageTable rows={paginatedData.map(toInternetPackageRow)} />
-                  ) : reportType === 'package-wise' ? (
-                    <SubscriberPackageWiseTable rows={paginatedData.map(toPackageWiseRow)} />
                   ) : reportType === 'with-package' ? (
                     <SubscriberWithPackageTable rows={packageWiseData} />
-                  ) : reportType === 'transaction-wise' ? (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>#</TableHead>
-                          <TableHead>Transaction Type</TableHead>
-                          <TableHead>Transaction ID</TableHead>
-                          <TableHead>Subscribers</TableHead>
-                          <TableHead className="text-right">Total Amount</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {paginatedData.map((item, i) => (
-                          <TableRow key={item.id}>
-                            <TableCell className="text-muted-foreground">{showAll ? i + 1 : (safePage - 1) * pageSize + i + 1}</TableCell>
-                            <TableCell className="font-medium capitalize">{item.transactionType}</TableCell>
-                            <TableCell className="max-w-[180px] truncate text-xs text-muted-foreground" title={item.transactionIds.join(', ')}>{item.transactionIds.length ? item.transactionIds.join(', ') : '-'}</TableCell>
-                            <TableCell>{item.billId}</TableCell>
-                            <TableCell className="text-right font-medium">PKR {item.amount.toLocaleString()}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  ) : (
+                  ) : reportType === 'transaction-wise' || reportType === 'sublocality-wise' || reportType === 'package-wise' ? (
+                    (() => {
+                      const grouped = reportType === 'transaction-wise' ? transactionWiseGrouped : reportType === 'sublocality-wise' ? sublocalityWiseGrouped : packageWiseGrouped;
+                      const groupLabel = reportType === 'transaction-wise' ? 'Transaction Type' : reportType === 'sublocality-wise' ? 'Sublocality' : 'Package';
+                      return (
+                    <div className="space-y-6">
+                      <div className="rounded-xl border bg-card overflow-hidden">
+                        <div className="px-4 py-3 border-b bg-muted/30">
+                          <h3 className="text-base font-bold">{groupLabel} Summary</h3>
+                          <p className="text-xs text-muted-foreground mt-0.5">Total collections grouped by {groupLabel.toLowerCase()}</p>
+                        </div>
+                        <div className="divide-y">
+                          {grouped.map((group) => (
+                            <div key={group.key} className="flex items-center justify-between px-4 py-3 hover:bg-muted/20 transition-colors">
+                              <div className="flex items-center gap-3">
+                                <div className="rounded-lg bg-gradient-to-br from-blue-500 to-cyan-600 p-2 text-white shadow-sm">
+                                  <Wallet className="h-4 w-4" />
+                                </div>
+                                <div>
+                                  <p className="font-semibold capitalize">{group.key}</p>
+                                  <p className="text-xs text-muted-foreground">{group.subscriberCount} subscriber{group.subscriberCount !== 1 ? 's' : ''} &middot; {group.records.length} record{group.records.length !== 1 ? 's' : ''}</p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-lg font-bold">PKR {group.totalAmount.toLocaleString()}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {grouped.map((group) => (
+                        <div key={group.key} className="rounded-xl border bg-card overflow-hidden">
+                          <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-base font-bold capitalize">{group.key}</h3>
+                              <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                                {group.records.length} record{group.records.length !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                            <span className="text-sm font-bold">PKR {group.totalAmount.toLocaleString()}</span>
+                          </div>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>#</TableHead>
+                                <TableHead>Subscriber Name</TableHead>
+                                <TableHead>Bill ID</TableHead>
+                                <TableHead>Amount (PKR)</TableHead>
+                                <TableHead>Collection Date</TableHead>
+                                <TableHead>Address</TableHead>
+                                <TableHead>Connection Type</TableHead>
+                                <TableHead>Received By</TableHead>
+                                <TableHead>Collected By</TableHead>
+                                <TableHead>Transaction ID</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {group.records.map((item, i) => (
+                                <TableRow key={item.id}>
+                                  <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                                  <TableCell className="font-medium">
+                                    {item.connectionId ? (
+                                      <Link
+                                        href={`/crm/subscriber-detail?connectionId=${item.connectionId}`}
+                                        className="text-blue-600 hover:underline dark:text-blue-400"
+                                      >
+                                        {item.subscriberName}
+                                      </Link>
+                                    ) : (
+                                      <span>{item.subscriberName}</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>{item.billId > 0 ? item.billId : '-'}</TableCell>
+                                  <TableCell className="font-medium">{item.amount.toLocaleString()}</TableCell>
+                                  <TableCell>{item.collectionDate ? format(new Date(item.collectionDate), 'dd MMM yyyy') : '-'}</TableCell>
+                                  <TableCell className="text-xs text-muted-foreground max-w-[140px] truncate" title={item.address}>{item.address || '-'}</TableCell>
+                                  <TableCell className="capitalize">{item.connectionType}</TableCell>
+                                  <TableCell>{item.method || '-'}</TableCell>
+                                  <TableCell>{item.collectedBy || '-'}</TableCell>
+                                  <TableCell className="text-xs text-muted-foreground">{item.transactionId || '-'}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()
+                ) : (
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -850,6 +932,7 @@ export default function SubscriberReportPage() {
                 </div>
 
                 {/* Pagination */}
+                {reportType !== 'transaction-wise' && reportType !== 'sublocality-wise' && (
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 no-print">
                   <div className="text-sm text-muted-foreground">
                     Showing {paginatedData.length === 0 ? 0 : (showAll ? 1 : (safePage - 1) * pageSize + 1)} to {Math.min(safePage * pageSize, filteredData.length)} of {filteredData.length} records
@@ -901,6 +984,7 @@ export default function SubscriberReportPage() {
                     </div>
                   </div>
                 </div>
+                )}
               </>
             )}
           </CardContent>

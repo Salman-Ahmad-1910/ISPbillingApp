@@ -275,3 +275,15 @@ type MessageTemplate struct {
 func (MessageTemplate) TableName() string {
 	return "message_templates"
 }
+
+// SharedFile stores metadata for files (e.g. drivers, the company application)
+// uploaded by an admin and downloadable by other users of the same company.
+// Kind distinguishes the category ("driver" or "application").
+type SharedFile struct {
+	TenantModel
+	Kind         string `gorm:"type:varchar(50);not null;index" json:"kind"`
+	OriginalName string `gorm:"type:varchar(255);not null" json:"originalName"`
+	StoredName   string `gorm:"type:varchar(255);not null" json:"storedName"`
+	Size         int64  `json:"size"`
+	ContentType  string `gorm:"type:varchar(100)" json:"contentType"`
+}
