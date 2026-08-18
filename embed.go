@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-//go:embed frontend/*
+//go:embed all:frontend
 var embeddedFrontend embed.FS
 
 type spaFileSystem struct {
