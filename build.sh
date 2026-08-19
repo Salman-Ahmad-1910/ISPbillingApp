@@ -37,12 +37,13 @@ npm install --silent
 
 echo ""
 echo "[2/3] Building frontend (static export)..."
+rm -rf .next .next-export out
 NEXT_PUBLIC_BACKEND_URL=/api/v1 npm run build
 
 echo ""
 echo "[3/3] Copying frontend build to embed directory..."
 rm -rf ../frontend
-cp -r out ../frontend
+cp -r .next-export ../frontend
 cd ..
 
 echo ""
