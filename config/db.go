@@ -146,6 +146,13 @@ func RunMigrations() {
 		log.Println("Migration completed successfully")
 	}
 
+	// Drop FK constraints that GORM AutoMigrate may recreate but that have
+	// orphaned data preventing creation.
+	DB.Exec(`ALTER TABLE invoices DROP CONSTRAINT IF EXISTS fk_invoices_subscriber`)
+	DB.Exec(`ALTER TABLE payments DROP CONSTRAINT IF EXISTS fk_payments_subscriber`)
+	DB.Exec(`ALTER TABLE payments DROP CONSTRAINT IF EXISTS fk_payments_invoice`)
+	log.Println("FK constraints cleaned up after migration")
+
 	// Backfill installment_plans: set percentage_increase to 0 for existing rows
 	DB.Exec("UPDATE installment_plans SET percentage_increase = 0 WHERE percentage_increase IS NULL")
 	// Drop old columns from installment_plans that no longer exist in the model
