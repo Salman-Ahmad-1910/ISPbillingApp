@@ -235,6 +235,12 @@ export default function SubscriberCollectionsPage() {
     return area?.subLocality || area?.locality || '';
   }, [selectedSubscriber, areas]);
 
+  useEffect(() => {
+    if (showReceiveDialog && selectedSubscriber?.transactionId) {
+      setReceiveTransactionId(selectedSubscriber.transactionId);
+    }
+  }, [showReceiveDialog, selectedSubscriber]);
+
   const packageFee = useMemo(
     () => (selectedSubscriber ? getPackagePrice(selectedSubscriber) : 0),
     [selectedSubscriber],
@@ -626,7 +632,7 @@ export default function SubscriberCollectionsPage() {
                 <CalendarClock className="mr-2 h-4 w-4" />
                 Make Promise
               </Button>
-              <Button onClick={() => { setSelectedPromiseId(null); setReceiveAmount(displayRemaining); setShowReceiveDialog(true); }} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
+              <Button onClick={() => { setSelectedPromiseId(null); setReceiveAmount(displayRemaining); setReceiveMethod('cash'); setReceiveTransactionId(''); setShowReceiveDialog(true); }} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
                 <DollarSign className="mr-2 h-4 w-4" />
                 Receive Payment
               </Button>
@@ -886,7 +892,16 @@ export default function SubscriberCollectionsPage() {
               <Label>Payment Type</Label>
               <SearchableSelect
                 value={receiveMethod}
-                onValueChange={(v) => { if (v) setReceiveMethod(v); }}
+                onValueChange={(v) => {
+                  if (v) {
+                    setReceiveMethod(v);
+                    if (v !== 'cash' && selectedSubscriber?.transactionId) {
+                      setReceiveTransactionId(selectedSubscriber.transactionId);
+                    } else {
+                      setReceiveTransactionId('');
+                    }
+                  }
+                }}
                 options={mergedPaymentOptions}
                 placeholder="Select payment type..."
                 searchPlaceholder="Search payment type..."
@@ -899,8 +914,12 @@ export default function SubscriberCollectionsPage() {
                 <Input
                   value={receiveTransactionId}
                   onChange={(e) => setReceiveTransactionId(e.target.value)}
-                  placeholder="Enter transaction ID / reference number"
+                  readOnly={!!selectedSubscriber?.transactionId}
+                  placeholder={selectedSubscriber?.transactionId ? "Auto-filled from subscriber" : "Enter transaction ID / reference number"}
                 />
+                {selectedSubscriber?.transactionId && (
+                  <p className="text-[11px] text-muted-foreground">Auto-filled from subscriber record</p>
+                )}
               </div>
             )}
             <div className="space-y-1">

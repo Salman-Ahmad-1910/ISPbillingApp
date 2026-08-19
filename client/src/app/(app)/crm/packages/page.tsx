@@ -275,7 +275,13 @@ export default function PackagesPage() {
         </div>
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <Input
+          placeholder="Filter by name or company..."
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="max-w-sm"
+        />
         <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
           <DialogTrigger asChild>
             <Button onClick={() => setSelectedPackage(null)} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
@@ -296,173 +302,119 @@ export default function PackagesPage() {
         </Dialog>
       </div>
 
+      {/* TV Cable Packages */}
       <Card className="transition-all duration-300 hover:shadow-md">
         <CardHeader>
-          <CardTitle>All Packages</CardTitle>
-          <CardDescription>List of available internet plans for the selected company.</CardDescription>
+          <div className="flex items-center gap-2">
+            <div className="rounded-lg bg-purple-100 dark:bg-purple-900/30 p-2 text-purple-600 dark:text-purple-400">
+              <Tag className="h-4 w-4" />
+            </div>
+            <div>
+              <CardTitle>TV Cable Packages</CardTitle>
+              <CardDescription>Packages for cable TV subscribers ({tvCableCount} packages)</CardDescription>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between mb-4">
-            <Input
-              placeholder="Filter by name, company, or type..."
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="max-w-sm"
-            />
-          </div>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Package ID</TableHead>
                 <TableHead>Package Name</TableHead>
                 <TableHead>Company Name</TableHead>
-                <TableHead>Package Type</TableHead>
                 <TableHead className="text-right">Sale Price (PKR)</TableHead>
                 <TableHead className="text-right">Purchase Price (PKR)</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {getPaginatedData().map((pkg: Package) => (
-                <TableRow key={pkg.id}>
-                  <TableCell className="font-mono text-sm">{pkg.packageNumber || '-'}</TableCell>
-                  <TableCell className="font-medium">{pkg.name}</TableCell>
-                  <TableCell>{pkg.companyName || '-'}</TableCell>
-                  <TableCell>
-                    <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                      pkg.packageType === 'TV Cable' 
-                        ? 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300'
-                        : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                    }`}>
-                      {pkg.packageType || 'Internet'}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">{(pkg.salePrice || 0).toLocaleString()}</TableCell>
-                  <TableCell className="text-right">{(pkg.purchasePrice || 0).toLocaleString()}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedPackage(pkg);
-                          setIsFormOpen(true);
-                        }}
-                        className="transition-all duration-300 hover:scale-105"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedPackage(pkg);
-                          setIsDeleteDialogOpen(true);
-                        }}
-                        title="Delete package"
-                        className="transition-all duration-300 hover:scale-105"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+              {filteredPackages.filter((pkg: Package) => pkg.packageType === 'TV Cable').length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                    No TV Cable packages found. Click &quot;Add Package&quot; to create one.
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                filteredPackages.filter((pkg: Package) => pkg.packageType === 'TV Cable').map((pkg: Package) => (
+                  <TableRow key={pkg.id}>
+                    <TableCell className="font-mono text-sm">{pkg.packageNumber || '-'}</TableCell>
+                    <TableCell className="font-medium">{pkg.name}</TableCell>
+                    <TableCell>{pkg.companyName || '-'}</TableCell>
+                    <TableCell className="text-right">{(pkg.salePrice || 0).toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{(pkg.purchasePrice || 0).toLocaleString()}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" size="sm" onClick={() => { setSelectedPackage(pkg); setIsFormOpen(true); }} className="transition-all duration-300 hover:scale-105">
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button variant="destructive" size="sm" onClick={() => { setSelectedPackage(pkg); setIsDeleteDialogOpen(true); }} className="transition-all duration-300 hover:scale-105">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
-          
-          {/* Advanced Pagination */}
-          <div className="flex items-center justify-between mt-4">
-              <div className="text-sm text-muted-foreground">
-                  Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredPackages.length)} of {filteredPackages.length} packages
-              </div>
-              <div className="flex items-center gap-2">
-                  <Select value={pageSize.toString()} onValueChange={(value) => setPageSize(parseInt(value))}>
-                      <SelectTrigger className="w-20">
-                          <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                          <SelectItem value="5">5</SelectItem>
-                          <SelectItem value="10">10</SelectItem>
-                          <SelectItem value="20">20</SelectItem>
-                          <SelectItem value="50">50</SelectItem>
-                          <SelectItem value="100">100</SelectItem>
-                      </SelectContent>
-                  </Select>
-                  <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                      disabled={currentPage === 1}
-                      className="transition-all duration-300 hover:scale-105"
-                  >
-                      Previous
-                  </Button>
-                  
-                  {/* Page numbers - show current page ± 3 */}
-                  <div className="flex items-center gap-1">
-                      {getVisiblePages().map(page => (
-                          <Button
-                              key={page}
-                              variant={currentPage === page ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => setCurrentPage(page)}
-                              className="w-8 h-8 p-0 transition-all duration-300 hover:scale-110"
-                          >
-                              {page}
-                          </Button>
-                      ))}
-                      
-                      {/* Show ellipsis if there are more pages */}
-                      {currentPage + 3 < totalPages && (
-                          <>
-                              <span className="px-2 text-muted-foreground">...</span>
-                              <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setCurrentPage(totalPages)}
-                                  className="w-8 h-8 p-0 transition-all duration-300 hover:scale-110"
-                              >
-                                  {totalPages}
-                              </Button>
-                          </>
-                      )}
-                  </div>
-                  
-                  {/* Page input */}
-                  <div className="flex items-center gap-1">
-                      <Input
-                          type="text"
-                          placeholder="Go to"
-                          value={pageInput}
-                          onChange={handlePageInputChange}
-                          onKeyPress={handlePageKeyPress}
-                          className="w-16 h-8 text-center"
-                          min={1}
-                          max={totalPages}
-                      />
-                      <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handlePageSubmit}
-                          disabled={!pageInput || parseInt(pageInput) < 1 || parseInt(pageInput) > totalPages}
-                          className="h-8 px-2 transition-all duration-300 hover:scale-105"
-                      >
-                          Go
-                      </Button>
-                  </div>
-                  
-                  <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                      disabled={currentPage === totalPages}
-                      className="transition-all duration-300 hover:scale-105"
-                  >
-                      Next
-                  </Button>
-              </div>
+        </CardContent>
+      </Card>
+
+      {/* Internet Packages */}
+      <Card className="transition-all duration-300 hover:shadow-md">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <div className="rounded-lg bg-blue-100 dark:bg-blue-900/30 p-2 text-blue-600 dark:text-blue-400">
+              <Wifi className="h-4 w-4" />
+            </div>
+            <div>
+              <CardTitle>Internet Packages</CardTitle>
+              <CardDescription>Packages for internet subscribers ({internetCount} packages)</CardDescription>
+            </div>
           </div>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Package ID</TableHead>
+                <TableHead>Package Name</TableHead>
+                <TableHead>Company Name</TableHead>
+                <TableHead className="text-right">Sale Price (PKR)</TableHead>
+                <TableHead className="text-right">Purchase Price (PKR)</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredPackages.filter((pkg: Package) => pkg.packageType === 'Internet').length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                    No Internet packages found. Click &quot;Add Package&quot; to create one.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredPackages.filter((pkg: Package) => pkg.packageType === 'Internet').map((pkg: Package) => (
+                  <TableRow key={pkg.id}>
+                    <TableCell className="font-mono text-sm">{pkg.packageNumber || '-'}</TableCell>
+                    <TableCell className="font-medium">{pkg.name}</TableCell>
+                    <TableCell>{pkg.companyName || '-'}</TableCell>
+                    <TableCell className="text-right">{(pkg.salePrice || 0).toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{(pkg.purchasePrice || 0).toLocaleString()}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" size="sm" onClick={() => { setSelectedPackage(pkg); setIsFormOpen(true); }} className="transition-all duration-300 hover:scale-105">
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button variant="destructive" size="sm" onClick={() => { setSelectedPackage(pkg); setIsDeleteDialogOpen(true); }} className="transition-all duration-300 hover:scale-105">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
       

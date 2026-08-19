@@ -168,6 +168,7 @@ export const connectionSchema = z.object({
   status: z.string().optional().default('active'),
   splitterId: z.string().optional().default(''),
   splitterPort: z.coerce.number().optional().default(0),
+  transactionId: z.string().optional().default(''),
 });
 
 export const oltSchema = z.object({

@@ -232,6 +232,11 @@ func RunMigrations() {
 	// Package number unique per company
 	DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_package_company_number ON packages (company_id, package_number) WHERE deleted_at IS NULL")
 
+	// Transaction ID unique per company on connections
+	DB.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_connection_transaction_id 
+		ON connections (transaction_id, company_id) 
+		WHERE transaction_id != '' AND deleted_at IS NULL`)
+
 	// Seed initial data
 	seedInitialData()
 }

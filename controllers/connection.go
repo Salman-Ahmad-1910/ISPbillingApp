@@ -108,6 +108,7 @@ type connectionInput struct {
 	BadDebt             *bool   `json:"badDebt"`
 	PaymentStatus       *string `json:"paymentStatus"`
 	RemainingAmount     *float64 `json:"remainingAmount"`
+	TransactionId       string  `json:"transactionId"`
 }
 
 func createConnection(c *gin.Context) {
@@ -168,6 +169,7 @@ func createConnection(c *gin.Context) {
 		SublocalityID:       input.SublocalityID,
 		SplitterID:          input.SplitterID,
 		SplitterPort:        input.SplitterPort,
+		TransactionId:       input.TransactionId,
 	}
 
 	switch input.ConnectionType {
@@ -315,6 +317,9 @@ func updateConnection(c *gin.Context) {
 	}
 	if input.PaymentStatus != nil {
 		updates["payment_status"] = *input.PaymentStatus
+	}
+	if input.TransactionId != "" {
+		updates["transaction_id"] = input.TransactionId
 	}
 	if input.RemainingAmount != nil {
 		updates["remaining_amount"] = *input.RemainingAmount

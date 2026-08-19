@@ -159,6 +159,7 @@ export type Connection = {
   comments?: string;
   badDebt?: boolean;
   paymentStatus?: string;
+  transactionId?: string;
   createdBy?: string;
   createdAt: string;
   updatedAt: string;

@@ -81,6 +81,7 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
       status: connection.status,
       splitterId: connection.splitterId || '',
       splitterPort: connection.splitterPort || 0,
+      transactionId: connection.transactionId || '',
     } : {
       internetId: '',
       sublocalityId: '',
@@ -106,6 +107,7 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
       status: 'active',
       splitterId: '',
       splitterPort: 0,
+      transactionId: '',
     },
   });
 
@@ -136,6 +138,7 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
         status: connection.status,
         splitterId: connection.splitterId || '',
         splitterPort: connection.splitterPort || 0,
+        transactionId: connection.transactionId || '',
       });
     } else {
       form.reset({
@@ -163,6 +166,7 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
         status: 'active',
         splitterId: '',
         splitterPort: 0,
+        transactionId: '',
       });
     }
   }, [connection, form]);
@@ -180,6 +184,9 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
   const showInternet = connectionType === 'both' || connectionType === 'internet';
   const isCableDisabled = !showCable;
   const isInternetDisabled = !showInternet;
+
+  const cablePackages = packages.filter(p => p.packageType === 'TV Cable');
+  const internetPackages = packages.filter(p => p.packageType === 'Internet');
 
   const [cablePkgId, setCablePkgId] = React.useState<string | undefined>();
   const [internetPkgId, setInternetPkgId] = React.useState<string | undefined>();
@@ -263,6 +270,22 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
               </FormItem>
             )}
           />
+          <FormField
+            control={form.control}
+            name="transactionId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Transaction ID</FormLabel>
+                <FormControl>
+                  <Input placeholder="e.g., TXN-001" {...field} />
+                </FormControl>
+                <p className="text-[11px] text-muted-foreground">Unique ID used for bank/easypaisa payments</p>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
             name="sublocalityId"
@@ -590,7 +613,7 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {packages.map((pkg) => (
+                      {cablePackages.map((pkg) => (
                         <SelectItem key={pkg.id} value={pkg.id}>
                           {pkg.name}{packagePrice(pkg) > 0 ? ` — PKR ${packagePrice(pkg)}` : ''}
                         </SelectItem>
@@ -682,7 +705,7 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {packages.map((pkg) => (
+                      {internetPackages.map((pkg) => (
                         <SelectItem key={pkg.id} value={pkg.id}>
                           {pkg.name}{packagePrice(pkg) > 0 ? ` — PKR ${packagePrice(pkg)}` : ''}
                         </SelectItem>
