@@ -14,7 +14,7 @@ import { z } from 'zod';
 import { vendorInvoiceSchema } from '@/lib/schemas';
 
 import { DataTable } from './data-table';
-import { columns as getColumns } from './columns';
+import { columns as getColumns, flattenInvoiceItems } from './columns';
 import { VendorInvoiceForm } from './vendor-invoice-form';
 import {
   Dialog,
@@ -87,6 +87,7 @@ export function ClientPage({ data }: ClientPageProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory/vendor-invoices', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['inventory/products', companyId] });
       setIsFormOpen(false);
       setSelectedInvoice(null);
       toast({
@@ -110,6 +111,7 @@ export function ClientPage({ data }: ClientPageProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory/vendor-invoices', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['inventory/products', companyId] });
       setIsDeleteDialogOpen(false);
       setSelectedInvoice(null);
       toast({
@@ -200,8 +202,8 @@ export function ClientPage({ data }: ClientPageProps) {
         </Button>
       </div>
 
-      {/* Data Table */}
-      <DataTable columns={columns} data={filteredInvoices} />
+      {/* Data Table - flattened so each SN is a separate row */}
+      <DataTable columns={columns} data={flattenInvoiceItems(filteredInvoices)} />
 
       {/* Form Dialog */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>

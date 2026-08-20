@@ -50,9 +50,14 @@ export const columns: ColumnDef<PurchasedProduct>[] = [
   {
     accessorKey: 'serialNumber',
     header: 'SN / MAC',
-    cell: ({ row }) => (
-      <span className="text-xs font-mono">{row.original.serialNumber || '—'}</span>
-    ),
+    cell: ({ row }) => {
+      const sn = row.original.serialNumber;
+      if (!sn) return <span className="text-xs font-mono text-muted-foreground">—</span>;
+      const sns = sn.split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
+      if (sns.length === 0) return <span className="text-xs font-mono text-muted-foreground">—</span>;
+      const display = sns.length === 1 ? sns[0] : `${sns[0]} (1/${sns.length})`;
+      return <span className="text-xs font-mono" title={sns.join(', ')}>{display}</span>;
+    },
   },
   {
     accessorKey: 'stock',

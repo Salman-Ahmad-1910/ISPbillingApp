@@ -61,6 +61,25 @@ export function PrintableVendorInvoice({ invoice, company, vendor, size }: Print
     }, 200);
   };
 
+  // Expand items into one row per SN (product name + info repeated for each SN)
+  const expandedRows = (() => {
+    const rows: { productName: string; serialNumber: string; quantity: number; unitType: string; unitPrice: number; subtotal: number }[] = [];
+    for (const item of invoice.items || []) {
+      const sns = item.serialNumber
+        ? item.serialNumber.split(/[,\s]+/).map((s: string) => s.trim()).filter(Boolean)
+        : [];
+      if (sns.length === 0) {
+        rows.push({ productName: item.productName, serialNumber: '-', quantity: item.quantity, unitType: item.unitType, unitPrice: item.unitPrice, subtotal: item.subtotal });
+      } else {
+        const perUnit = item.unitPrice;
+        for (const sn of sns) {
+          rows.push({ productName: item.productName, serialNumber: sn, quantity: 1, unitType: item.unitType, unitPrice: perUnit, subtotal: perUnit });
+        }
+      }
+    }
+    return rows;
+  })();
+
   const containerClass = size === 'thermal' ? '' : 'bg-white text-gray-900 p-8 font-sans max-w-4xl mx-auto';
 
   return (
@@ -119,31 +138,16 @@ export function PrintableVendorInvoice({ invoice, company, vendor, size }: Print
                 </tr>
               </thead>
               <tbody>
-                {(() => {
-                  const grouped = invoice.items?.reduce((acc: any[], item) => {
-                    const existing = acc.find(i => i.productId === item.productId);
-                    if (existing) {
-                      existing.quantity += item.quantity;
-                      existing.subtotal += item.subtotal;
-                      if (item.serialNumber) {
-                        existing.serialNumbers.push(item.serialNumber);
-                      }
-                    } else {
-                      acc.push({ ...item, serialNumbers: item.serialNumber ? [item.serialNumber] : [] });
-                    }
-                    return acc;
-                  }, []) || [];
-                  return grouped.map((item, index) => (
+                {expandedRows.map((row, index) => (
                     <tr key={index} className="hover:bg-emerald-50/50">
-                      <td className="border border-gray-300 p-3">{item.productName}</td>
-                      <td className="border border-gray-300 p-3 text-xs font-mono">{item.serialNumbers.length > 0 ? item.serialNumbers.join(', ') : '-'}</td>
-                      <td className="border border-gray-300 p-3 text-center font-semibold">{item.quantity}</td>
-                      <td className="border border-gray-300 p-3 text-center">{item.unitType === 'piece' ? 'Pcs' : 'Mtr'}</td>
-                      <td className="border border-gray-300 p-3 text-right">{item.unitPrice.toFixed(2)}</td>
-                      <td className="border border-gray-300 p-3 text-right font-semibold">{item.subtotal.toFixed(2)}</td>
+                      <td className="border border-gray-300 p-3">{row.productName}</td>
+                      <td className="border border-gray-300 p-3 text-xs font-mono">{row.serialNumber}</td>
+                      <td className="border border-gray-300 p-3 text-center font-semibold">{row.quantity}</td>
+                      <td className="border border-gray-300 p-3 text-center">{row.unitType === 'piece' ? 'Pcs' : 'Mtr'}</td>
+                      <td className="border border-gray-300 p-3 text-right">{row.unitPrice.toFixed(2)}</td>
+                      <td className="border border-gray-300 p-3 text-right font-semibold">{row.subtotal.toFixed(2)}</td>
                     </tr>
-                  ));
-                })()}
+                ))}
               </tbody>
               <tfoot>
                 <tr className="bg-gray-50 font-bold">
@@ -198,34 +202,19 @@ export function PrintableVendorInvoice({ invoice, company, vendor, size }: Print
             <div>Vendor: {vendor.name}</div>
           </div>
           <div style={{ borderBottom: '1px dashed #000', paddingBottom: '8px', marginBottom: '8px' }}>
-            {(() => {
-              const grouped = invoice.items?.reduce((acc: any[], item) => {
-                const existing = acc.find(i => i.productId === item.productId);
-                if (existing) {
-                  existing.quantity += item.quantity;
-                  existing.subtotal += item.subtotal;
-                  if (item.serialNumber) {
-                    existing.serialNumbers.push(item.serialNumber);
-                  }
-                } else {
-                  acc.push({ ...item, serialNumbers: item.serialNumber ? [item.serialNumber] : [] });
-                }
-                return acc;
-              }, []) || [];
-              return grouped.map((item, index) => (
+            {expandedRows.map((row, index) => (
                 <div key={index} style={{ marginBottom: '4px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>{item.productName} x{item.quantity}</span>
-                    <span>{item.subtotal.toFixed(0)}</span>
+                    <span>{row.productName} x{row.quantity}</span>
+                    <span>{row.subtotal.toFixed(0)}</span>
                   </div>
-                  {item.serialNumbers.length > 0 && (
+                  {row.serialNumber && row.serialNumber !== '-' && (
                     <div style={{ fontSize: '10px', color: '#666', paddingLeft: '4px' }}>
-                      {item.serialNumbers.join(', ')}
+                      {row.serialNumber}
                     </div>
                   )}
                 </div>
-              ));
-            })()}
+            ))}
           </div>
           <div style={{ fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #000', paddingTop: '8px' }}>
             <span>TOTAL:</span>

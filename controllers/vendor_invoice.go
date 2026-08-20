@@ -3,7 +3,9 @@ package controllers
 import (
 	"awesomeProject/config"
 	"awesomeProject/models"
+	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -12,7 +14,27 @@ import (
 	"gorm.io/gorm"
 )
 
-// CreateVendorInvoice handles creating vendor invoices with items
+// parseVendorInvoiceSNs splits a comma/space-delimited serial number string into individual SNs.
+func parseVendorInvoiceSNs(raw string) []string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	re := regexp.MustCompile(`[,\s]+`)
+	parts := re.Split(raw, -1)
+	var result []string
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			result = append(result, p)
+		}
+	}
+	return result
+}
+
+// CreateVendorInvoice handles creating vendor invoices with items.
+// The frontend sends one item per SN/MAC (each with quantity=1 and serialNumber set).
+// The backend validates each SN exists on the product and creates one line item per SN.
 func CreateVendorInvoice(c *gin.Context) {
 	db := config.DB
 
@@ -40,6 +62,78 @@ func CreateVendorInvoice(c *gin.Context) {
 		}
 	}
 
+	// Validate SNs: each item must have serialNumber set and qty=1.
+	type validatedItem struct {
+		item     models.VendorInvoiceItem
+		sns      []string
+	}
+	var validItems []validatedItem
+	type productSNSet struct {
+		available map[string]bool
+		allSNs    []string
+	}
+	productSNSets := map[string]*productSNSet{}
+
+	for _, item := range items {
+		if item.Quantity <= 0 {
+			continue
+		}
+
+		key := item.ProductID.String()
+		ps, exists := productSNSets[key]
+		if !exists {
+			var prod models.Product
+			if err := db.Where("id = ? AND company_id = ?", item.ProductID, invoice.CompanyID).First(&prod).Error; err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Product not found: %s", item.ProductName)})
+				return
+			}
+			allSNs := prod.ParseSerialNumbers()
+			avail := make(map[string]bool, len(allSNs))
+			for _, sn := range allSNs {
+				avail[sn] = true
+			}
+			ps = &productSNSet{available: avail, allSNs: allSNs}
+			productSNSets[key] = ps
+		}
+
+		// Parse comma-separated SNs from the item's serialNumber field
+		sns := parseVendorInvoiceSNs(item.SerialNumber)
+		if len(sns) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Missing serial number for %s", item.ProductName)})
+			return
+		}
+
+		// Validate each SN exists and mark as consumed
+		var validSNs []string
+		for _, sn := range sns {
+			if !ps.available[sn] {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Serial number %s is not available for %s", sn, item.ProductName)})
+				return
+			}
+			ps.available[sn] = false
+			validSNs = append(validSNs, sn)
+		}
+
+		validItems = append(validItems, validatedItem{
+			item: models.VendorInvoiceItem{
+				TenantModel:  models.TenantModel{CompanyID: invoice.CompanyID},
+				ProductID:    item.ProductID,
+				ProductName:  item.ProductName,
+				Quantity:     len(validSNs),
+				UnitPrice:    item.UnitPrice,
+				UnitType:     item.UnitType,
+				Subtotal:     item.UnitPrice * float64(len(validSNs)),
+				SerialNumber: strings.Join(validSNs, ", "),
+			},
+			sns: validSNs,
+		})
+	}
+
+	if len(validItems) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No valid items to invoice"})
+		return
+	}
+
 	var createErr error
 	for attempt := 0; attempt < 3; attempt++ {
 		invoice.ID = uuid.New()
@@ -57,23 +151,49 @@ func CreateVendorInvoice(c *gin.Context) {
 			return
 		}
 
-		for i, item := range items {
-			newItem := models.VendorInvoiceItem{
-				TenantModel: models.TenantModel{
-					CompanyID: invoice.CompanyID,
-				},
-				InvoiceID:    invoice.ID,
-				ProductID:    item.ProductID,
-				ProductName:  item.ProductName,
-				Quantity:     item.Quantity,
-				UnitPrice:    item.UnitPrice,
-				UnitType:     item.UnitType,
-				Subtotal:     item.Subtotal,
-				SerialNumber: item.SerialNumber,
-			}
-			if err := tx.Create(&newItem).Error; err != nil {
+		for i, vi := range validItems {
+			vi.item.InvoiceID = invoice.ID
+			if err := tx.Create(&vi.item).Error; err != nil {
 				tx.Rollback()
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create invoice item", "details": err.Error(), "item_index": i})
+				return
+			}
+		}
+
+		// Remove consumed SNs from products and update stock.
+		consumedByProduct := map[string][]string{}
+		for _, vi := range validItems {
+			key := vi.item.ProductID.String()
+			consumedByProduct[key] = append(consumedByProduct[key], vi.sns...)
+		}
+
+		for key, consumedSNs := range consumedByProduct {
+			var prod models.Product
+			if err := tx.Where("id = ? AND company_id = ?", key, invoice.CompanyID).First(&prod).Error; err != nil {
+				continue
+			}
+			allSNs := prod.ParseSerialNumbers()
+			consumedSet := make(map[string]bool, len(consumedSNs))
+			for _, sn := range consumedSNs {
+				consumedSet[sn] = true
+			}
+			var remaining []string
+			for _, sn := range allSNs {
+				if !consumedSet[sn] {
+					remaining = append(remaining, sn)
+				}
+			}
+			remainingStr := strings.Join(remaining, ", ")
+			newStock := len(remaining)
+			productID, _ := uuid.Parse(key)
+			if err := tx.Model(&models.Product{}).
+				Where("id = ? AND company_id = ?", productID, invoice.CompanyID).
+				Updates(map[string]interface{}{
+					"serial_number": remainingStr,
+					"stock":         newStock,
+				}).Error; err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update product serial numbers"})
 				return
 			}
 		}
@@ -267,19 +387,70 @@ func UpdateVendorInvoice(c *gin.Context) {
 	})
 }
 
-// DeleteVendorInvoice handles deleting vendor invoices
+// DeleteVendorInvoice handles deleting vendor invoices and returning SNs to products
 func DeleteVendorInvoice(c *gin.Context) {
 	db := config.DB
 	id := c.Param("id")
 
 	invoiceUUID, err := uuid.Parse(id)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid invoice ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid invoice number"})
+		return
+	}
+
+	// Fetch the existing invoice with items to return SNs
+	var existingInvoice models.VendorInvoice
+	if err := db.Preload("Items").Where("id = ?", invoiceUUID).First(&existingInvoice).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Invoice not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch invoice"})
 		return
 	}
 
 	// Start transaction
 	tx := db.Begin()
+
+	// Return SNs to products. Each item has one SN in its serialNumber field.
+	type snReturn struct {
+		ProductID uuid.UUID
+		SNs       []string
+	}
+	snReturns := map[string]*snReturn{}
+	for _, item := range existingInvoice.Items {
+		sn := strings.TrimSpace(item.SerialNumber)
+		if sn == "" {
+			continue
+		}
+		key := item.ProductID.String()
+		sr, exists := snReturns[key]
+		if !exists {
+			sr = &snReturn{ProductID: item.ProductID}
+			snReturns[key] = sr
+		}
+		sr.SNs = append(sr.SNs, parseVendorInvoiceSNs(sn)...)
+	}
+
+	for _, sr := range snReturns {
+		var prod models.Product
+		if err := tx.Where("id = ? AND company_id = ?", sr.ProductID, existingInvoice.CompanyID).First(&prod).Error; err != nil {
+			continue
+		}
+		existingSNs := prod.ParseSerialNumbers()
+		allSNs := append(existingSNs, sr.SNs...)
+		allSNsStr := strings.Join(allSNs, ", ")
+		if err := tx.Model(&models.Product{}).
+			Where("id = ? AND company_id = ?", sr.ProductID, existingInvoice.CompanyID).
+			Updates(map[string]interface{}{
+				"serial_number": allSNsStr,
+				"stock":         len(allSNs),
+			}).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to restore product serial numbers"})
+			return
+		}
+	}
 
 	// Delete invoice items first (due to foreign key constraint)
 	if err := tx.Where("invoice_id = ?", invoiceUUID).Delete(&models.VendorInvoiceItem{}).Error; err != nil {

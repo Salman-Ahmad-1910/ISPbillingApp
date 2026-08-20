@@ -67,11 +67,31 @@ export const columns = ({ onEdit, onDelete }: ProductColumnsProps): ColumnDef<Pr
   {
     accessorKey: 'serialNumber',
     header: 'SN / MAC',
-    cell: ({ row }) => (
-      <div className="text-xs font-mono text-muted-foreground">
-        {row.original.serialNumber || '-'}
-      </div>
-    ),
+    cell: ({ row }) => {
+      const product = row.original;
+      const serialNumber = product.serialNumber || '';
+      const currentSn = (() => {
+        const sns = serialNumber.split(/[\s,]+/).map((s: string) => s.trim()).filter(Boolean);
+        if (sns.length === 0) return '';
+        const idx = product.currentSerialIndex ?? 0;
+        return sns[idx] || sns[0];
+      })();
+      if (!currentSn) return <div className="text-xs font-mono text-muted-foreground">-</div>;
+      const total = serialNumber.split(/[\s,]+/).map((s: string) => s.trim()).filter(Boolean).length;
+      return (
+        <div className="text-xs font-mono text-muted-foreground" title={serialNumber}>
+          {currentSn}{total > 1 ? ` (${(product.currentSerialIndex ?? 0) + 1}/${total})` : ''}
+        </div>
+      );
+    },
+  },
+  {
+    accessorKey: 'stock',
+    header: () => <div className="text-right">Stock</div>,
+    cell: ({ row }) => {
+      const stock = row.original.stock || 0;
+      return <div className="text-right font-medium">{stock}</div>;
+    },
   },
   {
     accessorKey: 'discount',

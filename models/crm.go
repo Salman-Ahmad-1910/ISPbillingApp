@@ -1,6 +1,10 @@
 package models
 
-import "github.com/google/uuid"
+import (
+	"strings"
+
+	"github.com/google/uuid"
+)
 
 // Customer - Specific to Installment / Product Sales Tracking
 type Customer struct {
@@ -27,22 +31,63 @@ type Guarantor struct {
 // Product - Point of Sale items / General Items
 type Product struct {
 	TenantModel
-	Name           string  `gorm:"type:varchar(255);not null" json:"name"`
-	Category       string  `gorm:"type:varchar(100);not null" json:"category"`
-	Price          float64 `gorm:"type:decimal(10,2);not null" json:"price"`
-	Stock          int     `gorm:"not null;default:0" json:"stock"`
-	UnitType       string  `gorm:"type:varchar(50);not null;default:'piece'" json:"unitType"`
-	TaxPercent     float64 `gorm:"type:decimal(5,2);not null;default:0" json:"taxPercent"`
-	Image          string  `gorm:"type:varchar(255)" json:"image"`
-	Barcode        string  `gorm:"type:varchar(100)" json:"barcode"`
-	SalePrice      float64 `gorm:"type:decimal(10,2);not null;default:0" json:"salePrice"`
-	PurchasePrice  float64 `gorm:"type:decimal(10,2);not null;default:0" json:"purchasePrice"`
-	Discount       float64 `gorm:"type:decimal(10,2);not null;default:0" json:"discount"`
-	BrandID        string  `gorm:"type:varchar(100)" json:"brandId"`
-	BrandName      string  `gorm:"type:varchar(255)" json:"brandName"`
-	ProductTypeID  string  `gorm:"type:varchar(100)" json:"productTypeId"`
-	ProductTypeName string `gorm:"type:varchar(255)" json:"productTypeName"`
-	SerialNumber   string `gorm:"type:varchar(255)" json:"serialNumber"`
+	Name               string  `gorm:"type:varchar(255);not null" json:"name"`
+	Category           string  `gorm:"type:varchar(100);not null" json:"category"`
+	Price              float64 `gorm:"type:decimal(10,2);not null" json:"price"`
+	Stock              int     `gorm:"not null;default:0" json:"stock"`
+	UnitType           string  `gorm:"type:varchar(50);not null;default:'piece'" json:"unitType"`
+	TaxPercent         float64 `gorm:"type:decimal(5,2);not null;default:0" json:"taxPercent"`
+	Image              string  `gorm:"type:varchar(255)" json:"image"`
+	Barcode            string  `gorm:"type:varchar(100)" json:"barcode"`
+	SalePrice          float64 `gorm:"type:decimal(10,2);not null;default:0" json:"salePrice"`
+	PurchasePrice      float64 `gorm:"type:decimal(10,2);not null;default:0" json:"purchasePrice"`
+	Discount           float64 `gorm:"type:decimal(10,2);not null;default:0" json:"discount"`
+	BrandID            string  `gorm:"type:varchar(100)" json:"brandId"`
+	BrandName          string  `gorm:"type:varchar(255)" json:"brandName"`
+	ProductTypeID      string  `gorm:"type:varchar(100)" json:"productTypeId"`
+	ProductTypeName    string  `gorm:"type:varchar(255)" json:"productTypeName"`
+	SerialNumber       string  `gorm:"type:varchar(255)" json:"serialNumber"`
+	CurrentSerialIndex int     `gorm:"not null;default:0" json:"currentSerialIndex"`
+}
+
+func (p *Product) ParseSerialNumbers() []string {
+	if p.SerialNumber == "" {
+		return nil
+	}
+	parts := strings.FieldsFunc(p.SerialNumber, func(r rune) bool {
+		return r == ',' || r == ' '
+	})
+	var result []string
+	for _, s := range parts {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			result = append(result, s)
+		}
+	}
+	return result
+}
+
+func (p *Product) GetCurrentSerialNumber() string {
+	sns := p.ParseSerialNumbers()
+	if len(sns) == 0 {
+		return p.SerialNumber
+	}
+	if p.CurrentSerialIndex >= 0 && p.CurrentSerialIndex < len(sns) {
+		return sns[p.CurrentSerialIndex]
+	}
+	return sns[0]
+}
+
+func (p *Product) AdvanceSerialNumber() string {
+	sns := p.ParseSerialNumbers()
+	if len(sns) == 0 {
+		return p.SerialNumber
+	}
+	current := p.GetCurrentSerialNumber()
+	if p.CurrentSerialIndex < len(sns)-1 {
+		p.CurrentSerialIndex++
+	}
+	return current
 }
 
 // SerialNumberPool - Pool of serial numbers to be auto-assigned to products

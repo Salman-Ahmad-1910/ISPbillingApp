@@ -33,6 +33,14 @@ import { SnPoolDialog } from './sn-pool-dialog';
 
 type ProductFormValues = z.infer<typeof productSchema>;
 
+function parseSerialNumbers(raw: string): string[] {
+  if (!raw.trim()) return [];
+  return raw
+    .split(/[,\s]+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
 interface ClientPageProps {
   data: Product[];
 }
@@ -59,10 +67,31 @@ export function ClientPage({ data }: ClientPageProps) {
     setProducts(data);
   }, [data]);
 
-  const filteredData = useMemo(() => products.filter(
+  const groupedProducts = useMemo(() => {
+    const groupMap = new Map<string, Product[]>();
+    for (const p of products) {
+      const key = `${p.name}|${p.brandName || ''}|${p.productTypeName || p.category || ''}`;
+      const existing = groupMap.get(key);
+      if (existing) {
+        existing.push(p);
+      } else {
+        groupMap.set(key, [p]);
+      }
+    }
+    return Array.from(groupMap.values()).map(group => {
+      if (group.length === 1) return group[0];
+      const representative = { ...group[0] };
+      representative.stock = group.reduce((sum, p) => sum + (p.stock || 0), 0);
+      const allSns = group.flatMap(p => (p.serialNumber || '').split(',').map(s => s.trim()).filter(Boolean));
+      representative.serialNumber = [...new Set(allSns)].join(', ');
+      return representative;
+    });
+  }, [products]);
+
+  const filteredData = useMemo(() => groupedProducts.filter(
     (product) =>
       smartMatch(filter, [product.serialNumber], [product.name, product.category, product.brandName])
-  ), [products, filter]);
+  ), [groupedProducts, filter]);
 
     // Pagination helpers
     const totalPages = Math.ceil(filteredData.length / pageSize);
@@ -118,8 +147,20 @@ export function ClientPage({ data }: ClientPageProps) {
         await api.put(`/inventory/products/${selectedProduct.id}?companyId=${companyId}`, data);
         toast({ title: 'Success', description: 'Product updated successfully.' });
       } else {
-        await api.post(`/inventory/products?companyId=${companyId}`, { ...data, companyId: companyId! });
-        toast({ title: 'Success', description: 'Product added successfully.' });
+        const serialNumbers = parseSerialNumbers(data.serialNumber || '');
+        const payload = {
+          ...data,
+          companyId: companyId!,
+          stock: serialNumbers.length > 0 ? serialNumbers.length : data.stock || 1,
+        };
+        await api.post(`/inventory/products?companyId=${companyId}`, payload);
+        const count = serialNumbers.length;
+        toast({
+          title: 'Success',
+          description: count > 1
+            ? `Product added with ${count} serial numbers.`
+            : 'Product added successfully.',
+        });
       }
       queryClient.invalidateQueries({ queryKey: ['inventory/products', companyId] });
       setIsFormOpen(false);

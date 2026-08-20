@@ -460,6 +460,28 @@ export default function POSPage() {
 
         setIsProcessing(true);
         try {
+            const expandedItems = cart.flatMap(item => {
+                const sns = ((item.product as any).serialNumber || '').split(/[\s,]+/).map((s: string) => s.trim()).filter(Boolean);
+                if (sns.length === 0 || item.quantity <= 1) {
+                    return [{
+                        productId: item.product.id,
+                        productName: item.product.name,
+                        quantity: item.quantity,
+                        price: item.product.price,
+                        taxPercent: Number(item.product.taxPercent) || 0,
+                        serialNumber: sns[0] || '',
+                    }];
+                }
+                return Array.from({ length: Math.min(item.quantity, sns.length) }, (_, i) => ({
+                    productId: item.product.id,
+                    productName: item.product.name,
+                    quantity: 1,
+                    price: item.product.price,
+                    taxPercent: Number(item.product.taxPercent) || 0,
+                    serialNumber: sns[i] || sns[0],
+                }));
+            });
+
             if (isInstallment && selectedPlanId && !existingInstallment) {
                 await api.post(`/pos/installment-sales?companyId=${companyId}`, {
                     subscriberId: customerId,
@@ -470,14 +492,7 @@ export default function POSPage() {
                     paymentMethod: paymentMethod,
                     date: new Date().toISOString(),
                     companyId: companyId!,
-                    items: cart.map(item => ({
-                        productId: item.product.id,
-                        productName: item.product.name,
-                        quantity: item.quantity,
-                        price: item.product.price,
-                        taxPercent: Number(item.product.taxPercent) || 0,
-                        serialNumber: (item.product as any).serialNumber || '',
-                    }))
+                    items: expandedItems,
                 });
             } else if (isInstallment && existingInstallment) {
                 await handlePayNextInstallment();
@@ -491,14 +506,7 @@ export default function POSPage() {
                     paymentMethod: paymentMethod,
                     date: new Date().toISOString(),
                     companyId: companyId!,
-                    items: cart.map(item => ({
-                        productId: item.product.id,
-                        productName: item.product.name,
-                        quantity: item.quantity,
-                        price: item.product.price,
-                        taxPercent: Number(item.product.taxPercent) || 0,
-                        serialNumber: (item.product as any).serialNumber || '',
-                    }))
+                    items: expandedItems,
                 });
             }
 
@@ -545,6 +553,27 @@ export default function POSPage() {
 
         setIsProcessing(true);
         try {
+            const holdItems = cart.flatMap(item => {
+                const sns = ((item.product as any).serialNumber || '').split(/[\s,]+/).map((s: string) => s.trim()).filter(Boolean);
+                if (sns.length === 0 || item.quantity <= 1) {
+                    return [{
+                        productId: item.product.id,
+                        productName: item.product.name,
+                        quantity: item.quantity,
+                        price: item.product.price,
+                        taxPercent: Number(item.product.taxPercent) || 0,
+                        serialNumber: sns[0] || '',
+                    }];
+                }
+                return Array.from({ length: Math.min(item.quantity, sns.length) }, (_, i) => ({
+                    productId: item.product.id,
+                    productName: item.product.name,
+                    quantity: 1,
+                    price: item.product.price,
+                    taxPercent: Number(item.product.taxPercent) || 0,
+                    serialNumber: sns[i] || sns[0],
+                }));
+            });
             await api.post(`/pos/sales?companyId=${companyId}`, {
                 subscriberId: customerId,
                 subscriberName: selectedName || 'Unknown',
@@ -555,13 +584,7 @@ export default function POSPage() {
                 companyId: companyId!,
                 status: 'hold',
                 discount,
-                items: cart.map(item => ({
-                    productId: item.product.id,
-                    productName: item.product.name,
-                    quantity: item.quantity,
-                    price: item.product.price,
-                    taxPercent: Number(item.product.taxPercent) || 0,
-                }))
+                items: holdItems,
             });
 
             queryClient.invalidateQueries({ queryKey: ['pos/sales'] });
@@ -683,11 +706,15 @@ export default function POSPage() {
                                     <div className="p-2 text-center">
                                         <h4 className="font-medium text-sm truncate">{product.name}</h4>
                                         <p className="text-xs font-semibold">PKR {product.price.toLocaleString()}</p>
-                                        {product.serialNumber && (
-                                          <p className="text-[10px] font-mono text-muted-foreground truncate mt-0.5" title={product.serialNumber}>
-                                            SN: {product.serialNumber}
-                                          </p>
-                                        )}
+                                        {product.serialNumber && (() => {
+                                          const sns = product.serialNumber.split(/[\s,]+/).map((s: string) => s.trim()).filter(Boolean);
+                                          const currentSn = sns.length > 0 ? sns[product.currentSerialIndex ?? 0] || sns[0] : '';
+                                          return currentSn ? (
+                                            <p className="text-[10px] font-mono text-muted-foreground truncate mt-0.5" title={product.serialNumber}>
+                                              SN: {currentSn}{sns.length > 1 ? ` (${(product.currentSerialIndex ?? 0) + 1}/${sns.length})` : ''}
+                                            </p>
+                                          ) : null;
+                                        })()}
                                     </div>
                                 </Card>
                                 );
@@ -847,20 +874,24 @@ export default function POSPage() {
                                             <Image src={backendImageUrl(item.product.image) || `https://picsum.photos/seed/${item.product.id}/50/50`} width={50} height={50} alt={item.product.name} className="rounded-md object-cover" unoptimized />
                                             <div className="flex-1 mx-3">
                                                 <p className="font-medium">{item.product.name}</p>
-                                                {item.product.serialNumber && (
+                                                {item.product.serialNumber && (() => {
+                                                  const sns = item.product.serialNumber.split(/[\s,]+/).map((s: string) => s.trim()).filter(Boolean);
+                                                  const currentSn = sns.length > 0 ? sns[item.product.currentSerialIndex ?? 0] || sns[0] : '';
+                                                  return currentSn ? (
                                                     <p className="text-[10px] font-mono text-muted-foreground truncate" title={item.product.serialNumber}>
-                                                        SN / MAC: {item.product.serialNumber}
+                                                      SN / MAC: {currentSn}
                                                     </p>
-                                                )}
+                                                  ) : null;
+                                                })()}
                                                 <p className="text-sm text-muted-foreground">PKR {item.product.price.toLocaleString()}</p>
-                                                <Input
-                                                    type="number"
-                                                    value={item.quantity}
-                                                    onChange={(e) => updateCartQuantity(item.product.id, parseInt(e.target.value) || 0)}
-                                                    className="h-8 w-20 mt-1"
-                                                    min="0"
-                                                    max={item.product.stock}
-                                                />
+                    <Input
+                        type="number"
+                        value={item.quantity}
+                        onChange={(e) => updateCartQuantity(item.product.id, parseInt(e.target.value) || 0)}
+                        className="h-8 w-20 mt-1"
+                        min="0"
+                        max={item.product.stock}
+                    />
                                             </div>
                                             <div className="flex flex-col items-end gap-2">
                                                 <p className="font-medium">PKR {(item.product.price * item.quantity).toLocaleString()}</p>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -17,16 +17,27 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Purchase, Vendor, Product } from '@/lib/types';
 import { purchaseSchema } from '@/lib/schemas';
-import { Loader2, Upload } from 'lucide-react';
-import Image from 'next/image';
-import api from '@/lib/api';
-import { useToast } from '@/hooks/use-toast';
-import { useQueryClient } from '@tanstack/react-query';
+import { Loader2, PlusCircle } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
-import { backendImageUrl } from '@/lib/utils';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 
 type PurchaseFormValues = z.infer<typeof purchaseSchema>;
+
+function parseSerialNumbers(raw: string): string[] {
+  if (!raw || !raw.trim()) return [];
+  return raw.split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
+}
+
+interface VendorProduct {
+  productId: string;
+  productName: string;
+  unitPrice: number;
+  unitType: string;
+  allSNs: string[];
+  vendorInvoiceId: string;
+  invoiceNumber: string;
+  batch: string;
+}
 
 interface PurchaseFormProps {
   purchase: Purchase | null;
@@ -45,12 +56,15 @@ export function PurchaseForm({
   onCancel,
   isSaving
 }: PurchaseFormProps) {
-  const [uploadingId, setUploadingId] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const prevVendorIdRef = useRef<string>('');
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
+  const productSelectTriggerRef = useRef<HTMLButtonElement>(null);
+  const [showProductSelect, setShowProductSelect] = useState(false);
   const { companyId } = useCompany();
+
+  const { data: vendorInvoices = [] } = useGenericQuery<any>(
+    companyId ? 'inventory/vendor-invoices' : null,
+    companyId ?? undefined
+  );
 
   const form = useForm<PurchaseFormValues>({
     resolver: zodResolver(purchaseSchema),
@@ -77,55 +91,6 @@ export function PurchaseForm({
   const items = form.watch('items');
   const selectedVendorId = form.watch('vendorId');
 
-  const { data: vendorInvoices = [] } = useGenericQuery<any>(
-    companyId ? 'inventory/vendor-invoices' : null,
-    companyId ?? undefined
-  );
-
-  const handleVendorInvoiceSelect = useCallback((invoiceId: string) => {
-    const vi = vendorInvoices.find((inv: any) => inv.id === invoiceId);
-    if (vi) {
-      form.setValue('billId', vi.invoiceNumber || '');
-      form.setValue('batch', vi.batch || '');
-      if (vi.vendorId) {
-        form.setValue('vendorId', vi.vendorId);
-        form.setValue('vendorName', vi.vendorName || '');
-      }
-      if (vi.items?.length > 0) {
-        const merged = new Map<string, any>();
-        for (const item of vi.items) {
-          const existing = merged.get(item.productId);
-          if (existing) {
-            existing.quantity += item.quantity;
-            existing.subtotal = existing.quantity * existing.purchasePrice;
-            if (item.serialNumber && existing.serialNumber !== item.serialNumber) {
-              const serials = existing.serialNumber ? existing.serialNumber.split(', ').filter(Boolean) : [];
-              if (!serials.includes(item.serialNumber)) {
-                serials.push(item.serialNumber);
-                existing.serialNumber = serials.join(', ');
-              }
-            }
-          } else {
-            const product = products.find((p: any) => p.id === item.productId);
-            const purchasePrice = item.unitPrice || 0;
-            merged.set(item.productId, {
-              productId: item.productId,
-              productName: item.productName,
-              quantity: item.quantity,
-              purchasePrice,
-              sellingPrice: product?.salePrice || product?.price || 0,
-              unitType: item.unitType || 'piece',
-              focNormal: 'normal',
-              serialNumber: item.serialNumber || '',
-              subtotal: item.subtotal || purchasePrice * item.quantity,
-            });
-          }
-        }
-        form.setValue('items', Array.from(merged.values()));
-      }
-    }
-  }, [vendorInvoices, products, form]);
-
   useEffect(() => {
     if (selectedVendorId && selectedVendorId !== prevVendorIdRef.current) {
       prevVendorIdRef.current = selectedVendorId;
@@ -145,15 +110,72 @@ export function PurchaseForm({
     form.setValue('totalAmount', total);
   }, [items, form]);
 
-  const updateItemField = (index: number, field: string, value: any) => {
-    const currentItems = [...form.getValues('items')];
-    if (index >= currentItems.length) return;
-    const item = { ...currentItems[index], [field]: value };
-    const qty = field === 'quantity' ? value : item.quantity;
-    const pp = field === 'purchasePrice' ? value : item.purchasePrice;
-    item.subtotal = qty * pp;
-    currentItems[index] = item;
-    form.setValue('items', currentItems, { shouldDirty: true, shouldTouch: true });
+  const vendorProducts = useMemo((): VendorProduct[] => {
+    if (!selectedVendorId) return [];
+    const productMap = new Map<string, VendorProduct>();
+    for (const vi of vendorInvoices) {
+      if (vi.vendorId !== selectedVendorId || !vi.items) continue;
+      for (const item of vi.items) {
+        const existing = productMap.get(item.productId);
+        const itemSNs = parseSerialNumbers(item.serialNumber || '');
+        if (existing) {
+          existing.allSNs.push(...itemSNs);
+        } else {
+          const product = products.find(p => p.id === item.productId);
+          productMap.set(item.productId, {
+            productId: item.productId,
+            productName: item.productName,
+            unitPrice: item.unitPrice || 0,
+            unitType: item.unitType || product?.unitType || 'piece',
+            allSNs: [...itemSNs],
+            vendorInvoiceId: vi.id,
+            invoiceNumber: vi.invoiceNumber || '',
+            batch: vi.batch || '',
+          });
+        }
+      }
+    }
+    return Array.from(productMap.values());
+  }, [selectedVendorId, vendorInvoices, products]);
+
+  const getAvailableSNs = (productId: string, excludeIndex: number): string[] => {
+    const vp = vendorProducts.find(p => p.productId === productId);
+    if (!vp) return [];
+    const usedByOthers = new Set<string>();
+    items.forEach((item, i) => {
+      if (i === excludeIndex) return;
+      if (item.productId === productId && item.serialNumber) {
+        parseSerialNumbers(item.serialNumber).forEach(sn => usedByOthers.add(sn));
+      }
+    });
+    return vp.allSNs.filter(sn => !usedByOthers.has(sn));
+  };
+
+  const addItem = (productId: string) => {
+    const vp = vendorProducts.find(p => p.productId === productId);
+    if (!vp) return;
+    const currentItems = form.getValues('items');
+    const availableSNs = getAvailableSNs(productId, currentItems.length);
+    const maxQty = availableSNs.length || 1;
+    const qty = Math.min(1, maxQty);
+    const snString = availableSNs.slice(0, qty).join(', ');
+    const newItem = {
+      productId,
+      productName: vp.productName,
+      quantity: qty,
+      purchasePrice: vp.unitPrice,
+      sellingPrice: vp.unitPrice,
+      unitType: vp.unitType,
+      focNormal: 'normal',
+      serialNumber: snString,
+      subtotal: vp.unitPrice * qty,
+      saleTax: 0,
+      wthTax: 0,
+      disc: 0,
+    };
+    form.setValue('items', [...currentItems, newItem], { shouldDirty: true, shouldTouch: true });
+    if (vp.invoiceNumber) form.setValue('billId', vp.invoiceNumber);
+    if (vp.batch) form.setValue('batch', vp.batch);
   };
 
   const removeItem = (index: number) => {
@@ -162,33 +184,30 @@ export function PurchaseForm({
     form.setValue('items', updated);
   };
 
-  const handleImageUpload = async (productId: string, file: File) => {
-    setUploadingId(productId);
-    try {
-      const formData = new FormData();
-      formData.append('image', file);
-      await api.post(`/upload/product-image/${productId}`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      queryClient.invalidateQueries({ queryKey: ['inventory/products', companyId] });
-      toast({
-        title: 'Image uploaded',
-        description: 'Product image has been updated.',
-      });
-    } catch (err: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Upload failed',
-        description: err.response?.data?.message || 'Failed to upload image',
-      });
-    } finally {
-      setUploadingId(null);
-    }
-  };
+  const updateItemField = (index: number, field: string, value: any) => {
+    const currentItems = [...form.getValues('items')];
+    if (index >= currentItems.length) return;
+    const item = { ...currentItems[index] };
 
-  const triggerUpload = (productId: string) => {
-    fileInputRef.current?.click();
-    fileInputRef.current!.dataset.productId = productId;
+    if (field === 'quantity') {
+      const availableSNs = getAvailableSNs(item.productId, index);
+      const maxQty = availableSNs.length || 1;
+      const qty = Math.max(1, Math.min(Number(value) || 1, maxQty));
+      const snString = availableSNs.slice(0, qty).join(', ');
+      item.quantity = qty;
+      item.serialNumber = snString;
+      item.subtotal = qty * item.purchasePrice;
+    } else if (field === 'purchasePrice') {
+      item.purchasePrice = value;
+      item.subtotal = item.quantity * value;
+    } else if (field === 'sellingPrice') {
+      item.sellingPrice = value;
+    } else {
+      (item as any)[field] = value;
+    }
+
+    currentItems[index] = item;
+    form.setValue('items', currentItems, { shouldDirty: true, shouldTouch: true });
   };
 
   function onSubmit(values: PurchaseFormValues) {
@@ -198,37 +217,7 @@ export function PurchaseForm({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        {vendorInvoices.length > 0 && (
-          <div className="space-y-2">
-            <FormLabel>Link Vendor Invoice (auto-fills Bill ID, Batch & Vendor)</FormLabel>
-            <Select onValueChange={handleVendorInvoiceSelect}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a vendor invoice to auto-fill" />
-              </SelectTrigger>
-              <SelectContent>
-                {vendorInvoices.map((vi: any) => (
-                  <SelectItem key={vi.id} value={vi.id}>
-                    {vi.invoiceNumber} — {vi.vendorName}{vi.batch ? ` — ${vi.batch}` : ''} — PKR {vi.totalAmount?.toLocaleString()}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="billId"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Bill ID</FormLabel>
-                <FormControl>
-                  <Input placeholder="e.g., BILL-001" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
           <FormField
             control={form.control}
             name="vendorId"
@@ -249,6 +238,19 @@ export function PurchaseForm({
                     ))}
                   </SelectContent>
                 </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="billId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Bill ID</FormLabel>
+                <FormControl>
+                  <Input placeholder="e.g., BILL-001" {...field} />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -286,52 +288,55 @@ export function PurchaseForm({
             <FormLabel>Products</FormLabel>
           </div>
 
-          <input
-            type="file"
-            ref={fileInputRef}
-            accept="image/jpeg,image/png,image/jpg"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              const pid = fileInputRef.current?.dataset.productId;
-              if (file && pid) {
-                handleImageUpload(pid, file);
-              }
-              e.target.value = '';
-            }}
-          />
+          {!selectedVendorId ? (
+            <p className="text-sm text-muted-foreground text-center py-4">Select a vendor first to add products.</p>
+          ) : vendorProducts.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">No vendor invoices found for this vendor.</p>
+          ) : null}
 
-          {items.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">No products added yet. Select a vendor invoice above to add products.</p>
-          ) : (
+          {selectedVendorId && vendorProducts.length > 0 && (
+            <div className="flex items-center gap-2">
+              <Select open={showProductSelect} onOpenChange={setShowProductSelect} onValueChange={(value) => { addItem(value); setShowProductSelect(false); }}>
+                <SelectTrigger ref={productSelectTriggerRef} className="w-full">
+                  <SelectValue placeholder="Select a product to add..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {vendorProducts.map((vp) => (
+                    <SelectItem key={vp.productId} value={vp.productId}>
+                      {vp.productName}{vp.allSNs.length > 0 ? ` (${vp.allSNs.length} SNs)` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button type="button" variant="outline" size="icon" className="shrink-0 h-9 w-9" onClick={() => setShowProductSelect(true)}>
+                <PlusCircle className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+
+          {items.length > 0 && (
             <div className="space-y-3">
               {items.map((item, index) => {
-                const product = products.find(p => p.id === item.productId);
+                const vp = vendorProducts.find(p => p.productId === item.productId);
+                const availableSNs = getAvailableSNs(item.productId, index);
+                const totalSNs = vp ? vp.allSNs.length : 0;
+                const maxQty = availableSNs.length || 1;
+                const sns = parseSerialNumbers(item.serialNumber || '');
+
                 return (
                   <div key={index} className="border rounded-lg p-3 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-sm">{item.productName}</span>
-                        {product?.image && (
-                          <Image
-                            src={backendImageUrl(product.image) || ''}
-                            width={32}
-                            height={32}
-                            alt={item.productName}
-                            className="rounded object-cover"
-                            unoptimized
-                          />
+                        {sns.length > 0 && (
+                          <span className="font-mono text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded">
+                            {sns.length === 1 ? `SN: ${sns[0]}` : `${sns[0]} (1/${sns.length})`}
+                          </span>
                         )}
                       </div>
-                      <div className="flex gap-2">
-                        <Button type="button" variant="outline" size="sm" onClick={() => triggerUpload(item.productId)} disabled={uploadingId === item.productId}>
-                          {uploadingId === item.productId ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Upload className="h-3 w-3 mr-1" />}
-                          Image
-                        </Button>
-                        <Button type="button" variant="outline" size="sm" onClick={() => removeItem(index)}>
-                          Remove
-                        </Button>
-                      </div>
+                      <Button type="button" variant="outline" size="sm" onClick={() => removeItem(index)}>
+                        Remove
+                      </Button>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                       <div>
@@ -355,13 +360,24 @@ export function PurchaseForm({
                         />
                       </div>
                       <div>
-                        <FormLabel className="text-xs">Quantity *</FormLabel>
+                        <FormLabel className="text-xs">
+                          Quantity * {maxQty > 0 && <span className="text-muted-foreground font-normal">(max {maxQty})</span>}
+                        </FormLabel>
                         <Input
                           type="number"
                           min="1"
+                          max={maxQty}
                           value={item.quantity}
                           onChange={(e) => updateItemField(index, 'quantity', parseInt(e.target.value) || 1)}
                         />
+                        {item.productId && (
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            {totalSNs > 0
+                              ? `${item.quantity} of ${totalSNs} SNs assigned`
+                              : 'No SNs on this product'
+                            }
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -391,9 +407,10 @@ export function PurchaseForm({
                       <div>
                         <FormLabel className="text-xs">Serial / MAC</FormLabel>
                         <Input
-                          placeholder="e.g., SN-001"
+                          readOnly
                           value={item.serialNumber || ''}
-                          onChange={(e) => updateItemField(index, 'serialNumber', e.target.value)}
+                          className="bg-muted font-mono text-xs"
+                          placeholder="Auto-assigned from vendor invoice"
                         />
                       </div>
                     </div>

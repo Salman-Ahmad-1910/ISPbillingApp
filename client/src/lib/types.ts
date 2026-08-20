@@ -614,6 +614,7 @@ export type Product = {
   salePrice?: number;
   discount?: number;
   serialNumber?: string;
+  currentSerialIndex?: number;
 };
 
 export type SerialNumberPoolEntry = {
@@ -653,13 +654,13 @@ export type VendorInvoice = {
 };
 
 export type VendorInvoiceItem = {
-  id: string;
-  invoiceId: string;
+  id?: string;
+  invoiceId?: string;
   productId: string;
   productName: string;
   quantity: number;
   unitPrice: number;
-  unitType: 'piece' | 'meter';
+  unitType: string;
   subtotal: number;
   serialNumber?: string;
 };

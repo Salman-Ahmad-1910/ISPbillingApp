@@ -120,6 +120,23 @@ func CreatePOSSale(c *gin.Context) {
 				Update("stock", gorm.Expr("GREATEST(stock - ?, 0)", qty)).Error; err != nil {
 				return err
 			}
+
+			// Advance the serial number index so the next SN is shown.
+			if it.SerialNumber != "" {
+				var prod models.Product
+				if err := tx.Where("id = ? AND company_id = ?", it.ProductID, companyID).First(&prod).Error; err == nil {
+					sns := prod.ParseSerialNumbers()
+					if len(sns) > 1 {
+						newIdx := prod.CurrentSerialIndex + qty
+						if newIdx >= len(sns) {
+							newIdx = len(sns) - 1
+						}
+						tx.Model(&models.Product{}).
+							Where("id = ? AND company_id = ?", it.ProductID, companyID).
+							Update("current_serial_index", newIdx)
+					}
+				}
+			}
 		}
 		return nil
 	})

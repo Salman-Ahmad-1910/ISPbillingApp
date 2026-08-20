@@ -69,10 +69,15 @@ export const columns = ({ onEdit, onPay, onPrint, onDelete, companyName }: Purch
     header: 'SN / MAC',
     cell: ({ row }) => {
       const items = row.original.items || [];
-      const serials = items.map(i => i.serialNumber).filter(Boolean);
+      const serials = items.map(i => i.serialNumber ?? '').filter(Boolean);
       if (serials.length === 0) return <span className="text-muted-foreground">\u2014</span>;
-      const display = serials.length > 2 ? `${serials.slice(0, 2).join(', ')} +${serials.length - 2}` : serials.join(', ');
-      return <span className="text-xs font-mono max-w-[200px] truncate block" title={serials.join(', ')}>{display}</span>;
+      const allSNs: string[] = [];
+      for (const s of serials) {
+        allSNs.push(...s.split(/[,\s]+/).map(sn => sn.trim()).filter(Boolean));
+      }
+      if (allSNs.length === 0) return <span className="text-xs font-mono text-muted-foreground">—</span>;
+      const display = allSNs.length === 1 ? allSNs[0] : `${allSNs[0]} (1/${allSNs.length})`;
+      return <span className="text-xs font-mono" title={allSNs.join(', ')}>{display}</span>;
     },
   },
   {

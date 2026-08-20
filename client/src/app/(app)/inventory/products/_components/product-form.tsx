@@ -16,12 +16,18 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Product, Brand, ProductType, UnitType } from '@/lib/types';
 import { productSchema } from '@/lib/schemas';
-import { Loader2 } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import { useEffect, useState } from 'react';
-import api from '@/lib/api';
+import { useEffect, useMemo } from 'react';
+
+function parseSerialNumbers(raw: string): string[] {
+  if (!raw.trim()) return [];
+  return raw
+    .split(/[,\s]+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+}
 
 type ProductFormValues = z.infer<typeof productSchema>;
 
@@ -58,6 +64,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
         productTypeId: product.productTypeId || '',
         productTypeName: product.productTypeName || '',
         serialNumber: product.serialNumber || '',
+        currentSerialIndex: product.currentSerialIndex ?? 0,
     } : {
       name: '',
       category: '',
@@ -75,13 +82,27 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
       salePrice: 0,
       discount: 0,
       serialNumber: '',
+      currentSerialIndex: 0,
     },
   });
 
   const brandIdValue = form.watch('brandId');
   const productTypeIdValue = form.watch('productTypeId');
+  const serialNumberValue = form.watch('serialNumber');
+  const currentSerialIndex = form.watch('currentSerialIndex');
 
-  const [isFetchingNextSn, setIsFetchingNextSn] = useState(false);
+  const parsedSnCount = useMemo(() => parseSerialNumbers(serialNumberValue || '').length, [serialNumberValue]);
+  const currentSn = useMemo(() => {
+    const sns = parseSerialNumbers(serialNumberValue || '');
+    if (sns.length === 0) return '';
+    return sns[currentSerialIndex ?? 0] || sns[0];
+  }, [serialNumberValue, currentSerialIndex]);
+
+  useEffect(() => {
+    if (!product && parsedSnCount > 0) {
+      form.setValue('stock', parsedSnCount);
+    }
+  }, [parsedSnCount, product, form]);
 
   useEffect(() => {
     const brand = brands.find(b => b.id === brandIdValue);
@@ -92,28 +113,6 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
     const pt = productTypes.find(pt => pt.id === productTypeIdValue);
     form.setValue('productTypeName', pt?.name || '');
   }, [productTypeIdValue, productTypes, form]);
-
-  // For new products, pre-fill the SN/MAC field with the next available
-  // serial number from the pool. The user can still edit it.
-  useEffect(() => {
-    if (product || !companyId) return;
-    let cancelled = false;
-    (async () => {
-      setIsFetchingNextSn(true);
-      try {
-        const res = await api.get(`/inventory/serial-number-pool/next?companyId=${companyId}`);
-        const sn = res.data?.data?.serialNumber;
-        if (!cancelled && sn) {
-          form.setValue('serialNumber', sn);
-        }
-      } catch {
-        // Ignore: user can type the serial number manually.
-      } finally {
-        if (!cancelled) setIsFetchingNextSn(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [product, companyId, form]);
 
   function onSubmit(values: ProductFormValues) {
     onSave({
@@ -245,15 +244,36 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
           name="serialNumber"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>SN / MAC {!product && <span className="text-xs font-normal text-muted-foreground">(auto from pool)</span>}</FormLabel>
-              <FormControl>
-                <div className="relative">
-                  <Input placeholder="e.g., 00:1A:2B:3C:4D:5E" {...field} disabled={isFetchingNextSn} />
-                  {isFetchingNextSn && (
-                    <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
-                  )}
+              <FormLabel>SN / MAC Numbers</FormLabel>
+              {product && currentSn && (
+                <div className="p-2 bg-emerald-50 dark:bg-emerald-950 rounded-md border border-emerald-200 dark:border-emerald-800">
+                  <p className="text-xs text-emerald-700 dark:text-emerald-300 font-medium">Current SN / MAC (will be sold next)</p>
+                  <p className="text-sm font-mono font-semibold text-emerald-800 dark:text-emerald-200 mt-0.5">{currentSn}</p>
                 </div>
+              )}
+              <FormControl>
+                <textarea
+                  placeholder="e.g., 00:1A:2B:3C:4D:5E, AA:BB:CC:DD:EE:FF, 11-22-33-44-55-66"
+                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  {...field}
+                  disabled={!!product}
+                />
               </FormControl>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">
+                  Separate multiple SN/MAC numbers with comma, space, or dash
+                </p>
+                {parsedSnCount > 0 && (
+                  <span className="text-xs font-medium text-emerald-600">
+                    {parsedSnCount} SN/MAC{parsedSnCount !== 1 ? 's' : ''} → stock = {parsedSnCount}
+                  </span>
+                )}
+              </div>
+              {product && (
+                <p className="text-xs text-muted-foreground">
+                  SN/MAC cannot be changed after creation. Current index: {(currentSerialIndex ?? 0) + 1} of {parsedSnCount}
+                </p>
+              )}
               <FormMessage />
             </FormItem>
           )}
@@ -312,8 +332,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
             Cancel
           </Button>
           <Button type="submit" disabled={isSaving} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700">
-            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isSaving ? 'Saving...' : 'Add Product'}
+            {isSaving ? 'Saving...' : product ? 'Update Product' : 'Add Product'}
           </Button>
         </div>
       </form>
