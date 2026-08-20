@@ -71,6 +71,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
         serialNumber: product.serialNumber || '',
         currentSerialIndex: product.currentSerialIndex ?? 0,
     } : {
+      productCode: '',
       name: '',
       category: '',
       price: 0,

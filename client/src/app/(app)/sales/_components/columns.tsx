@@ -116,10 +116,19 @@ export function getColumns(onDelete?: (id: string) => void): ColumnDef<Sale>[] {
               .filter(Boolean),
           );
         const uniqueSerials = [...new Set(serials)];
-        const serial = uniqueSerials[0] || '';
+        if (uniqueSerials.length === 0) {
+          return <div className="text-xs font-mono text-muted-foreground">—</div>;
+        }
+        const first = uniqueSerials[0];
+        const total = uniqueSerials.length;
         return (
-          <div className="text-xs font-mono max-w-[140px] truncate" title={uniqueSerials.join(', ')}>
-            {serial || '—'}
+          <div className="flex items-center gap-1.5 max-w-[180px]" title={uniqueSerials.join(', ')}>
+            <span className="text-xs font-mono truncate">
+              {first}{total > 1 ? ` (${total}/${total})` : ''}
+            </span>
+            {total > 1 && (
+              <Badge variant="secondary" className="text-[9px] px-1 py-0 shrink-0 font-mono">{total}</Badge>
+            )}
           </div>
         );
       },

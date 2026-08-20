@@ -67,19 +67,21 @@ type PurchaseItem struct {
 // PurchasedProduct - Product info derived entirely from purchase_items.
 // POS page reads from this so it only shows products that were actually purchased.
 type PurchasedProduct struct {
-	PurchaseItemID  string  `json:"purchaseItemId"`
-	ID              string  `json:"id"`
-	Name            string  `json:"name"`
-	Price           float64 `json:"price"`
-	Stock           int     `json:"stock"`
-	UnitType        string  `json:"unitType"`
-	TaxPercent      float64 `json:"taxPercent"`
-	PurchasePrice   float64 `json:"purchasePrice"`
-	BillId          string  `json:"billId"`
-	PurchaseNumber  string  `json:"purchaseNumber"`
-	VendorName      string  `json:"vendorName"`
-	PurchaseDate    string  `json:"purchaseDate"`
-	Batch           string  `json:"batch"`
-	SerialNumber    string  `json:"serialNumber"`
-	Image           string  `json:"image"`
+	PurchaseItemID       string  `json:"purchaseItemId"`
+	ID                   string  `json:"id"`
+	Name                 string  `json:"name"`
+	Price                float64 `json:"price"`
+	Stock                int     `json:"stock"`
+	UnitType             string  `json:"unitType"`
+	TaxPercent           float64 `json:"taxPercent"`
+	PurchasePrice        float64 `json:"purchasePrice"`
+	BillId               string  `json:"billId"`
+	PurchaseNumber       string  `json:"purchaseNumber"`
+	VendorName           string  `json:"vendorName"`
+	PurchaseDate         string  `json:"purchaseDate"`
+	Batch                string  `json:"batch"`
+	SerialNumber         string  `json:"serialNumber"`
+	ProductSerialNumber  string  `json:"productSerialNumber"`
+	CurrentSerialIndex   int     `json:"currentSerialIndex"`
+	Image                string  `json:"image"`
 }

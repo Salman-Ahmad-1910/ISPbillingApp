@@ -71,6 +71,7 @@ export function ClientPage({ data }: ClientPageProps) {
       }
       queryClient.invalidateQueries({ queryKey: ['inventory/purchases', companyId] });
       queryClient.invalidateQueries({ queryKey: ['inventory/purchased-products', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['inventory/products', companyId] });
       setIsFormOpen(false);
       setSelectedPurchase(null);
       toast({
@@ -118,6 +119,7 @@ export function ClientPage({ data }: ClientPageProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory/purchases', companyId] });
       queryClient.invalidateQueries({ queryKey: ['inventory/purchased-products', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['inventory/products', companyId] });
       setDeleteTarget(null);
       toast({
         title: "Success",

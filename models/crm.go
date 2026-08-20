@@ -61,7 +61,7 @@ type Product struct {
 	BrandName          string  `gorm:"type:varchar(255)" json:"brandName"`
 	ProductTypeID      string  `gorm:"type:varchar(100)" json:"productTypeId"`
 	ProductTypeName    string  `gorm:"type:varchar(255)" json:"productTypeName"`
-	SerialNumber       string  `gorm:"type:varchar(255)" json:"serialNumber"`
+	SerialNumber       string  `gorm:"type:text" json:"serialNumber"`
 	CurrentSerialIndex int     `gorm:"not null;default:0" json:"currentSerialIndex"`
 }
 
@@ -108,7 +108,7 @@ func (p *Product) AdvanceSerialNumber() string {
 // SerialNumberPool - Pool of serial numbers to be auto-assigned to products
 type SerialNumberPool struct {
 	TenantModel
-	SerialNumber string `gorm:"type:varchar(255);not null;index" json:"serialNumber"`
+	SerialNumber string `gorm:"type:text;not null;index" json:"serialNumber"`
 	Status       string `gorm:"type:varchar(50);not null;default:'available'" json:"status"` // available | used
 	ProductID    string `gorm:"type:varchar(100)" json:"productId"`
 }

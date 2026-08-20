@@ -290,11 +290,9 @@ export default function POSPage() {
                 byId.set(p.id, normalized);
                 continue;
             }
-            const serials = [existing.serialNumber, normalized.serialNumber].filter(Boolean).join(', ');
             byId.set(p.id, {
                 ...existing,
                 stock: existing.stock + normalized.stock,
-                serialNumber: serials || existing.serialNumber,
                 image: existing.image || normalized.image,
             });
         }
@@ -461,7 +459,7 @@ export default function POSPage() {
         setIsProcessing(true);
         try {
             const expandedItems = cart.flatMap(item => {
-                const sns = ((item.product as any).serialNumber || '').split(/[\s,]+/).map((s: string) => s.trim()).filter(Boolean);
+                const sns = ((item.product as any).productSerialNumber || '').split(/[\s,]+/).map((s: string) => s.trim()).filter(Boolean);
                 if (sns.length === 0 || item.quantity <= 1) {
                     return [{
                         productId: item.product.id,
@@ -512,6 +510,7 @@ export default function POSPage() {
 
             queryClient.invalidateQueries({ queryKey: ['pos/sales'] });
             queryClient.invalidateQueries({ queryKey: ['inventory/purchased-products', companyId] });
+            queryClient.invalidateQueries({ queryKey: ['inventory/products', companyId] });
             queryClient.invalidateQueries({ queryKey: ['billing/payments'] });
             queryClient.invalidateQueries({ queryKey: ['dashboard'] });
 
@@ -554,7 +553,7 @@ export default function POSPage() {
         setIsProcessing(true);
         try {
             const holdItems = cart.flatMap(item => {
-                const sns = ((item.product as any).serialNumber || '').split(/[\s,]+/).map((s: string) => s.trim()).filter(Boolean);
+                const sns = ((item.product as any).productSerialNumber || '').split(/[\s,]+/).map((s: string) => s.trim()).filter(Boolean);
                 if (sns.length === 0 || item.quantity <= 1) {
                     return [{
                         productId: item.product.id,
@@ -589,6 +588,7 @@ export default function POSPage() {
 
             queryClient.invalidateQueries({ queryKey: ['pos/sales'] });
             queryClient.invalidateQueries({ queryKey: ['inventory/purchased-products', companyId] });
+            queryClient.invalidateQueries({ queryKey: ['inventory/products', companyId] });
 
             toast({
                 title: 'Bill On Hold',
@@ -706,12 +706,13 @@ export default function POSPage() {
                                     <div className="p-2 text-center">
                                         <h4 className="font-medium text-sm truncate">{product.name}</h4>
                                         <p className="text-xs font-semibold">PKR {product.price.toLocaleString()}</p>
-                                        {product.serialNumber && (() => {
-                                          const sns = product.serialNumber.split(/[\s,]+/).map((s: string) => s.trim()).filter(Boolean);
-                                          const currentSn = sns.length > 0 ? sns[product.currentSerialIndex ?? 0] || sns[0] : '';
+                                        {product.productSerialNumber && (() => {
+                                          const sns = product.productSerialNumber.split(/[\s,]+/).map((s: string) => s.trim()).filter(Boolean);
+                                          const idx = product.currentSerialIndex ?? 0;
+                                          const currentSn = sns.length > 0 ? sns[idx] || sns[0] : '';
                                           return currentSn ? (
-                                            <p className="text-[10px] font-mono text-muted-foreground truncate mt-0.5" title={product.serialNumber}>
-                                              SN: {currentSn}{sns.length > 1 ? ` (${(product.currentSerialIndex ?? 0) + 1}/${sns.length})` : ''}
+                                            <p className="text-[10px] font-mono text-muted-foreground truncate mt-0.5" title={product.productSerialNumber}>
+                                              SN: {currentSn}{sns.length > 1 ? ` (${idx + 1}/${sns.length})` : ''}
                                             </p>
                                           ) : null;
                                         })()}
@@ -874,14 +875,22 @@ export default function POSPage() {
                                             <Image src={backendImageUrl(item.product.image) || `https://picsum.photos/seed/${item.product.id}/50/50`} width={50} height={50} alt={item.product.name} className="rounded-md object-cover" unoptimized />
                                             <div className="flex-1 mx-3">
                                                 <p className="font-medium">{item.product.name}</p>
-                                                {item.product.serialNumber && (() => {
-                                                  const sns = item.product.serialNumber.split(/[\s,]+/).map((s: string) => s.trim()).filter(Boolean);
-                                                  const currentSn = sns.length > 0 ? sns[item.product.currentSerialIndex ?? 0] || sns[0] : '';
-                                                  return currentSn ? (
-                                                    <p className="text-[10px] font-mono text-muted-foreground truncate" title={item.product.serialNumber}>
-                                                      SN / MAC: {currentSn}
+                                                {item.product.productSerialNumber && (() => {
+                                                  const sns = item.product.productSerialNumber.split(/[\s,]+/).map((s: string) => s.trim()).filter(Boolean);
+                                                  if (sns.length === 0) return null;
+                                                  const startIdx = item.product.currentSerialIndex ?? 0;
+                                                  const endIdx = Math.min(startIdx + item.quantity - 1, sns.length - 1);
+                                                  const startSn = sns[startIdx] || sns[0];
+                                                  const endSn = sns[endIdx] || sns[0];
+                                                  const consumed = Math.min(item.quantity, sns.length - startIdx);
+                                                  return (
+                                                    <p className="text-[10px] font-mono text-muted-foreground truncate" title={sns.slice(startIdx, startIdx + item.quantity).join(', ')}>
+                                                      SN / MAC: {startIdx === endIdx || consumed <= 1
+                                                        ? `${startSn} (${startIdx + 1}/${sns.length})`
+                                                        : `${startSn} → ${endSn} (${consumed}/${sns.length})`
+                                                      }
                                                     </p>
-                                                  ) : null;
+                                                  );
                                                 })()}
                                                 <p className="text-sm text-muted-foreground">PKR {item.product.price.toLocaleString()}</p>
                     <Input

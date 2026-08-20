@@ -4,12 +4,56 @@ import (
 	"awesomeProject/config"
 	"awesomeProject/models"
 	"awesomeProject/utils"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
+
+// parsePOSsoldSNs extracts the individual SNs that were sold.
+// The frontend sends a range like "SN001 → SN003 (3/10)" or a comma-separated list.
+func parsePOSsoldSNs(raw string, expectedQty int) []string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	// Try range format: "SN001 → SN003"
+	rangeRe := regexp.MustCompile(`^(\S+)\s*→\s*(\S+)`)
+	if m := rangeRe.FindStringSubmatch(raw); m != nil {
+		startSN, endSN := m[1], m[2]
+		// Extract numeric suffix from both
+		numRe := regexp.MustCompile(`(\d+)$`)
+		startNumStr := numRe.FindString(startSN)
+		endNumStr := numRe.FindString(endSN)
+		if startNumStr != "" && endNumStr != "" {
+			startNum, _ := strconv.Atoi(startNumStr)
+			endNum, _ := strconv.Atoi(endNumStr)
+			prefix := startSN[:len(startSN)-len(startNumStr)]
+			var sns []string
+			for i := startNum; i <= endNum; i++ {
+				sns = append(sns, prefix+strconv.Itoa(i))
+			}
+			if len(sns) > 0 {
+				return sns
+			}
+		}
+	}
+	// Fallback: comma-separated or space-separated
+	re := regexp.MustCompile(`[,\s]+`)
+	parts := re.Split(raw, -1)
+	var result []string
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			result = append(result, p)
+		}
+	}
+	return result
+}
 
 // POS sale input mirrors what the POS page sends (sale + nested line items).
 type posSaleRequest struct {
@@ -121,19 +165,33 @@ func CreatePOSSale(c *gin.Context) {
 				return err
 			}
 
-			// Advance the serial number index so the next SN is shown.
+			// Remove consumed SNs from products.serial_number.
 			if it.SerialNumber != "" {
 				var prod models.Product
 				if err := tx.Where("id = ? AND company_id = ?", it.ProductID, companyID).First(&prod).Error; err == nil {
-					sns := prod.ParseSerialNumbers()
-					if len(sns) > 1 {
-						newIdx := prod.CurrentSerialIndex + qty
-						if newIdx >= len(sns) {
-							newIdx = len(sns) - 1
+					allSNs := prod.ParseSerialNumbers()
+					if len(allSNs) > 0 {
+						// Parse the sold SNs from the cart (comma-separated or range)
+						soldSNs := parsePOSsoldSNs(it.SerialNumber, qty)
+						consumedSet := make(map[string]bool, len(soldSNs))
+						for _, sn := range soldSNs {
+							consumedSet[sn] = true
 						}
-						tx.Model(&models.Product{}).
+						var remaining []string
+						for _, sn := range allSNs {
+							if !consumedSet[sn] {
+								remaining = append(remaining, sn)
+							}
+						}
+						remainingStr := strings.Join(remaining, ", ")
+						if err := tx.Model(&models.Product{}).
 							Where("id = ? AND company_id = ?", it.ProductID, companyID).
-							Update("current_serial_index", newIdx)
+							Updates(map[string]interface{}{
+								"serial_number":         remainingStr,
+								"current_serial_index":  0,
+							}).Error; err != nil {
+							return err
+						}
 					}
 				}
 			}
@@ -264,7 +322,7 @@ func CreateInstallmentSale(c *gin.Context) {
 			return err
 		}
 
-		// Decrement stock
+		// Decrement stock and consume SNs
 		for _, it := range req.Items {
 			qty := it.Quantity
 			if qty <= 0 {
@@ -282,6 +340,35 @@ func CreateInstallmentSale(c *gin.Context) {
 			`, qty, it.ProductID, companyID)
 			if result.Error != nil {
 				return result.Error
+			}
+
+			if it.SerialNumber != "" {
+				var prod models.Product
+				if err := tx.Where("id = ? AND company_id = ?", it.ProductID, companyID).First(&prod).Error; err == nil {
+					allSNs := prod.ParseSerialNumbers()
+					if len(allSNs) > 0 {
+						soldSNs := parsePOSsoldSNs(it.SerialNumber, qty)
+						consumedSet := make(map[string]bool, len(soldSNs))
+						for _, sn := range soldSNs {
+							consumedSet[sn] = true
+						}
+						var remaining []string
+						for _, sn := range allSNs {
+							if !consumedSet[sn] {
+								remaining = append(remaining, sn)
+							}
+						}
+						remainingStr := strings.Join(remaining, ", ")
+						if err := tx.Model(&models.Product{}).
+							Where("id = ? AND company_id = ?", it.ProductID, companyID).
+							Updates(map[string]interface{}{
+								"serial_number":         remainingStr,
+								"current_serial_index":  0,
+							}).Error; err != nil {
+							return err
+						}
+					}
+				}
 			}
 		}
 		return nil

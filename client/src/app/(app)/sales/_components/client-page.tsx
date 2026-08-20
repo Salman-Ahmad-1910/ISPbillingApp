@@ -346,6 +346,12 @@ export function ClientPage({ data }: ClientPageProps) {
                           <Badge variant="secondary" className="text-[10px] font-mono">x{qty}</Badge>
                         </div>
                         <div className="px-3.5 py-2.5 space-y-1.5">
+                          {item.serialNumber && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">SN / MAC</span>
+                              <span className="font-mono text-xs">{item.serialNumber}</span>
+                            </div>
+                          )}
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Unit Price</span>
                             <span>PKR {fmtPKR(price)}</span>

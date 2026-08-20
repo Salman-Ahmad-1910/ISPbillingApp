@@ -614,6 +614,7 @@ export type Product = {
   salePrice?: number;
   discount?: number;
   serialNumber?: string;
+  productSerialNumber?: string;
   currentSerialIndex?: number;
 };
 

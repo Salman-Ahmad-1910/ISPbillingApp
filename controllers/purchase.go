@@ -12,19 +12,17 @@ import (
 	"gorm.io/gorm"
 )
 
-func validateSerialNumbers(db *gorm.DB, companyID uuid.UUID, items []models.PurchaseItem, excludePurchaseID uuid.UUID) string {
+func validateSerialNumbersWithinPurchase(items []models.PurchaseItem) string {
+	seen := make(map[string]bool)
 	for _, item := range items {
-		if strings.TrimSpace(item.SerialNumber) == "" {
+		sn := strings.TrimSpace(item.SerialNumber)
+		if sn == "" {
 			continue
 		}
-		var count int64
-		db.Model(&models.PurchaseItem{}).
-			Where("company_id = ? AND serial_number = ? AND serial_number != '' AND purchase_id != ?",
-				companyID, item.SerialNumber, excludePurchaseID).
-			Count(&count)
-		if count > 0 {
-			return item.SerialNumber
+		if seen[sn] {
+			return sn
 		}
+		seen[sn] = true
 	}
 	return ""
 }
@@ -50,9 +48,9 @@ func CreatePurchase(c *gin.Context) {
 		purchase.ID = uuid.New()
 		purchase.PurchaseNumber = ""
 
-		// Validate serial numbers are unique across the company
-		if dupSN := validateSerialNumbers(db, purchase.CompanyID, items, uuid.Nil); dupSN != "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Duplicate serial number found", "serialNumber": dupSN})
+		// Validate serial numbers are unique within this purchase
+		if dupSN := validateSerialNumbersWithinPurchase(items); dupSN != "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Duplicate serial number found within purchase", "serialNumber": dupSN})
 			return
 		}
 
@@ -257,10 +255,10 @@ func UpdatePurchase(c *gin.Context) {
 		return
 	}
 
-	// Validate serial numbers are unique across the company
-	if dupSN := validateSerialNumbers(db, existingPurchase.CompanyID, updateData.Items, purchaseUUID); dupSN != "" {
+	// Validate serial numbers are unique within this purchase
+	if dupSN := validateSerialNumbersWithinPurchase(updateData.Items); dupSN != "" {
 		tx.Rollback()
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Duplicate serial number found", "serialNumber": dupSN})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Duplicate serial number found within purchase", "serialNumber": dupSN})
 		return
 	}
 
@@ -444,6 +442,8 @@ func GetPurchasedProducts(c *gin.Context) {
 			END                                            AS tax_percent,
 			pi.purchase_price                             AS purchase_price,
 			pi.serial_number                              AS serial_number,
+			COALESCE(pr.serial_number, '')                 AS product_serial_number,
+			COALESCE(pr.current_serial_index, 0)           AS current_serial_index,
 			p.bill_id                                     AS bill_id,
 			p.purchase_number                             AS purchase_number,
 			p.vendor_name                                 AS vendor_name,
@@ -455,6 +455,7 @@ func GetPurchasedProducts(c *gin.Context) {
 		LEFT JOIN products pr ON pr.id = pi.product_id AND pr.deleted_at IS NULL
 		WHERE pi.company_id = ?
 			AND pi.deleted_at IS NULL
+			AND COALESCE(pr.serial_number, '') != ''
 		ORDER BY pi.product_name
 	`, companyID).Scan(&products).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch purchased products", "details": err.Error()})

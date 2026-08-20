@@ -85,7 +85,7 @@ export const columns = ({ onEdit, onDelete, onPrint }: VendorInvoiceColumnsProps
       if (sns.length === 0) return <div className="text-xs font-mono text-muted-foreground">—</div>;
       return (
         <div className="text-xs font-mono text-muted-foreground" title={sn}>
-          {sns.length === 1 ? sns[0] : `${sns[0]} (1/${sns.length})`}
+          {sns.length === 1 ? sns[0] : `${sns[0]} (${sns.length}/${sns.length})`}
         </div>
       );
     },

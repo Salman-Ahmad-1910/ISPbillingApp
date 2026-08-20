@@ -116,18 +116,30 @@ export function PurchaseForm({
     for (const vi of vendorInvoices) {
       if (vi.vendorId !== selectedVendorId || !vi.items) continue;
       for (const item of vi.items) {
-        const existing = productMap.get(item.productId);
         const itemSNs = parseSerialNumbers(item.serialNumber || '');
+        if (itemSNs.length === 0) continue;
+
+        // Get available SNs from the product (not consumed by POS/vendor invoice)
+        const product = products.find(p => p.id === item.productId);
+        const availableOnProduct = product
+          ? parseSerialNumbers(product.serialNumber || '')
+          : [];
+        const availableSet = new Set(availableOnProduct);
+
+        // Only keep SNs that are still available on the product
+        const unconsumedSNs = itemSNs.filter(sn => availableSet.has(sn));
+        if (unconsumedSNs.length === 0) continue;
+
+        const existing = productMap.get(item.productId);
         if (existing) {
-          existing.allSNs.push(...itemSNs);
+          existing.allSNs.push(...unconsumedSNs);
         } else {
-          const product = products.find(p => p.id === item.productId);
           productMap.set(item.productId, {
             productId: item.productId,
             productName: item.productName,
             unitPrice: item.unitPrice || 0,
             unitType: item.unitType || product?.unitType || 'piece',
-            allSNs: [...itemSNs],
+            allSNs: [...unconsumedSNs],
             vendorInvoiceId: vi.id,
             invoiceNumber: vi.invoiceNumber || '',
             batch: vi.batch || '',
