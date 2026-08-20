@@ -20,11 +20,11 @@ interface ProductColumnsProps {
 
 export const columns = ({ onEdit, onDelete }: ProductColumnsProps): ColumnDef<Product>[] => [
   {
-    accessorKey: 'barcode',
-    header: 'Barcode',
+    accessorKey: 'productCode',
+    header: 'Code',
     cell: ({ row }) => (
       <div className="text-xs font-mono text-muted-foreground">
-        {row.original.barcode || '-'}
+        {row.original.productCode || '-'}
       </div>
     ),
   },

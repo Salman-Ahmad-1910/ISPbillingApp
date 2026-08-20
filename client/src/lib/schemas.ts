@@ -58,6 +58,7 @@ export const expenseSchema = z.object({
 
 export const productSchema = z.object({
   id: z.string().optional(),
+  productCode: z.string().optional(),
   name: z.string().min(1, 'Name is required'),
   category: z.string().optional().default(''),
   price: z.coerce.number().min(0, 'Price must be a positive number'),
@@ -65,7 +66,6 @@ export const productSchema = z.object({
   unitType: z.string().default('piece'),
   taxPercent: z.coerce.number().min(0, 'Tax must be a positive number').default(0),
   image: z.string().optional(),
-  barcode: z.string().optional(),
   brandId: z.string().optional(),
   brandName: z.string().optional(),
   productTypeId: z.string().optional(),

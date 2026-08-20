@@ -127,7 +127,6 @@ export function VendorInvoiceForm({
         unitType: product.unitType,
         taxPercent: product.taxPercent ?? 0,
         image: product.image ?? '',
-        barcode: product.barcode ?? '',
         salePrice: product.salePrice ?? 0,
         purchasePrice: product.purchasePrice ?? 0,
         discount: product.discount ?? 0,
@@ -139,6 +138,7 @@ export function VendorInvoiceForm({
         currentSerialIndex: product.currentSerialIndex ?? 0,
       });
       queryClient.invalidateQueries({ queryKey: ['inventory/products', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['inventory/purchased-products', companyId] });
       toast({ title: 'Success', description: `${newSNs.length} serial number(s) added to ${snDialogProductName}` });
       setSnDialogOpen(false);
     } catch (error: any) {

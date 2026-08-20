@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PlusCircle, Layers } from 'lucide-react';
+import { PlusCircle } from 'lucide-react';
 import type { Product } from '@/lib/types';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
@@ -29,7 +29,7 @@ import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { smartMatch } from '@/lib/search';
-import { SnPoolDialog } from './sn-pool-dialog';
+
 
 type ProductFormValues = z.infer<typeof productSchema>;
 
@@ -55,7 +55,6 @@ export function ClientPage({ data }: ClientPageProps) {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isSnPoolOpen, setIsSnPoolOpen] = useState(false);
 
 
   // Advanced pagination state
@@ -163,6 +162,7 @@ export function ClientPage({ data }: ClientPageProps) {
         });
       }
       queryClient.invalidateQueries({ queryKey: ['inventory/products', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['inventory/purchased-products', companyId] });
       setIsFormOpen(false);
       setSelectedProduct(null);
     } catch (error: any) {
@@ -187,6 +187,7 @@ export function ClientPage({ data }: ClientPageProps) {
         await api.delete(`/inventory/products/${selectedProduct.id}?companyId=${companyId}`);
         toast({ title: 'Success', description: 'Product deleted successfully.' });
         queryClient.invalidateQueries({ queryKey: ['inventory/products', companyId] });
+        queryClient.invalidateQueries({ queryKey: ['inventory/purchased-products', companyId] });
         setIsDeleteDialogOpen(false);
         setSelectedProduct(null);
       } catch (error: any) {
@@ -217,14 +218,6 @@ export function ClientPage({ data }: ClientPageProps) {
             className="max-w-sm"
           />
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setIsSnPoolOpen(true)}
-              className="shadow-sm"
-            >
-              <Layers className="mr-2 h-4 w-4 text-violet-600 dark:text-violet-400" />
-              SN Pool
-            </Button>
             <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
             <DialogTrigger asChild>
               <Button onClick={() => setSelectedProduct(null)} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700">
@@ -351,8 +344,6 @@ export function ClientPage({ data }: ClientPageProps) {
         onDelete={handleDelete}
         itemName={selectedProduct?.name}
       />
-
-      <SnPoolDialog open={isSnPoolOpen} onOpenChange={setIsSnPoolOpen} />
 
     </>
   );

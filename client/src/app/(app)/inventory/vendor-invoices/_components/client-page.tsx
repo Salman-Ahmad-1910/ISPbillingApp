@@ -88,6 +88,7 @@ export function ClientPage({ data }: ClientPageProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory/vendor-invoices', companyId] });
       queryClient.invalidateQueries({ queryKey: ['inventory/products', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['inventory/purchased-products', companyId] });
       setIsFormOpen(false);
       setSelectedInvoice(null);
       toast({
@@ -112,6 +113,7 @@ export function ClientPage({ data }: ClientPageProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory/vendor-invoices', companyId] });
       queryClient.invalidateQueries({ queryKey: ['inventory/products', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['inventory/purchased-products', companyId] });
       setIsDeleteDialogOpen(false);
       setSelectedInvoice(null);
       toast({

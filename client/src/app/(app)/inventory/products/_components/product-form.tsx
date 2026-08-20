@@ -19,7 +19,13 @@ import { productSchema } from '@/lib/schemas';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Loader2, PlusCircle } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
+import api from '@/lib/api';
 
 function parseSerialNumbers(raw: string): string[] {
   if (!raw.trim()) return [];
@@ -58,7 +64,6 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
         purchasePrice: Number(product.purchasePrice ?? 0),
         salePrice: Number(product.salePrice ?? 0),
         discount: Number(product.discount ?? 0),
-        barcode: product.barcode || '',
         brandId: product.brandId || '',
         brandName: product.brandName || '',
         productTypeId: product.productTypeId || '',
@@ -73,7 +78,6 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
       unitType: 'piece',
       taxPercent: 0,
       image: '',
-      barcode: '',
       brandId: '',
       brandName: '',
       productTypeId: '',
@@ -114,6 +118,57 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
     form.setValue('productTypeName', pt?.name || '');
   }, [productTypeIdValue, productTypes, form]);
 
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [snDialogOpen, setSnDialogOpen] = useState(false);
+  const [snDialogRaw, setSnDialogRaw] = useState('');
+  const [snDialogSaving, setSnDialogSaving] = useState(false);
+
+  const handleAddSNs = async () => {
+    if (!product || !companyId) return;
+    const newSNs = parseSerialNumbers(snDialogRaw);
+    if (newSNs.length === 0) return;
+    setSnDialogSaving(true);
+    try {
+      const existing = parseSerialNumbers(product.serialNumber || '');
+      const combined = [...existing, ...newSNs].join(', ');
+      const newStock = existing.length + newSNs.length;
+      await api.put(`/inventory/products/${product.id}`, {
+        name: product.name,
+        category: product.category,
+        price: product.price,
+        stock: newStock,
+        unitType: product.unitType,
+        taxPercent: product.taxPercent ?? 0,
+        image: product.image ?? '',
+        salePrice: product.salePrice ?? 0,
+        purchasePrice: product.purchasePrice ?? 0,
+        discount: product.discount ?? 0,
+        brandId: product.brandId ?? '',
+        brandName: product.brandName ?? '',
+        productTypeId: product.productTypeId ?? '',
+        productTypeName: product.productTypeName ?? '',
+        serialNumber: combined,
+        currentSerialIndex: product.currentSerialIndex ?? 0,
+      });
+      form.setValue('serialNumber', combined);
+      form.setValue('stock', newStock);
+      queryClient.invalidateQueries({ queryKey: ['inventory/products', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['inventory/purchased-products', companyId] });
+      toast({ title: 'Success', description: `${newSNs.length} serial number(s) added.` });
+      setSnDialogOpen(false);
+      setSnDialogRaw('');
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.error || error.response?.data?.message || 'Failed to add serial numbers',
+      });
+    } finally {
+      setSnDialogSaving(false);
+    }
+  };
+
   function onSubmit(values: ProductFormValues) {
     onSave({
       ...values,
@@ -125,6 +180,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
   }
 
   return (
+    <>
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         {product && (
@@ -136,13 +192,14 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
 
         <FormField
           control={form.control}
-          name="barcode"
+          name="productCode"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Product Barcode</FormLabel>
+              <FormLabel>Product Code</FormLabel>
               <FormControl>
-                <Input placeholder="e.g., 8901234567890" {...field} />
+                <Input placeholder="e.g., P-001 (auto-generated if empty)" {...field} />
               </FormControl>
+              <p className="text-xs text-muted-foreground">Leave empty to auto-generate (P-001, P-002, ...)</p>
               <FormMessage />
             </FormItem>
           )}
@@ -274,6 +331,21 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                   SN/MAC cannot be changed after creation. Current index: {(currentSerialIndex ?? 0) + 1} of {parsedSnCount}
                 </p>
               )}
+              {product && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSnDialogRaw('');
+                    setSnDialogOpen(true);
+                  }}
+                  className="mt-2 bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700"
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Add More SNs
+                </Button>
+              )}
               <FormMessage />
             </FormItem>
           )}
@@ -337,5 +409,46 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
         </div>
       </form>
     </Form>
+
+    <Dialog open={snDialogOpen} onOpenChange={setSnDialogOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <PlusCircle className="h-4 w-4" />
+            Add Serial Numbers
+          </DialogTitle>
+          <DialogDescription>
+            Add new serial numbers to <strong>{product?.name}</strong>. Separate each one with a comma or space.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <Textarea
+            placeholder="e.g., SN-1001 SN-1002 SN-1003"
+            value={snDialogRaw}
+            onChange={(e) => setSnDialogRaw(e.target.value)}
+            className="min-h-[100px] font-mono"
+          />
+          {parseSerialNumbers(snDialogRaw).length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {parseSerialNumbers(snDialogRaw).length} serial number(s) will be added
+            </p>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setSnDialogOpen(false)} disabled={snDialogSaving}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddSNs}
+              disabled={snDialogSaving || parseSerialNumbers(snDialogRaw).length === 0}
+              className="bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-sm hover:from-violet-600 hover:to-purple-700"
+            >
+              {snDialogSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {snDialogSaving ? 'Adding...' : `Add ${parseSerialNumbers(snDialogRaw).length || ''} SN(s)`}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

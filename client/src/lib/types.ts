@@ -597,6 +597,7 @@ export type Guarantor = {
 
 export type Product = {
   id: string;
+  productCode?: string;
   name: string;
   category: string;
   price: number;
@@ -605,7 +606,6 @@ export type Product = {
   taxPercent?: number; // per-item tax %, default 0
   image?: string; // optional product image path
   companyId: string;
-  barcode?: string;
   brandId?: string;
   brandName?: string;
   productTypeId?: string;
