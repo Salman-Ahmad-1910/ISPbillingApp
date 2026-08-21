@@ -3,6 +3,7 @@ package controllers
 import (
 	"awesomeProject/config"
 	"awesomeProject/models"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -25,6 +26,136 @@ func validateSerialNumbersWithinPurchase(items []models.PurchaseItem) string {
 		seen[sn] = true
 	}
 	return ""
+}
+
+// consumeSNsFromVendorInvoices removes the given serial numbers from the vendor
+// invoice items they belong to (same company + product). This is the second link
+// of the SN chain: product -> vendor invoice -> purchase -> sale.
+// It returns an error if an SN is not available on any vendor invoice item or is
+// already consumed by another purchase item.
+func consumeSNsFromVendorInvoices(tx *gorm.DB, companyID, productID uuid.UUID, sns []string) error {
+	if len(sns) == 0 {
+		return nil
+	}
+
+	// SNs already used by other purchase items cannot be consumed again.
+	var existingPurchases []models.PurchaseItem
+	if err := tx.Where("company_id = ? AND product_id = ? AND deleted_at IS NULL", companyID, productID).
+		Find(&existingPurchases).Error; err != nil {
+		return err
+	}
+	usedInPurchase := make(map[string]bool)
+	for _, pi := range existingPurchases {
+		for _, sn := range parseVendorInvoiceSNs(pi.SerialNumber) {
+			usedInPurchase[sn] = true
+		}
+	}
+
+	// Load all vendor invoice items for this product.
+	var invoiceItems []models.VendorInvoiceItem
+	if err := tx.Where("company_id = ? AND product_id = ? AND deleted_at IS NULL", companyID, productID).
+		Order("created_at asc").
+		Find(&invoiceItems).Error; err != nil {
+		return err
+	}
+
+	// Map each available SN to its invoice item.
+	snOwner := map[string]*models.VendorInvoiceItem{}
+	for i := range invoiceItems {
+		item := &invoiceItems[i]
+		for _, sn := range parseVendorInvoiceSNs(item.SerialNumber) {
+			if _, taken := snOwner[sn]; !taken {
+				snOwner[sn] = item
+			}
+		}
+	}
+
+	consumedByItem := map[uuid.UUID][]string{}
+	for _, sn := range sns {
+		if usedInPurchase[sn] {
+			return fmt.Errorf("serial number %s is already used in another purchase", sn)
+		}
+		owner, ok := snOwner[sn]
+		if !ok {
+			return fmt.Errorf("serial number %s is not available on any vendor invoice for this product", sn)
+		}
+		consumedByItem[owner.ID] = append(consumedByItem[owner.ID], sn)
+	}
+
+	// Remove consumed SNs from their invoice items and sync quantity/subtotal.
+	for itemID, consumed := range consumedByItem {
+		var item models.VendorInvoiceItem
+		if err := tx.Where("id = ?", itemID).First(&item).Error; err != nil {
+			return err
+		}
+		consumedSet := make(map[string]bool, len(consumed))
+		for _, sn := range consumed {
+			consumedSet[sn] = true
+		}
+		var remaining []string
+		for _, sn := range parseVendorInvoiceSNs(item.SerialNumber) {
+			if !consumedSet[sn] {
+				remaining = append(remaining, sn)
+			}
+		}
+		newQty := len(remaining)
+		if err := tx.Model(&models.VendorInvoiceItem{}).
+			Where("id = ?", item.ID).
+			Updates(map[string]interface{}{
+				"serial_number": strings.Join(remaining, ", "),
+				"quantity":      newQty,
+				"subtotal":      item.UnitPrice * float64(newQty),
+			}).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// returnSNsToVendorInvoices gives serial numbers back to the vendor invoice
+// items of a product (used when a purchase is updated or deleted). SNs are
+// appended to the oldest invoice item of that product that does not already
+// hold them. Best effort: if no invoice item exists anymore, nothing happens.
+func returnSNsToVendorInvoices(tx *gorm.DB, companyID, productID uuid.UUID, sns []string) error {
+	if len(sns) == 0 {
+		return nil
+	}
+
+	var items []models.VendorInvoiceItem
+	if err := tx.Where("company_id = ? AND product_id = ? AND deleted_at IS NULL", companyID, productID).
+		Order("created_at asc").
+		Find(&items).Error; err != nil {
+		return err
+	}
+	if len(items) == 0 {
+		return nil
+	}
+
+	target := &items[0]
+	existing := parseVendorInvoiceSNs(target.SerialNumber)
+	have := make(map[string]bool, len(existing))
+	for _, sn := range existing {
+		have[sn] = true
+	}
+	var toAdd []string
+	for _, sn := range sns {
+		if !have[sn] {
+			toAdd = append(toAdd, sn)
+		}
+	}
+	if len(toAdd) == 0 {
+		return nil
+	}
+
+	combined := append(existing, toAdd...)
+	newQty := len(combined)
+	return tx.Model(&models.VendorInvoiceItem{}).
+		Where("id = ?", target.ID).
+		Updates(map[string]interface{}{
+			"serial_number": strings.Join(combined, ", "),
+			"quantity":      newQty,
+			"subtotal":      target.UnitPrice * float64(newQty),
+		}).Error
 }
 
 func CreatePurchase(c *gin.Context) {
@@ -67,6 +198,19 @@ func CreatePurchase(c *gin.Context) {
 		}
 
 		for _, item := range items {
+			itemSNs := parseVendorInvoiceSNs(item.SerialNumber)
+
+			// Consume the SNs from the vendor invoice items they belong to.
+			// Done before inserting this purchase's own item rows so the
+			// "already used by another purchase" check stays accurate.
+			if len(itemSNs) > 0 {
+				if err := consumeSNsFromVendorInvoices(tx, purchase.CompanyID, item.ProductID, itemSNs); err != nil {
+					tx.Rollback()
+					c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+					return
+				}
+			}
+
 			newItem := models.PurchaseItem{
 				TenantModel: models.TenantModel{
 					CompanyID: purchase.CompanyID,
@@ -93,8 +237,12 @@ func CreatePurchase(c *gin.Context) {
 				return
 			}
 
-			updates := map[string]interface{}{
-				"stock": gorm.Expr("stock + ?", item.Quantity),
+			// SN-bearing items were already taken out of product stock when the
+			// vendor invoice consumed them, so only sync prices here. Items
+			// without SNs keep the legacy behaviour of adding stock.
+			updates := map[string]interface{}{}
+			if len(itemSNs) == 0 {
+				updates["stock"] = gorm.Expr("stock + ?", item.Quantity)
 			}
 			if item.PurchasePrice > 0 {
 				updates["purchase_price"] = item.PurchasePrice
@@ -102,12 +250,14 @@ func CreatePurchase(c *gin.Context) {
 			if item.SellingPrice > 0 {
 				updates["sale_price"] = item.SellingPrice
 			}
-			if err := tx.Model(&models.Product{}).
-				Where("id = ? AND company_id = ?", item.ProductID, purchase.CompanyID).
-				Updates(updates).Error; err != nil {
-				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update product stock"})
-				return
+			if len(updates) > 0 {
+				if err := tx.Model(&models.Product{}).
+					Where("id = ? AND company_id = ?", item.ProductID, purchase.CompanyID).
+					Updates(updates).Error; err != nil {
+					tx.Rollback()
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update product stock"})
+					return
+				}
 			}
 		}
 
@@ -219,8 +369,18 @@ func UpdatePurchase(c *gin.Context) {
 	oldItems := existingPurchase.Items
 	existingPurchase.Items = nil
 
-	// Revert old item stock before updating
+	// Revert old items before updating: SN-bearing items give their SNs back to
+	// the vendor invoice items; plain items revert product stock.
 	for _, oldItem := range oldItems {
+		oldSNs := parseVendorInvoiceSNs(oldItem.SerialNumber)
+		if len(oldSNs) > 0 {
+			if err := returnSNsToVendorInvoices(tx, existingPurchase.CompanyID, oldItem.ProductID, oldSNs); err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to return serial numbers to vendor invoice"})
+				return
+			}
+			continue
+		}
 		if err := tx.Model(&models.Product{}).
 			Where("id = ? AND company_id = ?", oldItem.ProductID, existingPurchase.CompanyID).
 			Update("stock", gorm.Expr("GREATEST(stock - ?, 0)", oldItem.Quantity)).
@@ -263,6 +423,17 @@ func UpdatePurchase(c *gin.Context) {
 	}
 
 	for _, item := range updateData.Items {
+		itemSNs := parseVendorInvoiceSNs(item.SerialNumber)
+
+		// Consume the SNs from the vendor invoice items they belong to.
+		if len(itemSNs) > 0 {
+			if err := consumeSNsFromVendorInvoices(tx, existingPurchase.CompanyID, item.ProductID, itemSNs); err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+		}
+
 		newItem := models.PurchaseItem{
 			TenantModel: models.TenantModel{
 				CompanyID: existingPurchase.CompanyID,
@@ -293,8 +464,9 @@ func UpdatePurchase(c *gin.Context) {
 			return
 		}
 
-		updates := map[string]interface{}{
-			"stock": gorm.Expr("stock + ?", item.Quantity),
+		updates := map[string]interface{}{}
+		if len(itemSNs) == 0 {
+			updates["stock"] = gorm.Expr("stock + ?", item.Quantity)
 		}
 		if item.PurchasePrice > 0 {
 			updates["purchase_price"] = item.PurchasePrice
@@ -302,12 +474,14 @@ func UpdatePurchase(c *gin.Context) {
 		if item.SellingPrice > 0 {
 			updates["sale_price"] = item.SellingPrice
 		}
-		if err := tx.Model(&models.Product{}).
-			Where("id = ? AND company_id = ?", item.ProductID, existingPurchase.CompanyID).
-			Updates(updates).Error; err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update product stock"})
-			return
+		if len(updates) > 0 {
+			if err := tx.Model(&models.Product{}).
+				Where("id = ? AND company_id = ?", item.ProductID, existingPurchase.CompanyID).
+				Updates(updates).Error; err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update product stock"})
+				return
+			}
 		}
 	}
 
@@ -385,8 +559,18 @@ func DeletePurchase(c *gin.Context) {
 		return
 	}
 
-	// Revert stock for each item
+	// Revert items: SN-bearing items give their SNs back to the vendor invoice
+	// items; plain items revert product stock.
 	for _, item := range purchase.Items {
+		itemSNs := parseVendorInvoiceSNs(item.SerialNumber)
+		if len(itemSNs) > 0 {
+			if err := returnSNsToVendorInvoices(tx, purchase.CompanyID, item.ProductID, itemSNs); err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to return serial numbers to vendor invoice"})
+				return
+			}
+			continue
+		}
 		if err := tx.Model(&models.Product{}).
 			Where("id = ? AND company_id = ?", item.ProductID, purchase.CompanyID).
 			Update("stock", gorm.Expr("GREATEST(stock - ?, 0)", item.Quantity)).
@@ -418,6 +602,61 @@ func DeletePurchase(c *gin.Context) {
 		"success": true,
 		"message": "Purchase deleted successfully",
 	})
+}
+
+// consumeSNsFromPurchaseItems removes sold serial numbers from the purchase
+// items holding them. This is the third link of the SN chain:
+// product -> vendor invoice -> purchase -> sale.
+// It returns true if at least one SN was found on a purchase item.
+func consumeSNsFromPurchaseItems(tx *gorm.DB, companyID, productID uuid.UUID, sns []string) (bool, error) {
+	if len(sns) == 0 {
+		return false, nil
+	}
+
+	var items []models.PurchaseItem
+	if err := tx.Where("company_id = ? AND product_id = ? AND deleted_at IS NULL", companyID, productID).
+		Order("created_at asc").
+		Find(&items).Error; err != nil {
+		return false, err
+	}
+
+	consumedSet := make(map[string]bool, len(sns))
+	for _, sn := range sns {
+		consumedSet[sn] = true
+	}
+
+	found := false
+	for i := range items {
+		item := &items[i]
+		itemSNs := parseVendorInvoiceSNs(item.SerialNumber)
+		if len(itemSNs) == 0 {
+			continue
+		}
+		var remaining []string
+		changed := false
+		for _, sn := range itemSNs {
+			if consumedSet[sn] {
+				changed = true
+				found = true
+				continue
+			}
+			remaining = append(remaining, sn)
+		}
+		if !changed {
+			continue
+		}
+		newQty := len(remaining)
+		if err := tx.Model(&models.PurchaseItem{}).
+			Where("id = ?", item.ID).
+			Updates(map[string]interface{}{
+				"serial_number": strings.Join(remaining, ", "),
+				"quantity":      newQty,
+				"subtotal":      item.PurchasePrice * float64(newQty),
+			}).Error; err != nil {
+			return found, err
+		}
+	}
+	return found, nil
 }
 
 // GetPurchasedProducts returns each purchase item as a separate product for POS.
@@ -455,7 +694,7 @@ func GetPurchasedProducts(c *gin.Context) {
 		LEFT JOIN products pr ON pr.id = pi.product_id AND pr.deleted_at IS NULL
 		WHERE pi.company_id = ?
 			AND pi.deleted_at IS NULL
-			AND COALESCE(pr.serial_number, '') != ''
+			AND COALESCE(pi.serial_number, '') != ''
 		ORDER BY pi.product_name
 	`, companyID).Scan(&products).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch purchased products", "details": err.Error()})

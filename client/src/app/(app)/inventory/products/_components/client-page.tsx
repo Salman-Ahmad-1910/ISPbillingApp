@@ -36,7 +36,7 @@ type ProductFormValues = z.infer<typeof productSchema>;
 function parseSerialNumbers(raw: string): string[] {
   if (!raw.trim()) return [];
   return raw
-    .split(/[,\s]+/)
+    .split(/[\s,\-]+/)
     .map(s => s.trim())
     .filter(Boolean);
 }

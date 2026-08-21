@@ -73,10 +73,10 @@ export const columns = ({ onEdit, onPay, onPrint, onDelete, companyName }: Purch
       if (serials.length === 0) return <span className="text-muted-foreground">\u2014</span>;
       const allSNs: string[] = [];
       for (const s of serials) {
-        allSNs.push(...s.split(/[,\s]+/).map(sn => sn.trim()).filter(Boolean));
+        allSNs.push(...s.split(/[\s,\-]+/).map(sn => sn.trim()).filter(Boolean));
       }
       if (allSNs.length === 0) return <span className="text-xs font-mono text-muted-foreground">—</span>;
-      const display = allSNs.length === 1 ? allSNs[0] : `${allSNs[0]} (${allSNs.length}/${allSNs.length})`;
+      const display = allSNs.length === 1 ? allSNs[0] : `${allSNs[0]} (1/${allSNs.length})`;
       return <span className="text-xs font-mono" title={allSNs.join(', ')}>{display}</span>;
     },
   },

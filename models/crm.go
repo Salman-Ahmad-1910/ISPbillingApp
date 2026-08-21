@@ -70,7 +70,7 @@ func (p *Product) ParseSerialNumbers() []string {
 		return nil
 	}
 	parts := strings.FieldsFunc(p.SerialNumber, func(r rune) bool {
-		return r == ',' || r == ' '
+		return r == ',' || r == ' ' || r == '-'
 	})
 	var result []string
 	for _, s := range parts {

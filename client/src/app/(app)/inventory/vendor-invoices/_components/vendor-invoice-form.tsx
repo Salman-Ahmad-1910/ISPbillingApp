@@ -16,7 +16,7 @@ import api from '@/lib/api';
 
 function parseSerialNumbers(raw: string): string[] {
   if (!raw.trim()) return [];
-  return raw.split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
+  return raw.split(/[\s,\-]+/).map(s => s.trim()).filter(Boolean);
 }
 
 interface FormEntry {
@@ -439,7 +439,12 @@ export function VendorInvoiceForm({
                 </div>
                 {entry.expandedItems.length > 0 && entry.expandedItems[0].serialNumber && (
                   <div className="text-xs text-muted-foreground font-mono">
-                    {entry.expandedItems[0].serialNumber}
+                    {(() => {
+                      const sns = parseSerialNumbers(entry.expandedItems[0].serialNumber);
+                      if (sns.length === 0) return '';
+                      if (sns.length === 1) return sns[0];
+                      return `${sns[0]} (1/${sns.length})`;
+                    })()}
                   </div>
                 )}
               </div>

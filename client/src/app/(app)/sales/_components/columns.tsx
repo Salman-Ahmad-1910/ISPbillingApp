@@ -111,7 +111,7 @@ export function getColumns(onDelete?: (id: string) => void): ColumnDef<Sale>[] {
           .filter(Boolean)
           .flatMap(s =>
             String(s)
-              .split(',')
+              .split(/[\s,\-]+/)
               .map(x => x.trim())
               .filter(Boolean),
           );
@@ -119,16 +119,26 @@ export function getColumns(onDelete?: (id: string) => void): ColumnDef<Sale>[] {
         if (uniqueSerials.length === 0) {
           return <div className="text-xs font-mono text-muted-foreground">—</div>;
         }
-        const first = uniqueSerials[0];
         const total = uniqueSerials.length;
+        if (total <= 3) {
+          return (
+            <div className="space-y-0.5 max-w-[200px]">
+              {uniqueSerials.map((sn, i) => (
+                <div key={i} className="text-xs font-mono truncate" title={sn}>
+                  {sn}
+                </div>
+              ))}
+            </div>
+          );
+        }
         return (
-          <div className="flex items-center gap-1.5 max-w-[180px]" title={uniqueSerials.join(', ')}>
-            <span className="text-xs font-mono truncate">
-              {first}{total > 1 ? ` (${total}/${total})` : ''}
-            </span>
-            {total > 1 && (
-              <Badge variant="secondary" className="text-[9px] px-1 py-0 shrink-0 font-mono">{total}</Badge>
-            )}
+          <div className="space-y-0.5 max-w-[200px]" title={uniqueSerials.join(', ')}>
+            {uniqueSerials.slice(0, 2).map((sn, i) => (
+              <div key={i} className="text-xs font-mono truncate">
+                {sn}
+              </div>
+            ))}
+            <div className="text-[10px] text-muted-foreground">+{total - 2} more (total {total})</div>
           </div>
         );
       },

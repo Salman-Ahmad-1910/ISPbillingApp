@@ -48,7 +48,7 @@ export const columns: ColumnDef<PurchasedProduct, unknown>[] = [
     cell: ({ row }) => {
       const sn = row.original.serialNumber;
       if (!sn) return <span className="text-xs font-mono text-muted-foreground">\u2014</span>;
-      const sns = sn.split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
+      const sns = sn.split(/[\s,\-]+/).map(s => s.trim()).filter(Boolean);
       if (sns.length === 0) return <span className="text-xs font-mono text-muted-foreground">\u2014</span>;
       const display = sns.length === 1 ? sns[0] : `${sns[0]} (1/${sns.length})`;
       return <span className="text-xs font-mono" title={sns.join(', ')}>{display}</span>;

@@ -20,7 +20,7 @@ func parseVendorInvoiceSNs(raw string) []string {
 	if raw == "" {
 		return nil
 	}
-	re := regexp.MustCompile(`[,\s]+`)
+	re := regexp.MustCompile(`[,\s\-]+`)
 	parts := re.Split(raw, -1)
 	var result []string
 	for _, p := range parts {

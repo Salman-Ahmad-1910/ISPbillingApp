@@ -330,7 +330,7 @@ export function ClientPage({ data }: ClientPageProps) {
 
               <ScrollArea className="flex-1">
                 <div className="px-5 py-4 space-y-4">
-                  {/* Items */}
+                  {/* Items — one row per SN, each carrying its product info */}
                   {viewSale.items.map((item, idx) => {
                     const price = Number(item.price) || 0;
                     const qty = Number(item.quantity) || 0;
@@ -338,20 +338,22 @@ export function ClientPage({ data }: ClientPageProps) {
                     const taxPercent = Number((item as any).taxPercent) || 0;
                     const sst = net * (taxPercent / 100);
                     const payable = net + sst;
+                    const sn = String(item.serialNumber || '').trim();
 
                     return (
                       <div key={item.id || idx} className="border rounded-lg overflow-hidden">
+                        {/* Line 1: SN / MAC (prominent) */}
                         <div className="flex items-center justify-between px-3.5 py-2 bg-muted/40">
-                          <span className="font-semibold text-sm">{item.productName}</span>
-                          <Badge variant="secondary" className="text-[10px] font-mono">x{qty}</Badge>
+                          <span className="text-muted-foreground text-xs font-medium">SN / MAC</span>
+                          <span className="font-mono text-xs font-semibold">{sn ? sn : '—'}</span>
                         </div>
                         <div className="px-3.5 py-2.5 space-y-1.5">
-                          {item.serialNumber && (
-                            <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">SN / MAC</span>
-                              <span className="font-mono text-xs">{item.serialNumber}</span>
-                            </div>
-                          )}
+                          {/* Line 2: product name */}
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Product</span>
+                            <span className="font-medium text-right">{item.productName}{qty !== 1 ? ` ×${qty}` : ''}</span>
+                          </div>
+                          {/* Line 3: unit price */}
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Unit Price</span>
                             <span>PKR {fmtPKR(price)}</span>

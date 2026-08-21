@@ -43,7 +43,7 @@ func parsePOSsoldSNs(raw string, expectedQty int) []string {
 		}
 	}
 	// Fallback: comma-separated or space-separated
-	re := regexp.MustCompile(`[,\s]+`)
+	re := regexp.MustCompile(`[,\s\-]+`)
 	parts := re.Split(raw, -1)
 	var result []string
 	for _, p := range parts {
@@ -144,53 +144,69 @@ func CreatePOSSale(c *gin.Context) {
 			if qty <= 0 {
 				continue
 			}
-			result := tx.Exec(`
-				UPDATE purchase_items
-				SET quantity = GREATEST(quantity - ?, 0)
-				WHERE id IN (
-					SELECT id FROM purchase_items
-					WHERE product_id = ? AND company_id = ? AND deleted_at IS NULL
-					ORDER BY quantity DESC
-					LIMIT 1
-				)
-			`, qty, it.ProductID, companyID)
-			if result.Error != nil {
-				return result.Error
+
+			soldSNs := parsePOSsoldSNs(it.SerialNumber, qty)
+
+			// Consume the sold SNs from the purchase items holding them. When
+			// this succeeds the product itself is left untouched: its stock was
+			// already consumed when the vendor invoice took the SNs.
+			fromPurchase := false
+			if len(soldSNs) > 0 {
+				var err error
+				fromPurchase, err = consumeSNsFromPurchaseItems(tx, companyID, it.ProductID, soldSNs)
+				if err != nil {
+					return err
+				}
 			}
 
-			// Also decrement Product.stock so inventory status page stays in sync.
-			if err := tx.Model(&models.Product{}).
-				Where("id = ? AND company_id = ?", it.ProductID, companyID).
-				Update("stock", gorm.Expr("GREATEST(stock - ?, 0)", qty)).Error; err != nil {
-				return err
-			}
+			// Legacy fallback for items without SNs on purchase items.
+			if !fromPurchase {
+				result := tx.Exec(`
+					UPDATE purchase_items
+					SET quantity = GREATEST(quantity - ?, 0)
+					WHERE id IN (
+						SELECT id FROM purchase_items
+						WHERE product_id = ? AND company_id = ? AND deleted_at IS NULL
+						ORDER BY quantity DESC
+						LIMIT 1
+					)
+				`, qty, it.ProductID, companyID)
+				if result.Error != nil {
+					return result.Error
+				}
 
-			// Remove consumed SNs from products.serial_number.
-			if it.SerialNumber != "" {
-				var prod models.Product
-				if err := tx.Where("id = ? AND company_id = ?", it.ProductID, companyID).First(&prod).Error; err == nil {
-					allSNs := prod.ParseSerialNumbers()
-					if len(allSNs) > 0 {
-						// Parse the sold SNs from the cart (comma-separated or range)
-						soldSNs := parsePOSsoldSNs(it.SerialNumber, qty)
-						consumedSet := make(map[string]bool, len(soldSNs))
-						for _, sn := range soldSNs {
-							consumedSet[sn] = true
-						}
-						var remaining []string
-						for _, sn := range allSNs {
-							if !consumedSet[sn] {
-								remaining = append(remaining, sn)
+				// Also decrement Product.stock so inventory status page stays in sync.
+				if err := tx.Model(&models.Product{}).
+					Where("id = ? AND company_id = ?", it.ProductID, companyID).
+					Update("stock", gorm.Expr("GREATEST(stock - ?, 0)", qty)).Error; err != nil {
+					return err
+				}
+
+				// Remove consumed SNs from products.serial_number.
+				if it.SerialNumber != "" {
+					var prod models.Product
+					if err := tx.Where("id = ? AND company_id = ?", it.ProductID, companyID).First(&prod).Error; err == nil {
+						allSNs := prod.ParseSerialNumbers()
+						if len(allSNs) > 0 {
+							consumedSet := make(map[string]bool, len(soldSNs))
+							for _, sn := range soldSNs {
+								consumedSet[sn] = true
 							}
-						}
-						remainingStr := strings.Join(remaining, ", ")
-						if err := tx.Model(&models.Product{}).
-							Where("id = ? AND company_id = ?", it.ProductID, companyID).
-							Updates(map[string]interface{}{
-								"serial_number":         remainingStr,
-								"current_serial_index":  0,
-							}).Error; err != nil {
-							return err
+							var remaining []string
+							for _, sn := range allSNs {
+								if !consumedSet[sn] {
+									remaining = append(remaining, sn)
+								}
+							}
+							remainingStr := strings.Join(remaining, ", ")
+							if err := tx.Model(&models.Product{}).
+								Where("id = ? AND company_id = ?", it.ProductID, companyID).
+								Updates(map[string]interface{}{
+									"serial_number":         remainingStr,
+									"current_serial_index":  0,
+								}).Error; err != nil {
+								return err
+							}
 						}
 					}
 				}
@@ -328,44 +344,59 @@ func CreateInstallmentSale(c *gin.Context) {
 			if qty <= 0 {
 				continue
 			}
-			result := tx.Exec(`
-				UPDATE purchase_items
-				SET quantity = GREATEST(quantity - ?, 0)
-				WHERE id IN (
-					SELECT id FROM purchase_items
-					WHERE product_id = ? AND company_id = ? AND deleted_at IS NULL
-					ORDER BY quantity DESC
-					LIMIT 1
-				)
-			`, qty, it.ProductID, companyID)
-			if result.Error != nil {
-				return result.Error
+
+			soldSNs := parsePOSsoldSNs(it.SerialNumber, qty)
+
+			// Consume the sold SNs from the purchase items holding them.
+			fromPurchase := false
+			if len(soldSNs) > 0 {
+				var err error
+				fromPurchase, err = consumeSNsFromPurchaseItems(tx, companyID, it.ProductID, soldSNs)
+				if err != nil {
+					return err
+				}
 			}
 
-			if it.SerialNumber != "" {
-				var prod models.Product
-				if err := tx.Where("id = ? AND company_id = ?", it.ProductID, companyID).First(&prod).Error; err == nil {
-					allSNs := prod.ParseSerialNumbers()
-					if len(allSNs) > 0 {
-						soldSNs := parsePOSsoldSNs(it.SerialNumber, qty)
-						consumedSet := make(map[string]bool, len(soldSNs))
-						for _, sn := range soldSNs {
-							consumedSet[sn] = true
-						}
-						var remaining []string
-						for _, sn := range allSNs {
-							if !consumedSet[sn] {
-								remaining = append(remaining, sn)
+			// Legacy fallback for items without SNs on purchase items.
+			if !fromPurchase {
+				result := tx.Exec(`
+					UPDATE purchase_items
+					SET quantity = GREATEST(quantity - ?, 0)
+					WHERE id IN (
+						SELECT id FROM purchase_items
+						WHERE product_id = ? AND company_id = ? AND deleted_at IS NULL
+						ORDER BY quantity DESC
+						LIMIT 1
+					)
+				`, qty, it.ProductID, companyID)
+				if result.Error != nil {
+					return result.Error
+				}
+
+				if it.SerialNumber != "" {
+					var prod models.Product
+					if err := tx.Where("id = ? AND company_id = ?", it.ProductID, companyID).First(&prod).Error; err == nil {
+						allSNs := prod.ParseSerialNumbers()
+						if len(allSNs) > 0 {
+							consumedSet := make(map[string]bool, len(soldSNs))
+							for _, sn := range soldSNs {
+								consumedSet[sn] = true
 							}
-						}
-						remainingStr := strings.Join(remaining, ", ")
-						if err := tx.Model(&models.Product{}).
-							Where("id = ? AND company_id = ?", it.ProductID, companyID).
-							Updates(map[string]interface{}{
-								"serial_number":         remainingStr,
-								"current_serial_index":  0,
-							}).Error; err != nil {
-							return err
+							var remaining []string
+							for _, sn := range allSNs {
+								if !consumedSet[sn] {
+									remaining = append(remaining, sn)
+								}
+							}
+							remainingStr := strings.Join(remaining, ", ")
+							if err := tx.Model(&models.Product{}).
+								Where("id = ? AND company_id = ?", it.ProductID, companyID).
+								Updates(map[string]interface{}{
+									"serial_number":         remainingStr,
+									"current_serial_index":  0,
+								}).Error; err != nil {
+								return err
+							}
 						}
 					}
 				}

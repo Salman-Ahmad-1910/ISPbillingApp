@@ -66,7 +66,7 @@ export function PrintableVendorInvoice({ invoice, company, vendor, size }: Print
     const rows: { productName: string; serialNumber: string; quantity: number; unitType: string; unitPrice: number; subtotal: number }[] = [];
     for (const item of invoice.items || []) {
       const sns = item.serialNumber
-        ? item.serialNumber.split(/[,\s]+/).map((s: string) => s.trim()).filter(Boolean)
+        ? item.serialNumber.split(/[\s,\-]+/).map((s: string) => s.trim()).filter(Boolean)
         : [];
       if (sns.length === 0) {
         rows.push({ productName: item.productName, serialNumber: '-', quantity: item.quantity, unitType: item.unitType, unitPrice: item.unitPrice, subtotal: item.subtotal });

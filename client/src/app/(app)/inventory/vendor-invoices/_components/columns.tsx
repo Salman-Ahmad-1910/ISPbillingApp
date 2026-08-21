@@ -81,11 +81,11 @@ export const columns = ({ onEdit, onDelete, onPrint }: VendorInvoiceColumnsProps
     cell: ({ row }) => {
       const sn = row.original.item.serialNumber || '';
       if (!sn) return <div className="text-xs font-mono text-muted-foreground">—</div>;
-      const sns = sn.split(/[,\s]+/).map((s: string) => s.trim()).filter(Boolean);
+      const sns = sn.split(/[\s,\-]+/).map((s: string) => s.trim()).filter(Boolean);
       if (sns.length === 0) return <div className="text-xs font-mono text-muted-foreground">—</div>;
       return (
         <div className="text-xs font-mono text-muted-foreground" title={sn}>
-          {sns.length === 1 ? sns[0] : `${sns[0]} (${sns.length}/${sns.length})`}
+          {sns.length === 1 ? sns[0] : `${sns[0]} (1/${sns.length})`}
         </div>
       );
     },
@@ -183,11 +183,11 @@ export function flattenInvoiceItems(invoices: any[]): FlatRow[] {
           g.quantity += item.quantity;
           g.subtotal += item.subtotal;
           if (item.serialNumber) {
-            const sns = item.serialNumber.split(/[,\s]+/).map((s: string) => s.trim()).filter(Boolean);
+            const sns = item.serialNumber.split(/[\s,\-]+/).map((s: string) => s.trim()).filter(Boolean);
             g.serialNumbers.push(...sns);
           }
         } else {
-          const sns = item.serialNumber ? item.serialNumber.split(/[,\s]+/).map((s: string) => s.trim()).filter(Boolean) : [];
+          const sns = item.serialNumber ? item.serialNumber.split(/[\s,\-]+/).map((s: string) => s.trim()).filter(Boolean) : [];
           grouped.set(key, {
             productName: item.productName,
             quantity: item.quantity,

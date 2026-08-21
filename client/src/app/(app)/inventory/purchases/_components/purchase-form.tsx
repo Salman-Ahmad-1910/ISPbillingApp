@@ -25,7 +25,7 @@ type PurchaseFormValues = z.infer<typeof purchaseSchema>;
 
 function parseSerialNumbers(raw: string): string[] {
   if (!raw || !raw.trim()) return [];
-  return raw.split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
+  return raw.split(/[\s,\-]+/).map(s => s.trim()).filter(Boolean);
 }
 
 interface VendorProduct {
@@ -43,6 +43,7 @@ interface PurchaseFormProps {
   purchase: Purchase | null;
   vendors: Vendor[];
   products: Product[];
+  purchases?: Purchase[];
   onSave: (data: PurchaseFormValues) => void;
   onCancel: () => void;
   isSaving?: boolean;
@@ -52,6 +53,7 @@ export function PurchaseForm({
   purchase,
   vendors,
   products,
+  purchases = [],
   onSave,
   onCancel,
   isSaving
@@ -110,6 +112,19 @@ export function PurchaseForm({
     form.setValue('totalAmount', total);
   }, [items, form]);
 
+  // SNs already consumed by other purchases are no longer available.
+  // When editing, this purchase's own SNs stay selectable.
+  const usedSNsByOtherPurchases = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of purchases) {
+      if (purchase && p.id === purchase.id) continue;
+      for (const item of p.items || []) {
+        parseSerialNumbers(item.serialNumber || '').forEach(sn => set.add(sn));
+      }
+    }
+    return set;
+  }, [purchases, purchase]);
+
   const vendorProducts = useMemo((): VendorProduct[] => {
     if (!selectedVendorId) return [];
     const productMap = new Map<string, VendorProduct>();
@@ -119,21 +134,16 @@ export function PurchaseForm({
         const itemSNs = parseSerialNumbers(item.serialNumber || '');
         if (itemSNs.length === 0) continue;
 
-        // Get available SNs from the product (not consumed by POS/vendor invoice)
-        const product = products.find(p => p.id === item.productId);
-        const availableOnProduct = product
-          ? parseSerialNumbers(product.serialNumber || '')
-          : [];
-        const availableSet = new Set(availableOnProduct);
-
-        // Only keep SNs that are still available on the product
-        const unconsumedSNs = itemSNs.filter(sn => availableSet.has(sn));
+        // The purchase page sources its products/SNs from the vendor invoice
+        // items. Only SNs not yet consumed by another purchase remain.
+        const unconsumedSNs = itemSNs.filter(sn => !usedSNsByOtherPurchases.has(sn));
         if (unconsumedSNs.length === 0) continue;
 
         const existing = productMap.get(item.productId);
         if (existing) {
           existing.allSNs.push(...unconsumedSNs);
         } else {
+          const product = products.find(p => p.id === item.productId);
           productMap.set(item.productId, {
             productId: item.productId,
             productName: item.productName,
@@ -148,7 +158,7 @@ export function PurchaseForm({
       }
     }
     return Array.from(productMap.values());
-  }, [selectedVendorId, vendorInvoices, products]);
+  }, [selectedVendorId, vendorInvoices, products, usedSNsByOtherPurchases]);
 
   const getAvailableSNs = (productId: string, excludeIndex: number): string[] => {
     const vp = vendorProducts.find(p => p.productId === productId);

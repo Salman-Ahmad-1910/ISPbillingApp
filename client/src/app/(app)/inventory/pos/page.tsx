@@ -25,6 +25,15 @@ interface CartItem {
     quantity: number;
 }
 
+// SNs available for selling come from the purchase item (what was bought and
+// not yet sold), falling back to the product list for legacy data.
+function purchasedSNs(product: any): string[] {
+    return String(product?.serialNumber || product?.productSerialNumber || '')
+        .split(/[\s,\-]+/)
+        .map((s: string) => s.trim())
+        .filter(Boolean);
+}
+
 interface DropdownItem {
     id: string;
     name: string;
@@ -277,6 +286,8 @@ export default function POSPage() {
 
     const posProducts = useMemo(() => {
         if (!purchasedProducts) return [];
+        const mergeSNField = (a: any, b: any) =>
+            [String(a || '').trim(), String(b || '').trim()].filter(Boolean).join(', ');
         const byId = new Map<string, any>();
         for (const p of purchasedProducts as any[]) {
             const normalized = {
@@ -293,6 +304,10 @@ export default function POSPage() {
             byId.set(p.id, {
                 ...existing,
                 stock: existing.stock + normalized.stock,
+                // Merge SN lists from all purchase lines so the displayed SN
+                // count always equals the stock.
+                serialNumber: mergeSNField(existing.serialNumber, normalized.serialNumber),
+                productSerialNumber: mergeSNField(existing.productSerialNumber, normalized.productSerialNumber),
                 image: existing.image || normalized.image,
             });
         }
@@ -459,7 +474,7 @@ export default function POSPage() {
         setIsProcessing(true);
         try {
             const expandedItems = cart.flatMap(item => {
-                const sns = ((item.product as any).productSerialNumber || '').split(/[\s,]+/).map((s: string) => s.trim()).filter(Boolean);
+                const sns = purchasedSNs(item.product);
                 if (sns.length === 0 || item.quantity <= 1) {
                     return [{
                         productId: item.product.id,
@@ -553,7 +568,7 @@ export default function POSPage() {
         setIsProcessing(true);
         try {
             const holdItems = cart.flatMap(item => {
-                const sns = ((item.product as any).productSerialNumber || '').split(/[\s,]+/).map((s: string) => s.trim()).filter(Boolean);
+                const sns = purchasedSNs(item.product);
                 if (sns.length === 0 || item.quantity <= 1) {
                     return [{
                         productId: item.product.id,
@@ -706,15 +721,16 @@ export default function POSPage() {
                                     <div className="p-2 text-center">
                                         <h4 className="font-medium text-sm truncate">{product.name}</h4>
                                         <p className="text-xs font-semibold">PKR {product.price.toLocaleString()}</p>
-                                        {product.productSerialNumber && (() => {
-                                          const sns = product.productSerialNumber.split(/[\s,]+/).map((s: string) => s.trim()).filter(Boolean);
+                                        {(() => {
+                                          const sns = purchasedSNs(product);
+                                          if (sns.length === 0) return null;
                                           const idx = product.currentSerialIndex ?? 0;
-                                          const currentSn = sns.length > 0 ? sns[idx] || sns[0] : '';
-                                          return currentSn ? (
-                                            <p className="text-[10px] font-mono text-muted-foreground truncate mt-0.5" title={product.productSerialNumber}>
+                                          const currentSn = sns[idx] || sns[0];
+                                          return (
+                                            <p className="text-[10px] font-mono text-muted-foreground truncate mt-0.5" title={sns.join(', ')}>
                                               SN: {currentSn}{sns.length > 1 ? ` (${idx + 1}/${sns.length})` : ''}
                                             </p>
-                                          ) : null;
+                                          );
                                         })()}
                                     </div>
                                 </Card>
@@ -875,8 +891,8 @@ export default function POSPage() {
                                             <Image src={backendImageUrl(item.product.image) || `https://picsum.photos/seed/${item.product.id}/50/50`} width={50} height={50} alt={item.product.name} className="rounded-md object-cover" unoptimized />
                                             <div className="flex-1 mx-3">
                                                 <p className="font-medium">{item.product.name}</p>
-                                                {item.product.productSerialNumber && (() => {
-                                                  const sns = item.product.productSerialNumber.split(/[\s,]+/).map((s: string) => s.trim()).filter(Boolean);
+                                                {(() => {
+                                                  const sns = purchasedSNs(item.product);
                                                   if (sns.length === 0) return null;
                                                   const startIdx = item.product.currentSerialIndex ?? 0;
                                                   const endIdx = Math.min(startIdx + item.quantity - 1, sns.length - 1);

@@ -42,10 +42,9 @@ api.interceptors.response.use(
           localStorage.removeItem('companies');
           localStorage.removeItem('selectedCompany');
           localStorage.removeItem('selectedCompanyId');
-          // Only redirect if not already on auth pages
-          if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/signup')) {
-            window.location.href = '/';
-          }
+        if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/signup')) {
+          window.location.href = '/';
+        }
         }
       }
     }
