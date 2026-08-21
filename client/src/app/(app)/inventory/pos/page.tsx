@@ -698,12 +698,18 @@ export default function POSPage() {
                             <Input placeholder="Search products..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                         </CardHeader>
                         <CardContent className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                            {filteredProducts.map(product => {
-                                const imgSrc = backendImageUrl(product.image) || `https://picsum.photos/seed/${product.id}/200/200`;
-                                return (
-                                <Card key={product.purchaseItemId || product.id} className="overflow-hidden cursor-pointer group/product transition-all duration-300 hover:-translate-y-1 hover:shadow-lg" onClick={() => addToCart(product.id)}>
-                                    <div className="aspect-square bg-muted relative">
-                                        <Image src={imgSrc} width={200} height={200} alt={product.name} className="object-cover w-full h-full" unoptimized />
+                                {filteredProducts.map(product => {
+                                    const imgSrc = backendImageUrl(product.image);
+                                    return (
+                                    <Card key={product.purchaseItemId || product.id} className="overflow-hidden cursor-pointer group/product transition-all duration-300 hover:-translate-y-1 hover:shadow-lg" onClick={() => addToCart(product.id)}>
+                                        <div className="aspect-square bg-muted relative">
+                                            {imgSrc ? (
+                                                <Image src={imgSrc} width={200} height={200} alt={product.name} className="object-cover w-full h-full" unoptimized />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-2xl font-semibold text-muted-foreground">
+                                                    {product.name.charAt(0).toUpperCase()}
+                                                </div>
+                                            )}
                                         {product.stock > 0 && (
                                             <Badge variant="secondary" className="absolute top-1 right-1 text-xs">
                                                 Stock: {product.stock}
@@ -888,7 +894,13 @@ export default function POSPage() {
                                 {cart.length > 0 ? (
                                     cart.map(item => (
                                         <div key={item.product.id} className="flex items-start justify-between p-2 rounded-lg transition-all duration-200 hover:bg-muted/50">
-                                            <Image src={backendImageUrl(item.product.image) || `https://picsum.photos/seed/${item.product.id}/50/50`} width={50} height={50} alt={item.product.name} className="rounded-md object-cover" unoptimized />
+                                            {backendImageUrl(item.product.image) ? (
+                                                <Image src={backendImageUrl(item.product.image)!} width={50} height={50} alt={item.product.name} className="rounded-md object-cover" unoptimized />
+                                            ) : (
+                                                <div className="w-[50px] h-[50px] rounded-md bg-muted flex items-center justify-center text-base font-semibold text-muted-foreground">
+                                                    {item.product.name.charAt(0).toUpperCase()}
+                                                </div>
+                                            )}
                                             <div className="flex-1 mx-3">
                                                 <p className="font-medium">{item.product.name}</p>
                                                 {(() => {
