@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useMemo, type ReactNode, useEffect
 import type { Company } from '@/lib/types';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { useUser } from '@/hooks/use-user';
 
 // Minimal company type matching API response
 interface APICompany {
@@ -50,6 +51,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   });
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { user } = useUser();
 
   // Save to localStorage when companyId changes
   useEffect(() => {
@@ -122,9 +124,18 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    fetchCompanies();
+    // Only fetch companies when a user is authenticated.
+    // Calling this while logged out triggers a 401, which the axios
+    // interceptor would redirect/reload on, causing an infinite loop
+    // (e.g. the public home page blinking).
+    if (user) {
+      fetchCompanies();
+    } else if (user === null) {
+      setCompanies([]);
+      setLoading(false);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user]);
 
   // Read companyId from URL parameters on initial load
   useEffect(() => {

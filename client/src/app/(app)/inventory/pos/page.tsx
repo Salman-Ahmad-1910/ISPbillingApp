@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 
-import { PlusCircle, Trash2, CreditCard, Landmark, CircleDollarSign, Loader2, ShoppingCart, Search, Users, UserRound, Handshake, CalendarDays, Receipt } from 'lucide-react';
+import { PlusCircle, Trash2, CreditCard, Landmark, CircleDollarSign, Loader2, ShoppingCart, Search, Users, UserRound, Handshake, CalendarDays, Receipt, MoreVertical } from 'lucide-react';
 import Image from 'next/image';
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -19,6 +19,22 @@ import { backendImageUrl } from '@/lib/utils';
 import api from '@/lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { smartMatch, prefixMatch } from '@/lib/search';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface CartItem {
     product: Product;
@@ -181,6 +197,24 @@ export default function POSPage() {
     const [existingInstallment, setExistingInstallment] = useState<SubscriberInstallment | null>(null);
     const [fetchingInstallment, setFetchingInstallment] = useState(false);
     const [pendingSaleItems, setPendingSaleItems] = useState<any[]>([]);
+    const [productToDelete, setProductToDelete] = useState<any | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const confirmDeleteProduct = async () => {
+        if (!productToDelete) return;
+        setIsDeleting(true);
+        try {
+            await api.delete(`/inventory/products/${productToDelete.id}?companyId=${companyId}`);
+            queryClient.invalidateQueries({ queryKey: ['inventory/products', companyId] });
+            queryClient.invalidateQueries({ queryKey: ['inventory/purchased-products', companyId] });
+            toast({ title: 'Product deleted', description: `${productToDelete.name} has been removed.` });
+        } catch (err: any) {
+            toast({ variant: 'destructive', title: 'Delete failed', description: err?.response?.data?.message || 'Could not delete product.' });
+        } finally {
+            setIsDeleting(false);
+            setProductToDelete(null);
+        }
+    };
 
     const customerList = useMemo(() => {
         if (!Array.isArray(customersData)) return [];
@@ -703,6 +737,27 @@ export default function POSPage() {
                                     return (
                                     <Card key={product.purchaseItemId || product.id} className="overflow-hidden cursor-pointer group/product transition-all duration-300 hover:-translate-y-1 hover:shadow-lg" onClick={() => addToCart(product.id)}>
                                         <div className="aspect-square bg-muted relative">
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button
+                                                        variant="secondary"
+                                                        size="icon"
+                                                        className="absolute top-1 left-1 h-7 w-7 z-20"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        <MoreVertical className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
+                                                    <DropdownMenuItem
+                                                        className="text-destructive focus:text-destructive"
+                                                        onSelect={() => setProductToDelete(product)}
+                                                    >
+                                                        <Trash2 className="h-4 w-4 mr-2" />
+                                                        Delete
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                             {imgSrc ? (
                                                 <Image src={imgSrc} width={200} height={200} alt={product.name} className="object-cover w-full h-full" unoptimized />
                                             ) : (
@@ -746,6 +801,23 @@ export default function POSPage() {
                         </CardContent>
                     </Card>
                 </div>
+
+                <AlertDialog open={!!productToDelete} onOpenChange={(o) => { if (!o) setProductToDelete(null); }}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Delete product?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                This will permanently delete <span className="font-semibold">{productToDelete?.name}</span> and cannot be undone.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={confirmDeleteProduct} disabled={isDeleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                {isDeleting ? 'Deleting…' : 'Delete'}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
                 <div className="lg:col-span-1 flex flex-col gap-4">
                     <Card className="sticky top-20 transition-all duration-300 hover:shadow-md">
                         <CardHeader>

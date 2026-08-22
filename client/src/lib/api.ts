@@ -42,9 +42,13 @@ api.interceptors.response.use(
           localStorage.removeItem('companies');
           localStorage.removeItem('selectedCompany');
           localStorage.removeItem('selectedCompanyId');
-        if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/signup')) {
-          window.location.href = '/';
-        }
+          const currentPath = window.location.pathname;
+          const onAuthPage = currentPath.includes('/login') || currentPath.includes('/signup');
+          // Only navigate if we're not already on the destination, otherwise
+          // assigning window.location.href would force a reload loop.
+          if (!onAuthPage && currentPath !== '/') {
+            window.location.href = '/';
+          }
         }
       }
     }
