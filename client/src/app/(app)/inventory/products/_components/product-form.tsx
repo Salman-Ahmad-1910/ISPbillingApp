@@ -71,6 +71,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
         serialNumber: product.serialNumber || '',
         currentSerialIndex: product.currentSerialIndex ?? 0,
     } : {
+      productId: '',
       name: '',
       category: '',
       price: 0,
@@ -192,6 +193,28 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
 
         <FormField
           control={form.control}
+          name="productId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Product ID</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder="Auto-generated (Pr-001)"
+                  readOnly
+                  className="bg-muted/50 cursor-not-allowed"
+                  {...field}
+                />
+              </FormControl>
+              <p className="text-xs text-muted-foreground">
+                Auto-generated as Pr-001, Pr-002, &hellip; The &quot;Pr-&quot; prefix is added automatically and the count increments with every product.
+              </p>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
           name="name"
           render={({ field }) => (
             <FormItem>
@@ -224,7 +247,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
             )}
           />
 
-          {/* <FormField
+          <FormField
             control={form.control}
             name="productTypeId"
             render={({ field }) => (
@@ -241,7 +264,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                 <FormMessage />
               </FormItem>
             )}
-          /> */}
+          />
 
           <FormField
             control={form.control}
