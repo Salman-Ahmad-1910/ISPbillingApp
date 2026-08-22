@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -13,8 +13,11 @@ import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import type { Connection } from '@/lib/types';
-import { smartMatchScore } from '@/lib/search';
+import type { Connection, Area, DistributionBox, Package, Company } from '@/lib/types';
+import { ConnectionFilterBar } from '@/components/shared/connection-filter-bar';
+import { applyConnectionFilters, applyConnectionDateRange, defaultConnectionFilters, type ConnectionFilterState } from '@/lib/connection-filters';
+import { DateRangeFilter } from '@/components/shared/date-range-filter';
+import { CollectionPagination } from '@/components/shared/collection-pagination';
 
 function getPackagePrice(c: Connection): number {
   const cable = Number(c.amount) || 0;
@@ -25,31 +28,52 @@ function getPackagePrice(c: Connection): number {
 }
 
 export default function AdvanceSubscribersPage() {
-  const { companyId, companies } = useCompany();
-  const currentCompany = companies.find(c => c.id === companyId);
+  const { companyId } = useCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
+  const [filters, setFilters] = useState<ConnectionFilterState>(defaultConnectionFilters());
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [pageSize, setPageSize] = useState('10');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const { data: connections = [], isLoading: loading } = useGenericQuery<Connection>(
     'admin/connections',
     companyId ?? undefined,
   );
+  const { data: areasData } = useGenericQuery<Area>('network/areas', companyId ?? undefined);
+  const { data: boxesData } = useGenericQuery<DistributionBox>('network/boxes', companyId ?? undefined);
+  const { data: packagesData } = useGenericQuery<Package>('billing/packages', companyId ?? undefined);
+  const { data: companiesData } = useGenericQuery<Company>('companies', companyId ?? undefined);
 
-  const advanceSubscribers = useMemo(() => {
-    return (connections as Connection[]).filter(c => c.paymentStatus === 'advance');
-  }, [connections]);
+  const advanceSubscribers = useMemo(
+    () => (connections as Connection[]).filter(c => c.paymentStatus === 'advance'),
+    [connections],
+  );
 
-  const filteredSubscribers = useMemo(() => {
-    if (!search.trim()) return advanceSubscribers;
-    const q = search.trim();
-    return advanceSubscribers
-      .map(c => ({ c, s: smartMatchScore(q, [c.internetId, c.id, c.cell, c.mobile], [c.name]) }))
-      .filter(x => x.s >= 0)
-      .sort((a, b) => a.s - b.s)
-      .map(x => x.c);
-  }, [advanceSubscribers, search]);
+  const filteredSubscribers = useMemo(
+    () => applyConnectionFilters(advanceSubscribers, filters, search),
+    [advanceSubscribers, filters, search],
+  );
+
+  const dateFilteredSubscribers = useMemo(
+    () => applyConnectionDateRange(filteredSubscribers, dateFrom, dateTo),
+    [filteredSubscribers, dateFrom, dateTo],
+  );
+
+  const pageSizeNum = pageSize === 'all' ? dateFilteredSubscribers.length : parseInt(pageSize, 10);
+  const startIdx = pageSize === 'all' ? 0 : (currentPage - 1) * pageSizeNum;
+  const pagedSubscribers = useMemo(
+    () => (pageSize === 'all' ? dateFilteredSubscribers : dateFilteredSubscribers.slice(startIdx, startIdx + pageSizeNum)),
+    [dateFilteredSubscribers, pageSize, currentPage, startIdx, pageSizeNum],
+  );
+
+  useEffect(() => { setCurrentPage(1); }, [search, filters, dateFrom, dateTo, pageSize]);
+
+  const setFilter = (key: keyof ConnectionFilterState, value: string) =>
+    setFilters(f => ({ ...f, [key]: value }));
 
   const handleDelete = async (c: Connection) => {
     if (!confirm(`Reset payment status for ${c.name}? This will clear their advance status.`)) return;
@@ -140,6 +164,24 @@ export default function AdvanceSubscribersPage() {
         </Card>
       </div>
 
+      <ConnectionFilterBar
+        filters={filters}
+        onChange={setFilter}
+        data={{
+          areas: (areasData || []),
+          boxes: (boxesData || []),
+          packages: (packagesData || []),
+          companies: (companiesData || []),
+        }}
+      />
+
+      <DateRangeFilter
+        from={dateFrom}
+        to={dateTo}
+        onFromChange={(v) => setDateFrom(v)}
+        onToChange={(v) => setDateTo(v)}
+      />
+
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -164,7 +206,7 @@ export default function AdvanceSubscribersPage() {
             <div className="flex items-center justify-center h-32">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
-          ) : filteredSubscribers.length === 0 ? (
+          ) : dateFilteredSubscribers.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <TrendingUp className="h-10 w-10 opacity-30 mx-auto mb-3" />
               <p className="text-sm font-medium">No advance subscribers</p>
@@ -188,9 +230,9 @@ export default function AdvanceSubscribersPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredSubscribers.map((c, i) => (
-                    <TableRow key={c.id}>
-                      <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                   {pagedSubscribers.map((c, i) => (
+                     <TableRow key={c.id}>
+                       <TableCell className="text-muted-foreground">{startIdx + i + 1}</TableCell>
                       <TableCell className="font-medium">
                         <Link
                           href={`/crm/subscriber-detail?connectionId=${c.id}`}
@@ -237,6 +279,16 @@ export default function AdvanceSubscribersPage() {
           )}
         </CardContent>
       </Card>
+
+      {!loading && dateFilteredSubscribers.length > 0 && (
+        <CollectionPagination
+          total={dateFilteredSubscribers.length}
+          pageSize={pageSize}
+          setPageSize={setPageSize}
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+        />
+      )}
     </div>
   );
 }

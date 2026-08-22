@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -10,8 +10,11 @@ import { Clock, ArrowLeft, Users, Wallet, Loader2, Search } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { Button } from '@/components/ui/button';
-import type { Connection } from '@/lib/types';
-import { smartMatchScore } from '@/lib/search';
+import type { Connection, Area, DistributionBox, Package, Company } from '@/lib/types';
+import { ConnectionFilterBar } from '@/components/shared/connection-filter-bar';
+import { applyConnectionFilters, applyConnectionDateRange, defaultConnectionFilters, type ConnectionFilterState } from '@/lib/connection-filters';
+import { DateRangeFilter } from '@/components/shared/date-range-filter';
+import { CollectionPagination } from '@/components/shared/collection-pagination';
 
 function getPackagePrice(c: Connection): number {
   const cable = Number(c.amount) || 0;
@@ -21,36 +24,65 @@ function getPackagePrice(c: Connection): number {
   return cable + internet;
 }
 
-function getRemainingAmount(c: Connection): number {
-  const pkgFee = getPackagePrice(c);
-  const received = Number(c.remainingAmount) || 0;
-  if (pkgFee === 0) return 0;
-  // remainingAmount on connection = what's still owed after this month's payments
-  return Number(c.remainingAmount) || pkgFee;
+// Billing cycle is monthly (30 days) with a 3-day grace period (33 days total).
+const GRACE_DAYS = 33;
+
+function getDaysSince(dateStr: string): number {
+  if (!dateStr) return 0;
+  const d = new Date(dateStr);
+  const now = new Date();
+  return Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 export default function PendingSubscribersPage() {
   const { companyId } = useCompany();
   const [search, setSearch] = useState('');
+  const [filters, setFilters] = useState<ConnectionFilterState>(defaultConnectionFilters());
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [pageSize, setPageSize] = useState('10');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const { data: connections = [], isLoading: loading } = useGenericQuery<Connection>(
     'admin/connections',
     companyId ?? undefined,
   );
+  const { data: areasData } = useGenericQuery<Area>('network/areas', companyId ?? undefined);
+  const { data: boxesData } = useGenericQuery<DistributionBox>('network/boxes', companyId ?? undefined);
+  const { data: packagesData } = useGenericQuery<Package>('billing/packages', companyId ?? undefined);
+  const { data: companiesData } = useGenericQuery<Company>('companies', companyId ?? undefined);
 
   const pendingSubscribers = useMemo(() => {
-    return (connections as Connection[]).filter(c => c.paymentStatus === 'pending');
+    return (connections as Connection[]).filter(c => {
+      const activeDate = c.lastPaymentDate || c.rechargeDate || c.createdAt;
+      const owes = (Number(c.remainingAmount) || 0) > 0;
+      const days = activeDate ? getDaysSince(activeDate) : 0;
+      // Within the grace window (not yet overdue) => still pending.
+      return owes && days <= GRACE_DAYS;
+    });
   }, [connections]);
 
-  const filteredSubscribers = useMemo(() => {
-    if (!search.trim()) return pendingSubscribers;
-    const q = search.trim();
-    return pendingSubscribers
-      .map(c => ({ c, s: smartMatchScore(q, [c.internetId, c.id, c.cell, c.mobile], [c.name]) }))
-      .filter(x => x.s >= 0)
-      .sort((a, b) => a.s - b.s)
-      .map(x => x.c);
-  }, [pendingSubscribers, search]);
+  const filteredSubscribers = useMemo(
+    () => applyConnectionFilters(pendingSubscribers, filters, search),
+    [pendingSubscribers, filters, search],
+  );
+
+  const dateFilteredSubscribers = useMemo(
+    () => applyConnectionDateRange(filteredSubscribers, dateFrom, dateTo),
+    [filteredSubscribers, dateFrom, dateTo],
+  );
+
+  const pageSizeNum = pageSize === 'all' ? dateFilteredSubscribers.length : parseInt(pageSize, 10);
+  const startIdx = pageSize === 'all' ? 0 : (currentPage - 1) * pageSizeNum;
+  const pagedSubscribers = useMemo(
+    () => (pageSize === 'all' ? dateFilteredSubscribers : dateFilteredSubscribers.slice(startIdx, startIdx + pageSizeNum)),
+    [dateFilteredSubscribers, pageSize, currentPage, startIdx, pageSizeNum],
+  );
+
+  useEffect(() => { setCurrentPage(1); }, [search, filters, dateFrom, dateTo, pageSize]);
+
+  const setFilter = (key: keyof ConnectionFilterState, value: string) =>
+    setFilters(f => ({ ...f, [key]: value }));
 
   return (
     <div className="flex flex-col gap-6">
@@ -65,7 +97,7 @@ export default function PendingSubscribersPage() {
         </div>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Pending Subscribers</h1>
-          <p className="text-sm text-muted-foreground">Subscribers who paid less than the package fee</p>
+          <p className="text-sm text-muted-foreground">Subscribers who still owe within the grace period</p>
         </div>
       </div>
 
@@ -102,6 +134,24 @@ export default function PendingSubscribersPage() {
         </Card>
       </div>
 
+      <ConnectionFilterBar
+        filters={filters}
+        onChange={setFilter}
+        data={{
+          areas: (areasData || []),
+          boxes: (boxesData || []),
+          packages: (packagesData || []),
+          companies: (companiesData || []),
+        }}
+      />
+
+      <DateRangeFilter
+        from={dateFrom}
+        to={dateTo}
+        onFromChange={(v) => setDateFrom(v)}
+        onToChange={(v) => setDateTo(v)}
+      />
+
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
@@ -118,7 +168,7 @@ export default function PendingSubscribersPage() {
             <div className="flex items-center justify-center h-32">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
-          ) : filteredSubscribers.length === 0 ? (
+          ) : dateFilteredSubscribers.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Clock className="h-10 w-10 opacity-30 mx-auto mb-3" />
               <p className="text-sm font-medium">No pending subscribers</p>
@@ -141,9 +191,9 @@ export default function PendingSubscribersPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredSubscribers.map((c, i) => (
-                    <TableRow key={c.id}>
-                      <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                   {pagedSubscribers.map((c, i) => (
+                     <TableRow key={c.id}>
+                       <TableCell className="text-muted-foreground">{startIdx + i + 1}</TableCell>
                       <TableCell className="font-medium">
                         <Link
                           href={`/crm/subscriber-detail?connectionId=${c.id}`}
@@ -175,6 +225,16 @@ export default function PendingSubscribersPage() {
           )}
         </CardContent>
       </Card>
+
+      {!loading && dateFilteredSubscribers.length > 0 && (
+        <CollectionPagination
+          total={dateFilteredSubscribers.length}
+          pageSize={pageSize}
+          setPageSize={setPageSize}
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+        />
+      )}
     </div>
   );
 }

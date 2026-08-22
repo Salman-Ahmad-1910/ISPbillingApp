@@ -186,54 +186,10 @@ func CreatePayment(c *gin.Context) {
 		return
 	}
 
-	// Update Connection's lastPaymentDate and remainingAmount (current-month model)
+	// Recompute the connection balance from this month's payment data so the
+	// Paid/Pending/Overdue cards and pages stay in sync.
 	if payment.SubscriberID != nil {
-		paymentDate := payment.PaymentDate
-		if paymentDate == "" {
-			paymentDate = time.Now().Format("2006-01-02")
-		}
-		var conn models.Connection
-		if err := config.DB.Where("id = ?", *payment.SubscriberID).First(&conn).Error; err == nil {
-			// Calculate package fee based on connection type
-			packageFee := conn.Amount
-			switch conn.ConnectionType {
-			case "internet":
-				packageFee = conn.SameAmount
-			case "both", "tv_cable":
-				packageFee = conn.Amount + conn.SameAmount
-			}
-
-			// Sum all payments already made this month (before this new payment)
-			now := time.Now()
-			startOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-			startOfMonthStr := startOfMonth.Format("2006-01-02")
-			var totalReceivedBefore float64
-			config.DB.Raw(
-				"SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE subscriber_id = ? AND payment_date >= ? AND id <> ?",
-				*payment.SubscriberID, startOfMonthStr, payment.ID,
-			).Scan(&totalReceivedBefore)
-
-			// After this payment, total received = previous + this payment
-			totalReceivedAfter := totalReceivedBefore + payment.Amount
-			newRemaining := packageFee - totalReceivedAfter
-			// Negative = overpaid (advance), Positive = underpaid (pending), Zero = fully paid
-
-			// Classify payment status
-			paymentStatus := ""
-			if newRemaining > 0 && packageFee > 0 {
-				paymentStatus = "pending"
-			} else if newRemaining < 0 && packageFee > 0 {
-				paymentStatus = "advance"
-			}
-
-			config.DB.Model(&models.Connection{}).
-				Where("id = ?", *payment.SubscriberID).
-				UpdateColumns(map[string]interface{}{
-					"last_payment_date": paymentDate,
-					"remaining_amount":  newRemaining,
-					"payment_status":    paymentStatus,
-				})
-		}
+		recomputeConnectionBalance(*payment.SubscriberID)
 	}
 
 	// Allocate the payment against the connection's unpaid invoices
@@ -316,6 +272,10 @@ func UpdatePayment(c *gin.Context) {
 		return
 	}
 
+	if payment.SubscriberID != nil {
+		recomputeConnectionBalance(*payment.SubscriberID)
+	}
+
 	utils.SuccessResponse(c, "Payment updated successfully", payment)
 }
 
@@ -356,10 +316,74 @@ func DeletePayment(c *gin.Context) {
 	id := c.Param("id")
 	companyID, _ := c.Get("companyID")
 
+	var payment models.Payment
+	config.DB.Where("id = ?", id).First(&payment)
+
 	if err := config.DB.Where("id = ? AND company_id = ?", id, companyID).Delete(&models.Payment{}).Error; err != nil {
 		utils.ErrorResponse(c, 500, "Failed to delete payment", err.Error())
 		return
 	}
 
+	if payment.SubscriberID != nil {
+		recomputeConnectionBalance(*payment.SubscriberID)
+	}
+
 	utils.SuccessResponse(c, "Payment deleted successfully", nil)
+}
+
+// recomputeConnectionBalance recomputes a connection's remaining_amount,
+// payment_status and last_payment_date from the payments recorded for it in the
+// current billing month. This keeps the Paid/Pending/Overdue dashboard cards and
+// pages in sync with the actual payment data regardless of which code path
+// created, updated or deleted the payment.
+func recomputeConnectionBalance(subscriberID uuid.UUID) {
+	var conn models.Connection
+	if err := config.DB.Where("id = ?", subscriberID).First(&conn).Error; err != nil {
+		return
+	}
+
+	packageFee := conn.Amount
+	switch conn.ConnectionType {
+	case "internet":
+		packageFee = conn.SameAmount
+	case "both", "tv_cable":
+		packageFee = conn.Amount + conn.SameAmount
+	}
+
+	now := time.Now()
+	startOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	startOfMonthStr := startOfMonth.Format("2006-01-02")
+
+	var totalReceived float64
+	config.DB.Raw(
+		"SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE subscriber_id = ? AND payment_date >= ?",
+		subscriberID, startOfMonthStr,
+	).Scan(&totalReceived)
+
+	newRemaining := packageFee - totalReceived
+
+	paymentStatus := ""
+	if newRemaining > 0 && packageFee > 0 {
+		paymentStatus = "pending"
+	} else if newRemaining < 0 && packageFee > 0 {
+		paymentStatus = "advance"
+	}
+
+	var lastPay string
+	config.DB.Raw(
+		"SELECT COALESCE(MAX(payment_date), '') FROM payments WHERE subscriber_id = ?",
+		subscriberID,
+	).Scan(&lastPay)
+
+	updates := map[string]interface{}{
+		"remaining_amount": newRemaining,
+		"payment_status":   paymentStatus,
+	}
+	if lastPay != "" {
+		updates["last_payment_date"] = lastPay
+	}
+
+	config.DB.Model(&models.Connection{}).
+		Where("id = ?", subscriberID).
+		UpdateColumns(updates)
 }

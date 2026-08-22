@@ -40,6 +40,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [showSummary, setShowSummary] = useState(false);
   const [timeRange, setTimeRange] = useState<'daily' | 'monthly' | 'yearly' | 'all'>('monthly');
+  const [packageType, setPackageType] = useState<'both' | 'internet' | 'tv_cable'>('both');
   const [targetAmount, setTargetAmount] = useState<number>(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem(`collection_target_${companyId}`);
@@ -55,7 +56,7 @@ export default function DashboardPage() {
   const fetchDashboard = useCallback(() => {
     if (!companyId) return;
     setLoading(true);
-    api.get(`/dashboard?companyId=${companyId}&range=${timeRange}`)
+    api.get(`/dashboard?companyId=${companyId}&range=${timeRange}&packageType=${packageType}`)
       .then(response => {
         setData(response.data.data);
         setLoading(false);
@@ -64,7 +65,7 @@ export default function DashboardPage() {
         console.error("Failed to fetch dashboard data", error);
         setLoading(false);
       });
-  }, [companyId, timeRange]);
+  }, [companyId, timeRange, packageType]);
 
   useEffect(() => {
     fetchDashboard();
@@ -92,9 +93,9 @@ export default function DashboardPage() {
   const totalCollection = data?.totalCollection || 0;
 
   const kpiConfig = [
-    { title: 'Active Subscribers', value: data?.subscribersStats?.active || 0, icon: Users, change: `in ${companyName}`, gradient: 'from-blue-500 to-cyan-500', bgLight: 'bg-blue-50 dark:bg-blue-950/30' },
-    { title: 'Total Collection', value: `PKR ${(data?.totalCollection || 0).toLocaleString()}`, icon: Wallet, change: `${timeRange === 'daily' ? 'today' : timeRange === 'monthly' ? 'this month' : timeRange === 'yearly' ? 'this year' : 'all time'} total`, gradient: 'from-emerald-500 to-green-500', bgLight: 'bg-emerald-50 dark:bg-emerald-950/30' },
-    { title: 'Overdue Subscribers', value: data?.overdueCount || 0, icon: AlertCircle, change: 'unpaid accounts', gradient: 'from-rose-500 to-pink-500', bgLight: 'bg-rose-50 dark:bg-rose-950/30' },
+    { title: 'Active Subscribers', value: data?.subscribersStats?.active || 0, icon: Users, change: `in ${companyName}`, gradient: 'from-blue-500 to-cyan-500', bgLight: 'bg-blue-50 dark:bg-blue-950/30', href: '/collection/active-subscribers' },
+    { title: 'Total Collection', value: `PKR ${(data?.totalCollection || 0).toLocaleString()}`, icon: Wallet, change: `${timeRange === 'daily' ? 'today' : timeRange === 'monthly' ? 'this month' : timeRange === 'yearly' ? 'this year' : 'all time'} total`, gradient: 'from-emerald-500 to-green-500', bgLight: 'bg-emerald-50 dark:bg-emerald-950/30', href: '/billing/payments' },
+    { title: 'Overdue Subscribers', value: data?.overdueCount || 0, icon: AlertCircle, change: 'unpaid accounts', gradient: 'from-rose-500 to-pink-500', bgLight: 'bg-rose-50 dark:bg-rose-950/30', href: '/collection/overdue-subscribers' },
   ];
 
   if (loading) {
@@ -195,38 +196,56 @@ export default function DashboardPage() {
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-muted-foreground">Summary</h3>
-            <Select value={timeRange} onValueChange={(v) => setTimeRange(v as typeof timeRange)}>
-              <SelectTrigger className="w-[140px] h-8 text-xs">
-                <SelectValue placeholder="Select range" />
-              </SelectTrigger>
-              <SelectContent portal={false}>
-                <SelectItem value="daily">Daily</SelectItem>
-                <SelectItem value="monthly">Monthly</SelectItem>
-                <SelectItem value="yearly">Yearly</SelectItem>
-                <SelectItem value="all">All</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+              <Select value={packageType} onValueChange={(v) => setPackageType(v as typeof packageType)}>
+                <SelectTrigger className="w-[140px] h-8 text-xs">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent portal={false}>
+                  <SelectItem value="both">Both</SelectItem>
+                  <SelectItem value="internet">Internet</SelectItem>
+                  <SelectItem value="tv_cable">Cable</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={timeRange} onValueChange={(v) => setTimeRange(v as typeof timeRange)}>
+                <SelectTrigger className="w-[140px] h-8 text-xs">
+                  <SelectValue placeholder="Select range" />
+                </SelectTrigger>
+                <SelectContent portal={false}>
+                  <SelectItem value="daily">Daily</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                  <SelectItem value="yearly">Yearly</SelectItem>
+                  <SelectItem value="all">All</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-stretch gap-3">
-            {kpiConfig.map((kpi) => (
-              <Card
-                key={kpi.title}
-                className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 flex-1 min-w-[180px] max-w-[280px] min-h-[160px]"
-              >
-                <div className={`absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br ${kpi.gradient}`} />
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
-                  <CardTitle className="text-[11px] font-medium leading-tight">{kpi.title}</CardTitle>
-                  <div className={`rounded-lg p-1.5 bg-gradient-to-br ${kpi.gradient} text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md`}>
-                    <kpi.icon className="h-3 w-3" />
-                  </div>
-                </CardHeader>
-                <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
-                  <div className="text-2xl font-bold tracking-tight">{kpi.value}</div>
-                  <p className="text-xs text-muted-foreground mt-1">{kpi.change}</p>
-                </CardContent>
-              </Card>
-            ))}
+            {kpiConfig.map((kpi) => {
+              const card = (
+                <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[160px] cursor-pointer h-full">
+                  <div className={`absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br ${kpi.gradient}`} />
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
+                    <CardTitle className="text-[11px] font-medium leading-tight">{kpi.title}</CardTitle>
+                    <div className={`rounded-lg p-1.5 bg-gradient-to-br ${kpi.gradient} text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md`}>
+                      <kpi.icon className="h-3 w-3" />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
+                    <div className="text-2xl font-bold tracking-tight">{kpi.value}</div>
+                    <p className="text-xs text-muted-foreground mt-1">{kpi.change}</p>
+                  </CardContent>
+                </Card>
+              );
+              return kpi.href ? (
+                <Link key={kpi.title} href={kpi.href} className="block flex-1 min-w-[180px] max-w-[280px]">
+                  {card}
+                </Link>
+              ) : (
+                <div key={kpi.title} className="block flex-1 min-w-[180px] max-w-[280px]">{card}</div>
+              );
+            })}
             <Link href="/collection/pending-subscribers" className="block flex-1 min-w-[180px] max-w-[280px]">
               <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[160px] cursor-pointer h-full">
                 <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-amber-500 to-orange-500" />
@@ -254,6 +273,21 @@ export default function DashboardPage() {
                 <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
                   <div className="text-2xl font-bold tracking-tight">{data?.subscribersStats?.advance || 0}</div>
                   <p className="text-xs text-muted-foreground mt-1">paid more than package fee</p>
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href="/collection/paid-subscribers" className="block flex-1 min-w-[180px] max-w-[280px]">
+              <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[160px] cursor-pointer h-full">
+                <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-sky-500 to-blue-500" />
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
+                  <CardTitle className="text-[11px] font-medium leading-tight">Paid Subscribers</CardTitle>
+                  <div className="rounded-lg p-1.5 bg-gradient-to-br from-sky-500 to-blue-500 text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md">
+                    <CheckCircle2 className="h-3 w-3" />
+                  </div>
+                </CardHeader>
+                <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
+                  <div className="text-2xl font-bold tracking-tight">{data?.subscribersStats?.paid || 0}</div>
+                  <p className="text-xs text-muted-foreground mt-1">dues cleared</p>
                 </CardContent>
               </Card>
             </Link>

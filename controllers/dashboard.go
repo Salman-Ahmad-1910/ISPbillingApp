@@ -39,15 +39,41 @@ func GetDashboardData(c *gin.Context) {
 		dateFilter = "AND payment_date >= (DATE_TRUNC('month', CURRENT_DATE))::text"
 	}
 
-	var activeCount, suspendedCount int64
-	config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL AND status = 'active'`, companyUUID).Scan(&activeCount)
-	config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL AND status = 'suspended'`, companyUUID).Scan(&suspendedCount)
+	// packageType filter: internet | tv_cable | both (or empty = all)
+	packageType := c.Query("packageType")
+	packageClause := ""
+	switch packageType {
+	case "internet":
+		packageClause = " AND connection_type = 'internet'"
+	case "tv_cable":
+		packageClause = " AND connection_type = 'tv_cable'"
+	default:
+		packageClause = ""
+	}
 
+	// Billing cycle is monthly (30 days) with a 3-day grace period.
+	// A subscriber is "pending" while they still owe money and are within the
+	// grace window (<= 33 days since their last payment / recharge / creation).
+	// Once that window lapses they "move" to overdue.
+	const cycleStartExpr = "COALESCE(last_payment_date, recharge_date, created_at::text)::date"
+	pendingClause := " AND remaining_amount > 0 AND (CURRENT_DATE - " + cycleStartExpr + ") <= 33"
+	overdueClause := " AND remaining_amount > 0 AND (CURRENT_DATE - " + cycleStartExpr + ") > 33"
+
+	var activeCount, suspendedCount int64
+	config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL AND status = 'active'`+packageClause, companyUUID).Scan(&activeCount)
+	config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL AND status = 'suspended'`+packageClause, companyUUID).Scan(&suspendedCount)
+
+	// Pending = every subscriber who still owes money and hasn't passed the grace period.
 	var pendingCount int64
-	config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL AND payment_status = 'pending'`, companyUUID).Scan(&pendingCount)
+	config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL`+pendingClause+packageClause, companyUUID).Scan(&pendingCount)
+
+	// Paid = subscribers who have fully cleared their dues (remaining_amount <= 0).
+	// Advance subscribers (overpaid) are included here as well as on the Advance card.
+	var paidCount int64
+	config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL AND remaining_amount <= 0`+packageClause, companyUUID).Scan(&paidCount)
 
 	var advanceCount int64
-	config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL AND payment_status = 'advance'`, companyUUID).Scan(&advanceCount)
+	config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL AND payment_status = 'advance'`+packageClause, companyUUID).Scan(&advanceCount)
 
 	var totalCollectionToday float64
 	config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL AND payment_date = CURRENT_DATE::text`, companyUUID).Scan(&totalCollectionToday)
@@ -58,13 +84,13 @@ func GetDashboardData(c *gin.Context) {
 	var totalCollection float64
 	config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL `+dateFilter, companyUUID).Scan(&totalCollection)
 
+	// Overdue = subscribers who still owe money and have exceeded the grace period.
 	var overdueCount int64
 	config.DB.Raw(`
 		SELECT COUNT(*)
 		FROM connections
 		WHERE company_id = ? AND deleted_at IS NULL
-		AND remaining_amount > 0
-	`, companyUUID).Scan(&overdueCount)
+	`+overdueClause+packageClause, companyUUID).Scan(&overdueCount)
 
 	var overdueAmount float64
 	config.DB.Raw(`
@@ -78,11 +104,10 @@ func GetDashboardData(c *gin.Context) {
 		), 0)
 		FROM connections
 		WHERE company_id = ? AND deleted_at IS NULL
-		AND GREATEST(remaining_amount, 0) + (amount + same_amount) * GREATEST(0,
+	`+overdueClause+packageClause+` AND GREATEST(remaining_amount, 0) + (amount + same_amount) * GREATEST(0,
 			EXTRACT(YEAR FROM age(CURRENT_DATE, COALESCE(last_payment_date, recharge_date, created_at::text)::date)) * 12 +
 			EXTRACT(MONTH FROM age(CURRENT_DATE, COALESCE(last_payment_date, recharge_date, created_at::text)::date))
-		) > 0
-	`, companyUUID).Scan(&overdueAmount)
+		) > 0`, companyUUID).Scan(&overdueAmount)
 
 	var payments []models.Payment
 	config.DB.Scopes(models.TenantScope(companyUUID)).Order("payment_date desc").Limit(5).Find(&payments)
@@ -117,6 +142,7 @@ func GetDashboardData(c *gin.Context) {
 			"suspended": suspendedCount,
 			"pending":   pendingCount,
 			"advance":   advanceCount,
+			"paid":      paidCount,
 		},
 		"totalCollectionToday": totalCollectionToday,
 		"totalCollectionMonth": totalCollectionMonth,
