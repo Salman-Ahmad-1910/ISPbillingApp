@@ -48,7 +48,7 @@ func (p *Product) BeforeCreate(tx *gorm.DB) error {
 
 type Product struct {
 	TenantModel
-	ProductCode         string  `gorm:"type:varchar(50);uniqueIndex" json:"productId"`
+	ProductCode         string  `gorm:"type:varchar(50)" json:"productId"`
 	Name               string  `gorm:"type:varchar(255);not null" json:"name"`
 	Category           string  `gorm:"type:varchar(100);not null" json:"category"`
 	Price              float64 `gorm:"type:decimal(10,2);not null" json:"price"`

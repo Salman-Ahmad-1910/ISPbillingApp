@@ -153,6 +153,14 @@ func RunMigrations() {
 	DB.Exec(`ALTER TABLE payments DROP CONSTRAINT IF EXISTS fk_payments_invoice`)
 	log.Println("FK constraints cleaned up after migration")
 
+	// Product ID (product_code) must be unique per company, not globally, so each
+	// company can have its own Pr-001, Pr-002, ... sequence. The backend assigns
+	// the id in Product.BeforeCreate by querying MAX(product_code) within the
+	// company; this composite unique index is the per-company safety net.
+	DB.Exec(`DROP INDEX IF EXISTS idx_products_product_code`)
+	DB.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_products_company_product_code ON products (company_id, product_code)`)
+	log.Println("Product ID uniqueness scoped per company")
+
 	// Backfill installment_plans: set percentage_increase to 0 for existing rows
 	DB.Exec("UPDATE installment_plans SET percentage_increase = 0 WHERE percentage_increase IS NULL")
 	// Drop old columns from installment_plans that no longer exist in the model
