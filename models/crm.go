@@ -31,22 +31,24 @@ type Guarantor struct {
 }
 
 // Product - Point of Sale items / General Items
-// BeforeCreate hook to auto-generate product code
+// BeforeCreate hook to auto-generate the human-readable product code (Product ID).
+// The internal unique identifier is the UUID primary key (TenantModel.ID);
+// product_code is the display id shown in the UI as "Pr-001", "Pr-002", ...
 func (p *Product) BeforeCreate(tx *gorm.DB) error {
 	if p.ProductCode == "" {
 		var maxNum int
 		tx.Unscoped().Model(&Product{}).
-			Where("company_id = ? AND product_code LIKE ?", p.CompanyID, "P-%").
+			Where("company_id = ? AND product_code LIKE ?", p.CompanyID, "Pr-%").
 			Select("COALESCE(MAX(CAST(SUBSTRING(product_code FROM '\\d+$') AS INTEGER)), 0)").
 			Scan(&maxNum)
-		p.ProductCode = fmt.Sprintf("P-%03d", maxNum+1)
+		p.ProductCode = fmt.Sprintf("Pr-%03d", maxNum+1)
 	}
 	return nil
 }
 
 type Product struct {
 	TenantModel
-	ProductCode         string  `gorm:"type:varchar(50);uniqueIndex" json:"productCode"`
+	ProductCode         string  `gorm:"type:varchar(50);uniqueIndex" json:"productId"`
 	Name               string  `gorm:"type:varchar(255);not null" json:"name"`
 	Category           string  `gorm:"type:varchar(100);not null" json:"category"`
 	Price              float64 `gorm:"type:decimal(10,2);not null" json:"price"`

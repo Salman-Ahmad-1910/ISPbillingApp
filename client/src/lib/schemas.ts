@@ -58,7 +58,7 @@ export const expenseSchema = z.object({
 
 export const productSchema = z.object({
   id: z.string().optional(),
-  productCode: z.string().optional(),
+  productId: z.string().optional(),
   name: z.string().min(1, 'Name is required'),
   category: z.string().optional().default(''),
   price: z.coerce.number().min(0, 'Price must be a positive number'),

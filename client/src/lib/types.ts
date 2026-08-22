@@ -597,7 +597,7 @@ export type Guarantor = {
 
 export type Product = {
   id: string;
-  productCode?: string;
+  productId?: string; // display Product ID, e.g. "Pr-001" (backend UUID is `id`)
   name: string;
   category: string;
   price: number;

@@ -71,7 +71,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
         serialNumber: product.serialNumber || '',
         currentSerialIndex: product.currentSerialIndex ?? 0,
     } : {
-      productCode: '',
+      productId: '',
       name: '',
       category: '',
       price: 0,
@@ -186,21 +186,28 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         {product && (
           <div className="p-3 bg-muted rounded-md">
-            <div className="text-sm font-medium">Product ID</div>
+            <div className="text-sm font-medium">Backend UUID</div>
             <div className="text-xs font-mono text-muted-foreground mt-1">{product.id}</div>
           </div>
         )}
 
         <FormField
           control={form.control}
-          name="productCode"
+          name="productId"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Product Code</FormLabel>
+              <FormLabel>Product ID</FormLabel>
               <FormControl>
-                <Input placeholder="e.g., P-001 (auto-generated if empty)" {...field} />
+                <Input
+                  placeholder="Auto-generated (Pr-001)"
+                  readOnly
+                  className="bg-muted/50 cursor-not-allowed"
+                  {...field}
+                />
               </FormControl>
-              <p className="text-xs text-muted-foreground">Leave empty to auto-generate (P-001, P-002, ...)</p>
+              <p className="text-xs text-muted-foreground">
+                Auto-generated as Pr-001, Pr-002, &hellip; The &quot;Pr-&quot; prefix is added automatically and the count increments with every product.
+              </p>
               <FormMessage />
             </FormItem>
           )}
