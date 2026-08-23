@@ -192,7 +192,10 @@ export function VendorInvoiceForm({
       const allSNs = parseSerialNumbers(product.serialNumber || '');
       const availableSNs = allSNs.filter(sn => !usedByOthers.has(sn));
       const maxQty = availableSNs.length;
-      const qty = Math.min(updated[index].quantity || 1, maxQty || 1);
+      // No-SN products are quantity-only: don't cap quantity to the (zero) SN count.
+      const qty = availableSNs.length > 0
+        ? Math.min(updated[index].quantity || 1, maxQty)
+        : Math.max(1, updated[index].quantity || 1);
       const selectedSNs = availableSNs.slice(0, qty);
       const snString = selectedSNs.join(', ');
       updated[index] = {
@@ -217,7 +220,10 @@ export function VendorInvoiceForm({
       if (!productId) return;
       const availableSNs = getAvailableSNs(productId, index);
       const maxQty = availableSNs.length;
-      const qty = Math.max(1, Math.min(Number(value) || 1, maxQty));
+      // No-SN products are quantity-only: allow any positive quantity.
+      const qty = availableSNs.length > 0
+        ? Math.max(1, Math.min(Number(value) || 1, maxQty))
+        : Math.max(1, Number(value) || 1);
       const unitPrice = updated[index].unitPrice;
       const snString = availableSNs.slice(0, qty).join(', ');
       updated[index] = {

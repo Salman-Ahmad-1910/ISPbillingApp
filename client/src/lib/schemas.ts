@@ -75,6 +75,7 @@ export const productSchema = z.object({
   discount: z.coerce.number().min(0).optional().default(0),
   serialNumber: z.string().optional(),
   currentSerialIndex: z.coerce.number().min(0).optional().default(0),
+  noSerialNumber: z.boolean().optional().default(false),
 });
 
 export const vendorSchema = z.object({

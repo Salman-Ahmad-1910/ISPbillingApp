@@ -616,6 +616,7 @@ export type Product = {
   serialNumber?: string;
   productSerialNumber?: string;
   currentSerialIndex?: number;
+  noSerialNumber?: boolean;
 };
 
 export type SerialNumberPoolEntry = {

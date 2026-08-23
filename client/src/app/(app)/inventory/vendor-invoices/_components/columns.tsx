@@ -102,7 +102,7 @@ export const columns = ({ onEdit, onDelete, onPrint }: VendorInvoiceColumnsProps
     header: () => <div className="text-right">Unit Price</div>,
     cell: ({ row }) => (
       <div className="text-right whitespace-nowrap">
-        PKR {row.original.item.unitPrice.toFixed(2)}
+        {row.original.itemCount > 1 ? '—' : `PKR ${row.original.item.unitPrice.toFixed(2)}`}
       </div>
     ),
   },
@@ -166,57 +166,67 @@ export const columns = ({ onEdit, onDelete, onPrint }: VendorInvoiceColumnsProps
   },
 ];
 
-// Helper to flatten invoices into one row per product (grouping multiple items with same productId)
+// Helper to produce ONE row per invoice (all products consolidated into a
+// single entry), so a vendor purchase with several products shows as one entry
+// in the list. The full per-product breakdown is available in the print view.
 export function flattenInvoiceItems(invoices: any[]): FlatRow[] {
   const rows: FlatRow[] = [];
   for (const invoice of invoices) {
     const items = invoice.items || [];
     if (items.length === 0) {
-      rows.push({ invoice, item: { productId: '', productName: '', quantity: 0, unitPrice: 0, unitType: '', subtotal: 0, serialNumber: '' } as any, isFirst: true, itemCount: 0 });
-    } else {
-      // Group items by productId, combining SNs and summing quantities
-      const grouped = new Map<string, { productName: string; quantity: number; unitPrice: number; unitType: string; subtotal: number; serialNumbers: string[] }>();
-      for (const item of items) {
-        const key = item.productId;
-        if (grouped.has(key)) {
-          const g = grouped.get(key)!;
-          g.quantity += item.quantity;
-          g.subtotal += item.subtotal;
-          if (item.serialNumber) {
-            const sns = item.serialNumber.split(/[\s,\-]+/).map((s: string) => s.trim()).filter(Boolean);
-            g.serialNumbers.push(...sns);
-          }
-        } else {
-          const sns = item.serialNumber ? item.serialNumber.split(/[\s,\-]+/).map((s: string) => s.trim()).filter(Boolean) : [];
-          grouped.set(key, {
-            productName: item.productName,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            unitType: item.unitType,
-            subtotal: item.subtotal,
-            serialNumbers: sns,
-          });
+      rows.push({
+        invoice,
+        item: { productId: '', productName: '—', quantity: 0, unitPrice: 0, unitType: '', subtotal: invoice.totalAmount, serialNumber: '' } as any,
+        isFirst: true,
+        itemCount: 0,
+      });
+      continue;
+    }
+
+    // Group items by productId so each product is listed once in the summary.
+    const grouped = new Map<string, { productName: string; quantity: number; unitPrice: number; unitType: string; subtotal: number; serialNumbers: string[] }>();
+    for (const item of items) {
+      const key = item.productId;
+      if (grouped.has(key)) {
+        const g = grouped.get(key)!;
+        g.quantity += item.quantity;
+        g.subtotal += item.subtotal;
+        if (item.serialNumber) {
+          const sns = item.serialNumber.split(/[\s,\-]+/).map((s: string) => s.trim()).filter(Boolean);
+          g.serialNumbers.push(...sns);
         }
-      }
-      let isFirst = true;
-      for (const [, g] of grouped) {
-        rows.push({
-          invoice,
-          item: {
-            productId: items[0].productId,
-            productName: g.productName,
-            quantity: g.quantity,
-            unitPrice: g.unitPrice,
-            unitType: g.unitType,
-            subtotal: g.subtotal,
-            serialNumber: g.serialNumbers.join(', '),
-          },
-          isFirst,
-          itemCount: grouped.size,
+      } else {
+        const sns = item.serialNumber ? item.serialNumber.split(/[\s,\-]+/).map((s: string) => s.trim()).filter(Boolean) : [];
+        grouped.set(key, {
+          productName: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          unitType: item.unitType,
+          subtotal: item.subtotal,
+          serialNumbers: sns,
         });
-        isFirst = false;
       }
     }
+
+    const groups = Array.from(grouped.values());
+    const productNames = groups.map((g) => g.productName).join(', ');
+    const totalQty = groups.reduce((s, g) => s + g.quantity, 0);
+    const snCount = groups.reduce((s, g) => s + g.serialNumbers.length, 0);
+
+    rows.push({
+      invoice,
+      item: {
+        productId: '',
+        productName: productNames,
+        quantity: totalQty,
+        unitPrice: 0,
+        unitType: '',
+        subtotal: invoice.totalAmount,
+        serialNumber: snCount > 0 ? `${snCount} SN(s)` : '',
+      } as any,
+      isFirst: true,
+      itemCount: grouped.size,
+    });
   }
   return rows;
 }

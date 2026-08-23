@@ -13,6 +13,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Product, Brand, ProductType, UnitType } from '@/lib/types';
 import { productSchema } from '@/lib/schemas';
@@ -70,6 +71,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
         productTypeName: product.productTypeName || '',
         serialNumber: product.serialNumber || '',
         currentSerialIndex: product.currentSerialIndex ?? 0,
+        noSerialNumber: product.noSerialNumber ?? false,
     } : {
       productId: '',
       name: '',
@@ -88,8 +90,11 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
       discount: 0,
       serialNumber: '',
       currentSerialIndex: 0,
+      noSerialNumber: false,
     },
   });
+
+  const noSn = form.watch('noSerialNumber');
 
   const brandIdValue = form.watch('brandId');
   const productTypeIdValue = form.watch('productTypeId');
@@ -310,6 +315,24 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
           render={({ field }) => (
             <FormItem>
               <FormLabel>SN / MAC Numbers</FormLabel>
+              {!product && (
+                <div className="flex items-center gap-2 mb-2">
+                  <Checkbox
+                    id="noSerialNumber"
+                    checked={noSn}
+                    onCheckedChange={(checked) => {
+                      const val = !!checked;
+                      form.setValue('noSerialNumber', val);
+                      if (val) {
+                        form.setValue('serialNumber', '');
+                      }
+                    }}
+                  />
+                  <label htmlFor="noSerialNumber" className="text-sm font-medium leading-none cursor-pointer">
+                    Add without serial number
+                  </label>
+                </div>
+              )}
               {product && currentSn && (
                 <div className="p-2 bg-emerald-50 dark:bg-emerald-950 rounded-md border border-emerald-200 dark:border-emerald-800">
                   <p className="text-xs text-emerald-700 dark:text-emerald-300 font-medium">Current SN / MAC (will be sold next)</p>
@@ -321,7 +344,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                   placeholder="e.g., 00:1A:2B:3C:4D:5E, AA:BB:CC:DD:EE:FF, 11-22-33-44-55-66"
                   className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   {...field}
-                  disabled={!!product}
+                  disabled={!!product || noSn}
                 />
               </FormControl>
               <div className="flex items-center justify-between">

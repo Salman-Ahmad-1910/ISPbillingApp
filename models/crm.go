@@ -48,7 +48,7 @@ func (p *Product) BeforeCreate(tx *gorm.DB) error {
 
 type Product struct {
 	TenantModel
-	ProductCode         string  `gorm:"type:varchar(50)" json:"productId"`
+	ProductCode        string  `gorm:"type:varchar(50)" json:"productId"`
 	Name               string  `gorm:"type:varchar(255);not null" json:"name"`
 	Category           string  `gorm:"type:varchar(100);not null" json:"category"`
 	Price              float64 `gorm:"type:decimal(10,2);not null" json:"price"`
@@ -56,7 +56,7 @@ type Product struct {
 	UnitType           string  `gorm:"type:varchar(50);not null;default:'piece'" json:"unitType"`
 	TaxPercent         float64 `gorm:"type:decimal(5,2);not null;default:0" json:"taxPercent"`
 	Image              string  `gorm:"type:varchar(255)" json:"image"`
-	SalePrice float64 `gorm:"type:decimal(10,2);not null;default:0" json:"salePrice"`
+	SalePrice          float64 `gorm:"type:decimal(10,2);not null;default:0" json:"salePrice"`
 	PurchasePrice      float64 `gorm:"type:decimal(10,2);not null;default:0" json:"purchasePrice"`
 	Discount           float64 `gorm:"type:decimal(10,2);not null;default:0" json:"discount"`
 	BrandID            string  `gorm:"type:varchar(100)" json:"brandId"`
@@ -64,6 +64,7 @@ type Product struct {
 	ProductTypeID      string  `gorm:"type:varchar(100)" json:"productTypeId"`
 	ProductTypeName    string  `gorm:"type:varchar(255)" json:"productTypeName"`
 	SerialNumber       string  `gorm:"type:text" json:"serialNumber"`
+	NoSerialNumber     bool    `gorm:"not null;default:false" json:"noSerialNumber"`
 	CurrentSerialIndex int     `gorm:"not null;default:0" json:"currentSerialIndex"`
 }
 
@@ -134,44 +135,44 @@ type PricingPlan struct {
 // Sale - Point of Sale Transaction
 type Sale struct {
 	TenantModel
-	SubscriberID    uuid.UUID  `gorm:"type:uuid;not null;index" json:"subscriberId"`
-	SubscriberName  string     `gorm:"type:varchar(255)" json:"subscriberName"`
-	TotalAmount     float64    `gorm:"type:decimal(10,2);not null" json:"totalAmount"`
-	TaxAmount       float64    `gorm:"type:decimal(10,2);not null" json:"taxAmount"`
-	PaymentMethod   string     `gorm:"type:varchar(50);not null" json:"paymentMethod"`
-	Date            string     `gorm:"type:varchar(50);not null" json:"date"`
-	IsInstallment   bool       `gorm:"default:false" json:"isInstallment"`
-	Status          string     `gorm:"type:varchar(20);default:'completed'" json:"status"`
-	Discount        float64    `gorm:"type:decimal(10,2);default:0" json:"discount"`
-	Items           []SaleItem `gorm:"foreignKey:SaleID;constraint:OnDelete:CASCADE" json:"items"`
+	SubscriberID   uuid.UUID  `gorm:"type:uuid;not null;index" json:"subscriberId"`
+	SubscriberName string     `gorm:"type:varchar(255)" json:"subscriberName"`
+	TotalAmount    float64    `gorm:"type:decimal(10,2);not null" json:"totalAmount"`
+	TaxAmount      float64    `gorm:"type:decimal(10,2);not null" json:"taxAmount"`
+	PaymentMethod  string     `gorm:"type:varchar(50);not null" json:"paymentMethod"`
+	Date           string     `gorm:"type:varchar(50);not null" json:"date"`
+	IsInstallment  bool       `gorm:"default:false" json:"isInstallment"`
+	Status         string     `gorm:"type:varchar(20);default:'completed'" json:"status"`
+	Discount       float64    `gorm:"type:decimal(10,2);default:0" json:"discount"`
+	Items          []SaleItem `gorm:"foreignKey:SaleID;constraint:OnDelete:CASCADE" json:"items"`
 }
 
 // SaleItem - Individual product in a Sale
 type SaleItem struct {
 	TenantModel
-	SaleID      uuid.UUID `gorm:"type:uuid;not null;index" json:"saleId"`
-	ProductID   uuid.UUID `gorm:"type:uuid;not null;index" json:"productId"`
-	ProductName string    `gorm:"type:varchar(255)" json:"productName"`
-	Quantity    int       `gorm:"not null" json:"quantity"`
-	Price       float64   `gorm:"type:decimal(10,2);not null" json:"price"`
-	TaxPercent  float64   `gorm:"type:decimal(5,2);not null;default:0" json:"taxPercent"` // tax % applied to this line
-	SaleTax     float64   `gorm:"type:decimal(10,2);default:0" json:"saleTax"`
-	WthTax      float64   `gorm:"type:decimal(10,2);default:0" json:"wthTax"`
-	SerialNumber string  `gorm:"type:text" json:"serialNumber"`
+	SaleID       uuid.UUID `gorm:"type:uuid;not null;index" json:"saleId"`
+	ProductID    uuid.UUID `gorm:"type:uuid;not null;index" json:"productId"`
+	ProductName  string    `gorm:"type:varchar(255)" json:"productName"`
+	Quantity     int       `gorm:"not null" json:"quantity"`
+	Price        float64   `gorm:"type:decimal(10,2);not null" json:"price"`
+	TaxPercent   float64   `gorm:"type:decimal(5,2);not null;default:0" json:"taxPercent"` // tax % applied to this line
+	SaleTax      float64   `gorm:"type:decimal(10,2);default:0" json:"saleTax"`
+	WthTax       float64   `gorm:"type:decimal(10,2);default:0" json:"wthTax"`
+	SerialNumber string    `gorm:"type:text" json:"serialNumber"`
 }
 
 // SubscriberInstallment tracks an installment agreement for a subscriber on a sale.
 type SubscriberInstallment struct {
 	TenantModel
-	SaleID             uuid.UUID `gorm:"type:uuid;not null;index" json:"saleId"`
-	SubscriberID       uuid.UUID `gorm:"type:uuid;not null;index" json:"subscriberId"`
-	SubscriberName     string    `gorm:"type:varchar(255)" json:"subscriberName"`
-	InstallmentPlanID  uuid.UUID `gorm:"type:uuid;not null;index" json:"installmentPlanId"`
-	PlanName           string    `gorm:"type:varchar(255)" json:"planName"`
-	TotalInstallments  int       `gorm:"not null" json:"totalInstallments"`
-	PaidInstallments   int       `gorm:"not null;default:0" json:"paidInstallments"`
-	InstallmentAmount  float64   `gorm:"type:decimal(10,2);not null" json:"installmentAmount"`
-	TotalAmount        float64   `gorm:"type:decimal(10,2);not null" json:"totalAmount"`
-	NextInstallment    int       `gorm:"not null;default:1" json:"nextInstallment"`
-	Status             string    `gorm:"type:varchar(20);default:'active'" json:"status"` // active, completed, defaulted
+	SaleID            uuid.UUID `gorm:"type:uuid;not null;index" json:"saleId"`
+	SubscriberID      uuid.UUID `gorm:"type:uuid;not null;index" json:"subscriberId"`
+	SubscriberName    string    `gorm:"type:varchar(255)" json:"subscriberName"`
+	InstallmentPlanID uuid.UUID `gorm:"type:uuid;not null;index" json:"installmentPlanId"`
+	PlanName          string    `gorm:"type:varchar(255)" json:"planName"`
+	TotalInstallments int       `gorm:"not null" json:"totalInstallments"`
+	PaidInstallments  int       `gorm:"not null;default:0" json:"paidInstallments"`
+	InstallmentAmount float64   `gorm:"type:decimal(10,2);not null" json:"installmentAmount"`
+	TotalAmount       float64   `gorm:"type:decimal(10,2);not null" json:"totalAmount"`
+	NextInstallment   int       `gorm:"not null;default:1" json:"nextInstallment"`
+	Status            string    `gorm:"type:varchar(20);default:'active'" json:"status"` // active, completed, defaulted
 }

@@ -113,6 +113,13 @@ func CreateProduct(c *gin.Context) {
 	}
 	product.CompanyID = companyID
 
+	// Serial number is mandatory by default. It may only be omitted when the
+	// "no serial number" checkbox is checked (NoSerialNumber == true).
+	if strings.TrimSpace(product.SerialNumber) == "" && !product.NoSerialNumber {
+		utils.ErrorResponse(c, 400, "Serial number is required", "provide a serial number or check 'no serial number' to add the product without one")
+		return
+	}
+
 	if err := config.DB.Create(&product).Error; err != nil {
 		utils.ErrorResponse(c, 500, "Failed to create record", err.Error())
 		return
@@ -120,7 +127,8 @@ func CreateProduct(c *gin.Context) {
 
 	// If the frontend pre-filled a serial number taken from the pool, mark that
 	// pool entry as used so it is not reused. Products may be created with no
-	// serial number, in which case the serial_number cell is left empty.
+	// serial number (when the checkbox is checked), in which case the
+	// serial_number cell is left empty.
 	if strings.TrimSpace(product.SerialNumber) != "" {
 		config.DB.Model(&models.SerialNumberPool{}).
 			Scopes(models.TenantScope(companyID)).
