@@ -113,35 +113,15 @@ func CreateProduct(c *gin.Context) {
 	}
 	product.CompanyID = companyID
 
-	assignedFromPool := ""
-	if strings.TrimSpace(product.SerialNumber) == "" {
-		var pool models.SerialNumberPool
-		err := config.DB.Scopes(models.TenantScope(companyID)).
-			Where("status = ?", "available").
-			Order("created_at asc").
-			First(&pool).Error
-		if err == nil {
-			product.SerialNumber = pool.SerialNumber
-			assignedFromPool = pool.ID.String()
-		}
-	}
-
 	if err := config.DB.Create(&product).Error; err != nil {
 		utils.ErrorResponse(c, 500, "Failed to create record", err.Error())
 		return
 	}
 
-	// Mark the pool entry used. Prefer the entry we auto-assigned; otherwise
-	// match by serial number in case the frontend pre-filled it from the pool.
-	if assignedFromPool != "" {
-		config.DB.Model(&models.SerialNumberPool{}).
-			Scopes(models.TenantScope(companyID)).
-			Where("id = ?", assignedFromPool).
-			Updates(map[string]interface{}{
-				"status":     "used",
-				"product_id": product.ID.String(),
-			})
-	} else if strings.TrimSpace(product.SerialNumber) != "" {
+	// If the frontend pre-filled a serial number taken from the pool, mark that
+	// pool entry as used so it is not reused. Products may be created with no
+	// serial number, in which case the serial_number cell is left empty.
+	if strings.TrimSpace(product.SerialNumber) != "" {
 		config.DB.Model(&models.SerialNumberPool{}).
 			Scopes(models.TenantScope(companyID)).
 			Where("serial_number = ? AND status = ?", strings.TrimSpace(product.SerialNumber), "available").
