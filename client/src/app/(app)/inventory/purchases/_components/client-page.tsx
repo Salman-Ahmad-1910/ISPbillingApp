@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PlusCircle, Search, AlertTriangle } from 'lucide-react';
@@ -15,6 +15,7 @@ import { purchaseSchema } from '@/lib/schemas';
 import { DataTable } from './data-table';
 import { columns as getColumns } from './columns';
 import { PurchaseForm } from './purchase-form';
+import { CollectionPagination } from '@/components/shared/collection-pagination';
 import {
   Dialog,
   DialogContent,
@@ -43,6 +44,8 @@ export function ClientPage({ data }: ClientPageProps) {
   const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Purchase | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [pageSize, setPageSize] = useState<string>('10');
+  const [currentPage, setCurrentPage] = useState<number>(1);
 
   const { data: vendors = [] } = useGenericQuery<any>('inventory/vendors', companyId ?? undefined);
   const { data: products = [] } = useGenericQuery<any>('inventory/products', companyId ?? undefined);
@@ -53,6 +56,17 @@ export function ClientPage({ data }: ClientPageProps) {
       smartMatch(searchTerm, [purchase.purchaseNumber, purchase.billId], [purchase.vendorName])
     );
   }, [data, searchTerm]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, pageSize]);
+
+  const pagedPurchases = useMemo(() => {
+    if (pageSize === 'all') return filteredPurchases;
+    const size = parseInt(pageSize, 10) || 10;
+    const start = (currentPage - 1) * size;
+    return filteredPurchases.slice(start, start + size);
+  }, [filteredPurchases, pageSize, currentPage]);
 
   const purchaseMutation = useMutation({
     mutationFn: async (values: PurchaseFormValues) => {
@@ -195,7 +209,15 @@ export function ClientPage({ data }: ClientPageProps) {
         </Button>
       </div>
 
-      <DataTable columns={columns} data={filteredPurchases} />
+      <DataTable columns={columns} data={pagedPurchases} />
+
+      <CollectionPagination
+        total={filteredPurchases.length}
+        pageSize={pageSize}
+        setPageSize={setPageSize}
+        currentPage={currentPage}
+        setCurrentPage={setCurrentPage}
+      />
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto rounded-xl shadow-lg">

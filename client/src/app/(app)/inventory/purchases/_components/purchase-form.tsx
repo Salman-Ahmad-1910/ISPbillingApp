@@ -132,24 +132,28 @@ export function PurchaseForm({
       if (vi.vendorId !== selectedVendorId || !vi.items) continue;
       for (const item of vi.items) {
         const itemSNs = parseSerialNumbers(item.serialNumber || '');
-        if (itemSNs.length === 0) continue;
+        const product = products.find(p => p.id === item.productId);
+        // A product is quantity-only (no SN) when its flag says so, or when the
+        // vendor invoice item carries no serial numbers. The flag is authoritative
+        // so a stray/legacy serial number on a "no SN" product is ignored.
+        const isNoSN = !!product?.noSerialNumber || itemSNs.length === 0;
 
         // The purchase page sources its products/SNs from the vendor invoice
-        // items. Only SNs not yet consumed by another purchase remain.
+        // items. For SN-tracked items only unconsumed SNs remain. For
+        // quantity-only (no-SN) products the item is always available.
         const unconsumedSNs = itemSNs.filter(sn => !usedSNsByOtherPurchases.has(sn));
-        if (unconsumedSNs.length === 0) continue;
+        if (!isNoSN && unconsumedSNs.length === 0) continue;
 
         const existing = productMap.get(item.productId);
         if (existing) {
-          existing.allSNs.push(...unconsumedSNs);
+          if (!isNoSN) existing.allSNs.push(...unconsumedSNs);
         } else {
-          const product = products.find(p => p.id === item.productId);
           productMap.set(item.productId, {
             productId: item.productId,
             productName: item.productName,
             unitPrice: item.unitPrice || 0,
             unitType: item.unitType || product?.unitType || 'piece',
-            allSNs: [...unconsumedSNs],
+            allSNs: isNoSN ? [] : [...unconsumedSNs],
             vendorInvoiceId: vi.id,
             invoiceNumber: vi.invoiceNumber || '',
             batch: vi.batch || '',
@@ -176,11 +180,12 @@ export function PurchaseForm({
   const addItem = (productId: string) => {
     const vp = vendorProducts.find(p => p.productId === productId);
     if (!vp) return;
+    const isNoSN = vp.allSNs.length === 0;
     const currentItems = form.getValues('items');
     const availableSNs = getAvailableSNs(productId, currentItems.length);
-    const maxQty = availableSNs.length || 1;
-    const qty = Math.min(1, maxQty);
-    const snString = availableSNs.slice(0, qty).join(', ');
+    const maxQty = isNoSN ? 99999 : (availableSNs.length || 1);
+    const qty = isNoSN ? 1 : Math.min(1, availableSNs.length || 1);
+    const snString = isNoSN ? '' : availableSNs.slice(0, qty).join(', ');
     const newItem = {
       productId,
       productName: vp.productName,
@@ -212,10 +217,14 @@ export function PurchaseForm({
     const item = { ...currentItems[index] };
 
     if (field === 'quantity') {
+      const vp = vendorProducts.find(p => p.productId === item.productId);
+      const isNoSN = !vp || vp.allSNs.length === 0;
       const availableSNs = getAvailableSNs(item.productId, index);
-      const maxQty = availableSNs.length || 1;
-      const qty = Math.max(1, Math.min(Number(value) || 1, maxQty));
-      const snString = availableSNs.slice(0, qty).join(', ');
+      const maxQty = isNoSN ? 99999 : (availableSNs.length || 1);
+      const qty = isNoSN
+        ? Math.max(1, Number(value) || 1)
+        : Math.max(1, Math.min(Number(value) || 1, maxQty));
+      const snString = isNoSN ? '' : availableSNs.slice(0, qty).join(', ');
       item.quantity = qty;
       item.serialNumber = snString;
       item.subtotal = qty * item.purchasePrice;
@@ -325,7 +334,7 @@ export function PurchaseForm({
                 <SelectContent>
                   {vendorProducts.map((vp) => (
                     <SelectItem key={vp.productId} value={vp.productId}>
-                      {vp.productName}{vp.allSNs.length > 0 ? ` (${vp.allSNs.length} SNs)` : ''}
+                      {vp.productName}{vp.allSNs.length > 0 ? ` (${vp.allSNs.length} SNs)` : ' (no SN)'}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -342,7 +351,8 @@ export function PurchaseForm({
                 const vp = vendorProducts.find(p => p.productId === item.productId);
                 const availableSNs = getAvailableSNs(item.productId, index);
                 const totalSNs = vp ? vp.allSNs.length : 0;
-                const maxQty = availableSNs.length || 1;
+                const isNoSN = !vp || vp.allSNs.length === 0;
+                const maxQty = isNoSN ? 99999 : (availableSNs.length || 1);
                 const sns = parseSerialNumbers(item.serialNumber || '');
 
                 return (
@@ -383,7 +393,7 @@ export function PurchaseForm({
                       </div>
                       <div>
                         <FormLabel className="text-xs">
-                          Quantity * {maxQty > 0 && <span className="text-muted-foreground font-normal">(max {maxQty})</span>}
+                          Quantity * {!isNoSN && maxQty > 0 && <span className="text-muted-foreground font-normal">(max {maxQty})</span>}
                         </FormLabel>
                         <Input
                           type="number"

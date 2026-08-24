@@ -237,14 +237,12 @@ func CreatePurchase(c *gin.Context) {
 				return
 			}
 
-			// SN-bearing items were already taken out of product stock when the
-			// vendor invoice consumed them, so only sync prices here. Items
-			// without SNs keep the legacy behaviour of adding stock.
-			updates := map[string]interface{}{}
-			if len(itemSNs) == 0 {
-				updates["stock"] = gorm.Expr("stock + ?", item.Quantity)
-			}
-			if item.PurchasePrice > 0 {
+		// Stock for both SN-bearing and no-SN products is owned by the vendor
+		// invoice (it adds SNs / quantity when goods are received from a vendor),
+		// so recording a purchase only syncs prices and never mutates stock.
+		// This keeps quantity-only (no-SN) products from being double-counted.
+		updates := map[string]interface{}{}
+		if item.PurchasePrice > 0 {
 				updates["purchase_price"] = item.PurchasePrice
 			}
 			if item.SellingPrice > 0 {
@@ -370,7 +368,8 @@ func UpdatePurchase(c *gin.Context) {
 	existingPurchase.Items = nil
 
 	// Revert old items before updating: SN-bearing items give their SNs back to
-	// the vendor invoice items; plain items revert product stock.
+	// the vendor invoice items. No-SN items are owned by the vendor invoice (it
+	// holds the stock), so a purchase update does not touch product stock.
 	for _, oldItem := range oldItems {
 		oldSNs := parseVendorInvoiceSNs(oldItem.SerialNumber)
 		if len(oldSNs) > 0 {
@@ -379,15 +378,6 @@ func UpdatePurchase(c *gin.Context) {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to return serial numbers to vendor invoice"})
 				return
 			}
-			continue
-		}
-		if err := tx.Model(&models.Product{}).
-			Where("id = ? AND company_id = ?", oldItem.ProductID, existingPurchase.CompanyID).
-			Update("stock", gorm.Expr("GREATEST(stock - ?, 0)", oldItem.Quantity)).
-			Error; err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to revert product stock"})
-			return
 		}
 	}
 
@@ -465,9 +455,6 @@ func UpdatePurchase(c *gin.Context) {
 		}
 
 		updates := map[string]interface{}{}
-		if len(itemSNs) == 0 {
-			updates["stock"] = gorm.Expr("stock + ?", item.Quantity)
-		}
 		if item.PurchasePrice > 0 {
 			updates["purchase_price"] = item.PurchasePrice
 		}
@@ -560,7 +547,8 @@ func DeletePurchase(c *gin.Context) {
 	}
 
 	// Revert items: SN-bearing items give their SNs back to the vendor invoice
-	// items; plain items revert product stock.
+	// items. No-SN items are owned by the vendor invoice, so deleting a purchase
+	// does not change product stock.
 	for _, item := range purchase.Items {
 		itemSNs := parseVendorInvoiceSNs(item.SerialNumber)
 		if len(itemSNs) > 0 {
@@ -569,15 +557,6 @@ func DeletePurchase(c *gin.Context) {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to return serial numbers to vendor invoice"})
 				return
 			}
-			continue
-		}
-		if err := tx.Model(&models.Product{}).
-			Where("id = ? AND company_id = ?", item.ProductID, purchase.CompanyID).
-			Update("stock", gorm.Expr("GREATEST(stock - ?, 0)", item.Quantity)).
-			Error; err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to revert product stock"})
-			return
 		}
 	}
 
@@ -694,7 +673,6 @@ func GetPurchasedProducts(c *gin.Context) {
 		LEFT JOIN products pr ON pr.id = pi.product_id AND pr.deleted_at IS NULL
 		WHERE pi.company_id = ?
 			AND pi.deleted_at IS NULL
-			AND COALESCE(pi.serial_number, '') != ''
 		ORDER BY pi.product_name
 	`, companyID).Scan(&products).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch purchased products", "details": err.Error()})
