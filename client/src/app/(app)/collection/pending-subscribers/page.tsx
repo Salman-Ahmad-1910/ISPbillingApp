@@ -24,16 +24,6 @@ function getPackagePrice(c: Connection): number {
   return cable + internet;
 }
 
-// Billing cycle is monthly (30 days) with a 3-day grace period (33 days total).
-const GRACE_DAYS = 33;
-
-function getDaysSince(dateStr: string): number {
-  if (!dateStr) return 0;
-  const d = new Date(dateStr);
-  const now = new Date();
-  return Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
-}
-
 export default function PendingSubscribersPage() {
   const { companyId } = useCompany();
   const [search, setSearch] = useState('');
@@ -52,14 +42,10 @@ export default function PendingSubscribersPage() {
   const { data: packagesData } = useGenericQuery<Package>('billing/packages', companyId ?? undefined);
   const { data: companiesData } = useGenericQuery<Company>('companies', companyId ?? undefined);
 
+  // Pending = subscribers who still have a remaining amount to pay.
+  // Same definition as the dashboard and the Subscriber Collections page.
   const pendingSubscribers = useMemo(() => {
-    return (connections as Connection[]).filter(c => {
-      const activeDate = c.lastPaymentDate || c.rechargeDate || c.createdAt;
-      const owes = (Number(c.remainingAmount) || 0) > 0;
-      const days = activeDate ? getDaysSince(activeDate) : 0;
-      // Within the grace window (not yet overdue) => still pending.
-      return owes && days <= GRACE_DAYS;
-    });
+    return (connections as Connection[]).filter(c => (Number(c.remainingAmount) || 0) > 0);
   }, [connections]);
 
   const filteredSubscribers = useMemo(
@@ -97,7 +83,7 @@ export default function PendingSubscribersPage() {
         </div>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Pending Subscribers</h1>
-          <p className="text-sm text-muted-foreground">Subscribers who still owe within the grace period</p>
+          <p className="text-sm text-muted-foreground">Subscribers who still have a remaining amount</p>
         </div>
       </div>
 

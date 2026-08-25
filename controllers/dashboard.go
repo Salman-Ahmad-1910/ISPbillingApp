@@ -52,11 +52,12 @@ func GetDashboardData(c *gin.Context) {
 	}
 
 	// Billing cycle is monthly (30 days) with a 3-day grace period.
-	// A subscriber is "pending" while they still owe money and are within the
-	// grace window (<= 33 days since their last payment / recharge / creation).
-	// Once that window lapses they "move" to overdue.
+	// Pending = every subscriber who still has a remaining amount to pay,
+	// regardless of how long ago their last payment was (matches the
+	// Subscriber Collections page). Once that remaining amount lapses into
+	// months of non-payment they are additionally reported as overdue.
 	const cycleStartExpr = "COALESCE(last_payment_date, recharge_date, created_at::text)::date"
-	pendingClause := " AND remaining_amount > 0 AND (CURRENT_DATE - " + cycleStartExpr + ") <= 33"
+	pendingClause := " AND remaining_amount > 0"
 	overdueClause := " AND remaining_amount > 0 AND (CURRENT_DATE - " + cycleStartExpr + ") > 33"
 
 	var activeCount, suspendedCount int64
@@ -66,6 +67,10 @@ func GetDashboardData(c *gin.Context) {
 	// Pending = every subscriber who still owes money and hasn't passed the grace period.
 	var pendingCount int64
 	config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL`+pendingClause+packageClause, companyUUID).Scan(&pendingCount)
+
+	// Total remaining amount across all pending subscribers.
+	var pendingAmount float64
+	config.DB.Raw(`SELECT COALESCE(SUM(CAST(remaining_amount AS numeric)), 0) FROM connections WHERE company_id = ? AND deleted_at IS NULL`+pendingClause+packageClause, companyUUID).Scan(&pendingAmount)
 
 	// Paid = subscribers who have fully cleared their dues (remaining_amount <= 0).
 	// Advance subscribers (overpaid) are included here as well as on the Advance card.
@@ -147,6 +152,7 @@ func GetDashboardData(c *gin.Context) {
 		"totalCollectionToday": totalCollectionToday,
 		"totalCollectionMonth": totalCollectionMonth,
 		"totalCollection":      totalCollection,
+		"pendingAmount":        pendingAmount,
 		"range":                rangeParam,
 		"overdueCount":         overdueCount,
 		"overdueAmount":        overdueAmount,

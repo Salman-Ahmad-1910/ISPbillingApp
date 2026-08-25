@@ -23,6 +23,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
+import { CollectionPagination } from '@/components/shared/collection-pagination';
 
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import api from '@/lib/api';
@@ -49,6 +50,8 @@ export function ClientPage({ data }: ClientPageProps) {
   const [selectedInvoice, setSelectedInvoice] = useState<VendorInvoice | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [pageSize, setPageSize] = useState<string>('10');
+  const [currentPage, setCurrentPage] = useState<number>(1);
 
   // Fetch vendors and products for the form
   const { data: vendors = [] } = useGenericQuery<Vendor>('inventory/vendors', companyId ?? undefined);
@@ -73,6 +76,20 @@ export function ClientPage({ data }: ClientPageProps) {
 
     return filtered;
   }, [invoices, searchTerm, vendorFilter]);
+
+  // Flatten invoices into one row per product (matches the table display).
+  const flatRows = useMemo(() => flattenInvoiceItems(filteredInvoices), [filteredInvoices]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, vendorFilter, pageSize]);
+
+  const pagedRows = useMemo(() => {
+    if (pageSize === 'all') return flatRows;
+    const size = parseInt(pageSize, 10) || 10;
+    const start = (currentPage - 1) * size;
+    return flatRows.slice(start, start + size);
+  }, [flatRows, pageSize, currentPage]);
 
   // Create/Update invoice mutation
   const invoiceMutation = useMutation({
@@ -205,7 +222,15 @@ export function ClientPage({ data }: ClientPageProps) {
       </div>
 
       {/* Data Table - flattened so each SN is a separate row */}
-      <DataTable columns={columns} data={flattenInvoiceItems(filteredInvoices)} />
+      <DataTable columns={columns} data={pagedRows} />
+
+      <CollectionPagination
+        total={flatRows.length}
+        pageSize={pageSize}
+        setPageSize={setPageSize}
+        currentPage={currentPage}
+        setCurrentPage={setCurrentPage}
+      />
 
       {/* Form Dialog */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>

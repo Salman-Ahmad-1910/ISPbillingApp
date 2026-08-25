@@ -8,7 +8,11 @@ import (
 
 type Connection struct {
 	TenantModel
-	InternetID         string     `gorm:"type:varchar(100);uniqueIndex:idx_connection_internet_id_company" json:"internetId"`
+	// company_id is part of two composite unique keys so internet IDs and
+	// transaction IDs only need to be unique within a company, not across
+	// companies. Both indexes are partial: empty values are never unique-blocked.
+	CompanyID          uuid.UUID  `gorm:"type:uuid;index;not null;uniqueIndex:idx_connection_internet_id_company,priority:1,where:internet_id <> '';uniqueIndex:idx_connection_transaction_id_company,priority:1,where:transaction_id <> ''" json:"companyId"`
+	InternetID         string     `gorm:"type:varchar(100);uniqueIndex:idx_connection_internet_id_company,priority:2,where:internet_id <> ''" json:"internetId"`
 	Name               string     `gorm:"type:varchar(255);not null" json:"name"`
 	Address            string     `gorm:"type:text" json:"address"`
 	Cell               string     `gorm:"type:varchar(20)" json:"cell"`
@@ -40,7 +44,7 @@ type Connection struct {
 	Comments           string     `gorm:"type:text" json:"comments"`
 	BadDebt            bool       `gorm:"default:false" json:"badDebt"`
 	PaymentStatus      string     `gorm:"type:varchar(20);default:''" json:"paymentStatus"` // pending, advance, or empty
-	TransactionId      string     `gorm:"type:varchar(255);uniqueIndex:idx_connection_transaction_id" json:"transactionId"`
+	TransactionId      string     `gorm:"type:varchar(255);uniqueIndex:idx_connection_transaction_id_company,priority:2,where:transaction_id <> ''" json:"transactionId"`
 	CreatedBy          *uuid.UUID `gorm:"type:uuid;index" json:"createdBy"`
 }
 

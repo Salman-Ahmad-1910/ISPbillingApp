@@ -257,7 +257,22 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
                   <div className="text-2xl font-bold tracking-tight">{data?.subscribersStats?.pending || 0}</div>
-                  <p className="text-xs text-muted-foreground mt-1">paid less than package fee</p>
+                  <p className="text-xs text-muted-foreground mt-1">subscribers with remaining amount</p>
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href="/collection/pending-subscribers" className="block flex-1 min-w-[180px] max-w-[280px]">
+              <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[160px] cursor-pointer h-full">
+                <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-rose-500 to-pink-500" />
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
+                  <CardTitle className="text-[11px] font-medium leading-tight">Pending Amount</CardTitle>
+                  <div className="rounded-lg p-1.5 bg-gradient-to-br from-rose-500 to-pink-500 text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md">
+                    <Wallet className="h-3 w-3" />
+                  </div>
+                </CardHeader>
+                <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
+                  <div className="text-2xl font-bold tracking-tight">PKR {(data?.pendingAmount || 0).toLocaleString()}</div>
+                  <p className="text-xs text-muted-foreground mt-1">total remaining amount</p>
                 </CardContent>
               </Card>
             </Link>

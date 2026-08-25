@@ -34,7 +34,10 @@ func (p *Package) BeforeCreate(tx *gorm.DB) error {
 // Subscriber is the main entity linked geographically and technically
 type Subscriber struct {
 	TenantModel
-	SubscriberIdentity  string `gorm:"type:varchar(100);uniqueIndex" json:"subscriber_identity"`
+	// company_id is part of the composite unique key so subscriber identities
+	// only need to be unique within a company, not across companies.
+	CompanyID           uuid.UUID `gorm:"type:uuid;index;not null;uniqueIndex:idx_subscribers_company_identity,priority:1" json:"companyId"`
+	SubscriberIdentity  string    `gorm:"type:varchar(100);uniqueIndex:idx_subscribers_company_identity,priority:2" json:"subscriber_identity"`
 	Name                string `gorm:"type:varchar(255);not null" json:"name"`
 	Cnic                string `gorm:"type:varchar(20);not null" json:"cnic"`
 	Phone               string `gorm:"type:varchar(20);not null" json:"phone"`
