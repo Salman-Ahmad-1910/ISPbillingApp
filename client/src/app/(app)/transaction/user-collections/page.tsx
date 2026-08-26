@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -110,6 +111,15 @@ export default function SubscriberCollectionsPage() {
     companyId ?? undefined,
   );
 
+  // Fetch dashboard data so pending amount/count match the dashboard exactly
+  const [dash, setDash] = useState<any>(null);
+  useEffect(() => {
+    if (!companyId) return;
+    api.get(`/dashboard?companyId=${companyId}`)
+      .then(r => setDash(r.data.data))
+      .catch(() => {});
+  }, [companyId]);
+
   const filteredSubscribers = useMemo(() => {
     const q = subscriberSearch.trim();
     if (!q) return [];
@@ -157,18 +167,9 @@ export default function SubscriberCollectionsPage() {
     return connections.length;
   }, [connections]);
 
-  // Pending = subscribers who still have a remaining amount to pay.
-  const pendingSubscribers = useMemo(() => {
-    if (!Array.isArray(connections)) return [];
-    return connections.filter(c => (Number(c.remainingAmount) || 0) > 0);
-  }, [connections]);
-
-  const totalPendingSubscribers = pendingSubscribers.length;
-
-  const totalPendingAmount = useMemo(
-    () => pendingSubscribers.reduce((sum: number, c: Connection) => sum + (Number(c.remainingAmount) || 0), 0),
-    [pendingSubscribers],
-  );
+  // Pending counts from the dashboard so both pages always match
+  const totalPendingSubscribers = dash?.subscribersStats?.pending ?? 0;
+  const totalPendingAmount = dash?.pendingAmount ?? 0;
 
   const totalAmount = useMemo(() => {
     if (!Array.isArray(payments)) return 0;
@@ -490,7 +491,7 @@ export default function SubscriberCollectionsPage() {
             </div>
           </div>
         </div>
-        <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
+        <Link href="/collection/pending-subscribers" className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:bg-accent/50 cursor-pointer block">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
               <Clock className="h-5 w-5" />
@@ -500,8 +501,8 @@ export default function SubscriberCollectionsPage() {
               <p className="text-2xl font-bold">{totalPendingSubscribers}</p>
             </div>
           </div>
-        </div>
-        <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
+        </Link>
+        <Link href="/collection/pending-subscribers" className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:bg-accent/50 cursor-pointer block">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-gradient-to-br from-rose-500 to-pink-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
               <Wallet className="h-5 w-5" />
@@ -511,7 +512,7 @@ export default function SubscriberCollectionsPage() {
               <p className="text-2xl font-bold text-rose-600 dark:text-rose-400">PKR {totalPendingAmount.toLocaleString()}</p>
             </div>
           </div>
-        </div>
+        </Link>
       </div>
 
       <Card className="transition-all duration-300 hover:shadow-md">

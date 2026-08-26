@@ -89,6 +89,37 @@ func GetDashboardData(c *gin.Context) {
 	var totalCollection float64
 	config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL `+dateFilter, companyUUID).Scan(&totalCollection)
 
+	// Total subscribers (all statuses)
+	var totalSubscribers int64
+	config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL`, companyUUID).Scan(&totalSubscribers)
+
+	// Received all-time: every payment ever recorded (no date filter)
+	var receivedAllTime float64
+	config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL`, companyUUID).Scan(&receivedAllTime)
+
+	// Month/year params for the selected period (default = current month)
+	now := time.Now()
+	monthParam := c.DefaultQuery("month", fmt.Sprintf("%d", int(now.Month())))
+	yearParam := c.DefaultQuery("year", fmt.Sprintf("%d", now.Year()))
+	selectedMonth := monthParam
+	selectedYear := yearParam
+	monthStart := fmt.Sprintf("%s-%s-01", selectedYear, selectedMonth)
+
+	// Received in the selected month
+	var receivedThisMonth float64
+	config.DB.Raw(`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE company_id = ? AND deleted_at IS NULL AND payment_date >= ? AND payment_date < (?::date + INTERVAL '1 month')::text`, companyUUID, monthStart, monthStart).Scan(&receivedThisMonth)
+
+	// Receivable = pending + received this month (total expected this month)
+	receivableAmount := pendingAmount + receivedThisMonth
+
+	// Advance: overpayments by subscribers (remaining_amount < 0 means they paid more than owed)
+	var advanceAmount float64
+	config.DB.Raw(`SELECT COALESCE(SUM(ABS(CAST(remaining_amount AS numeric))), 0) FROM connections WHERE company_id = ? AND deleted_at IS NULL AND remaining_amount < 0`, companyUUID).Scan(&advanceAmount)
+
+	// Bad debt: unpaid money from inactive/deactivated (lost/defaulted) subscribers
+	var badDebtAmount float64
+	config.DB.Raw(`SELECT COALESCE(SUM(CAST(remaining_amount AS numeric)), 0) FROM connections WHERE company_id = ? AND deleted_at IS NULL AND status IN ('inactive','deactivated') AND remaining_amount > 0`, companyUUID).Scan(&badDebtAmount)
+
 	// Overdue = subscribers who still owe money and have exceeded the grace period.
 	var overdueCount int64
 	config.DB.Raw(`
@@ -143,8 +174,10 @@ func GetDashboardData(c *gin.Context) {
 
 	utils.SuccessResponse(c, "Dashboard data retrieved", gin.H{
 		"subscribersStats": gin.H{
+			"total":     totalSubscribers,
 			"active":    activeCount,
 			"suspended": suspendedCount,
+			"inactive":  totalSubscribers - activeCount,
 			"pending":   pendingCount,
 			"advance":   advanceCount,
 			"paid":      paidCount,
@@ -153,6 +186,13 @@ func GetDashboardData(c *gin.Context) {
 		"totalCollectionMonth": totalCollectionMonth,
 		"totalCollection":      totalCollection,
 		"pendingAmount":        pendingAmount,
+		"receivableAmount":     receivableAmount,
+		"receivedAllTime":      receivedAllTime,
+		"receivedThisMonth":    receivedThisMonth,
+		"advanceAmount":        advanceAmount,
+		"badDebtAmount":        badDebtAmount,
+		"selectedMonth":        selectedMonth,
+		"selectedYear":         selectedYear,
 		"range":                rangeParam,
 		"overdueCount":         overdueCount,
 		"overdueAmount":        overdueAmount,

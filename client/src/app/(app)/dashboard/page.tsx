@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CircleDollarSign, Users, Wallet, Clock, CheckCircle2, XCircle, ArrowUpRight, LayoutDashboard, Landmark, CreditCard, ChevronDown, ChevronUp, TrendingUp } from 'lucide-react';
+import { CircleDollarSign, Users, Wallet, Clock, CheckCircle2, XCircle, ArrowUpRight, LayoutDashboard, Landmark, CreditCard, ChevronDown, ChevronUp, TrendingUp, Calendar, Banknote, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -41,6 +41,9 @@ export default function DashboardPage() {
   const [showSummary, setShowSummary] = useState(false);
   const [timeRange, setTimeRange] = useState<'daily' | 'monthly' | 'yearly' | 'all'>('monthly');
   const [packageType, setPackageType] = useState<'both' | 'internet' | 'tv_cable'>('both');
+  const now = new Date();
+  const [selectedMonth, setSelectedMonth] = useState<string>(String(now.getMonth() + 1).padStart(2, '0'));
+  const [selectedYear, setSelectedYear] = useState<string>(String(now.getFullYear()));
   const [targetAmount, setTargetAmount] = useState<number>(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem(`collection_target_${companyId}`);
@@ -56,7 +59,7 @@ export default function DashboardPage() {
   const fetchDashboard = useCallback(() => {
     if (!companyId) return;
     setLoading(true);
-    api.get(`/dashboard?companyId=${companyId}&range=${timeRange}&packageType=${packageType}`)
+    api.get(`/dashboard?companyId=${companyId}&range=${timeRange}&packageType=${packageType}&month=${selectedMonth}&year=${selectedYear}`)
       .then(response => {
         setData(response.data.data);
         setLoading(false);
@@ -65,7 +68,7 @@ export default function DashboardPage() {
         console.error("Failed to fetch dashboard data", error);
         setLoading(false);
       });
-  }, [companyId, timeRange, packageType]);
+  }, [companyId, timeRange, packageType, selectedMonth, selectedYear]);
 
   useEffect(() => {
     fetchDashboard();
@@ -92,11 +95,8 @@ export default function DashboardPage() {
 
   const totalCollection = data?.totalCollection || 0;
 
-  const kpiConfig = [
-    { title: 'Active Subscribers', value: data?.subscribersStats?.active || 0, icon: Users, change: `in ${companyName}`, gradient: 'from-blue-500 to-cyan-500', bgLight: 'bg-blue-50 dark:bg-blue-950/30', href: '/collection/active-subscribers' },
-    { title: 'Total Collection', value: `PKR ${(data?.totalCollection || 0).toLocaleString()}`, icon: Wallet, change: `${timeRange === 'daily' ? 'today' : timeRange === 'monthly' ? 'this month' : timeRange === 'yearly' ? 'this year' : 'all time'} total`, gradient: 'from-emerald-500 to-green-500', bgLight: 'bg-emerald-50 dark:bg-emerald-950/30', href: '/billing/payments' },
-    { title: 'Overdue Subscribers', value: data?.overdueCount || 0, icon: AlertCircle, change: 'unpaid accounts', gradient: 'from-rose-500 to-pink-500', bgLight: 'bg-rose-50 dark:bg-rose-950/30', href: '/collection/overdue-subscribers' },
-  ];
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const selectedMonthName = monthNames[parseInt(selectedMonth, 10) - 1] || '';
 
   if (loading) {
     return (
@@ -193,116 +193,171 @@ export default function DashboardPage() {
       </button>
 
       {showSummary && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold text-muted-foreground">Summary</h3>
-            <div className="flex items-center gap-2">
-              <Select value={packageType} onValueChange={(v) => setPackageType(v as typeof packageType)}>
-                <SelectTrigger className="w-[140px] h-8 text-xs">
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent portal={false}>
-                  <SelectItem value="both">Both</SelectItem>
-                  <SelectItem value="internet">Internet</SelectItem>
-                  <SelectItem value="tv_cable">Cable</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={timeRange} onValueChange={(v) => setTimeRange(v as typeof timeRange)}>
-                <SelectTrigger className="w-[140px] h-8 text-xs">
-                  <SelectValue placeholder="Select range" />
-                </SelectTrigger>
-                <SelectContent portal={false}>
-                  <SelectItem value="daily">Daily</SelectItem>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                  <SelectItem value="yearly">Yearly</SelectItem>
-                  <SelectItem value="all">All</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+        <div className="space-y-4">
+          {/* Subscriber Overview — 3 cards */}
+          <div className="flex flex-wrap items-stretch gap-3">
+            <Link href="/collection/active-subscribers" className="block flex-1 min-w-[180px] max-w-[280px]">
+              <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[140px] cursor-pointer h-full">
+                <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-sky-500 to-blue-500" />
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
+                  <CardTitle className="text-[11px] font-medium leading-tight">Total Subscribers</CardTitle>
+                  <div className="rounded-lg p-1.5 bg-gradient-to-br from-sky-500 to-blue-500 text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md">
+                    <Users className="h-3 w-3" />
+                  </div>
+                </CardHeader>
+                <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
+                  <div className="text-2xl font-bold tracking-tight">{data?.subscribersStats?.total || 0}</div>
+                  <p className="text-xs text-muted-foreground mt-1">all subscribers</p>
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href="/collection/active-subscribers" className="block flex-1 min-w-[180px] max-w-[280px]">
+              <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[140px] cursor-pointer h-full">
+                <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-blue-500 to-cyan-500" />
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
+                  <CardTitle className="text-[11px] font-medium leading-tight">Active Subscribers</CardTitle>
+                  <div className="rounded-lg p-1.5 bg-gradient-to-br from-blue-500 to-cyan-500 text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md">
+                    <Users className="h-3 w-3" />
+                  </div>
+                </CardHeader>
+                <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
+                  <div className="text-2xl font-bold tracking-tight">{data?.subscribersStats?.active || 0}</div>
+                  <p className="text-xs text-muted-foreground mt-1">in {companyName}</p>
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href="/collection/overdue-subscribers" className="block flex-1 min-w-[180px] max-w-[280px]">
+              <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[140px] cursor-pointer h-full">
+                <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-orange-500 to-amber-500" />
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
+                  <CardTitle className="text-[11px] font-medium leading-tight">Inactive Subscribers</CardTitle>
+                  <div className="rounded-lg p-1.5 bg-gradient-to-br from-orange-500 to-amber-500 text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md">
+                    <XCircle className="h-3 w-3" />
+                  </div>
+                </CardHeader>
+                <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
+                  <div className="text-2xl font-bold tracking-tight">{data?.subscribersStats?.inactive || 0}</div>
+                  <p className="text-xs text-muted-foreground mt-1">suspended / inactive</p>
+                </CardContent>
+              </Card>
+            </Link>
           </div>
 
+          {/* Month Selector */}
+          <div className="flex items-center gap-3">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium text-muted-foreground">For the month of</span>
+            <Select value={selectedMonth} onValueChange={(v) => setSelectedMonth(v)}>
+              <SelectTrigger className="w-[140px] h-8 text-xs">
+                <SelectValue placeholder="Month" />
+              </SelectTrigger>
+              <SelectContent portal={false}>
+                {monthNames.map((name, i) => (
+                  <SelectItem key={i + 1} value={String(i + 1).padStart(2, '0')}>{name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedYear} onValueChange={(v) => setSelectedYear(v)}>
+              <SelectTrigger className="w-[100px] h-8 text-xs">
+                <SelectValue placeholder="Year" />
+              </SelectTrigger>
+              <SelectContent portal={false}>
+                {Array.from({ length: 7 }, (_, i) => now.getFullYear() - 3 + i).map(y => (
+                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Financial Metrics — 6 cards */}
           <div className="flex flex-wrap items-stretch gap-3">
-            {kpiConfig.map((kpi) => {
-              const card = (
-                <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[160px] cursor-pointer h-full">
-                  <div className={`absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br ${kpi.gradient}`} />
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
-                    <CardTitle className="text-[11px] font-medium leading-tight">{kpi.title}</CardTitle>
-                    <div className={`rounded-lg p-1.5 bg-gradient-to-br ${kpi.gradient} text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md`}>
-                      <kpi.icon className="h-3 w-3" />
-                    </div>
-                  </CardHeader>
-                  <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
-                    <div className="text-2xl font-bold tracking-tight">{kpi.value}</div>
-                    <p className="text-xs text-muted-foreground mt-1">{kpi.change}</p>
-                  </CardContent>
-                </Card>
-              );
-              return kpi.href ? (
-                <Link key={kpi.title} href={kpi.href} className="block flex-1 min-w-[180px] max-w-[280px]">
-                  {card}
-                </Link>
-              ) : (
-                <div key={kpi.title} className="block flex-1 min-w-[180px] max-w-[280px]">{card}</div>
-              );
-            })}
             <Link href="/collection/pending-subscribers" className="block flex-1 min-w-[180px] max-w-[280px]">
-              <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[160px] cursor-pointer h-full">
+              <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[140px] cursor-pointer h-full">
+                <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-emerald-500 to-green-500" />
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
+                  <CardTitle className="text-[11px] font-medium leading-tight">Receivable</CardTitle>
+                  <div className="rounded-lg p-1.5 bg-gradient-to-br from-emerald-500 to-green-500 text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md">
+                    <Banknote className="h-3 w-3" />
+                  </div>
+                </CardHeader>
+                <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
+                  <div className="text-2xl font-bold tracking-tight">PKR {(data?.receivableAmount || 0).toLocaleString()}</div>
+                  <p className="text-xs text-muted-foreground mt-1">pending + received this month</p>
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href="/collection/pending-subscribers" className="block flex-1 min-w-[180px] max-w-[280px]">
+              <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[140px] cursor-pointer h-full">
                 <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-amber-500 to-orange-500" />
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
-                  <CardTitle className="text-[11px] font-medium leading-tight">Pending Subscribers</CardTitle>
+                  <CardTitle className="text-[11px] font-medium leading-tight">Balance</CardTitle>
                   <div className="rounded-lg p-1.5 bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md">
                     <Clock className="h-3 w-3" />
                   </div>
                 </CardHeader>
                 <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
-                  <div className="text-2xl font-bold tracking-tight">{data?.subscribersStats?.pending || 0}</div>
-                  <p className="text-xs text-muted-foreground mt-1">subscribers with remaining amount</p>
+                  <div className="text-2xl font-bold tracking-tight">PKR {(data?.pendingAmount || 0).toLocaleString()}</div>
+                  <p className="text-xs text-muted-foreground mt-1">pending amount this month</p>
                 </CardContent>
               </Card>
             </Link>
-            <Link href="/collection/pending-subscribers" className="block flex-1 min-w-[180px] max-w-[280px]">
-              <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[160px] cursor-pointer h-full">
-                <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-rose-500 to-pink-500" />
+            <Link href="/billing/payments" className="block flex-1 min-w-[180px] max-w-[280px]">
+              <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[140px] cursor-pointer h-full">
+                <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-blue-500 to-indigo-500" />
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
-                  <CardTitle className="text-[11px] font-medium leading-tight">Pending Amount</CardTitle>
-                  <div className="rounded-lg p-1.5 bg-gradient-to-br from-rose-500 to-pink-500 text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md">
+                  <CardTitle className="text-[11px] font-medium leading-tight">Received (All Time)</CardTitle>
+                  <div className="rounded-lg p-1.5 bg-gradient-to-br from-blue-500 to-indigo-500 text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md">
                     <Wallet className="h-3 w-3" />
                   </div>
                 </CardHeader>
                 <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
-                  <div className="text-2xl font-bold tracking-tight">PKR {(data?.pendingAmount || 0).toLocaleString()}</div>
-                  <p className="text-xs text-muted-foreground mt-1">total remaining amount</p>
+                  <div className="text-2xl font-bold tracking-tight">PKR {(data?.receivedAllTime || 0).toLocaleString()}</div>
+                  <p className="text-xs text-muted-foreground mt-1">total payments received</p>
                 </CardContent>
               </Card>
             </Link>
-            <Link href="/collection/advance-subscribers" className="block flex-1 min-w-[180px] max-w-[280px]">
-              <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[160px] cursor-pointer h-full">
-                <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-emerald-500 to-green-500" />
+            <Link href="/collection/pending-subscribers" className="block flex-1 min-w-[180px] max-w-[280px]">
+              <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[140px] cursor-pointer h-full">
+                <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-cyan-500 to-sky-500" />
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
-                  <CardTitle className="text-[11px] font-medium leading-tight">Advance Subscribers</CardTitle>
-                  <div className="rounded-lg p-1.5 bg-gradient-to-br from-emerald-500 to-green-500 text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md">
+                  <CardTitle className="text-[11px] font-medium leading-tight">Total Balance</CardTitle>
+                  <div className="rounded-lg p-1.5 bg-gradient-to-br from-cyan-500 to-sky-500 text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md">
+                    <Clock className="h-3 w-3" />
+                  </div>
+                </CardHeader>
+                <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
+                  <div className="text-2xl font-bold tracking-tight">PKR {(data?.pendingAmount || 0).toLocaleString()}</div>
+                  <p className="text-xs text-muted-foreground mt-1">remaining amount all time</p>
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href="/billing/payments" className="block flex-1 min-w-[180px] max-w-[280px]">
+              <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[140px] cursor-pointer h-full">
+                <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-teal-500 to-emerald-500" />
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
+                  <CardTitle className="text-[11px] font-medium leading-tight">Received This Month</CardTitle>
+                  <div className="rounded-lg p-1.5 bg-gradient-to-br from-teal-500 to-emerald-500 text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md">
                     <TrendingUp className="h-3 w-3" />
                   </div>
                 </CardHeader>
                 <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
-                  <div className="text-2xl font-bold tracking-tight">{data?.subscribersStats?.advance || 0}</div>
-                  <p className="text-xs text-muted-foreground mt-1">paid more than package fee</p>
+                  <div className="text-2xl font-bold tracking-tight">PKR {(data?.receivedThisMonth || 0).toLocaleString()}</div>
+                  <p className="text-xs text-muted-foreground mt-1">collected in {selectedMonthName} {selectedYear}</p>
                 </CardContent>
               </Card>
             </Link>
-            <Link href="/collection/paid-subscribers" className="block flex-1 min-w-[180px] max-w-[280px]">
-              <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[160px] cursor-pointer h-full">
-                <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-sky-500 to-blue-500" />
+            <Link href="/collection/overdue-subscribers" className="block flex-1 min-w-[180px] max-w-[280px]">
+              <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[140px] cursor-pointer h-full">
+                <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-red-500 to-rose-500" />
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
-                  <CardTitle className="text-[11px] font-medium leading-tight">Paid Subscribers</CardTitle>
-                  <div className="rounded-lg p-1.5 bg-gradient-to-br from-sky-500 to-blue-500 text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md">
-                    <CheckCircle2 className="h-3 w-3" />
+                  <CardTitle className="text-[11px] font-medium leading-tight">Bad Debt</CardTitle>
+                  <div className="rounded-lg p-1.5 bg-gradient-to-br from-red-500 to-rose-500 text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md">
+                    <AlertTriangle className="h-3 w-3" />
                   </div>
                 </CardHeader>
                 <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
-                  <div className="text-2xl font-bold tracking-tight">{data?.subscribersStats?.paid || 0}</div>
-                  <p className="text-xs text-muted-foreground mt-1">dues cleared</p>
+                  <div className="text-2xl font-bold tracking-tight">PKR {(data?.badDebtAmount || 0).toLocaleString()}</div>
+                  <p className="text-xs text-muted-foreground mt-1">unpaid by lost / defaulted subscribers</p>
                 </CardContent>
               </Card>
             </Link>
