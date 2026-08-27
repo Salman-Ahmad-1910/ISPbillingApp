@@ -275,13 +275,20 @@ export default function SubscriberCollectionsPage() {
     // Negative = overpaid (advance), Positive = underpaid (pending), Zero = fully paid
   }, [selectedSubscriber, packageFee, totalReceivedThisMonth]);
 
+  // Actual outstanding dues stored on the connection (matches the dashboard
+  // "Pending Subscribers" card and /collection/pending-subscribers).
+  const storedRemaining = useMemo(
+    () => (selectedSubscriber ? Number(selectedSubscriber.remainingAmount) || 0 : 0),
+    [selectedSubscriber],
+  );
+
   const displayRemaining = useMemo(() => {
     return Math.max(0, remainingAmount);
   }, [remainingAmount]);
 
   const advanceAmount = useMemo(() => {
-    return remainingAmount < 0 ? Math.abs(remainingAmount) : 0;
-  }, [remainingAmount]);
+    return storedRemaining < 0 ? Math.abs(storedRemaining) : 0;
+  }, [storedRemaining]);
 
   const afterPaymentRemaining = useMemo(() => {
     return Math.max(0, remainingAmount - receiveAmount);
@@ -630,10 +637,12 @@ export default function SubscriberCollectionsPage() {
                   <div>
                     {advanceAmount > 0 ? (
                       <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300">Advance</Badge>
-                    ) : remainingAmount > 0 ? (
+                    ) : storedRemaining > 0 ? (
                       <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300">Pending</Badge>
+                    ) : remainingAmount > 0 ? (
+                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300">Unpaid This Month</Badge>
                     ) : packageFee > 0 ? (
-                      <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300">Full</Badge>
+                      <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-amerald-300">Full</Badge>
                     ) : (
                       <span className="text-muted-foreground text-sm">---</span>
                     )}

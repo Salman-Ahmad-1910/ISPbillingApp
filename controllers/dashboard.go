@@ -16,6 +16,20 @@ type ChartPoint struct {
 	Value float64 `json:"value"`
 }
 
+// pendingOutstandingSQL returns a SQL expression computing a connection's
+// current outstanding balance: the monthly package fee (based on connection
+// type) minus the payments received for the subscriber in the current billing
+// cycle, floored at zero. This guarantees that both fully-unpaid (never paid)
+// and half-paid subscribers are counted as pending even when the stored
+// remaining_amount is stale or zero. The month start string is a safe
+// YYYY-MM-DD literal derived from time.Now().
+func pendingOutstandingSQL(monthStart string) string {
+	return "GREATEST(" +
+		"CASE connection_type WHEN 'tv_cable' THEN amount WHEN 'internet' THEN same_amount ELSE amount + same_amount END" +
+		" - COALESCE((SELECT SUM(CAST(amount AS numeric)) FROM payments p WHERE p.subscriber_id = connections.id AND p.payment_date >= '" + monthStart + "'), 0)" +
+		", 0)"
+}
+
 func GetDashboardData(c *gin.Context) {
 	companyID, exists := c.Get("companyID")
 	if !exists {
@@ -52,13 +66,19 @@ func GetDashboardData(c *gin.Context) {
 	}
 
 	// Billing cycle is monthly (30 days) with a 3-day grace period.
-	// Pending = every subscriber who still has a remaining amount to pay,
-	// regardless of how long ago their last payment was (matches the
-	// Subscriber Collections page). Once that remaining amount lapses into
-	// months of non-payment they are additionally reported as overdue.
+	// A subscriber is Pending whenever they still owe money for the current
+	// billing cycle, regardless of how long ago their last payment was. The
+	// outstanding is derived live from the package fee minus the payments
+	// received this month, so that BOTH subscribers who have not paid at all
+	// (fully unpaid) AND subscribers who have only partially paid (half paid)
+	// are always included, even if the stored remaining_amount is stale/zero.
+	// Once that outstanding lapses into months of non-payment they are
+	// additionally reported as overdue.
 	const cycleStartExpr = "COALESCE(last_payment_date, recharge_date, created_at::text)::date"
-	pendingClause := " AND remaining_amount > 0"
-	overdueClause := " AND remaining_amount > 0 AND (CURRENT_DATE - " + cycleStartExpr + ") > 33"
+	pendingMonthStart := time.Now().Format("2006-01") + "-01"
+	outstandingExpr := pendingOutstandingSQL(pendingMonthStart)
+	pendingClause := " AND " + outstandingExpr + " > 0"
+	overdueClause := " AND " + outstandingExpr + " > 0 AND (CURRENT_DATE - " + cycleStartExpr + ") > 33"
 
 	var activeCount, suspendedCount int64
 	config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL AND status = 'active'`+packageClause, companyUUID).Scan(&activeCount)
@@ -68,9 +88,9 @@ func GetDashboardData(c *gin.Context) {
 	var pendingCount int64
 	config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL`+pendingClause+packageClause, companyUUID).Scan(&pendingCount)
 
-	// Total remaining amount across all pending subscribers.
+	// Total outstanding amount across all pending subscribers.
 	var pendingAmount float64
-	config.DB.Raw(`SELECT COALESCE(SUM(CAST(remaining_amount AS numeric)), 0) FROM connections WHERE company_id = ? AND deleted_at IS NULL`+pendingClause+packageClause, companyUUID).Scan(&pendingAmount)
+	config.DB.Raw(`SELECT COALESCE(SUM(`+outstandingExpr+`), 0) FROM connections WHERE company_id = ? AND deleted_at IS NULL`+pendingClause+packageClause, companyUUID).Scan(&pendingAmount)
 
 	// Paid = subscribers who have fully cleared their dues (remaining_amount <= 0).
 	// Advance subscribers (overpaid) are included here as well as on the Advance card.
@@ -131,7 +151,7 @@ func GetDashboardData(c *gin.Context) {
 	var overdueAmount float64
 	config.DB.Raw(`
 		SELECT COALESCE(SUM(
-			GREATEST(remaining_amount, 0) +
+			`+outstandingExpr+` +
 			amount *
 			GREATEST(0,
 				EXTRACT(YEAR FROM age(CURRENT_DATE, COALESCE(last_payment_date, recharge_date, created_at::text)::date)) * 12 +
@@ -140,7 +160,7 @@ func GetDashboardData(c *gin.Context) {
 		), 0)
 		FROM connections
 		WHERE company_id = ? AND deleted_at IS NULL
-	`+overdueClause+packageClause+` AND GREATEST(remaining_amount, 0) + (amount + same_amount) * GREATEST(0,
+	`+overdueClause+packageClause+` AND `+outstandingExpr+` + (amount + same_amount) * GREATEST(0,
 			EXTRACT(YEAR FROM age(CURRENT_DATE, COALESCE(last_payment_date, recharge_date, created_at::text)::date)) * 12 +
 			EXTRACT(MONTH FROM age(CURRENT_DATE, COALESCE(last_payment_date, recharge_date, created_at::text)::date))
 		) > 0`, companyUUID).Scan(&overdueAmount)

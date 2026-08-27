@@ -3,6 +3,7 @@ package controllers
 import (
 	"strconv"
 	"strings"
+	"time"
 
 	"awesomeProject/config"
 	"awesomeProject/models"
@@ -18,7 +19,14 @@ import (
 // *gorm.DB (config.DB.Model(&models.Connection{})) — reusing a db
 // instance across Count/Scan/Find calls in GORM can leak state.
 func applyPendingFilters(db *gorm.DB, c *gin.Context, companyUUID uuid.UUID) *gorm.DB {
-	db = db.Where("company_id = ? AND deleted_at IS NULL AND remaining_amount > 0", companyUUID)
+	// Pending = any subscriber who still owes money for the current billing
+	// cycle. The outstanding is derived live from the package fee minus the
+	// payments received this month, so BOTH fully-unpaid (never paid) and
+	// half-paid subscribers are always included (even if the stored
+	// remaining_amount is stale/zero).
+	outstandingExpr := pendingOutstandingSQL(time.Now().Format("2006-01") + "-01")
+	db = db.Where("company_id = ? AND deleted_at IS NULL", companyUUID)
+	db = db.Where(outstandingExpr + " > 0")
 
 	if search := strings.TrimSpace(c.Query("search")); search != "" {
 		like := "%" + strings.ToLower(search) + "%"
@@ -72,6 +80,37 @@ func applyPendingFilters(db *gorm.DB, c *gin.Context, companyUUID uuid.UUID) *go
 	return db
 }
 
+// packageFee computes a connection's monthly package fee based on its type,
+// matching the frontend getPackagePrice() and billing.go recompute logic.
+func packageFee(conn models.Connection) float64 {
+	switch conn.ConnectionType {
+	case "tv_cable":
+		return conn.Amount
+	case "internet":
+		return conn.SameAmount
+	default: // both
+		return conn.Amount + conn.SameAmount
+	}
+}
+
+// connectionOutstanding returns the live outstanding balance for a connection
+// for the current billing cycle: package fee minus the payments received so
+// far this month, floored at zero. It does not rely on the stored
+// remaining_amount, which can be stale at month boundaries.
+func connectionOutstanding(conn models.Connection, monthStart string) float64 {
+	fee := packageFee(conn)
+	var paid float64
+	config.DB.Raw(
+		`SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE subscriber_id = ? AND payment_date >= ?`,
+		conn.ID, monthStart,
+	).Scan(&paid)
+	outstanding := fee - paid
+	if outstanding < 0 {
+		outstanding = 0
+	}
+	return outstanding
+}
+
 func GetPendingSubscribers(c *gin.Context) {
 	companyID, exists := c.Get("companyID")
 	if !exists {
@@ -86,9 +125,10 @@ func GetPendingSubscribers(c *gin.Context) {
 		Count(&totalCount)
 
 	// --- total pending amount (unfiltered by pagination) ---
+	outstandingExpr := pendingOutstandingSQL(time.Now().Format("2006-01") + "-01")
 	var sumRow struct{ Total float64 }
 	applyPendingFilters(config.DB.Model(&models.Connection{}), c, companyUUID).
-		Select("COALESCE(SUM(remaining_amount), 0) as total").
+		Select("COALESCE(SUM(" + outstandingExpr + "), 0) as total").
 		Scan(&sumRow)
 
 	// --- pending count broken down by connection type ---
@@ -130,6 +170,14 @@ func GetPendingSubscribers(c *gin.Context) {
 
 	var subscribers []models.Connection
 	query.Find(&subscribers)
+
+	// Reflect the true outstanding (package fee - payments this month) on each
+	// returned row so the frontend shows the correct remaining amount, even for
+	// fully-unpaid subscribers whose stored remaining_amount may be stale/zero.
+	monthStart := time.Now().Format("2006-01") + "-01"
+	for i := range subscribers {
+		subscribers[i].RemainingAmount = connectionOutstanding(subscribers[i], monthStart)
+	}
 
 	utils.SuccessResponse(c, "Pending subscribers retrieved", gin.H{
 		"subscribers":        subscribers,
