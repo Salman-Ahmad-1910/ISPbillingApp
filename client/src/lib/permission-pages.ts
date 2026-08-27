@@ -88,7 +88,27 @@ export const PERMISSION_DEFS: PermissionDef[] = [
   { id: '13339', name: 'Change Username/Password', module: 'Settings' },
   { id: '13338', name: 'Subscriber Rights', module: 'Settings' },
   { id: '13337', name: 'Configurations', module: 'Settings' },
+  { id: '15334', name: 'Dashboard Summary', module: 'Dashboard' },
 ];
+
+// Permission id that controls whether a user can see the dashboard summary
+// section (subscriber overview + financial metric cards).
+export const DASHBOARD_SUMMARY_PERMISSION = '15334';
+
+// Feature-level permission check for a numeric permission id stored on the
+// user (user.permissions / grantedPermissions). When an admin has NOT
+// configured per-user permissions, features remain visible to everyone. Admin
+// roles always see everything.
+export function hasFeaturePermission(
+  grantedPermissions: string[],
+  permissionsConfigured: boolean,
+  isAdmin: boolean,
+  id: string,
+): boolean {
+  if (isAdmin) return true;
+  if (!permissionsConfigured) return true;
+  return (grantedPermissions || []).includes(id);
+}
 
 // Map a permission id to the page(s) it unlocks. Pages that are always available
 // (e.g. Dashboard, Support) do not appear here and are never filtered out.

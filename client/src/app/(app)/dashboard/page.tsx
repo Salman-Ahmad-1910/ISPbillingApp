@@ -11,6 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertCircle, Ticket } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
+import { useUserPermissions } from '@/hooks/usePermissions';
+import { hasFeaturePermission, DASHBOARD_SUMMARY_PERMISSION } from '@/lib/permission-pages';
 import api from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
 import dynamic from 'next/dynamic';
@@ -39,6 +41,15 @@ export default function DashboardPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showSummary, setShowSummary] = useState(false);
+
+  const { userRole, grantedPermissions, permissionsConfigured } = useUserPermissions();
+  const isAdminRole = ['admin', 'owner', 'manager'].includes(userRole);
+  const canViewSummary = hasFeaturePermission(
+    grantedPermissions,
+    permissionsConfigured,
+    isAdminRole,
+    DASHBOARD_SUMMARY_PERMISSION,
+  );
   const [timeRange, setTimeRange] = useState<'daily' | 'monthly' | 'yearly' | 'all'>('monthly');
   const [packageType, setPackageType] = useState<'both' | 'internet' | 'tv_cable'>('both');
   const now = new Date();
@@ -184,17 +195,19 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <button
-        onClick={() => setShowSummary(!showSummary)}
-        className="w-full flex items-center justify-center gap-2 py-2 px-4 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors rounded-lg border border-dashed hover:border-solid hover:bg-muted/50"
-      >
-        {showSummary ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        {showSummary ? 'Hide Summary' : 'Show Summary'}
-      </button>
+      {canViewSummary && (
+        <button
+          onClick={() => setShowSummary(!showSummary)}
+          className="w-full flex items-center justify-center gap-2 py-2 px-4 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors rounded-lg border border-dashed hover:border-solid hover:bg-muted/50"
+        >
+          {showSummary ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          {showSummary ? 'Hide Summary' : 'Show Summary'}
+        </button>
+      )}
 
-      {showSummary && (
+      {canViewSummary && showSummary && (
         <div className="space-y-4">
-          {/* Subscriber Overview — 3 cards */}
+          {/* Subscriber Overview — Total / Active / Inactive / Pending */}
           <div className="flex flex-wrap items-stretch gap-3">
             <Link href="/collection/active-subscribers" className="block flex-1 min-w-[180px] max-w-[280px]">
               <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[140px] cursor-pointer h-full">
@@ -238,6 +251,21 @@ export default function DashboardPage() {
                 <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
                   <div className="text-2xl font-bold tracking-tight">{data?.subscribersStats?.inactive || 0}</div>
                   <p className="text-xs text-muted-foreground mt-1">suspended / inactive</p>
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href="/collection/pending-subscribers" className="block flex-1 min-w-[180px] max-w-[280px]">
+              <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[140px] cursor-pointer h-full">
+                <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-amber-500 to-orange-500" />
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
+                  <CardTitle className="text-[11px] font-medium leading-tight">Pending Subscribers</CardTitle>
+                  <div className="rounded-lg p-1.5 bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md">
+                    <Clock className="h-3 w-3" />
+                  </div>
+                </CardHeader>
+                <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
+                  <div className="text-2xl font-bold tracking-tight">{data?.subscribersStats?.pending || 0}</div>
+                  <p className="text-xs text-muted-foreground mt-1">still owe amount</p>
                 </CardContent>
               </Card>
             </Link>
