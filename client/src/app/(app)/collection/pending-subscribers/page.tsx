@@ -1,18 +1,19 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Clock, ArrowLeft, Users, Wallet, Loader2, Search } from 'lucide-react';
+import { Clock, ArrowLeft, Users, Wallet, Loader2, Search, Tv, Wifi, Layers } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { Button } from '@/components/ui/button';
+import api from '@/lib/api';
 import type { Connection, Area, DistributionBox, Package, Company } from '@/lib/types';
 import { ConnectionFilterBar } from '@/components/shared/connection-filter-bar';
-import { applyConnectionFilters, applyConnectionDateRange, defaultConnectionFilters, type ConnectionFilterState } from '@/lib/connection-filters';
+import { defaultConnectionFilters, type ConnectionFilterState } from '@/lib/connection-filters';
 import { DateRangeFilter } from '@/components/shared/date-range-filter';
 import { CollectionPagination } from '@/components/shared/collection-pagination';
 
@@ -27,45 +28,82 @@ function getPackagePrice(c: Connection): number {
 export default function PendingSubscribersPage() {
   const { companyId } = useCompany();
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filters, setFilters] = useState<ConnectionFilterState>(defaultConnectionFilters());
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [pageSize, setPageSize] = useState('10');
   const [currentPage, setCurrentPage] = useState(1);
 
-  const { data: connections = [], isLoading: loading } = useGenericQuery<Connection>(
-    'admin/connections',
-    companyId ?? undefined,
-  );
+  const [subscribers, setSubscribers] = useState<Connection[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPendingAmount, setTotalPendingAmount] = useState(0);
+  const [tvCableCount, setTvCableCount] = useState(0);
+  const [internetCount, setInternetCount] = useState(0);
+  const [bothCount, setBothCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const requestId = useRef(0);
+
   const { data: areasData } = useGenericQuery<Area>('network/areas', companyId ?? undefined);
   const { data: boxesData } = useGenericQuery<DistributionBox>('network/boxes', companyId ?? undefined);
   const { data: packagesData } = useGenericQuery<Package>('billing/packages', companyId ?? undefined);
   const { data: companiesData } = useGenericQuery<Company>('companies', companyId ?? undefined);
 
-  // Pending = subscribers who still have a remaining amount to pay.
-  // Same definition as the dashboard and the Subscriber Collections page.
-  const pendingSubscribers = useMemo(() => {
-    return (connections as Connection[]).filter(c => (Number(c.remainingAmount) || 0) > 0);
-  }, [connections]);
+  // Debounce the free-text search so we're not hitting the API on every keystroke
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
-  const filteredSubscribers = useMemo(
-    () => applyConnectionFilters(pendingSubscribers, filters, search),
-    [pendingSubscribers, filters, search],
-  );
+  useEffect(() => { setCurrentPage(1); }, [debouncedSearch, filters, dateFrom, dateTo, pageSize]);
 
-  const dateFilteredSubscribers = useMemo(
-    () => applyConnectionDateRange(filteredSubscribers, dateFrom, dateTo),
-    [filteredSubscribers, dateFrom, dateTo],
-  );
+  const fetchPending = useCallback(() => {
+    if (!companyId) return;
+    const myRequestId = ++requestId.current;
+    setLoading(true);
+    api.get('/collection/pending-subscribers', {
+      params: {
+        companyId,
+        search: debouncedSearch || undefined,
+        sublocality: filters.sublocality,
+        status: filters.status,
+        type: filters.type,
+        box: filters.box,
+        package: filters.package,
+        discount: filters.discount,
+        provider: filters.provider,
+        sortBy: filters.sortBy,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+        page: currentPage,
+        pageSize,
+      },
+    })
+      .then(res => {
+        if (myRequestId !== requestId.current) return; // stale response, ignore
+        const d = res.data.data;
+        setSubscribers(d.subscribers || []);
+        setTotalCount(d.totalCount || 0);
+        setTotalPendingAmount(d.totalPendingAmount || 0);
+        setTvCableCount(d.tvCableCount || 0);
+        setInternetCount(d.internetCount || 0);
+        setBothCount(d.bothCount || 0);
+      })
+      .catch(() => {
+        if (myRequestId !== requestId.current) return;
+        setSubscribers([]);
+        setTotalCount(0);
+        setTotalPendingAmount(0);
+        setTvCableCount(0);
+        setInternetCount(0);
+        setBothCount(0);
+      })
+      .finally(() => {
+        if (myRequestId === requestId.current) setLoading(false);
+      });
+  }, [companyId, debouncedSearch, filters, dateFrom, dateTo, currentPage, pageSize]);
 
-  const pageSizeNum = pageSize === 'all' ? dateFilteredSubscribers.length : parseInt(pageSize, 10);
-  const startIdx = pageSize === 'all' ? 0 : (currentPage - 1) * pageSizeNum;
-  const pagedSubscribers = useMemo(
-    () => (pageSize === 'all' ? dateFilteredSubscribers : dateFilteredSubscribers.slice(startIdx, startIdx + pageSizeNum)),
-    [dateFilteredSubscribers, pageSize, currentPage, startIdx, pageSizeNum],
-  );
-
-  useEffect(() => { setCurrentPage(1); }, [search, filters, dateFrom, dateTo, pageSize]);
+  useEffect(() => { fetchPending(); }, [fetchPending]);
 
   const setFilter = (key: keyof ConnectionFilterState, value: string) =>
     setFilters(f => ({ ...f, [key]: value }));
@@ -89,13 +127,13 @@ export default function PendingSubscribersPage() {
 
       <div className="h-0.5 bg-gradient-to-r from-amber-500/50 via-orange-500/30 to-transparent" />
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Total Pending</p>
-                <p className="text-3xl font-bold mt-1">{pendingSubscribers.length}</p>
+                <p className="text-3xl font-bold mt-1">{totalCount}</p>
               </div>
               <div className="rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 p-2.5 text-white shadow-sm">
                 <Users className="h-5 w-5" />
@@ -108,12 +146,65 @@ export default function PendingSubscribersPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Total Pending Amount</p>
-                <p className="text-3xl font-bold mt-1">
-                  PKR {pendingSubscribers.reduce((sum, c) => sum + (Number(c.remainingAmount) || getPackagePrice(c)), 0).toLocaleString()}
-                </p>
+                <p className="text-3xl font-bold mt-1">PKR {totalPendingAmount.toLocaleString()}</p>
               </div>
               <div className="rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 p-2.5 text-white shadow-sm">
                 <Wallet className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Avg Pending Amount</p>
+                <p className="text-3xl font-bold mt-1">
+                  PKR {totalCount > 0 ? Math.round(totalPendingAmount / totalCount).toLocaleString() : 0}
+                </p>
+              </div>
+              <div className="rounded-lg bg-gradient-to-br from-sky-500 to-blue-600 p-2.5 text-white shadow-sm">
+                <Clock className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">TV Cable Pending</p>
+                <p className="text-3xl font-bold mt-1">{tvCableCount}</p>
+              </div>
+              <div className="rounded-lg bg-gradient-to-br from-fuchsia-500 to-purple-600 p-2.5 text-white shadow-sm">
+                <Tv className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Internet Pending</p>
+                <p className="text-3xl font-bold mt-1">{internetCount}</p>
+              </div>
+              <div className="rounded-lg bg-gradient-to-br from-cyan-500 to-teal-600 p-2.5 text-white shadow-sm">
+                <Wifi className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Both Pending</p>
+                <p className="text-3xl font-bold mt-1">{bothCount}</p>
+              </div>
+              <div className="rounded-lg bg-gradient-to-br from-rose-500 to-pink-600 p-2.5 text-white shadow-sm">
+                <Layers className="h-5 w-5" />
               </div>
             </div>
           </CardContent>
@@ -154,7 +245,7 @@ export default function PendingSubscribersPage() {
             <div className="flex items-center justify-center h-32">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
-          ) : dateFilteredSubscribers.length === 0 ? (
+          ) : subscribers.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Clock className="h-10 w-10 opacity-30 mx-auto mb-3" />
               <p className="text-sm font-medium">No pending subscribers</p>
@@ -177,34 +268,37 @@ export default function PendingSubscribersPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                   {pagedSubscribers.map((c, i) => (
-                     <TableRow key={c.id}>
-                       <TableCell className="text-muted-foreground">{startIdx + i + 1}</TableCell>
-                      <TableCell className="font-medium">
-                        <Link
-                          href={`/crm/subscriber-detail?connectionId=${c.id}`}
-                          className="text-blue-600 hover:underline dark:text-blue-400"
-                        >
-                          {c.name}
-                        </Link>
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">{c.id?.slice(0, 8) || '---'}</TableCell>
-                      <TableCell>{c.cell || c.mobile || '---'}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground max-w-[150px] truncate" title={c.address}>
-                        {c.address || '---'}
-                      </TableCell>
-                      <TableCell>{c.packageInternet || c.packageCable || '---'}</TableCell>
-                      <TableCell className="font-semibold">
-                        PKR {getPackagePrice(c).toLocaleString()}
-                      </TableCell>
-                      <TableCell className="font-semibold text-amber-600">
-                        PKR {(Number(c.remainingAmount) || getPackagePrice(c)).toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300">Pending</Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {subscribers.map((c, i) => {
+                    const startIdx = pageSize === 'all' ? 0 : (currentPage - 1) * parseInt(pageSize, 10);
+                    return (
+                      <TableRow key={c.id}>
+                        <TableCell className="text-muted-foreground">{startIdx + i + 1}</TableCell>
+                        <TableCell className="font-medium">
+                          <Link
+                            href={`/crm/subscriber-detail?connectionId=${c.id}`}
+                            className="text-blue-600 hover:underline dark:text-blue-400"
+                          >
+                            {c.name}
+                          </Link>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">{c.id?.slice(0, 8) || '---'}</TableCell>
+                        <TableCell>{c.cell || c.mobile || '---'}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground max-w-[150px] truncate" title={c.address}>
+                          {c.address || '---'}
+                        </TableCell>
+                        <TableCell>{c.packageInternet || c.packageCable || '---'}</TableCell>
+                        <TableCell className="font-semibold">
+                          PKR {getPackagePrice(c).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="font-semibold text-amber-600">
+                          PKR {(Number(c.remainingAmount) || getPackagePrice(c)).toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300">Pending</Badge>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -212,9 +306,9 @@ export default function PendingSubscribersPage() {
         </CardContent>
       </Card>
 
-      {!loading && dateFilteredSubscribers.length > 0 && (
+      {!loading && totalCount > 0 && (
         <CollectionPagination
-          total={dateFilteredSubscribers.length}
+          total={totalCount}
           pageSize={pageSize}
           setPageSize={setPageSize}
           currentPage={currentPage}

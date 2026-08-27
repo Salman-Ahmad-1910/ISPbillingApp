@@ -145,6 +145,12 @@ func SetupRoutes(r *gin.Engine) {
 		protected.GET("/dashboard/collection-chart", controllers.GetCollectionChart)
 		protected.GET("/dashboard/subscriber-growth-chart", controllers.GetSubscriberGrowthChart)
 
+		// Collection sub-routes
+		collection := protected.Group("/collection")
+		{
+			collection.GET("/pending-subscribers", controllers.GetPendingSubscribers)
+		}
+
 		// Upload routes
 		upload := protected.Group("/upload")
 		{

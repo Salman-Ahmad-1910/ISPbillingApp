@@ -269,9 +269,9 @@ export default function DashboardPage() {
             </Select>
           </div>
 
-          {/* Financial Metrics — 6 cards */}
-          <div className="flex flex-wrap items-stretch gap-3">
-            <Link href="/collection/pending-subscribers" className="block flex-1 min-w-[180px] max-w-[280px]">
+          {/* Financial Metrics — 6 cards in 2 rows of 3 */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <Link href="/collection/pending-subscribers" className="block">
               <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[140px] cursor-pointer h-full">
                 <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-emerald-500 to-green-500" />
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
@@ -286,7 +286,7 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
             </Link>
-            <Link href="/collection/pending-subscribers" className="block flex-1 min-w-[180px] max-w-[280px]">
+            <Link href="/collection/pending-subscribers" className="block">
               <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[140px] cursor-pointer h-full">
                 <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-amber-500 to-orange-500" />
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
@@ -301,7 +301,7 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
             </Link>
-            <Link href="/billing/payments" className="block flex-1 min-w-[180px] max-w-[280px]">
+            <Link href="/billing/payments" className="block">
               <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[140px] cursor-pointer h-full">
                 <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-blue-500 to-indigo-500" />
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
@@ -316,7 +316,7 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
             </Link>
-            <Link href="/collection/pending-subscribers" className="block flex-1 min-w-[180px] max-w-[280px]">
+            <Link href="/collection/pending-subscribers" className="block">
               <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[140px] cursor-pointer h-full">
                 <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-cyan-500 to-sky-500" />
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
@@ -331,7 +331,7 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
             </Link>
-            <Link href="/billing/payments" className="block flex-1 min-w-[180px] max-w-[280px]">
+            <Link href="/billing/payments" className="block">
               <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[140px] cursor-pointer h-full">
                 <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-teal-500 to-emerald-500" />
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
@@ -346,7 +346,7 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
             </Link>
-            <Link href="/collection/overdue-subscribers" className="block flex-1 min-w-[180px] max-w-[280px]">
+            <Link href="/collection/overdue-subscribers" className="block">
               <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[140px] cursor-pointer h-full">
                 <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-red-500 to-rose-500" />
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
