@@ -30,9 +30,7 @@ interface CompanyContextType {
   setCompanyId: (id: string | null) => void;
   companyName: string | null;
   companies: Company[];
-  addCompany: (company: Omit<Company, 'id' | 'logo' | 'stamp'>) => Promise<void>;
   updateCompany: (company: Company) => Promise<void>;
-  deleteCompany: (companyId: string) => Promise<void>;
   switchCompany: (companyId: string) => void;
   fetchCompanyDetails: (companyId: string) => Promise<void>;
 }
@@ -156,39 +154,6 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     setCompanyId(newCompanyId);
   };
 
-  const addCompany = async (companyData: Omit<Company, 'id' | 'logo' | 'stamp'>) => {
-    try {
-      const response = await api.post('/companies', companyData);
-      const newCompany = response.data.data;
-
-      // Convert full Company to APICompany format for consistency
-      const apiCompany: APICompany = {
-        id: newCompany.id,
-        name: newCompany.name,
-        role: 'owner', // User who creates company is owner
-        user_company_id: newCompany.id, // This will be updated by backend
-      };
-
-      setCompanies(prev => [...prev, {
-        ...newCompany,
-        logo: '',
-        stamp: '',
-        contact1: '',
-        contact2: '',
-        email: '',
-        address: '',
-        description: '',
-        taxRules: '',
-        invoiceTemplate: '',
-      }]);
-      setCompanyId(newCompany.id);
-      toast({ title: 'Success', description: 'Company added successfully.' });
-    } catch (error) {
-      console.error("Failed to add company", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to add company.' });
-    }
-  };
-
   const updateCompany = async (updatedCompany: Company) => {
     try {
       await api.put(`/admin/companies/${updatedCompany.id}`, updatedCompany);
@@ -200,30 +165,13 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const deleteCompany = async (companyIdToDelete: string) => {
-    try {
-      await api.delete(`/admin/companies/${companyIdToDelete}`);
-      const updatedCompanies = companies.filter((c) => c.id !== companyIdToDelete);
-      setCompanies(updatedCompanies);
-      if (companyId === companyIdToDelete) {
-        setCompanyId(updatedCompanies[0]?.id || null);
-      }
-      toast({ title: 'Success', description: 'Company deleted successfully.' });
-    } catch (error) {
-      console.error("Failed to delete company", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete company.' });
-    }
-  };
-
 
   const value = {
     companyId,
     setCompanyId,
     companyName,
     companies,
-    addCompany,
     updateCompany,
-    deleteCompany,
     switchCompany,
     fetchCompanyDetails,
     loading,

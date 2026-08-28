@@ -244,7 +244,6 @@ const navItems: NavItemGroup[] = [
     title: 'Administration',
     items: [
       { title: 'My Company Profile', href: '/admin/company-profile', icon: Building, allowedRoles: ['admin', 'manager'] },
-      { title: 'Companies', href: '/admin/companies', icon: Building2, allowedRoles: ['admin'] },
       { title: 'Roles & Permissions', href: '/admin/roles', icon: ShieldCheck, allowedRoles: ['admin'] },
       { title: 'System Config', href: '/admin/settings', icon: Settings, allowedRoles: ['admin'] },
     ],

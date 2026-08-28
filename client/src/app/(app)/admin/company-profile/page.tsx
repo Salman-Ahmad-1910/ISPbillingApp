@@ -222,7 +222,7 @@ export default function CompanyProfilePage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="company-email">Contact Email</Label>
-                  <Input id="company-email" type="email" value={email} disabled className="bg-gray-100" />
+                  <Input id="company-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="company-phone1">Contact Phone 1</Label>

@@ -32,12 +32,6 @@ const AVAILABLE_PERMISSIONS = [
   { id: 'users_delete', label: 'Delete Subscribers', category: 'Subscribers' },
   { id: 'users_change_status', label: 'Change Subscriber Status', category: 'Subscribers' },
   
-  // Companies Management
-  { id: 'companies_view', label: 'View Companies', category: 'Companies' },
-  { id: 'companies_add', label: 'Add Companies', category: 'Companies' },
-  { id: 'companies_edit', label: 'Edit Companies', category: 'Companies' },
-  { id: 'companies_delete', label: 'Delete Companies', category: 'Companies' },
-  
   // Network Management
   { id: 'network_view', label: 'View Network', category: 'Network' },
   { id: 'network_areas_add', label: 'Add Areas', category: 'Network' },
