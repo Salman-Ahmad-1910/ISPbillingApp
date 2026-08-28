@@ -186,6 +186,35 @@ func RunMigrations() {
 	DB.Exec("DROP INDEX IF EXISTS uniq_vendor_invoice_company")
 	DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_vendor_invoice_company_number ON vendor_invoices (company_id, invoice_number) WHERE deleted_at IS NULL")
 
+	// Distribution box name must be unique per company, not globally, so two
+	// different companies can independently use the same box name. Drop the
+	// old whole-column unique index and recreate it as (company_id, name).
+	DB.Exec("DROP INDEX IF EXISTS idx_box_name_company")
+	DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_box_name_company ON distribution_boxes (company_id, name)")
+	log.Println("Distribution box name uniqueness scoped per company")
+
+	// Internet ID must be unique per company, not globally: each company may
+	// independently use the same internet_id. Drop any leftover whole-column
+	// index (created by older versions) and recreate it as (company_id,
+	// internet_id), so two different companies can add subscribers with the
+	// same internet ID.
+	DB.Exec("DROP INDEX IF EXISTS idx_connection_internet_id_company")
+	DB.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_connection_internet_id_company
+		ON connections (company_id, internet_id)
+		WHERE internet_id IS NOT NULL AND internet_id <> ''`)
+	log.Println("Connection internet ID uniqueness scoped per company")
+
+	// Same for transaction_id: kept unique per company (empty values and
+	// deactivated rows are excluded to avoid blocking re-use).
+	DB.Exec("DROP INDEX IF EXISTS idx_connection_transaction_id")
+	DB.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_connection_transaction_id
+		ON connections (transaction_id, company_id)
+		WHERE transaction_id IS NOT NULL AND transaction_id <> '' AND deleted_at IS NULL`)
+	DB.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_connection_transaction_id_company
+		ON connections (company_id, transaction_id)
+		WHERE transaction_id IS NOT NULL AND transaction_id <> ''`)
+	log.Println("Connection transaction ID uniqueness scoped per company")
+
 	// Backfill connection status change log:
 	// 1) Initial creation record for every connection
 	// 2) Last status change for connections currently non-active (approximated via updated_at)
@@ -239,11 +268,6 @@ func RunMigrations() {
 
 	// Package number unique per company
 	DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_package_company_number ON packages (company_id, package_number) WHERE deleted_at IS NULL")
-
-	// Transaction ID unique per company on connections
-	DB.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_connection_transaction_id 
-		ON connections (transaction_id, company_id) 
-		WHERE transaction_id != '' AND deleted_at IS NULL`)
 
 	// Seed initial data
 	seedInitialData()
