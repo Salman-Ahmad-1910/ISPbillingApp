@@ -210,6 +210,12 @@ func RunMigrations() {
 	DB.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_connection_transaction_id
 		ON connections (transaction_id, company_id)
 		WHERE transaction_id IS NOT NULL AND transaction_id <> '' AND deleted_at IS NULL`)
+	// Drop the per-company transaction_id index before recreating it so that any
+	// stale/older definition with the same index name (e.g. a global unique
+	// index on transaction_id alone from a previous deploy) is replaced. Without
+	// the DROP, "CREATE ... IF NOT EXISTS" is a no-op and the old wrong index
+	// keeps blocking same transaction_id across different companies.
+	DB.Exec("DROP INDEX IF EXISTS idx_connection_transaction_id_company")
 	DB.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_connection_transaction_id_company
 		ON connections (company_id, transaction_id)
 		WHERE transaction_id IS NOT NULL AND transaction_id <> ''`)
