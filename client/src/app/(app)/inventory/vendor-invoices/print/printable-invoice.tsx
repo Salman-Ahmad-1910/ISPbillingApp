@@ -13,7 +13,8 @@ interface PrintableVendorInvoiceProps {
 }
 
 export function PrintableVendorInvoice({ invoice, company, vendor, size }: PrintableVendorInvoiceProps) {
-  const subtotal = invoice.totalAmount;
+  const subtotal = (invoice.items || []).reduce((sum, item) => sum + (item.subtotal || 0), 0) || invoice.totalAmount;
+  const discount = invoice.discount || 0;
   const total = invoice.totalAmount;
 
   const logoUrl = company.logo
@@ -68,10 +69,10 @@ export function PrintableVendorInvoice({ invoice, company, vendor, size }: Print
       const sns = item.serialNumber
         ? item.serialNumber.split(/[\s,\-]+/).map((s: string) => s.trim()).filter(Boolean)
         : [];
+      const perUnit = item.purchasePrice ?? item.unitPrice;
       if (sns.length === 0) {
-        rows.push({ productName: item.productName, serialNumber: '-', quantity: item.quantity, unitType: item.unitType, unitPrice: item.unitPrice, subtotal: item.subtotal });
+        rows.push({ productName: item.productName, serialNumber: '-', quantity: item.quantity, unitType: item.unitType, unitPrice: perUnit, subtotal: perUnit * item.quantity });
       } else {
-        const perUnit = item.unitPrice;
         for (const sn of sns) {
           rows.push({ productName: item.productName, serialNumber: sn, quantity: 1, unitType: item.unitType, unitPrice: perUnit, subtotal: perUnit });
         }
@@ -150,10 +151,22 @@ export function PrintableVendorInvoice({ invoice, company, vendor, size }: Print
                 ))}
               </tbody>
               <tfoot>
+                {discount > 0 && (
+                  <tr className="bg-gray-50 font-bold">
+                    <td className="border border-gray-300 p-3" colSpan={5}>SUBTOTAL</td>
+                    <td className="border border-gray-300 p-3 text-right">{subtotal.toFixed(2)}</td>
+                  </tr>
+                )}
                 <tr className="bg-gray-50 font-bold">
-                  <td className="border border-gray-300 p-3" colSpan={5}>TOTAL</td>
-                  <td className="border border-gray-300 p-3 text-right text-lg">{total.toFixed(2)}</td>
+                  <td className="border border-gray-300 p-3" colSpan={5}>{discount > 0 ? 'DISCOUNT' : 'TOTAL'}</td>
+                  <td className="border border-gray-300 p-3 text-right text-lg">{discount > 0 ? `- ${discount.toFixed(2)}` : total.toFixed(2)}</td>
                 </tr>
+                {discount > 0 && (
+                  <tr className="bg-gray-100 font-bold">
+                    <td className="border border-gray-300 p-3" colSpan={5}>TOTAL</td>
+                    <td className="border border-gray-300 p-3 text-right text-lg">{total.toFixed(2)}</td>
+                  </tr>
+                )}
               </tfoot>
             </table>
 
@@ -216,6 +229,18 @@ export function PrintableVendorInvoice({ invoice, company, vendor, size }: Print
                 </div>
             ))}
           </div>
+          {discount > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>SUBTOTAL:</span>
+              <span>{subtotal.toFixed(0)}</span>
+            </div>
+          )}
+          {discount > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>DISCOUNT:</span>
+              <span>-{discount.toFixed(0)}</span>
+            </div>
+          )}
           <div style={{ fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #000', paddingTop: '8px' }}>
             <span>TOTAL:</span>
             <span>{total.toFixed(0)}</span>

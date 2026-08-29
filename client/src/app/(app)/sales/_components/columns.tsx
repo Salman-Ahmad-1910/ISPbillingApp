@@ -9,7 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Pencil, Trash2, BadgeCheck } from 'lucide-react';
 
 interface Sale {
   id: string;
@@ -18,6 +18,7 @@ interface Sale {
   totalAmount: number;
   taxAmount: number;
   paymentMethod: string;
+  status?: string;
   date: string;
   companyId: string;
   isInstallment?: boolean;
@@ -36,7 +37,7 @@ interface SaleItem {
   serialNumber?: string;
 }
 
-export function getColumns(onDelete?: (id: string) => void): ColumnDef<Sale>[] {
+export function getColumns(onDelete?: (id: string) => void, onPay?: (sale: Sale) => void): ColumnDef<Sale>[] {
   return [
     {
       accessorKey: 'id',
@@ -70,11 +71,18 @@ export function getColumns(onDelete?: (id: string) => void): ColumnDef<Sale>[] {
       cell: ({ row }) => {
         const method = row.original.paymentMethod;
         const isInstallment = row.original.isInstallment;
+        const isHold = row.original.status === 'hold';
         return (
           <div className="flex items-center gap-1.5">
-            <Badge variant="outline">
-              {method}
-            </Badge>
+            {isHold ? (
+              <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
+                Hold
+              </Badge>
+            ) : (
+              <Badge variant="outline">
+                {method}
+              </Badge>
+            )}
             {isInstallment && (
               <Badge variant="secondary" className="text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
                 Installment
@@ -193,6 +201,17 @@ export function getColumns(onDelete?: (id: string) => void): ColumnDef<Sale>[] {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              {sale.status === 'hold' && (
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onPay?.(sale);
+                  }}
+                >
+                  <BadgeCheck className="mr-2 h-4 w-4 text-emerald-600" />
+                  Mark as Paid
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={(e) => {
                 e.stopPropagation();
                 row.original;

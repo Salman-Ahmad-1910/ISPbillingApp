@@ -23,6 +23,8 @@ interface APICompany {
   invoiceTemplate?: string;
   subscriptionPlan?: string;
   subscriptionExpiry?: string;
+  posDiscountPercent?: number;
+  posDiscountUnlimited?: boolean;
 }
 
 interface CompanyContextType {
@@ -78,7 +80,9 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         taxRules: ac.taxRules || '',
         invoiceTemplate: ac.invoiceTemplate || '',
         subscriptionPlan: ac.subscriptionPlan as 'basic' | 'pro' | 'enterprise' | undefined,
-        subscriptionExpiry: ac.subscriptionExpiry
+        subscriptionExpiry: ac.subscriptionExpiry,
+        posDiscountPercent: ac.posDiscountPercent || 0,
+        posDiscountUnlimited: !!ac.posDiscountUnlimited,
       }));
 
       setCompanies(fetchedCompanies);
@@ -113,7 +117,9 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
           taxRules: companyDetails.taxRules || '',
           invoiceTemplate: companyDetails.invoiceTemplate || '',
           subscriptionPlan: companyDetails.subscriptionPlan,
-          subscriptionExpiry: companyDetails.subscriptionExpiry
+          subscriptionExpiry: companyDetails.subscriptionExpiry,
+          posDiscountPercent: companyDetails.posDiscountPercent || 0,
+          posDiscountUnlimited: !!companyDetails.posDiscountUnlimited,
         } : c
       ));
     } catch (error) {

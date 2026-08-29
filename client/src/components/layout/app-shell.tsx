@@ -10,16 +10,19 @@ import { useEffect } from 'react';
 import { LoadingSpinner } from '@/components/shared/loading-spinner';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const { user } = useUser();
+  const { user, loading } = useUser();
   const router = useRouter();
 
   useEffect(() => {
-    if (user === null) {
+    // Only redirect once the auth check has fully settled. Without this, a
+    // page mounted right after login could read a stale "logged out" state and
+    // bounce the user back to /login before /auth/me resolves.
+    if (user === null && !loading) {
       router.replace('/login');
     }
-  }, [user, router]);
+  }, [user, loading, router]);
 
-  if (user === undefined) {
+  if (user === undefined || loading) {
     return <LoadingSpinner text="Loading..." />;
   }
 

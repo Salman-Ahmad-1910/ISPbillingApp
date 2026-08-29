@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 
-import { PlusCircle, Trash2, CreditCard, Landmark, CircleDollarSign, Loader2, ShoppingCart, Search, Users, UserRound, Handshake, CalendarDays, Receipt, MoreVertical } from 'lucide-react';
+import { PlusCircle, Trash2, CreditCard, Landmark, CircleDollarSign, Loader2, ShoppingCart, Search, Users, UserRound, Handshake, CalendarDays, Receipt, MoreVertical, Hash } from 'lucide-react';
 import Image from 'next/image';
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -35,6 +35,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { SerialEntriesTable } from '@/components/shared/serial-entries';
 
 interface CartItem {
     product: Product;
@@ -167,7 +176,7 @@ function SearchableDropdown({
 }
 
 export default function POSPage() {
-    const { companyId } = useCompany();
+    const { companyId, companies } = useCompany();
     const { toast } = useToast();
     const queryClient = useQueryClient();
 
@@ -199,6 +208,7 @@ export default function POSPage() {
     const [pendingSaleItems, setPendingSaleItems] = useState<any[]>([]);
     const [productToDelete, setProductToDelete] = useState<any | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [snEntriesProduct, setSnEntriesProduct] = useState<Product | null>(null);
 
     const confirmDeleteProduct = async () => {
         if (!productToDelete) return;
@@ -434,6 +444,22 @@ export default function POSPage() {
       0
     );
 
+    // The active company's POS discount settings cap how much the cashier can
+    // discount. The limit is a percentage of the selling-price total; when the
+    // unlimited checkbox is on, the full selling-price total is the cap.
+    const activeCompany = companies.find(c => c.id === companyId);
+    const posDiscountPercent = activeCompany?.posDiscountPercent ?? 0;
+    const posDiscountUnlimited = !!activeCompany?.posDiscountUnlimited;
+    const maxDiscount = useMemo(() => {
+      if (posDiscountUnlimited) return subtotal;
+      return Math.round((subtotal * posDiscountPercent) / 100);
+    }, [subtotal, posDiscountPercent, posDiscountUnlimited]);
+
+    useEffect(() => {
+      if (discount > maxDiscount) setDiscount(maxDiscount);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [maxDiscount]);
+
     const percentageIncrease = useMemo(() => {
         if (!isInstallment) return 0;
         const plan = existingInstallment
@@ -536,6 +562,7 @@ export default function POSPage() {
                     installmentPlanId: selectedPlanId,
                     subtotal,
                     taxAmount: tax,
+                    discount,
                     paymentMethod: paymentMethod,
                     date: new Date().toISOString(),
                     companyId: companyId!,
@@ -550,6 +577,7 @@ export default function POSPage() {
                     subscriberName: selectedName || 'Unknown',
                     totalAmount: total,
                     taxAmount: tax,
+                    discount,
                     paymentMethod: paymentMethod,
                     date: new Date().toISOString(),
                     companyId: companyId!,
@@ -818,6 +846,31 @@ export default function POSPage() {
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
+
+                <Dialog open={!!snEntriesProduct} onOpenChange={(o) => { if (!o) setSnEntriesProduct(null); }}>
+                    <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto rounded-xl shadow-lg">
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                                <Hash className="h-4 w-4 text-amber-500" />
+                                All SN entries
+                            </DialogTitle>
+                            <DialogDescription>
+                                {snEntriesProduct?.name || ''}
+                            </DialogDescription>
+                        </DialogHeader>
+                        {snEntriesProduct && (
+                            <SerialEntriesTable
+                                entries={purchasedSNs(snEntriesProduct).map((sn, i) => ({
+                                    key: `${snEntriesProduct.id}-${i}-${sn}`,
+                                    productName: snEntriesProduct.name,
+                                    serialNumber: sn,
+                                    price: snEntriesProduct.price,
+                                }))}
+                            />
+                        )}
+                    </DialogContent>
+                </Dialog>
+
                 <div className="lg:col-span-1 flex flex-col gap-4">
                     <Card className="sticky top-20 transition-all duration-300 hover:shadow-md">
                         <CardHeader>
@@ -1004,9 +1057,24 @@ export default function POSPage() {
                                             </div>
                                             <div className="flex flex-col items-end gap-2">
                                                 <p className="font-medium">PKR {(item.product.price * item.quantity).toLocaleString()}</p>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive transition-all duration-300 hover:scale-110 hover:bg-destructive/10" onClick={() => removeFromCart(item.product.id)}>
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
+                                                <div className="flex items-center gap-1">
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                                <MoreVertical className="h-4 w-4" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end">
+                                                            <DropdownMenuItem onSelect={() => setSnEntriesProduct(item.product)}>
+                                                                <Hash className="h-4 w-4 mr-2" />
+                                                                Show all SN entries
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive transition-all duration-300 hover:scale-110 hover:bg-destructive/10" onClick={() => removeFromCart(item.product.id)}>
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
                                             </div>
                                         </div>
                                     ))
@@ -1061,10 +1129,11 @@ export default function POSPage() {
                                         <Input
                                             type="number"
                                             value={discount || ''}
-                                            onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
-                                            placeholder="0"
+                                            onChange={(e) => setDiscount(Math.max(0, Math.min(parseFloat(e.target.value) || 0, maxDiscount)))}
+                                            placeholder={`0 (max ${maxDiscount})`}
                                             className="h-8 text-right"
                                             min="0"
+                                            max={maxDiscount}
                                         />
                                     </div>
                                 )}

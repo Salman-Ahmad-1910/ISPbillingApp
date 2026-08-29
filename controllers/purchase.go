@@ -99,12 +99,13 @@ func consumeSNsFromVendorInvoices(tx *gorm.DB, companyID, productID uuid.UUID, s
 			}
 		}
 		newQty := len(remaining)
+		purchasePrice, _ := vendorInvoiceItemPrices(item)
 		if err := tx.Model(&models.VendorInvoiceItem{}).
 			Where("id = ?", item.ID).
 			Updates(map[string]interface{}{
 				"serial_number": strings.Join(remaining, ", "),
 				"quantity":      newQty,
-				"subtotal":      item.UnitPrice * float64(newQty),
+				"subtotal":      purchasePrice * float64(newQty),
 			}).Error; err != nil {
 			return err
 		}
@@ -149,12 +150,13 @@ func returnSNsToVendorInvoices(tx *gorm.DB, companyID, productID uuid.UUID, sns 
 
 	combined := append(existing, toAdd...)
 	newQty := len(combined)
+	purchasePrice, _ := vendorInvoiceItemPrices(*target)
 	return tx.Model(&models.VendorInvoiceItem{}).
 		Where("id = ?", target.ID).
 		Updates(map[string]interface{}{
 			"serial_number": strings.Join(combined, ", "),
 			"quantity":      newQty,
-			"subtotal":      target.UnitPrice * float64(newQty),
+			"subtotal":      purchasePrice * float64(newQty),
 		}).Error
 }
 

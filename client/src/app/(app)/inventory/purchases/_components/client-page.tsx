@@ -15,6 +15,7 @@ import { purchaseSchema } from '@/lib/schemas';
 import { DataTable } from './data-table';
 import { columns as getColumns } from './columns';
 import { PurchaseForm } from './purchase-form';
+import { SerialEntriesTable, parseSerialNumbers } from '@/components/shared/serial-entries';
 import { CollectionPagination } from '@/components/shared/collection-pagination';
 import {
   Dialog,
@@ -209,7 +210,27 @@ export function ClientPage({ data }: ClientPageProps) {
         </Button>
       </div>
 
-      <DataTable columns={columns} data={pagedPurchases} />
+      <DataTable
+        columns={columns}
+        data={pagedPurchases}
+        getRowCanExpand={(purchase) =>
+          (purchase.items || []).some((item) => parseSerialNumbers(item.serialNumber).length > 1)
+        }
+        renderExpanded={(purchase) => {
+          const entries = [];
+          for (const item of purchase.items || []) {
+            for (const sn of parseSerialNumbers(item.serialNumber)) {
+              entries.push({
+                key: `${item.productId}-${sn}`,
+                productName: item.productName,
+                serialNumber: sn,
+                price: item.purchasePrice,
+              });
+            }
+          }
+          return <SerialEntriesTable entries={entries} />;
+        }}
+      />
 
       <CollectionPagination
         total={filteredPurchases.length}

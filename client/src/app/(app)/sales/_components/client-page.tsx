@@ -21,6 +21,7 @@ import { Loader2 } from 'lucide-react';
 import { printSaleReceipt, type SaleReceiptData } from './sale-receipt';
 import { getColumns } from './columns';
 import { DataTable } from './data-table';
+import { SerialEntriesTable, parseSerialNumbers } from '@/components/shared/serial-entries';
 import type { Company } from '@/lib/types';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 
@@ -30,7 +31,9 @@ interface Sale {
   subscriberName: string;
   totalAmount: number;
   taxAmount: number;
+  discount?: number;
   paymentMethod: string;
+  status?: string;
   date: string;
   companyId: string;
   isInstallment?: boolean;
@@ -131,6 +134,7 @@ export function ClientPage({ data }: ClientPageProps) {
     subscriberName: s.subscriberName,
     totalAmount: Number(s.totalAmount) || 0,
     taxAmount: Number(s.taxAmount) || 0,
+    discount: Number(s.discount) || 0,
     paymentMethod: s.paymentMethod,
     date: s.date,
     isInstallment: s.isInstallment,
@@ -242,12 +246,41 @@ export function ClientPage({ data }: ClientPageProps) {
     setDeleteTarget(id);
   };
 
+  const invalidateInventoryQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['pos/sales', companyId] });
+    queryClient.invalidateQueries({ queryKey: ['pos/sales'] });
+    queryClient.invalidateQueries({ queryKey: ['inventory/purchases', companyId] });
+    queryClient.invalidateQueries({ queryKey: ['inventory/purchased-products', companyId] });
+    queryClient.invalidateQueries({ queryKey: ['inventory/products', companyId] });
+    queryClient.invalidateQueries({ queryKey: ['inventory/vendor-invoices', companyId] });
+  };
+
+  const handlePayHold = async (sale: Sale) => {
+    try {
+      await api.patch(`/pos/sales/${sale.id}/status`, {
+        status: 'completed',
+        paymentMethod: sale.paymentMethod === 'hold' ? 'cash' : sale.paymentMethod,
+      });
+      toast({
+        title: 'Bill Paid',
+        description: `Hold bill ${sale.id} has been paid. The sale is now permanent.`,
+      });
+      invalidateInventoryQueries();
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.response?.data?.message || error.response?.data?.error || 'Failed to pay this bill',
+      });
+    }
+  };
+
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     try {
       await api.delete(`/pos/sales/${deleteTarget}`);
       toast({ title: 'Deleted', description: 'Sale entry deleted.' });
-      queryClient.invalidateQueries({ queryKey: ['pos/sales', companyId] });
+      invalidateInventoryQueries();
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.response?.data?.message || 'Failed to delete' });
     } finally {
@@ -255,7 +288,7 @@ export function ClientPage({ data }: ClientPageProps) {
     }
   };
 
-  const columns = getColumns(handleDelete);
+  const columns = getColumns(handleDelete, handlePayHold);
 
   const viewSubtotal = viewSale ? (Number(viewSale.totalAmount) || 0) - (Number(viewSale.taxAmount) || 0) : 0;
   const viewTotalItems = viewSale ? (viewSale.items || []).reduce((sum, i) => sum + (Number(i.quantity) || 0), 0) : 0;
@@ -276,7 +309,28 @@ export function ClientPage({ data }: ClientPageProps) {
             />
           </div>
           <div className="p-4">
-            <DataTable columns={columns} data={filteredData} onRowClick={handleRowClick} />
+            <DataTable
+              columns={columns}
+              data={filteredData}
+              onRowClick={handleRowClick}
+              getRowCanExpand={(sale) =>
+                (sale.items || []).some((item) => parseSerialNumbers(item.serialNumber).length > 1)
+              }
+              renderExpanded={(sale) => {
+                const entries = [];
+                for (const item of sale.items || []) {
+                  for (const sn of parseSerialNumbers(item.serialNumber)) {
+                    entries.push({
+                      key: `${item.id}-${sn}`,
+                      productName: item.productName,
+                      serialNumber: sn,
+                      price: Number(item.price) || 0,
+                    });
+                  }
+                }
+                return <SerialEntriesTable entries={entries} />;
+              }}
+            />
           </div>
         </CardContent>
       </Card>
@@ -337,7 +391,6 @@ export function ClientPage({ data }: ClientPageProps) {
                     const net = price * qty;
                     const taxPercent = Number((item as any).taxPercent) || 0;
                     const sst = net * (taxPercent / 100);
-                    const payable = net + sst;
                     const sn = String(item.serialNumber || '').trim();
 
                     return (
@@ -368,10 +421,6 @@ export function ClientPage({ data }: ClientPageProps) {
                               <span>PKR {fmtPKR(sst)}</span>
                             </div>
                           )}
-                          <div className="flex justify-between text-sm font-semibold pt-1.5 border-t">
-                            <span>Payable</span>
-                            <span>PKR {fmtPKR(payable)}</span>
-                          </div>
                         </div>
                       </div>
                     );
@@ -457,6 +506,12 @@ export function ClientPage({ data }: ClientPageProps) {
                       <span className="text-muted-foreground">Tax</span>
                       <span>PKR {fmtPKR(viewSale.taxAmount)}</span>
                     </div>
+                    {Number(viewSale.discount) > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Discount</span>
+                        <span>- PKR {fmtPKR(Number(viewSale.discount) || 0)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between font-bold text-base border-t pt-2 mt-1">
                       <span>Total</span>
                       <span>PKR {fmtPKR(viewSale.totalAmount)}</span>

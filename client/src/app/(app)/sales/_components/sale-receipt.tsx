@@ -19,6 +19,7 @@ export interface SaleReceiptData {
   subscriberName: string;
   totalAmount: number;
   taxAmount: number;
+  discount?: number;
   paymentMethod: string;
   date: string;
   items: SaleReceiptItem[];
@@ -108,7 +109,8 @@ function buildA4Receipt(
   const totalSaleTax = (sale.items || []).reduce((sum, i) => sum + (Number(i.saleTax) || 0), 0);
   const totalWthTax = (sale.items || []).reduce((sum, i) => sum + (Number(i.wthTax) || 0), 0);
   const subtotal = (sale.items || []).reduce((sum, i) => sum + ((Number(i.price) || 0) * (Number(i.quantity) || 0)), 0);
-  const total = subtotal + totalSaleTax + totalWthTax;
+  const discount = Math.max(0, Number(sale.discount) || 0);
+  const total = subtotal + totalSaleTax + totalWthTax - discount;
 
   const inst = sale.installmentInfo;
   const isInst = sale.isInstallment && inst;
@@ -208,6 +210,10 @@ function buildA4Receipt(
       <span class="label">Total Items</span>
       <span class="value">${totalQty}</span>
     </div>
+    ${discount > 0 ? `<div class="box-row info">
+      <span class="label">Discount</span>
+      <span class="value">- PKR ${formatPKR(discount)}</span>
+    </div>` : ''}
     <div class="divider"></div>
     <div class="box-row per-inst">
       <span class="label">Amount per Installment</span>
@@ -373,6 +379,7 @@ function buildA4Receipt(
         <tr><td style="padding:3px 0;font-size:13px;color:#6b7280;">Subtotal</td><td style="padding:3px 0;font-size:13px;color:#6b7280;text-align:right;">PKR ${formatPKR(subtotal)}</td></tr>
         <tr><td style="padding:3px 0;font-size:13px;color:#6b7280;">Total Sale Tax</td><td style="padding:3px 0;font-size:13px;color:#6b7280;text-align:right;">PKR ${formatPKR(totalSaleTax)}</td></tr>
         <tr><td style="padding:3px 0;font-size:13px;color:#6b7280;">Total WTH</td><td style="padding:3px 0;font-size:13px;color:#6b7280;text-align:right;">PKR ${formatPKR(totalWthTax)}</td></tr>
+        ${discount > 0 ? `<tr><td style="padding:3px 0;font-size:13px;color:#6b7280;">Discount</td><td style="padding:3px 0;font-size:13px;color:#6b7280;text-align:right;">- PKR ${formatPKR(discount)}</td></tr>` : ''}
         <tr><td style="padding:6px 0 0 0;border-top:2px solid #111827;font-weight:700;font-size:13px;text-transform:uppercase;">Total</td><td style="padding:6px 0 0 0;border-top:2px solid #111827;font-weight:700;font-size:16px;text-align:right;">PKR ${formatPKR(total)}</td></tr>
       </tbody>
     </table>
@@ -414,7 +421,8 @@ async function buildThermalReceipt(
   phone: string,
   logoUrl: string | null
 ): Promise<string> {
-  const subtotal = (sale.totalAmount || 0) - (sale.taxAmount || 0);
+  const subtotal = (sale.totalAmount || 0) - (sale.taxAmount || 0) + (Math.max(0, Number(sale.discount) || 0));
+  const discount = Math.max(0, Number(sale.discount) || 0);
   const totalItems = (sale.items || []).reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
 
   // Inline QR code (SVG) encoding the sale id + total for verification.
@@ -483,6 +491,7 @@ async function buildThermalReceipt(
 
   <div class="amounts">
     <div class="row"><span class="lbl">Per Installment:</span><span class="val">PKR ${formatPKR(inst!.installmentAmount)}</span></div>
+    ${discount > 0 ? `<div class="row"><span class="lbl">Discount:</span><span class="val">- PKR ${formatPKR(discount)}</span></div>` : ''}
     <div class="row"><span class="lbl">Total Installments:</span><span class="val">${inst!.totalInstallments}</span></div>
     <div class="row"><span class="lbl">Paid:</span><span class="val">${inst!.paidInstallments} / ${inst!.totalInstallments} (PKR ${formatPKR(paidAmount)})</span></div>
     <div class="row"><span class="lbl">Remaining:</span><span class="val">${inst!.remainingInstallments} / ${inst!.totalInstallments} (PKR ${formatPKR(remainingAmount)})</span></div>
@@ -559,6 +568,7 @@ async function buildThermalReceipt(
   <div class="row"><span>Total Items</span><span>${totalItems}</span></div>
   <div class="row"><span>Subtotal</span><span>PKR ${formatPKR(subtotal)}</span></div>
   <div class="row"><span>Tax</span><span>PKR ${formatPKR(sale.taxAmount)}</span></div>
+  ${discount > 0 ? `<div class="row"><span>Discount</span><span>- PKR ${formatPKR(discount)}</span></div>` : ''}
   <div class="row grand"><span>TOTAL</span><span>PKR ${formatPKR(sale.totalAmount)}</span></div>
   <div class="qr">${qrSvg}</div>
   <div class="center muted" style="margin-top:4px">Scan to verify</div>

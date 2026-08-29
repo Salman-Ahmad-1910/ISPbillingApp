@@ -233,6 +233,7 @@ func CreateInstallmentSale(c *gin.Context) {
 		InstallmentPlanID uuid.UUID `json:"installmentPlanId"`
 		Subtotal          float64   `json:"subtotal"`
 		TaxAmount         float64   `json:"taxAmount"`
+		Discount          float64   `json:"discount"`
 		PaymentMethod     string    `json:"paymentMethod"`
 		Date              string    `json:"date"`
 		Items             []posSaleItem `json:"items"`
@@ -271,6 +272,7 @@ func CreateInstallmentSale(c *gin.Context) {
 		SubscriberName: req.SubscriberName,
 		TotalAmount:    totalWithIncrease + req.TaxAmount,
 		TaxAmount:      req.TaxAmount,
+		Discount:       req.Discount,
 		PaymentMethod:  req.PaymentMethod,
 		Date:           req.Date,
 		IsInstallment:  true,
@@ -552,10 +554,240 @@ func GetPOSSale(c *gin.Context) {
 	utils.SuccessResponse(c, "Record found", sale)
 }
 
-// DeletePOSSale deletes a sale and its line items (cascaded).
+// DeletePOSSale deletes a sale and its line items (cascaded). A held (unpaid)
+// sale had reserved inventory from the point of sale, so deleting one restores
+// the SNs and quantities it consumed. Completed/paid sales are permanent and
+// are removed without side effects.
 func DeletePOSSale(c *gin.Context) {
 	companyID := c.MustGet("companyID").(uuid.UUID)
 	id := c.Param("id")
+
+	var sale models.Sale
+	if err := config.DB.
+		Scopes(models.TenantScope(companyID)).
+		Preload("Items").
+		Where("id = ?", id).
+		First(&sale).Error; err != nil {
+		utils.ErrorResponse(c, 404, "Sale not found", err.Error())
+		return
+	}
+
+	if sale.Status == "hold" {
+		err := config.DB.Transaction(func(tx *gorm.DB) error {
+			if err := revertSaleStock(tx, companyID, sale); err != nil {
+				return err
+			}
+			return tx.Delete(&sale).Error
+		})
+		if err != nil {
+			utils.ErrorResponse(c, 500, "Failed to delete held sale", err.Error())
+			return
+		}
+		utils.SuccessResponse(c, "Held sale deleted, stock restored", nil)
+		return
+	}
+
+	if err := config.DB.Delete(&sale).Error; err != nil {
+		utils.ErrorResponse(c, 500, "Failed to delete sale", err.Error())
+		return
+	}
+
+	utils.SuccessResponse(c, "Sale deleted successfully", nil)
+}
+
+// revertSaleStock returns a held sale's items back to inventory. It restores
+// each sold SN to the purchase items that drive the point-of-sale list and, if
+// the SN was consumed from the product record itself (legacy path), back to
+// the product's serial list / stock as well. Serial-less (quantity-based)
+// products have their quantities added back to the purchase items and product
+// stock.
+func revertSaleStock(tx *gorm.DB, companyID uuid.UUID, sale models.Sale) error {
+	for _, it := range sale.Items {
+		qty := it.Quantity
+		if qty <= 0 {
+			continue
+		}
+		soldSNs := parsePOSsoldSNs(it.SerialNumber, qty)
+		if len(soldSNs) == 0 {
+			if err := restoreQuantityStock(tx, companyID, it.ProductID, qty); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := restoreSNsToPurchaseItems(tx, companyID, it.ProductID, soldSNs); err != nil {
+			return err
+		}
+		if err := restoreProductSerialNumbers(tx, companyID, it.ProductID, soldSNs); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// restoreQuantityStock returns the sold quantity of a serial-less (measured)
+// product to the point-of-sale stock. It reverses the quantity-based
+// consumption that ran when the sale was created: the quantity is added back to
+// the most-depleted purchase item of the product (the consume path took it from
+// the most-stocked one, so this restores the total) and the product's stock is
+// incremented to keep the inventory status page in sync.
+func restoreQuantityStock(tx *gorm.DB, companyID, productID uuid.UUID, qty int) error {
+	if qty <= 0 {
+		return nil
+	}
+
+	var item models.PurchaseItem
+	err := tx.Where("company_id = ? AND product_id = ? AND deleted_at IS NULL", companyID, productID).
+		Order("quantity asc, created_at asc").
+		First(&item).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil
+		}
+		return err
+	}
+
+	if err := tx.Model(&models.PurchaseItem{}).
+		Where("id = ?", item.ID).
+		Update("quantity", gorm.Expr("quantity + ?", qty)).Error; err != nil {
+		return err
+	}
+
+	// Restore the product record as well: reset its stock and, if it was
+	// deleted from the point-of-sale list while the sale was on hold, un-delete
+	// it so it reappears on the inventory / purchase pages too.
+	return tx.Unscoped().
+		Model(&models.Product{}).
+		Where("id = ? AND company_id = ?", productID, companyID).
+		Updates(map[string]interface{}{
+			"deleted_at": nil,
+			"stock":      gorm.Expr("COALESCE(stock, 0) + ?", qty),
+		}).Error
+}
+
+// restoreSNsToPurchaseItems returns serial numbers to the purchase items of a
+// product. SNs no longer held anywhere are appended to the oldest SN-bearing
+// purchase item, and every SN-bearing item then has its quantity/subtotal
+// recomputed from its serial list so POS availability returns to its
+// pre-sale state. Quantity-only (no SN) items are left untouched.
+func restoreSNsToPurchaseItems(tx *gorm.DB, companyID, productID uuid.UUID, sns []string) error {
+	if len(sns) == 0 {
+		return nil
+	}
+
+	var items []models.PurchaseItem
+	if err := tx.Where("company_id = ? AND product_id = ? AND deleted_at IS NULL", companyID, productID).
+		Order("created_at asc").
+		Find(&items).Error; err != nil {
+		return err
+	}
+	if len(items) == 0 {
+		return nil
+	}
+
+	var target *models.PurchaseItem
+	for i := range items {
+		if len(parseVendorInvoiceSNs(items[i].SerialNumber)) > 0 {
+			target = &items[i]
+			break
+		}
+	}
+	if target == nil {
+		target = &items[0]
+	}
+
+	have := make(map[string]bool)
+	for _, sn := range parseVendorInvoiceSNs(target.SerialNumber) {
+		have[sn] = true
+	}
+	var toAdd []string
+	for _, sn := range sns {
+		if !have[sn] {
+			toAdd = append(toAdd, sn)
+		}
+	}
+	if len(toAdd) > 0 {
+		target.SerialNumber = strings.TrimSpace(target.SerialNumber + ", " + strings.Join(toAdd, ", "))
+	}
+
+	for i := range items {
+		serials := parseVendorInvoiceSNs(items[i].SerialNumber)
+		if len(serials) == 0 {
+			continue
+		}
+		newQty := len(serials)
+		if err := tx.Model(&models.PurchaseItem{}).
+			Where("id = ?", items[i].ID).
+			Updates(map[string]interface{}{
+				"serial_number": strings.Join(serials, ", "),
+				"quantity":      newQty,
+				"subtotal":      items[i].PurchasePrice * float64(newQty),
+			}).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// restoreProductSerialNumbers returns consumed serial numbers to the product
+// record (legacy path where SNs were removed directly from the product's
+// serial list). SNs that are still present are left untouched, so serial lists
+// consumed from purchase items are not doubled up.
+func restoreProductSerialNumbers(tx *gorm.DB, companyID, productID uuid.UUID, sns []string) error {
+	if len(sns) == 0 {
+		return nil
+	}
+
+	var prod models.Product
+	if err := tx.Unscoped().Where("id = ? AND company_id = ?", productID, companyID).First(&prod).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil
+		}
+		return err
+	}
+
+	allSNs := prod.ParseSerialNumbers()
+	have := make(map[string]bool, len(allSNs))
+	for _, sn := range allSNs {
+		have[sn] = true
+	}
+	var toAdd []string
+	for _, sn := range sns {
+		if !have[sn] {
+			toAdd = append(toAdd, sn)
+		}
+	}
+	if len(toAdd) == 0 {
+		return nil
+	}
+
+	merged := append(allSNs, toAdd...)
+	return tx.Unscoped().
+		Model(&models.Product{}).
+		Where("id = ? AND company_id = ?", productID, companyID).
+		Updates(map[string]interface{}{
+			"serial_number": strings.Join(merged, ", "),
+			"stock":         len(merged),
+			"deleted_at":    nil,
+		}).Error
+}
+
+type posSaleStatusRequest struct {
+	Status        string `json:"status" binding:"required"`
+	PaymentMethod string `json:"paymentMethod"`
+}
+
+// UpdatePOSSaleStatus updates a sale's status (and optionally payment method).
+// Used to settle a held bill: once a hold is paid the sale becomes permanent
+// and no longer restores stock if deleted.
+func UpdatePOSSaleStatus(c *gin.Context) {
+	companyID := c.MustGet("companyID").(uuid.UUID)
+	id := c.Param("id")
+
+	var req posSaleStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, 400, "Invalid input data", err.Error())
+		return
+	}
 
 	var sale models.Sale
 	if err := config.DB.
@@ -566,10 +798,14 @@ func DeletePOSSale(c *gin.Context) {
 		return
 	}
 
-	if err := config.DB.Delete(&sale).Error; err != nil {
-		utils.ErrorResponse(c, 500, "Failed to delete sale", err.Error())
+	updates := map[string]interface{}{"status": req.Status}
+	if req.PaymentMethod != "" {
+		updates["payment_method"] = req.PaymentMethod
+	}
+	if err := config.DB.Model(&sale).Updates(updates).Error; err != nil {
+		utils.ErrorResponse(c, 500, "Failed to update sale status", err.Error())
 		return
 	}
 
-	utils.SuccessResponse(c, "Sale deleted successfully", nil)
+	utils.SuccessResponse(c, "Sale status updated", gin.H{"status": req.Status})
 }

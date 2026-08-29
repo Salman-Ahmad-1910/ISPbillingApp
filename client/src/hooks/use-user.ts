@@ -8,11 +8,28 @@ type UserState = User | undefined | null;
 
 let cachedUser: UserState = undefined;
 let fetchPromise: Promise<UserState> | null = null;
+let currentLoading = false;
 const listeners = new Set<(user: UserState) => void>();
+const loadingListeners = new Set<(loading: boolean) => void>();
 
 function notifyListeners(user: UserState) {
   cachedUser = user;
   listeners.forEach((fn) => fn(user));
+}
+
+function setLoading(loading: boolean) {
+  currentLoading = loading;
+  loadingListeners.forEach((fn) => fn(loading));
+}
+
+// Reset the shared user cache to "unknown" (undefined) so the next mount
+// re-fetches the authed user instead of reading a stale value. This is called
+// right after a fresh login so a page mounted immediately after navigation
+// doesn't read a leftover `null` and bounce the user back out.
+export function resetUserCache() {
+  cachedUser = undefined;
+  fetchPromise = null;
+  setLoading(false);
 }
 
 function fetchUser(): Promise<UserState> {
@@ -24,6 +41,7 @@ function fetchUser(): Promise<UserState> {
     return Promise.resolve(null);
   }
 
+  setLoading(true);
   fetchPromise = api
     .get('/auth/me')
     .then((res) => {
@@ -41,6 +59,7 @@ function fetchUser(): Promise<UserState> {
     })
     .finally(() => {
       fetchPromise = null;
+      setLoading(false);
     });
 
   return fetchPromise;
@@ -48,6 +67,7 @@ function fetchUser(): Promise<UserState> {
 
 export function useUser() {
   const [user, setUser] = useState<UserState>(cachedUser);
+  const [loading, setLoadingState] = useState<boolean>(currentLoading);
 
   useEffect(() => {
     if (cachedUser !== undefined) {
@@ -57,12 +77,16 @@ export function useUser() {
     const listener = (u: UserState) => setUser(u);
     listeners.add(listener);
 
+    const loadingListener = (l: boolean) => setLoadingState(l);
+    loadingListeners.add(loadingListener);
+
     if (cachedUser === undefined || (cachedUser === null && typeof window !== 'undefined' && localStorage.getItem('token'))) {
       fetchUser();
     }
 
     return () => {
       listeners.delete(listener);
+      loadingListeners.delete(loadingListener);
     };
   }, []);
 
@@ -85,5 +109,5 @@ export function useUser() {
     return response.data;
   }, []);
 
-  return { user, logout, updateStatus };
+  return { user, loading, logout, updateStatus };
 }

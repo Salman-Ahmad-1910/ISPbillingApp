@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Search, X } from 'lucide-react';
 import type { Product } from '@/lib/types';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { DataTable } from './data-table';
 import { columns as getColumns } from './columns';
 import { ProductForm } from './product-form';
+import { SerialEntriesTable, parseSerialNumbers } from '@/components/shared/serial-entries';
 import {
   Dialog,
   DialogContent,
@@ -32,14 +33,6 @@ import { smartMatch } from '@/lib/search';
 
 
 type ProductFormValues = z.infer<typeof productSchema>;
-
-function parseSerialNumbers(raw: string): string[] {
-  if (!raw.trim()) return [];
-  return raw
-    .split(/[\s,\-]+/)
-    .map(s => s.trim())
-    .filter(Boolean);
-}
 
 interface ClientPageProps {
   data: Product[];
@@ -211,12 +204,26 @@ export function ClientPage({ data }: ClientPageProps) {
     <>
       <div className="p-6">
         <div className="flex items-center justify-between mb-4">
-          <Input
-            placeholder="Filter by name, category, or brand..."
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="max-w-sm"
-          />
+          <div className="relative max-w-sm flex-1">
+            <div className="flex items-center border rounded-md transition-colors hover:border-foreground/30 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1">
+              <Search className="ml-2 h-4 w-4 text-muted-foreground shrink-0" />
+              <input
+                className="flex-1 bg-transparent border-0 outline-none px-2 py-2 text-sm h-9"
+                placeholder="Filter by name, category, or brand..."
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+              />
+              {filter && (
+                <button
+                  type="button"
+                  className="mr-2 p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                  onClick={() => setFilter('')}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
           <div className="flex items-center gap-2">
             <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
             <DialogTrigger asChild>
@@ -244,7 +251,21 @@ export function ClientPage({ data }: ClientPageProps) {
           </Dialog>
           </div>
         </div>
-        <DataTable columns={columns} data={getPaginatedData()} />
+        <DataTable
+          columns={columns}
+          data={getPaginatedData()}
+          getRowCanExpand={(product) => parseSerialNumbers(product.serialNumber).length > 1}
+          renderExpanded={(product) => (
+            <SerialEntriesTable
+              entries={parseSerialNumbers(product.serialNumber).map((sn, i) => ({
+                key: `${product.id}-${i}-${sn}`,
+                productName: product.name,
+                serialNumber: sn,
+                price: product.salePrice ?? product.price,
+              }))}
+            />
+          )}
+        />
                 
                 {/* Advanced Pagination */}
                 <div className="flex items-center justify-between mt-4">

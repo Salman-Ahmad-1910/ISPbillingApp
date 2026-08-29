@@ -19,11 +19,11 @@ import type { Product, Brand, ProductType, UnitType } from '@/lib/types';
 import { productSchema } from '@/lib/schemas';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
-import { SearchableSelect } from '@/components/ui/searchable-select';
+import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
 import { useEffect, useMemo, useState } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Loader2, PlusCircle } from 'lucide-react';
+import { Loader2, PlusCircle, Tag, Package, Ruler } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
@@ -178,9 +178,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
   function onSubmit(values: ProductFormValues) {
     onSave({
       ...values,
-      salePrice: values.salePrice,
-      purchasePrice: values.purchasePrice,
-      price: values.salePrice || values.price,
+      price: values.price,
       category: productTypes.find(pt => pt.id === values.productTypeId)?.name || values.category,
     });
   }
@@ -238,13 +236,14 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
             name="brandId"
             render={({ field }) => (
               <FormItem>
-                <SearchableSelect
+                <SearchableDropdown
                   label="Brand"
-                  value={field.value || null}
+                  icon={Tag}
+                  color="text-violet-500"
+                  items={brands.map(b => ({ id: b.id, name: b.name }))}
+                  value={field.value || undefined}
                   onValueChange={(val) => field.onChange(val || '')}
-                  options={brands.map(b => ({ id: b.id, name: b.name }))}
                   placeholder="Search brand..."
-                  searchPlaceholder="Type to search brands..."
                   allowClear={false}
                 />
                 <FormMessage />
@@ -257,13 +256,14 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
             name="productTypeId"
             render={({ field }) => (
               <FormItem>
-                <SearchableSelect
+                <SearchableDropdown
                   label="Product Type"
-                  value={field.value || null}
+                  icon={Package}
+                  color="text-emerald-600"
+                  items={productTypes.map(pt => ({ id: pt.id, name: pt.name }))}
+                  value={field.value || undefined}
                   onValueChange={(val) => field.onChange(val || '')}
-                  options={productTypes.map(pt => ({ id: pt.id, name: pt.name }))}
                   placeholder="Search product type..."
-                  searchPlaceholder="Type to search product types..."
                   allowClear={false}
                 />
                 <FormMessage />
@@ -277,16 +277,17 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
             render={({ field }) => (
               <FormItem>
                 {unitTypes.length > 0 ? (
-                  <SearchableSelect
+                  <SearchableDropdown
                     label="Unit Type"
-                    value={unitTypes.find(ut => ut.name === field.value)?.id || null}
+                    icon={Ruler}
+                    color="text-amber-600"
+                    items={unitTypes.map(ut => ({ id: ut.id, name: ut.name }))}
+                    value={unitTypes.find(ut => ut.name === field.value)?.id || undefined}
                     onValueChange={(val) => {
                       const selected = unitTypes.find(ut => ut.id === val);
                       field.onChange(selected?.name || 'piece');
                     }}
-                    options={unitTypes.map(ut => ({ id: ut.id, name: ut.name }))}
                     placeholder="Search unit type..."
-                    searchPlaceholder="Type to search unit types..."
                     allowClear={false}
                   />
                 ) : (
@@ -381,54 +382,6 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
             </FormItem>
           )}
         />
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <FormField
-            control={form.control}
-            name="purchasePrice"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Purchase Price (PKR)</FormLabel>
-                <FormControl>
-                  <Input type="number" min="0" step="0.01" {...field}
-                    className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="salePrice"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Sale Price (PKR)</FormLabel>
-                <FormControl>
-                  <Input type="number" min="0" step="0.01" {...field}
-                    className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="discount"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Discount (PKR)</FormLabel>
-                <FormControl>
-                  <Input type="number" min="0" step="0.01" {...field}
-                    className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
 
         <div className="flex justify-end gap-2 pt-4">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSaving}>

@@ -17,6 +17,12 @@ type Company struct {
 	SubscriptionPlan string `gorm:"type:varchar(50)" json:"subscriptionPlan"`
 	SubscriptionExp  string `gorm:"type:varchar(50)" json:"subscriptionExpiry"` // Or time.Time depending on usage
 
+	// POS discount control. PoSDiscountPercent caps the discount a POS user can
+	// apply (as a % of the sale's selling-price total). When PoSDiscountUnlimited
+	// is true the cap is lifted and any discount below the selling price is allowed.
+	PoSDiscountPercent   float64 `gorm:"type:decimal(5,2);not null;default:0" json:"posDiscountPercent"`
+	PoSDiscountUnlimited bool    `gorm:"not null;default:false" json:"posDiscountUnlimited"`
+
 	// Relationships
 	UserCompanies   []UserCompany    `gorm:"foreignKey:CompanyID;constraint:OnDelete:CASCADE;" json:"-"`
 	Roles           []Role           `gorm:"foreignKey:CompanyID;constraint:OnDelete:CASCADE;" json:"-"`

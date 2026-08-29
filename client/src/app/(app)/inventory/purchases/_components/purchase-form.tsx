@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -17,9 +17,10 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Purchase, Vendor, Product } from '@/lib/types';
 import { purchaseSchema } from '@/lib/schemas';
-import { Loader2, PlusCircle } from 'lucide-react';
+import { Loader2, Store, Package } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
 
 type PurchaseFormValues = z.infer<typeof purchaseSchema>;
 
@@ -32,6 +33,7 @@ interface VendorProduct {
   productId: string;
   productName: string;
   unitPrice: number;
+  sellingPrice: number;
   unitType: string;
   allSNs: string[];
   vendorInvoiceId: string;
@@ -59,8 +61,6 @@ export function PurchaseForm({
   isSaving
 }: PurchaseFormProps) {
   const prevVendorIdRef = useRef<string>('');
-  const productSelectTriggerRef = useRef<HTMLButtonElement>(null);
-  const [showProductSelect, setShowProductSelect] = useState(false);
   const { companyId } = useCompany();
 
   const { data: vendorInvoices = [] } = useGenericQuery<any>(
@@ -148,10 +148,12 @@ export function PurchaseForm({
         if (existing) {
           if (!isNoSN) existing.allSNs.push(...unconsumedSNs);
         } else {
+          const unitPrice = item.purchasePrice || item.unitPrice || 0;
           productMap.set(item.productId, {
             productId: item.productId,
             productName: item.productName,
-            unitPrice: item.unitPrice || 0,
+            unitPrice,
+            sellingPrice: item.sellingPrice || unitPrice,
             unitType: item.unitType || product?.unitType || 'piece',
             allSNs: isNoSN ? [] : [...unconsumedSNs],
             vendorInvoiceId: vi.id,
@@ -191,7 +193,7 @@ export function PurchaseForm({
       productName: vp.productName,
       quantity: qty,
       purchasePrice: vp.unitPrice,
-      sellingPrice: vp.unitPrice,
+      sellingPrice: vp.sellingPrice,
       unitType: vp.unitType,
       focNormal: 'normal',
       serialNumber: snString,
@@ -228,11 +230,6 @@ export function PurchaseForm({
       item.quantity = qty;
       item.serialNumber = snString;
       item.subtotal = qty * item.purchasePrice;
-    } else if (field === 'purchasePrice') {
-      item.purchasePrice = value;
-      item.subtotal = item.quantity * value;
-    } else if (field === 'sellingPrice') {
-      item.sellingPrice = value;
     } else {
       (item as any)[field] = value;
     }
@@ -254,21 +251,18 @@ export function PurchaseForm({
             name="vendorId"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Vendor *</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a vendor" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {vendors.map((vendor) => (
-                      <SelectItem key={vendor.id} value={vendor.id}>
-                        {vendor.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <FormControl>
+                  <SearchableDropdown
+                    label="Vendor *"
+                    icon={Store}
+                    color="text-amber-500"
+                    items={vendors.map((vendor) => ({ id: vendor.id, name: vendor.name }))}
+                    value={field.value || undefined}
+                    onValueChange={field.onChange}
+                    placeholder="Search vendor..."
+                    allowClear
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -327,21 +321,22 @@ export function PurchaseForm({
 
           {selectedVendorId && vendorProducts.length > 0 && (
             <div className="flex items-center gap-2">
-              <Select open={showProductSelect} onOpenChange={setShowProductSelect} onValueChange={(value) => { addItem(value); setShowProductSelect(false); }}>
-                <SelectTrigger ref={productSelectTriggerRef} className="w-full">
-                  <SelectValue placeholder="Select a product to add..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {vendorProducts.map((vp) => (
-                    <SelectItem key={vp.productId} value={vp.productId}>
-                      {vp.productName}{vp.allSNs.length > 0 ? ` (${vp.allSNs.length} SNs)` : ' (no SN)'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button type="button" variant="outline" size="icon" className="shrink-0 h-9 w-9" onClick={() => setShowProductSelect(true)}>
-                <PlusCircle className="h-4 w-4" />
-              </Button>
+              <div className="flex-1">
+                <SearchableDropdown
+                  label="Product"
+                  icon={Package}
+                  color="text-emerald-600"
+                  items={vendorProducts.map((vp) => ({
+                    id: vp.productId,
+                    name: vp.productName,
+                    secondary: vp.allSNs.length > 0 ? `${vp.allSNs.length} SNs` : 'No SN',
+                  }))}
+                  value=""
+                  onValueChange={(value) => { addItem(value); }}
+                  placeholder="Select a product to add..."
+                  allowClear={false}
+                />
+              </div>
             </div>
           )}
 
@@ -370,25 +365,13 @@ export function PurchaseForm({
                         Remove
                       </Button>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
-                        <FormLabel className="text-xs">Purchase Price *</FormLabel>
+                        <FormLabel className="text-xs">Selling Price (from vendor invoice)</FormLabel>
                         <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={item.purchasePrice}
-                          onChange={(e) => updateItemField(index, 'purchasePrice', parseFloat(e.target.value) || 0)}
-                        />
-                      </div>
-                      <div>
-                        <FormLabel className="text-xs">Selling Price *</FormLabel>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
+                          readOnly
+                          className="bg-muted text-sm"
                           value={item.sellingPrice}
-                          onChange={(e) => updateItemField(index, 'sellingPrice', parseFloat(e.target.value) || 0)}
                         />
                       </div>
                       <div>

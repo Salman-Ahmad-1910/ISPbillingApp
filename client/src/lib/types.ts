@@ -15,6 +15,8 @@ export type Company = {
   invoiceTemplate: string;
   subscriptionPlan?: 'basic' | 'pro' | 'enterprise';
   subscriptionExpiry?: string;
+  posDiscountPercent?: number;
+  posDiscountUnlimited?: boolean;
 }
 
 // Basic Nav
@@ -647,6 +649,7 @@ export type VendorInvoice = {
   vendorName: string;
   invoiceNumber: string;
   invoiceDate: string;
+  discount?: number;
   totalAmount: number;
   batch?: string;
   items: VendorInvoiceItem[];
@@ -662,6 +665,8 @@ export type VendorInvoiceItem = {
   productName: string;
   quantity: number;
   unitPrice: number;
+  purchasePrice?: number;
+  sellingPrice?: number;
   unitType: string;
   subtotal: number;
   serialNumber?: string;

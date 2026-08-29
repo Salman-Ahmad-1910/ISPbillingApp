@@ -232,21 +232,23 @@ func GetUserCompanies(c *gin.Context) {
 	var companies []gin.H
 	for _, uc := range userCompanies {
 		companies = append(companies, gin.H{
-			"id":                 uc.Company.ID,
-			"name":               uc.Company.Name,
-			"logo":               uc.Company.Logo,
-			"stamp":              uc.Company.Stamp,
-			"contact1":           uc.Company.Contact1,
-			"contact2":           uc.Company.Contact2,
-			"email":              uc.Company.Email,
-			"address":            uc.Company.Address,
-			"description":        uc.Company.Description,
-			"taxRules":           uc.Company.TaxRules,
-			"invoiceTemplate":    uc.Company.InvoiceTemplate,
-			"subscriptionPlan":   uc.Company.SubscriptionPlan,
-			"subscriptionExpiry": uc.Company.SubscriptionExp,
-			"role":               uc.UserRole,
-			"user_company_id":    uc.ID,
+			"id":                   uc.Company.ID,
+			"name":                 uc.Company.Name,
+			"logo":                 uc.Company.Logo,
+			"stamp":                uc.Company.Stamp,
+			"contact1":             uc.Company.Contact1,
+			"contact2":             uc.Company.Contact2,
+			"email":                uc.Company.Email,
+			"address":              uc.Company.Address,
+			"description":          uc.Company.Description,
+			"taxRules":             uc.Company.TaxRules,
+			"invoiceTemplate":      uc.Company.InvoiceTemplate,
+			"subscriptionPlan":     uc.Company.SubscriptionPlan,
+			"subscriptionExpiry":   uc.Company.SubscriptionExp,
+			"posDiscountPercent":   uc.Company.PoSDiscountPercent,
+			"posDiscountUnlimited": uc.Company.PoSDiscountUnlimited,
+			"role":                 uc.UserRole,
+			"user_company_id":      uc.ID,
 		})
 	}
 

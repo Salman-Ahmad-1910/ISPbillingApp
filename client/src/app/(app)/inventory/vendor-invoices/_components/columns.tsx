@@ -1,7 +1,8 @@
 'use client';
 
 import { type ColumnDef } from '@tanstack/react-table';
-import type { VendorInvoice, VendorInvoiceItem } from '@/lib/types';
+import type { VendorInvoice, VendorInvoiceItem, Product } from '@/lib/types';
+import { parseSerialNumbers } from '@/components/shared/serial-entries';
 import { MoreHorizontal, Calendar, Building2, Printer, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,9 +25,10 @@ interface VendorInvoiceColumnsProps {
   onEdit: (invoice: VendorInvoice) => void;
   onDelete: (invoice: VendorInvoice) => void;
   onPrint: (invoice: VendorInvoice) => void;
+  products?: Product[];
 }
 
-export const columns = ({ onEdit, onDelete, onPrint }: VendorInvoiceColumnsProps): ColumnDef<FlatRow>[] => [
+export const columns = ({ onEdit, onDelete, onPrint, products = [] }: VendorInvoiceColumnsProps): ColumnDef<FlatRow>[] => [
   {
     id: 'index',
     header: '#',
@@ -79,13 +81,25 @@ export const columns = ({ onEdit, onDelete, onPrint }: VendorInvoiceColumnsProps
     id: 'serialNumber',
     header: 'SN / MAC',
     cell: ({ row }) => {
-      const sn = row.original.item.serialNumber || '';
-      if (!sn) return <div className="text-xs font-mono text-muted-foreground">—</div>;
-      const sns = sn.split(/[\s,\-]+/).map((s: string) => s.trim()).filter(Boolean);
+      const item = row.original.item;
+      const sns = parseSerialNumbers(item.serialNumber);
       if (sns.length === 0) return <div className="text-xs font-mono text-muted-foreground">—</div>;
+
+      // Remaining = the purchased SNs of this row that have not yet been sold.
+      // The product carries the full aggregated SN list plus a pointer
+      // (currentSerialIndex) to the first <sold> N SNs of that list.
+      let remaining = sns.length;
+      const product = products.find((p) => p.id === item.productId);
+      if (product) {
+        const productSNs = parseSerialNumbers(product.serialNumber);
+        const consumed = Math.min(product.currentSerialIndex ?? 0, productSNs.length);
+        const consumedSet = new Set(productSNs.slice(0, consumed));
+        remaining = sns.filter((sn) => !consumedSet.has(sn)).length;
+      }
+
       return (
-        <div className="text-xs font-mono text-muted-foreground" title={sn}>
-          {sns.length === 1 ? sns[0] : `${sns[0]} (1/${sns.length})`}
+        <div className="text-xs font-mono text-muted-foreground" title={item.serialNumber}>
+          {sns.length === 1 ? sns[0] : `${sns[0]} (${remaining}/${sns.length})`}
         </div>
       );
     },
@@ -99,10 +113,10 @@ export const columns = ({ onEdit, onDelete, onPrint }: VendorInvoiceColumnsProps
   },
   {
     id: 'unitPrice',
-    header: () => <div className="text-right">Unit Price</div>,
+    header: () => <div className="text-right">Purchase Price</div>,
     cell: ({ row }) => (
       <div className="text-right whitespace-nowrap">
-        {row.original.itemCount > 1 ? '—' : `PKR ${row.original.item.unitPrice.toFixed(2)}`}
+        {row.original.itemCount > 1 ? '—' : `PKR ${(row.original.item.purchasePrice ?? row.original.item.unitPrice).toFixed(2)}`}
       </div>
     ),
   },
@@ -176,7 +190,7 @@ export function flattenInvoiceItems(invoices: any[]): FlatRow[] {
     if (items.length === 0) {
       rows.push({
         invoice,
-        item: { productId: '', productName: '—', quantity: 0, unitPrice: 0, unitType: '', subtotal: invoice.totalAmount, serialNumber: '' } as any,
+        item: { productId: '', productName: '—', quantity: 0, unitPrice: 0, purchasePrice: 0, sellingPrice: 0, unitType: '', subtotal: invoice.totalAmount, serialNumber: '' } as any,
         isFirst: true,
         itemCount: 0,
       });
@@ -200,7 +214,7 @@ export function flattenInvoiceItems(invoices: any[]): FlatRow[] {
         grouped.set(key, {
           productName: item.productName,
           quantity: item.quantity,
-          unitPrice: item.unitPrice,
+          unitPrice: item.purchasePrice ?? item.unitPrice,
           unitType: item.unitType,
           subtotal: item.subtotal,
           serialNumbers: sns,
@@ -208,21 +222,26 @@ export function flattenInvoiceItems(invoices: any[]): FlatRow[] {
       }
     }
 
-    const groups = Array.from(grouped.values());
-    const productNames = groups.map((g) => g.productName).join(', ');
-    const totalQty = groups.reduce((s, g) => s + g.quantity, 0);
-    const snCount = groups.reduce((s, g) => s + g.serialNumbers.length, 0);
+    const groups = Array.from(grouped.entries());
+    const productNames = groups.map(([, g]) => g.productName).join(', ');
+    const totalQty = groups.reduce((s, [, g]) => s + g.quantity, 0);
+    const jsons = groups.map(([key, g]) => ({ productId: key, serialNumbers: g.serialNumbers }));
 
     rows.push({
       invoice,
       item: {
-        productId: '',
+        productId: groups.length === 1 ? groups[0][0] : '',
         productName: productNames,
         quantity: totalQty,
         unitPrice: 0,
+        purchasePrice: 0,
+        sellingPrice: 0,
         unitType: '',
         subtotal: invoice.totalAmount,
-        serialNumber: snCount > 0 ? `${snCount} SN(s)` : '',
+        serialNumber: jsons
+          .filter((j) => j.serialNumbers.length > 0)
+          .flatMap((j) => j.serialNumbers)
+          .join(', '),
       } as any,
       isFirst: true,
       itemCount: grouped.size,

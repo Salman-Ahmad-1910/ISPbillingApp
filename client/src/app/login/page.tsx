@@ -11,6 +11,7 @@ import * as React from 'react';
 import api from '@/lib/api';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
+import { resetUserCache } from '@/hooks/use-user';
 
 function LoginPageContent() {
   const router = useRouter();
@@ -36,6 +37,11 @@ function LoginPageContent() {
 
       // Save token to localStorage (matching useUser hook)
       localStorage.setItem('token', token);
+
+      // Reset the shared auth cache so any page mounted right after this
+      // navigation re-fetches the logged-in user instead of reading a stale
+      // "logged out" value and redirecting back to the login page.
+      resetUserCache();
 
       // Redirect to dashboard
       router.push('/dashboard');

@@ -2,9 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PlusCircle, Search, Filter, ShoppingCart } from 'lucide-react';
+import { PlusCircle, Search, ShoppingCart, Store } from 'lucide-react';
 import type { VendorInvoice, Vendor, Product } from '@/lib/types';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
@@ -15,6 +13,7 @@ import { vendorInvoiceSchema } from '@/lib/schemas';
 
 import { DataTable } from './data-table';
 import { columns as getColumns, flattenInvoiceItems } from './columns';
+import { SerialEntriesTable, parseSerialNumbers } from '@/components/shared/serial-entries';
 import { VendorInvoiceForm } from './vendor-invoice-form';
 import {
   Dialog,
@@ -24,6 +23,7 @@ import {
 } from '@/components/ui/dialog';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 import { CollectionPagination } from '@/components/shared/collection-pagination';
+import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
 
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import api from '@/lib/api';
@@ -182,7 +182,7 @@ export function ClientPage({ data }: ClientPageProps) {
     setIsFormOpen(true);
   };
 
-  const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, onPrint: handlePrint });
+  const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, onPrint: handlePrint, products });
 
   return (
     <div className="space-y-4">
@@ -190,29 +190,36 @@ export function ClientPage({ data }: ClientPageProps) {
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2 flex-1">
           <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search purchases..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-8"
-            />
+            <div className="flex items-center border rounded-md transition-colors hover:border-foreground/30 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1">
+              <Search className="ml-2 h-4 w-4 text-muted-foreground shrink-0" />
+              <input
+                className="flex-1 bg-transparent border-0 outline-none px-2 py-2 text-sm h-9"
+                placeholder="Search purchases..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  className="mr-2 p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                  onClick={() => setSearchTerm('')}
+                >
+                  &times;
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4" />
-            <Select value={vendorFilter} onValueChange={setVendorFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Filter by vendor" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Vendors</SelectItem>
-                {vendors.map((vendor) => (
-                  <SelectItem key={vendor.id} value={vendor.id}>
-                    {vendor.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="w-48">
+            <SearchableDropdown
+              icon={Store}
+              label="Vendor"
+              color="text-amber-500"
+              items={[{ id: 'all', name: 'All Vendors' }, ...vendors.map((vendor) => ({ id: vendor.id, name: vendor.name }))]}
+              value={vendorFilter}
+              onValueChange={setVendorFilter}
+              placeholder="Filter by vendor..."
+              allowClear={false}
+            />
           </div>
         </div>
         <Button onClick={handleAddNew} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700">
@@ -222,7 +229,33 @@ export function ClientPage({ data }: ClientPageProps) {
       </div>
 
       {/* Data Table - flattened so each SN is a separate row */}
-      <DataTable columns={columns} data={pagedRows} />
+      <DataTable
+        columns={columns}
+        data={pagedRows}
+        getRowCanExpand={(row: any) => {
+          const items = row.invoice?.items || [];
+          let count = 0;
+          for (const item of items) {
+            count += parseSerialNumbers(item.serialNumber).length;
+          }
+          return count > 1;
+        }}
+        renderExpanded={(row: any) => {
+          const entries = [];
+          const items = row.invoice?.items || [];
+          for (const item of items) {
+            for (const sn of parseSerialNumbers(item.serialNumber)) {
+              entries.push({
+                key: `${item.productId}-${sn}`,
+                productName: item.productName,
+                serialNumber: sn,
+                price: item.purchasePrice ?? item.unitPrice,
+              });
+            }
+          }
+          return <SerialEntriesTable entries={entries} />;
+        }}
+      />
 
       <CollectionPagination
         total={flatRows.length}

@@ -5,14 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import type { VendorInvoice, VendorInvoiceItem, Vendor, Product } from '@/lib/types';
-import { Loader2, Plus, Trash2, PlusCircle } from 'lucide-react';
+import { Loader2, Plus, Trash2, PlusCircle, Store, Package, Percent } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCompany } from '@/context/company-context';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
+import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
 
 function parseSerialNumbers(raw: string): string[] {
   if (!raw.trim()) return [];
@@ -24,6 +24,7 @@ interface FormEntry {
   productName: string;
   quantity: number;
   unitPrice: number;
+  sellingPrice: number;
   unitType: string;
   expandedItems: VendorInvoiceItem[];
 }
@@ -32,7 +33,7 @@ interface VendorInvoiceFormProps {
   invoice: VendorInvoice | null;
   vendors: Vendor[];
   products: Product[];
-  onSave: (data: { vendorId: string; vendorName: string; invoiceNumber: string; invoiceDate: string; totalAmount: number; batch: string; items: VendorInvoiceItem[] }) => void;
+  onSave: (data: { vendorId: string; vendorName: string; invoiceNumber: string; invoiceDate: string; discount: number; totalAmount: number; batch: string; items: VendorInvoiceItem[] }) => void;
   onCancel: () => void;
   isSaving?: boolean;
   onSaveValidationError?: (message: string) => void;
@@ -61,7 +62,8 @@ export function VendorInvoiceForm({
             productId: item.productId,
             productName: item.productName,
             quantity: item.quantity,
-            unitPrice: item.unitPrice,
+            unitPrice: item.purchasePrice ?? item.unitPrice,
+            sellingPrice: item.sellingPrice ?? 0,
             unitType: item.unitType,
             expandedItems: [item],
           });
@@ -69,13 +71,14 @@ export function VendorInvoiceForm({
       }
       return Array.from(grouped.values());
     }
-    return [{ productId: '', productName: '', quantity: 1, unitPrice: 0, unitType: 'piece', expandedItems: [] }];
+    return [{ productId: '', productName: '', quantity: 1, unitPrice: 0, sellingPrice: 0, unitType: 'piece', expandedItems: [] }];
   });
 
   const [selectedVendorId, setSelectedVendorId] = useState(invoice?.vendorId || '');
   const [vendorName, setVendorName] = useState(invoice?.vendorName || '');
   const [invoiceDate, setInvoiceDate] = useState(invoice?.invoiceDate || new Date().toISOString().split('T')[0]);
   const [batch, setBatch] = useState(invoice?.batch || '');
+  const [discount, setDiscount] = useState<number>(invoice?.discount || 0);
 
   const [snDialogOpen, setSnDialogOpen] = useState(false);
   const [snDialogProductId, setSnDialogProductId] = useState('');
@@ -180,6 +183,7 @@ export function VendorInvoiceForm({
       const product = products.find(p => p.id === value);
       if (!product) return;
       const unitPrice = product.purchasePrice || product.price;
+      const sellingPrice = product.salePrice || product.price;
       const usedByOthers = new Set<string>();
       entries.forEach((entry, i) => {
         if (i === index) return;
@@ -204,12 +208,15 @@ export function VendorInvoiceForm({
         productName: product.name,
         unitType: product.unitType,
         unitPrice,
+        sellingPrice,
         quantity: qty,
         expandedItems: [{
           productId: value,
           productName: product.name,
           quantity: qty,
           unitPrice,
+          purchasePrice: unitPrice,
+          sellingPrice,
           unitType: product.unitType,
           subtotal: unitPrice * qty,
           serialNumber: snString,
@@ -225,6 +232,7 @@ export function VendorInvoiceForm({
         ? Math.max(1, Math.min(Number(value) || 1, maxQty))
         : Math.max(1, Number(value) || 1);
       const unitPrice = updated[index].unitPrice;
+      const sellingPrice = updated[index].sellingPrice;
       const snString = availableSNs.slice(0, qty).join(', ');
       updated[index] = {
         ...updated[index],
@@ -234,6 +242,8 @@ export function VendorInvoiceForm({
           productName: updated[index].productName,
           quantity: qty,
           unitPrice,
+          purchasePrice: unitPrice,
+          sellingPrice,
           unitType: updated[index].unitType,
           subtotal: unitPrice * qty,
           serialNumber: snString,
@@ -246,7 +256,17 @@ export function VendorInvoiceForm({
         expandedItems: updated[index].expandedItems.map(item => ({
           ...item,
           unitPrice: value,
+          purchasePrice: value,
           subtotal: value * item.quantity,
+        })),
+      };
+    } else if (field === 'sellingPrice') {
+      updated[index] = {
+        ...updated[index],
+        sellingPrice: value,
+        expandedItems: updated[index].expandedItems.map(item => ({
+          ...item,
+          sellingPrice: value,
         })),
       };
     }
@@ -255,20 +275,24 @@ export function VendorInvoiceForm({
   };
 
   const addEntry = () => {
-    setEntries([...entries, { productId: '', productName: '', quantity: 1, unitPrice: 0, unitType: 'piece', expandedItems: [] }]);
+    setEntries([...entries, { productId: '', productName: '', quantity: 1, unitPrice: 0, sellingPrice: 0, unitType: 'piece', expandedItems: [] }]);
   };
 
   const removeEntry = (index: number) => {
     const updated = entries.filter((_, i) => i !== index);
     if (updated.length === 0) {
-      updated.push({ productId: '', productName: '', quantity: 1, unitPrice: 0, unitType: 'piece', expandedItems: [] });
+      updated.push({ productId: '', productName: '', quantity: 1, unitPrice: 0, sellingPrice: 0, unitType: 'piece', expandedItems: [] });
     }
     setEntries(updated);
   };
 
-  const totalAmount = useMemo(() => {
+  const subtotal = useMemo(() => {
     return entries.reduce((sum, entry) => sum + entry.expandedItems.reduce((s, item) => s + item.subtotal, 0), 0);
   }, [entries]);
+
+  const totalAmount = useMemo(() => {
+    return Math.max(0, subtotal - discount);
+  }, [subtotal, discount]);
 
   function handleSubmit() {
     const allItems: VendorInvoiceItem[] = [];
@@ -287,6 +311,7 @@ export function VendorInvoiceForm({
       vendorName,
       invoiceNumber: invoice?.invoiceNumber || '',
       invoiceDate,
+      discount: discount || 0,
       totalAmount,
       batch,
       items: allItems,
@@ -297,17 +322,16 @@ export function VendorInvoiceForm({
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <Label>Vendor *</Label>
-          <Select value={selectedVendorId} onValueChange={setSelectedVendorId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select a vendor" />
-            </SelectTrigger>
-            <SelectContent>
-              {vendors.map((v) => (
-                <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableDropdown
+            label="Vendor *"
+            icon={Store}
+            color="text-amber-500"
+            items={vendors.map((v) => ({ id: v.id, name: v.name }))}
+            value={selectedVendorId || undefined}
+            onValueChange={setSelectedVendorId}
+            placeholder="Search vendor..."
+            allowClear
+          />
         </div>
         <div>
           <Label>Buying Date *</Label>
@@ -365,23 +389,23 @@ export function VendorInvoiceForm({
               </div>
 
               <div>
-                <Label className="text-sm">Product *</Label>
                 <div className="flex gap-2">
-                  <Select
-                    value={entry.productId || undefined}
-                    onValueChange={(value) => updateEntry(index, 'productId', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select product" />
-                    </SelectTrigger>
-                    <SelectContent>
-                    {groupedProducts.map((gp) => (
-                      <SelectItem key={gp.id} value={gp.id}>
-                        {gp.name}{gp.totalSNs > 0 ? ` (${gp.totalSNs} SNs)` : ''}
-                      </SelectItem>
-                    ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex-1">
+                    <SearchableDropdown
+                      label="Product *"
+                      icon={Package}
+                      color="text-emerald-600"
+                      items={groupedProducts.map((gp) => ({
+                        id: gp.id,
+                        name: gp.name,
+                        secondary: gp.totalSNs > 0 ? `${gp.totalSNs} SNs` : undefined,
+                      }))}
+                      value={entry.productId || undefined}
+                      onValueChange={(value) => updateEntry(index, 'productId', value)}
+                      placeholder="Search product..."
+                      allowClear
+                    />
+                  </div>
                   {entry.productId && (
                     <Button
                       type="button"
@@ -396,7 +420,7 @@ export function VendorInvoiceForm({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <Label className="text-sm">Unit Type</Label>
                   <Input
@@ -426,13 +450,24 @@ export function VendorInvoiceForm({
                   )}
                 </div>
                 <div>
-                  <Label className="text-sm">Unit Price *</Label>
+                  <Label className="text-sm">Purchase Price *</Label>
                   <Input
                     type="number"
                     min="0"
                     step="0.01"
                     value={entry.unitPrice}
                     onChange={(e) => updateEntry(index, 'unitPrice', parseFloat(e.target.value) || 0)}
+                    placeholder={entry.productId ? "Auto from product" : "Select product first"}
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm">Selling Price *</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={entry.sellingPrice}
+                    onChange={(e) => updateEntry(index, 'sellingPrice', parseFloat(e.target.value) || 0)}
                     placeholder={entry.productId ? "Auto from product" : "Select product first"}
                   />
                 </div>
@@ -459,9 +494,30 @@ export function VendorInvoiceForm({
         })}
       </div>
 
-      <div className="text-right border-t pt-4">
-        <div className="text-lg font-medium">
-          Total Amount: PKR {totalAmount.toFixed(2)}
+      <div className="flex flex-col items-end gap-2 border-t pt-4">
+        <div className="flex items-center justify-between w-full max-w-xs text-sm text-muted-foreground">
+          <span>Subtotal</span>
+          <span>PKR {subtotal.toFixed(2)}</span>
+        </div>
+        <div className="flex items-center justify-between w-full max-w-xs gap-3">
+          <Label htmlFor="invoice-discount" className="flex items-center gap-1.5 whitespace-nowrap">
+            <Percent className="h-3.5 w-3.5 text-emerald-600" />
+            Discount
+          </Label>
+          <Input
+            id="invoice-discount"
+            type="number"
+            min="0"
+            step="0.01"
+            value={discount || ''}
+            onChange={(e) => setDiscount(Math.max(0, Math.min(parseFloat(e.target.value) || 0, subtotal)))}
+            className="w-32 text-right"
+            placeholder="0.00"
+          />
+        </div>
+        <div className="w-full max-w-xs text-lg font-medium flex items-center justify-between">
+          <span>Total Amount:</span>
+          <span>PKR {totalAmount.toFixed(2)}</span>
         </div>
       </div>
 

@@ -15,6 +15,7 @@ type VendorInvoice struct {
 	VendorName    string              `gorm:"type:varchar(255)" json:"vendorName"`
 	InvoiceNumber string              `gorm:"type:varchar(100);not null" json:"invoiceNumber"`
 	InvoiceDate   string              `gorm:"type:varchar(50);not null" json:"invoiceDate"`
+	Discount      float64             `gorm:"type:decimal(10,2);not null;default:0" json:"discount"`
 	TotalAmount   float64             `gorm:"type:decimal(10,2);not null" json:"totalAmount"`
 	Batch         string              `gorm:"type:varchar(100)" json:"batch"`
 	Items         []VendorInvoiceItem `gorm:"foreignKey:InvoiceID;constraint:OnDelete:CASCADE" json:"items"`
@@ -41,12 +42,14 @@ func (vi *VendorInvoice) BeforeCreate(tx *gorm.DB) error {
 // VendorInvoiceItem - Individual items in a vendor invoice
 type VendorInvoiceItem struct {
 	TenantModel
-	InvoiceID   uuid.UUID `gorm:"type:uuid;not null;index" json:"invoiceId"`
-	ProductID   uuid.UUID `gorm:"type:uuid;not null;index" json:"productId"`
-	ProductName string    `gorm:"type:varchar(255)" json:"productName"`
-	Quantity    int       `gorm:"not null" json:"quantity"`
-	UnitPrice   float64   `gorm:"type:decimal(10,2);not null" json:"unitPrice"`
-	UnitType    string    `gorm:"type:varchar(50);not null" json:"unitType"`
-	Subtotal    float64   `gorm:"type:decimal(10,2);not null" json:"subtotal"`
-	SerialNumber string  `gorm:"type:text" json:"serialNumber"`
+	InvoiceID      uuid.UUID `gorm:"type:uuid;not null;index" json:"invoiceId"`
+	ProductID      uuid.UUID `gorm:"type:uuid;not null;index" json:"productId"`
+	ProductName    string    `gorm:"type:varchar(255)" json:"productName"`
+	Quantity       int       `gorm:"not null" json:"quantity"`
+	UnitPrice      float64   `gorm:"type:decimal(10,2);not null" json:"unitPrice"`
+	PurchasePrice  float64   `gorm:"type:decimal(10,2);not null;default:0" json:"purchasePrice"`
+	SellingPrice   float64   `gorm:"type:decimal(10,2);not null;default:0" json:"sellingPrice"`
+	UnitType       string    `gorm:"type:varchar(50);not null" json:"unitType"`
+	Subtotal       float64   `gorm:"type:decimal(10,2);not null" json:"subtotal"`
+	SerialNumber   string    `gorm:"type:text" json:"serialNumber"`
 }

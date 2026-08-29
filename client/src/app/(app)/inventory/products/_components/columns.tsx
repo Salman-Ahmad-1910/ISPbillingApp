@@ -47,24 +47,6 @@ export const columns = ({ onEdit, onDelete }: ProductColumnsProps): ColumnDef<Pr
     ),
   },
   {
-    accessorKey: 'purchasePrice',
-    header: () => <div className="text-right">Purchase Price</div>,
-    cell: ({ row }) => {
-      const amount = row.original.purchasePrice || 0;
-      const formatted = new Intl.NumberFormat('en-US').format(amount);
-      return <div className="text-right font-medium">{formatted}</div>;
-    },
-  },
-  {
-    accessorKey: 'salePrice',
-    header: () => <div className="text-right">Sale Price</div>,
-    cell: ({ row }) => {
-      const amount = row.original.salePrice ?? row.original.price ?? 0;
-      const formatted = new Intl.NumberFormat('en-US').format(amount);
-      return <div className="text-right font-medium">{formatted}</div>;
-    },
-  },
-  {
     accessorKey: 'serialNumber',
     header: 'SN / MAC',
     cell: ({ row }) => {

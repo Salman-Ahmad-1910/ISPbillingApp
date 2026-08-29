@@ -32,6 +32,21 @@ func parseVendorInvoiceSNs(raw string) []string {
 	return result
 }
 
+// vendorInvoiceItemPrices returns the effective purchase and selling prices for
+// a vendor invoice item, falling back to the legacy UnitPrice field when the
+// dedicated price fields are not populated.
+func vendorInvoiceItemPrices(item models.VendorInvoiceItem) (purchase, selling float64) {
+	purchase = item.PurchasePrice
+	if purchase <= 0 {
+		purchase = item.UnitPrice
+	}
+	selling = item.SellingPrice
+	if selling <= 0 {
+		selling = purchase
+	}
+	return purchase, selling
+}
+
 // applyVendorInvoiceInventory reconciles a product's stock after a vendor-invoice
 // change. Serial-number-tracked products keep stock == number of SNs; quantity-only
 // (no-SN) products keep an independent integer stock that is adjusted by qtyDelta.
@@ -176,16 +191,20 @@ func CreateVendorInvoice(c *gin.Context) {
 			qty = item.Quantity
 		}
 
+		purchasePrice, sellingPrice := vendorInvoiceItemPrices(item)
+
 		validItems = append(validItems, validatedItem{
 			item: models.VendorInvoiceItem{
-				TenantModel:  models.TenantModel{CompanyID: invoice.CompanyID},
-				ProductID:    item.ProductID,
-				ProductName:  item.ProductName,
-				Quantity:     qty,
-				UnitPrice:    item.UnitPrice,
-				UnitType:     item.UnitType,
-				Subtotal:     item.UnitPrice * float64(qty),
-				SerialNumber: strings.Join(validSNs, ", "),
+				TenantModel:   models.TenantModel{CompanyID: invoice.CompanyID},
+				ProductID:     item.ProductID,
+				ProductName:   item.ProductName,
+				Quantity:      qty,
+				UnitPrice:     purchasePrice,
+				PurchasePrice: purchasePrice,
+				SellingPrice:  sellingPrice,
+				UnitType:      item.UnitType,
+				Subtotal:      purchasePrice * float64(qty),
+				SerialNumber:  strings.Join(validSNs, ", "),
 			},
 			sns: validSNs,
 		})
@@ -194,6 +213,18 @@ func CreateVendorInvoice(c *gin.Context) {
 	if len(validItems) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No valid items to invoice"})
 		return
+	}
+
+	// Total = sum of item subtotals (purchase price * qty) minus the flat
+	// invoice discount. The discount only reduces the purchase total; it is
+	// not applied to selling prices.
+	var itemTotal float64
+	for _, vi := range validItems {
+		itemTotal += vi.item.Subtotal
+	}
+	invoice.TotalAmount = itemTotal - invoice.Discount
+	if invoice.TotalAmount < 0 {
+		invoice.TotalAmount = 0
 	}
 
 	var createErr error
@@ -410,7 +441,6 @@ func UpdateVendorInvoice(c *gin.Context) {
 		"vendor_id":      updateData.VendorID,
 		"vendor_name":    updateData.VendorName,
 		"invoice_date":   updateData.InvoiceDate,
-		"total_amount":   updateData.TotalAmount,
 		"batch":          updateData.Batch,
 		"invoice_number": updateData.InvoiceNumber,
 	}).Error; err != nil {
@@ -480,17 +510,21 @@ func UpdateVendorInvoice(c *gin.Context) {
 			qty = item.Quantity
 		}
 
+		purchasePrice, sellingPrice := vendorInvoiceItemPrices(item)
+
 		validItems = append(validItems, validatedItem{
 			item: models.VendorInvoiceItem{
-				TenantModel:  models.TenantModel{CompanyID: existingInvoice.CompanyID},
-				InvoiceID:    existingInvoice.ID,
-				ProductID:    item.ProductID,
-				ProductName:  item.ProductName,
-				Quantity:     qty,
-				UnitPrice:    item.UnitPrice,
-				UnitType:     item.UnitType,
-				Subtotal:     item.UnitPrice * float64(qty),
-				SerialNumber: strings.Join(validSNs, ", "),
+				TenantModel:   models.TenantModel{CompanyID: existingInvoice.CompanyID},
+				InvoiceID:     existingInvoice.ID,
+				ProductID:     item.ProductID,
+				ProductName:   item.ProductName,
+				Quantity:      qty,
+				UnitPrice:     purchasePrice,
+				PurchasePrice: purchasePrice,
+				SellingPrice:  sellingPrice,
+				UnitType:      item.UnitType,
+				Subtotal:      purchasePrice * float64(qty),
+				SerialNumber:  strings.Join(validSNs, ", "),
 			},
 			sns: validSNs,
 		})
@@ -503,6 +537,26 @@ func UpdateVendorInvoice(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create invoice item", "details": err.Error(), "item_index": i})
 			return
 		}
+	}
+
+	// Total = sum of item subtotals (purchase price * qty) minus the flat
+	// invoice discount. Recompute from the stored items so cleared/discounted
+	// Server-side totals always match the invoice's own discount.
+	var itemTotal float64
+	for _, vi := range validItems {
+		itemTotal += vi.item.Subtotal
+	}
+	effectiveTotal := itemTotal - updateData.Discount
+	if effectiveTotal < 0 {
+		effectiveTotal = 0
+	}
+	if err := tx.Model(&existingInvoice).Updates(map[string]interface{}{
+		"discount":     updateData.Discount,
+		"total_amount": effectiveTotal,
+	}).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update invoice total"})
+		return
 	}
 
 	// 6. Apply the new items to products (buying from a vendor increases stock).

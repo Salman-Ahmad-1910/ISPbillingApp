@@ -10,7 +10,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { CompanyImageUpload } from '@/components/company-image-upload';
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Building2, Phone, Mail, MapPin, Stamp, Upload, Trash2 } from 'lucide-react';
+import { Loader2, Building2, Phone, Mail, MapPin, Stamp, Upload, Trash2, Percent } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import api from '@/lib/api';
 import {
   Dialog,
@@ -31,7 +32,10 @@ export default function CompanyProfilePage() {
   const [contact2, setContact2] = useState('');
   const [address, setAddress] = useState('');
   const [description, setDescription] = useState('');
+  const [posDiscountPercent, setPosDiscountPercent] = useState(0);
+  const [posDiscountUnlimited, setPosDiscountUnlimited] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingDiscount, setIsSavingDiscount] = useState(false);
   const [stampUploading, setStampUploading] = useState(false);
   const [stampVersion, setStampVersion] = useState(0);
   const stampInputRef = useRef<HTMLInputElement>(null);
@@ -50,6 +54,8 @@ export default function CompanyProfilePage() {
       setContact2(company.contact2 || '');
       setAddress(company.address || '');
       setDescription(company.description || '');
+      setPosDiscountPercent(Number(company.posDiscountPercent) || 0);
+      setPosDiscountUnlimited(!!company.posDiscountUnlimited);
     }
   }, [company]);
 
@@ -89,9 +95,26 @@ export default function CompanyProfilePage() {
       contact2,
       address,
       description,
+      posDiscountPercent,
+      posDiscountUnlimited,
     };
     await updateCompany(updatedData);
     setIsSaving(false);
+  }
+
+  const handleSaveDiscount = async () => {
+    if (!companyId) return;
+    setIsSavingDiscount(true);
+    try {
+      await updateCompany({
+        ...company,
+        posDiscountPercent,
+        posDiscountUnlimited,
+      });
+      toast({ title: 'Success', description: 'POS discount settings saved.' });
+    } finally {
+      setIsSavingDiscount(false);
+    }
   }
 
   const handleStampUpload = async (file: File) => {
@@ -240,6 +263,57 @@ export default function CompanyProfilePage() {
               <div className="space-y-2">
                 <Label htmlFor="company-description">Description</Label>
                 <Textarea id="company-description" value={description} onChange={(e) => setDescription(e.target.value)} />
+              </div>
+              <div className="border-t pt-4">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="pos-discount-percent" className="flex items-center gap-1.5">
+                      <Percent className="h-3.5 w-3.5 text-emerald-600" />
+                      POS Discount Limit (%)
+                    </Label>
+                    <Input
+                      id="pos-discount-percent"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={posDiscountPercent || ''}
+                      onChange={(e) => setPosDiscountPercent(parseFloat(e.target.value) || 0)}
+                      placeholder="e.g., 10"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Maximum discount a POS user can give, as a percentage of the sale&apos;s selling-price total.
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-2 pt-6">
+                    <Checkbox
+                      id="pos-discount-unlimited"
+                      checked={posDiscountUnlimited}
+                      onCheckedChange={(checked) => setPosDiscountUnlimited(!!checked)}
+                    />
+                    <Label htmlFor="pos-discount-unlimited" className="leading-5 cursor-pointer">
+                      Unlimited discount in POS
+                      <span className="block text-xs text-muted-foreground">
+                        When checked, the percentage limit is ignored and only the selling price caps the discount.
+                      </span>
+                    </Label>
+                  </div>
+                  <div className="md:col-span-2 flex items-center gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleSaveDiscount}
+                      disabled={isSaving || isSavingDiscount}
+                      className="gap-2"
+                    >
+                      {isSavingDiscount && <Loader2 className="h-4 w-4 animate-spin" />}
+                      {isSavingDiscount ? 'Saving...' : 'Save Discount % Permanently'}
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      Saves the POS discount percentage and unlimited checkbox to this company permanently.
+                    </span>
+                  </div>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Company Stamp</Label>
