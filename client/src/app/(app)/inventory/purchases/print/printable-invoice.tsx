@@ -153,7 +153,7 @@ export function PrintablePurchaseInvoice({ purchase, company, size = 'a4', open,
                     <td className="border border-gray-300 p-3">{item.productName}</td>
                     <td className="border border-gray-300 p-3 text-xs font-mono">{item.serialNumber || '-'}</td>
                     <td className="border border-gray-300 p-3 text-right">{(item.purchasePrice || 0).toFixed(2)}</td>
-                    <td className="border border-gray-300 p-3 text-center font-semibold">{item.quantity}</td>
+                    <td className="border border-gray-300 p-3 text-center font-semibold">{Number(item.quantityEntered) || item.quantity}</td>
                     <td className="border border-gray-300 p-3 text-right">{(item.saleTax || 0).toFixed(2)}</td>
                     <td className="border border-gray-300 p-3 text-right">{(item.wthTax || 0).toFixed(2)}</td>
                     <td className="border border-gray-300 p-3 text-right">{(item.disc || 0).toFixed(2)}</td>
@@ -236,7 +236,7 @@ export function PrintablePurchaseInvoice({ purchase, company, size = 'a4', open,
             <div style={{ borderBottom: '1px dashed #000', paddingBottom: '8px', marginBottom: '8px' }}>
               {purchase.items?.map((item, index) => (
                 <div key={index} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                  <span style={{ maxWidth: '45mm', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.productName} x{item.quantity}</span>
+                  <span style={{ maxWidth: '45mm', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.productName} x{Number(item.quantityEntered) || item.quantity}</span>
                   <span style={{ fontWeight: 700 }}>{(item.subtotal || 0).toFixed(0)}</span>
                 </div>
               ))}

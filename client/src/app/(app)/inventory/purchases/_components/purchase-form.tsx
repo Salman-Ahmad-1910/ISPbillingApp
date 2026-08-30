@@ -14,6 +14,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Purchase, Vendor, Product } from '@/lib/types';
 import { purchaseSchema } from '@/lib/schemas';
@@ -72,7 +73,10 @@ export function PurchaseForm({
     resolver: zodResolver(purchaseSchema),
     defaultValues: purchase ? {
       ...purchase,
-      items: purchase.items || [],
+      items: (purchase.items || []).map(it => ({
+        ...it,
+        quantity: Number(it.quantityEntered) || it.quantity,
+      })),
     } : {
       vendorId: '',
       vendorName: '',
@@ -92,6 +96,7 @@ export function PurchaseForm({
 
   const items = form.watch('items');
   const selectedVendorId = form.watch('vendorId');
+  const selectedBatch = form.watch('batch');
 
   useEffect(() => {
     if (selectedVendorId && selectedVendorId !== prevVendorIdRef.current) {
@@ -124,6 +129,25 @@ export function PurchaseForm({
     }
     return set;
   }, [purchases, purchase]);
+
+  // For each form line, find whether an existing purchase item (same company
+  // product + purchase/selling price + unit type, within the current batch)
+  // can absorb this quantity, and which purchase it belongs to.
+  const mergeTargets = useMemo(() => {
+    return items.map((item) => {
+      const matches = purchases
+        .filter(p => (p.batch || '') === (selectedBatch || '') && (p.items || []).some(it =>
+          it.productId === item.productId &&
+          Number(it.purchasePrice) === Number(item.purchasePrice) &&
+          Number(it.sellingPrice) === Number(item.sellingPrice) &&
+          (it.unitType || '') === (item.unitType || '')
+        ))
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      return matches.length > 0
+        ? { exists: true, purchaseNumber: matches[0].purchaseNumber }
+        : { exists: false, purchaseNumber: '' };
+    });
+  }, [items, purchases, selectedBatch]);
 
   const vendorProducts = useMemo((): VendorProduct[] => {
     if (!selectedVendorId) return [];
@@ -201,6 +225,7 @@ export function PurchaseForm({
       saleTax: 0,
       wthTax: 0,
       disc: 0,
+      mergeExisting: false,
     };
     form.setValue('items', [...currentItems, newItem], { shouldDirty: true, shouldTouch: true });
     if (vp.invoiceNumber) form.setValue('billId', vp.invoiceNumber);
@@ -365,6 +390,31 @@ export function PurchaseForm({
                         Remove
                       </Button>
                     </div>
+                    {!purchase && (
+                      <div className={`flex items-start gap-2 rounded-md border px-2.5 py-1.5 ${mergeTargets[index].exists ? 'border-emerald-200 bg-emerald-50/50' : 'border-border bg-muted/30'}`}>
+                        <Checkbox
+                          id={`merge-${index}`}
+                          checked={!!item.mergeExisting}
+                          disabled={!mergeTargets[index].exists}
+                          onCheckedChange={(checked) => updateItemField(index, 'mergeExisting', checked === true)}
+                        />
+                        <div className="leading-tight">
+                          <label
+                            htmlFor={`merge-${index}`}
+                            className={`text-xs font-medium cursor-pointer ${mergeTargets[index].exists ? 'text-emerald-700' : 'text-muted-foreground'}`}
+                          >
+                            Merge into existing entry
+                          </label>
+                          <p className="text-[10px] text-muted-foreground">
+                            {mergeTargets[index].exists
+                              ? item.mergeExisting
+                                ? `Will add to purchase ${mergeTargets[index].purchaseNumber || '(no number)'}`
+                                : `A matching entry exists (${mergeTargets[index].purchaseNumber || 'same batch'})`
+                              : 'No matching existing entry for this product/price/batch'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
                         <FormLabel className="text-xs">Selling Price (from vendor invoice)</FormLabel>

@@ -163,6 +163,30 @@ func RunMigrations() {
 
 	// Backfill installment_plans: set percentage_increase to 0 for existing rows
 	DB.Exec("UPDATE installment_plans SET percentage_increase = 0 WHERE percentage_increase IS NULL")
+	// Backfill purchase item "entered" quantity for existing rows: the stored
+	// quantity is the remaining stock (reduced by sales), but the purchases page
+	// should display the quantity that was originally entered.
+	// 1) Rows that still hold stock: the best lower bound we know is what's left.
+	// 2) Rows that are fully consumed: recover the entered quantity from the
+	//    purchase total when the purchase is a single line and the implied
+	//    subtotal (total + discount - sales_tax - wth_tax) divides exactly by
+	//    the unit price.
+	DB.Exec("UPDATE purchase_items SET quantity_entered = quantity WHERE quantity_entered = 0 AND quantity > 0")
+	DB.Exec(`
+		UPDATE purchase_items pi
+		SET quantity_entered = ROUND((p.total_amount + p.discount - p.sales_tax - p.wth_tax) / pi.purchase_price)
+		FROM purchases p
+		WHERE pi.purchase_id = p.id
+			AND p.deleted_at IS NULL AND pi.deleted_at IS NULL
+			AND pi.quantity_entered = 0
+			AND (p.total_amount + p.discount - p.sales_tax - p.wth_tax) > 0
+			AND pi.purchase_price > 0
+			AND (ROUND((p.total_amount + p.discount - p.sales_tax - p.wth_tax) / pi.purchase_price)
+				= ((p.total_amount + p.discount - p.sales_tax - p.wth_tax) / pi.purchase_price))
+			AND (SELECT COUNT(*) FROM purchase_items x WHERE x.purchase_id = p.id AND x.deleted_at IS NULL) = 1
+	`)
+	log.Println("Purchase item entered quantity backfilled")
+
 	// Drop old columns from installment_plans that no longer exist in the model
 	DB.Exec("ALTER TABLE installment_plans DROP COLUMN IF EXISTS product_id")
 	DB.Exec("ALTER TABLE installment_plans DROP COLUMN IF EXISTS product_name")

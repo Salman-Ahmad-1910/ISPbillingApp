@@ -61,7 +61,6 @@ import {
   Map,
   ClipboardPen,
   FolderClosed,
-  UserX,
   TriangleAlert,
   Tag,
   Ruler,
@@ -69,6 +68,7 @@ import {
   Activity,
   ArrowLeftRight,
   Archive,
+  ScrollText,
   Mail,
   MailQuestion,
   FileEdit,
@@ -135,12 +135,6 @@ const navItems: NavItemGroup[] = [
       { title: 'Customers', href: '/sales/customers', icon: UserRound, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
       { title: 'Installment Plans', href: '/sales/installment-plans', icon: FileCog, allowedRoles: ['admin', 'manager'] },
       { title: 'Point of Sale', href: '/inventory/pos', icon: ShoppingCart, allowedRoles: ['admin', 'manager', 'dealer'] },
-    ],
-  },
-  {
-    title: 'Billing',
-    items: [
-      { title: 'Invoices', href: '/billing/invoices', icon: ReceiptText, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
     ],
   },
   {
@@ -251,9 +245,7 @@ const navItems: NavItemGroup[] = [
   {
     title: 'System Log',
     items: [
-      { title: 'Deleted Collection', href: '/admin/logs/deleted-collections', icon: Archive, allowedRoles: ['admin'] },
-      { title: 'Deleted Members', href: '/admin/logs/deleted-members', icon: UserX, allowedRoles: ['admin'] },
-      { title: 'Update Connection Log', href: '/admin/logs/update-connection', icon: ArrowLeftRight, allowedRoles: ['admin'] },
+      { title: 'System Log', href: '/admin/logs', icon: ScrollText, allowedRoles: ['admin'] },
     ],
   },
   {

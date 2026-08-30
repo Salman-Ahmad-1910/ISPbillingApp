@@ -110,6 +110,10 @@ func GetSystemLogs(c *gin.Context) {
 	module := c.Query("module")
 	status := c.Query("status")
 	search := c.Query("search")
+	actorType := c.Query("actorType")
+	serial := c.Query("serial")
+	connectionType := c.Query("connectionType")
+	page := c.Query("page")
 	format := c.Query("format")
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
@@ -121,13 +125,16 @@ func GetSystemLogs(c *gin.Context) {
 			al.created_at as timestamp,
 			al.user_id,
 			u.name as user_name,
+			u.role as user_role,
 			al.action,
 			al.module,
 			al.description,
 			al.details,
 			al.user_agent,
 			al.status,
-			al.page
+			al.page,
+			al.serial_numbers,
+			al.user_role as logged_role
 		FROM audit_logs al
 		LEFT JOIN users u ON u.id = al.user_id AND u.deleted_at IS NULL
 		WHERE al.company_id = ? AND al.deleted_at IS NULL
@@ -160,26 +167,44 @@ func GetSystemLogs(c *gin.Context) {
 		query += " AND al.status = ?"
 		args = append(args, status)
 	}
+	if page != "" {
+		query += " AND LOWER(al.page) LIKE LOWER(?)"
+		args = append(args, "%"+page+"%")
+	}
+	if actorType != "" {
+		query += " AND LOWER(COALESCE(al.user_role,'')) = LOWER(?)"
+		args = append(args, actorType)
+	}
+	if serial != "" {
+		query += " AND (al.serial_numbers ILIKE ? OR al.details::text ILIKE ?)"
+		args = append(args, "%"+serial+"%", "%"+serial+"%")
+	}
+	if connectionType != "" {
+		query += " AND al.details::jsonb->>'connectionType' = ?"
+		args = append(args, connectionType)
+	}
 	if search != "" {
-		query += " AND (LOWER(u.name) LIKE LOWER(?) OR LOWER(al.action) LIKE LOWER(?) OR LOWER(al.description) LIKE LOWER(?))"
-		args = append(args, "%"+search+"%", "%"+search+"%", "%"+search+"%")
+		query += " AND (LOWER(u.name) LIKE LOWER(?) OR LOWER(al.action) LIKE LOWER(?) OR LOWER(al.description) LIKE LOWER(?) OR al.serial_numbers ILIKE ?)"
+		args = append(args, "%"+search+"%", "%"+search+"%", "%"+search+"%", "%"+search+"%")
 	}
 
 	query += " ORDER BY al.created_at DESC LIMIT ? OFFSET ?"
 	args = append(args, limit, offset)
 
 	type LogEntry struct {
-		ID          string          `json:"id"`
-		Timestamp   string          `json:"timestamp"`
-		UserID      string          `json:"userId"`
-		UserName    string          `json:"userName"`
-		Action      string          `json:"action"`
-		Module      string          `json:"module"`
-		Description string          `json:"description"`
-		Details     json.RawMessage `json:"details"`
-		UserAgent   string          `json:"userAgent"`
-		Status      string          `json:"status"`
-		Page        string          `json:"page"`
+		ID            string          `json:"id"`
+		Timestamp     string          `json:"timestamp"`
+		UserID        string          `json:"userId"`
+		UserName      string          `json:"userName"`
+		UserRole      string          `json:"userRole"`
+		Action        string          `json:"action"`
+		Module        string          `json:"module"`
+		Description   string          `json:"description"`
+		Details       json.RawMessage `json:"details"`
+		UserAgent     string          `json:"userAgent"`
+		Status        string          `json:"status"`
+		Page          string          `json:"page"`
+		SerialNumbers string          `json:"serialNumbers"`
 	}
 
 	var logs []LogEntry
@@ -280,6 +305,7 @@ func GetSystemLogs(c *gin.Context) {
 	usersQuery := "SELECT DISTINCT u.id, u.name FROM audit_logs al LEFT JOIN users u ON u.id = al.user_id WHERE al.company_id = ? AND u.deleted_at IS NULL"
 	actionsQuery := "SELECT DISTINCT action FROM audit_logs WHERE company_id = ? AND deleted_at IS NULL"
 	modulesQuery := "SELECT DISTINCT module FROM audit_logs WHERE company_id = ? AND deleted_at IS NULL"
+	rolesQuery := "SELECT DISTINCT role FROM (SELECT al.user_role AS role FROM audit_logs al WHERE al.company_id = ? AND al.deleted_at IS NULL AND al.user_role <> '' UNION SELECT u.role AS role FROM audit_logs al LEFT JOIN users u ON u.id = al.user_id WHERE al.company_id = ? AND u.deleted_at IS NULL AND u.role <> '') t WHERE role IS NOT NULL ORDER BY role"
 
 	var users []struct {
 		ID   string `json:"id"`
@@ -287,10 +313,12 @@ func GetSystemLogs(c *gin.Context) {
 	}
 	var actions []string
 	var modules []string
+	var roles []string
 
 	config.DB.Raw(usersQuery, companyID).Scan(&users)
 	config.DB.Raw(actionsQuery, companyID).Pluck("action", &actions)
 	config.DB.Raw(modulesQuery, companyID).Pluck("module", &modules)
+	config.DB.Raw(rolesQuery, companyID, companyID).Pluck("role", &roles)
 
 	response := gin.H{
 		"data":       logs,
@@ -298,6 +326,7 @@ func GetSystemLogs(c *gin.Context) {
 		"users":      users,
 		"actions":    actions,
 		"modules":    modules,
+		"roles":      roles,
 		"topUsers":   topUsers,
 		"topModules": topModules,
 	}

@@ -506,6 +506,7 @@ export const purchaseItemSchema = z.object({
   disc: z.coerce.number().min(0).optional().default(0),
   expiryDate: z.string().optional(),
   serialNumber: z.string().optional(),
+  mergeExisting: z.boolean().optional().default(false),
 });
 
 export const purchaseSchema = z.object({

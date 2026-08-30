@@ -120,9 +120,11 @@ type SystemLog struct {
 	Description string      `gorm:"type:text;not null" json:"description"`            // Human-readable description
 	IPAddress   string      `gorm:"type:varchar(45)" json:"ipAddress"`                // IPv4 or IPv6
 	UserAgent   string      `gorm:"type:text" json:"userAgent"`                       // Browser/client info
-	Status      string      `gorm:"type:varchar(20);default:'success'" json:"status"` // success, error, warning
-	Page        string      `gorm:"type:varchar(100)" json:"page"`                    // Page where action was taken
-	Details     interface{} `gorm:"type:jsonb" json:"details,omitempty"`              // Additional log details
+	Status        string      `gorm:"type:varchar(20);default:'success'" json:"status"` // success, error, warning
+	Page          string      `gorm:"type:varchar(100)" json:"page"`                    // Page where action was taken
+	UserRole      string      `gorm:"type:varchar(50)" json:"userRole"`                 // operator role: admin, staff, dealer, recovery_officer, etc
+	SerialNumbers string      `gorm:"type:text" json:"serialNumbers"`                   // comma separated serials touched by the operation
+	Details       interface{} `gorm:"type:jsonb" json:"details,omitempty"`              // Additional log details
 
 	// Relationships
 	User    User    `gorm:"foreignKey:UserID" json:"user"`

@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"awesomeProject/config"
-	"awesomeProject/middleware"
 	"awesomeProject/models"
 	"awesomeProject/utils"
 	"fmt"
@@ -37,7 +36,6 @@ func incrementSplitterPorts(tx *gorm.DB, splitterID string) error {
 
 func RegisterConnectionRoutes(admin *gin.RouterGroup) {
 	connections := admin.Group("/connections")
-	connections.Use(middleware.AuditMiddleware())
 	connections.GET("", findConnections)
 	connections.GET("/logs", getConnectionLogs)
 	connections.POST("", createConnection)

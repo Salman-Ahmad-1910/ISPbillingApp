@@ -189,6 +189,41 @@ func CreatePurchase(c *gin.Context) {
 
 		tx := db.Begin()
 
+		// Items flagged for merging are added to an existing purchase_item line
+		// with the same product/price/unit-type/batch instead of creating a new
+		// entry. Items with no matching line fall through to the insert path.
+		var insertItems []models.PurchaseItem
+		for _, item := range items {
+			if !item.MergeExisting {
+				insertItems = append(insertItems, item)
+				continue
+			}
+			merged, err := mergePurchaseItemInto(tx, purchase.CompanyID, &item, purchase.Batch)
+			if err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+			if !merged {
+				insertItems = append(insertItems, item)
+			}
+		}
+
+		// If every item was merged there is no new purchase to record.
+		if len(insertItems) == 0 {
+			if err := tx.Commit().Error; err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit transaction"})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{
+				"success": true,
+				"message": "Purchased items merged into existing entries",
+				"data":    nil,
+			})
+			return
+		}
+
 		if createErr = tx.Create(&purchase).Error; createErr != nil {
 			tx.Rollback()
 			if strings.Contains(createErr.Error(), "duplicate key") {
@@ -199,7 +234,7 @@ func CreatePurchase(c *gin.Context) {
 			return
 		}
 
-		for _, item := range items {
+		for _, item := range insertItems {
 			itemSNs := parseVendorInvoiceSNs(item.SerialNumber)
 
 			// Consume the SNs from the vendor invoice items they belong to.
@@ -221,6 +256,7 @@ func CreatePurchase(c *gin.Context) {
 				ProductID:     item.ProductID,
 				ProductName:   item.ProductName,
 				Quantity:      item.Quantity,
+				QuantityEntered: item.Quantity,
 				PurchasePrice: item.PurchasePrice,
 				SellingPrice:  item.SellingPrice,
 				UnitPrice:     item.PurchasePrice,
@@ -282,6 +318,75 @@ func CreatePurchase(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create purchase after retries", "details": createErr.Error()})
+}
+
+// mergePurchaseItemInto adds the incoming item's quantity and serial numbers
+// to the most recent existing purchase_item with the same company, product,
+// purchase/selling price, unit type and purchase batch. It syncs the item's
+// quantity/quantity_entered/subtotal plus the owning purchase's totals.
+// Returns (false, nil) when no matching line exists so the caller falls back
+// to creating a new purchase item.
+func mergePurchaseItemInto(tx *gorm.DB, companyID uuid.UUID, item *models.PurchaseItem, batch string) (bool, error) {
+	var target models.PurchaseItem
+	err := tx.
+		Where("company_id = ? AND product_id = ? AND purchase_price = ? AND selling_price = ? AND unit_type = ? AND deleted_at IS NULL",
+			companyID, item.ProductID, item.PurchasePrice, item.SellingPrice, item.UnitType).
+		Where("purchase_id IN (SELECT id FROM purchases WHERE company_id = ? AND COALESCE(batch,'') = ? AND deleted_at IS NULL)",
+			companyID, batch).
+		Order("created_at DESC").
+		First(&target).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return false, nil
+		}
+		return false, err
+	}
+
+	itemSNs := parseVendorInvoiceSNs(item.SerialNumber)
+	if len(itemSNs) > 0 {
+		if err := consumeSNsFromVendorInvoices(tx, companyID, item.ProductID, itemSNs); err != nil {
+			return false, err
+		}
+		// Reject serial numbers that the target line already holds so stock is
+		// not double-counted on the merged line.
+		existing := parseVendorInvoiceSNs(target.SerialNumber)
+		have := make(map[string]bool, len(existing))
+		for _, sn := range existing {
+			have[sn] = true
+		}
+		for _, sn := range itemSNs {
+			if have[sn] {
+				return false, fmt.Errorf("serial number %s already exists on the merged purchase line", sn)
+			}
+		}
+	}
+
+	quantity := target.Quantity + item.Quantity
+	subtotal := item.PurchasePrice * float64(quantity)
+	serialText := strings.Join(append(parseVendorInvoiceSNs(target.SerialNumber), itemSNs...), ", ")
+
+	if err := tx.Model(&models.PurchaseItem{}).
+		Where("id = ? AND deleted_at IS NULL", target.ID).
+		Updates(map[string]interface{}{
+			"quantity":         quantity,
+			"quantity_entered": target.QuantityEntered + item.Quantity,
+			"subtotal":         subtotal,
+			"serial_number":    serialText,
+		}).Error; err != nil {
+		return false, err
+	}
+
+	delta := item.PurchasePrice * float64(item.Quantity)
+	if err := tx.Model(&models.Purchase{}).
+		Where("id = ? AND deleted_at IS NULL", target.PurchaseID).
+		Updates(map[string]interface{}{
+			"total_amount":     gorm.Expr("total_amount + ?", delta),
+			"remaining_amount": gorm.Expr("remaining_amount + ?", delta),
+		}).Error; err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 func GetPurchases(c *gin.Context) {
@@ -434,6 +539,7 @@ func UpdatePurchase(c *gin.Context) {
 			ProductID:     item.ProductID,
 			ProductName:   item.ProductName,
 			Quantity:      item.Quantity,
+			QuantityEntered: item.Quantity,
 			PurchasePrice: item.PurchasePrice,
 			SellingPrice:  item.SellingPrice,
 			UnitPrice:     item.PurchasePrice,
@@ -649,9 +755,9 @@ func GetPurchasedProducts(c *gin.Context) {
 	var products []models.PurchasedProduct
 	if err := db.Raw(`
 		SELECT
-			pi.id                                        AS purchase_item_id,
+pi.id                                           AS purchase_item_id,
 			pi.product_id                                 AS id,
-			pi.product_name                               AS name,
+			COALESCE(NULLIF(pi.product_name, ''), pr.name) AS name,
 			pi.selling_price                              AS price,
 			pi.quantity                                   AS stock,
 			pi.unit_type                                  AS unit_type,
@@ -672,9 +778,10 @@ func GetPurchasedProducts(c *gin.Context) {
 			pr.image                                      AS image
 		FROM purchase_items pi
 		JOIN purchases p ON p.id = pi.purchase_id AND p.deleted_at IS NULL
-		LEFT JOIN products pr ON pr.id = pi.product_id AND pr.deleted_at IS NULL
+		LEFT JOIN products pr ON pr.id = pi.product_id
 		WHERE pi.company_id = ?
 			AND pi.deleted_at IS NULL
+			AND pr.id IS NOT NULL
 		ORDER BY pi.product_name
 	`, companyID).Scan(&products).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch purchased products", "details": err.Error()})

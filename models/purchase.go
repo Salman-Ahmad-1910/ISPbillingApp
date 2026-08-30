@@ -51,6 +51,7 @@ type PurchaseItem struct {
 	ProductID     uuid.UUID `gorm:"type:uuid;not null;index" json:"productId"`
 	ProductName   string    `gorm:"type:varchar(255)" json:"productName"`
 	Quantity      int       `gorm:"not null" json:"quantity"`
+	QuantityEntered int     `gorm:"not null;default:0" json:"quantityEntered"`
 	PurchasePrice float64   `gorm:"type:decimal(10,2);not null;default:0" json:"purchasePrice"`
 	SellingPrice  float64   `gorm:"type:decimal(10,2);not null;default:0" json:"sellingPrice"`
 	UnitPrice     float64   `gorm:"type:decimal(10,2);not null;default:0" json:"-"` // legacy column
@@ -62,6 +63,7 @@ type PurchaseItem struct {
 	Disc          float64   `gorm:"type:decimal(10,2);default:0" json:"disc"`
 	ExpiryDate    string    `gorm:"type:varchar(50)" json:"expiryDate"`
 	SerialNumber  string    `gorm:"type:text" json:"serialNumber"`
+	MergeExisting bool      `gorm:"default:false" json:"mergeExisting"`
 }
 
 // PurchasedProduct - Product info derived entirely from purchase_items.

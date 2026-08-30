@@ -652,16 +652,9 @@ func restoreQuantityStock(tx *gorm.DB, companyID, productID uuid.UUID, qty int) 
 		return err
 	}
 
-	// Restore the product record as well: reset its stock and, if it was
-	// deleted from the point-of-sale list while the sale was on hold, un-delete
-	// it so it reappears on the inventory / purchase pages too.
-	return tx.Unscoped().
-		Model(&models.Product{}).
+	return tx.Model(&models.Product{}).
 		Where("id = ? AND company_id = ?", productID, companyID).
-		Updates(map[string]interface{}{
-			"deleted_at": nil,
-			"stock":      gorm.Expr("COALESCE(stock, 0) + ?", qty),
-		}).Error
+		Update("stock", gorm.Expr("COALESCE(stock, 0) + ?", qty)).Error
 }
 
 // restoreSNsToPurchaseItems returns serial numbers to the purchase items of a
@@ -738,7 +731,7 @@ func restoreProductSerialNumbers(tx *gorm.DB, companyID, productID uuid.UUID, sn
 	}
 
 	var prod models.Product
-	if err := tx.Unscoped().Where("id = ? AND company_id = ?", productID, companyID).First(&prod).Error; err != nil {
+	if err := tx.Where("id = ? AND company_id = ?", productID, companyID).First(&prod).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil
 		}
@@ -761,13 +754,11 @@ func restoreProductSerialNumbers(tx *gorm.DB, companyID, productID uuid.UUID, sn
 	}
 
 	merged := append(allSNs, toAdd...)
-	return tx.Unscoped().
-		Model(&models.Product{}).
+	return tx.Model(&models.Product{}).
 		Where("id = ? AND company_id = ?", productID, companyID).
 		Updates(map[string]interface{}{
 			"serial_number": strings.Join(merged, ", "),
 			"stock":         len(merged),
-			"deleted_at":    nil,
 		}).Error
 }
 

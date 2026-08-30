@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 
-import { PlusCircle, Trash2, CreditCard, Landmark, CircleDollarSign, Loader2, ShoppingCart, Search, Users, UserRound, Handshake, CalendarDays, Receipt, MoreVertical, Hash } from 'lucide-react';
+import { PlusCircle, Trash2, CreditCard, Landmark, CircleDollarSign, Loader2, ShoppingCart, Search, Users, UserRound, Handshake, CalendarDays, Receipt, MoreVertical, Hash, ChevronDown } from 'lucide-react';
 import Image from 'next/image';
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -48,6 +48,7 @@ import { SerialEntriesTable } from '@/components/shared/serial-entries';
 interface CartItem {
     product: Product;
     quantity: number;
+    selectedSNs: string[];
 }
 
 // SNs available for selling come from the purchase item (what was bought and
@@ -168,6 +169,102 @@ function SearchableDropdown({
                 {open && query && filtered.length === 0 && (
                     <div className="absolute z-50 mt-1 w-full bg-popover border rounded-md shadow-lg p-3 text-center text-sm text-muted-foreground">
                         No results found
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+// Multi-select dropdown that lets the cashier pick which SN / MAC numbers of a
+// product are being sold. Each SN has its own checkbox, and the number of
+// checked entries cannot exceed the quantity being sold.
+function SNSSelect({
+    idPrefix,
+    sns,
+    quantity,
+    selected,
+    onChange,
+}: {
+    idPrefix: string;
+    sns: string[];
+    quantity: number;
+    selected: string[];
+    onChange: (next: string[]) => void;
+}) {
+    const ref = useRef<HTMLDivElement>(null);
+    const [open, setOpen] = useState(false);
+
+    useEffect(() => {
+        function handleClick(e: MouseEvent) {
+            if (ref.current && !ref.current.contains(e.target as Node)) {
+                setOpen(false);
+            }
+        }
+        document.addEventListener('mousedown', handleClick);
+        return () => document.removeEventListener('mousedown', handleClick);
+    }, []);
+
+    if (sns.length === 0) {
+        return null;
+    }
+
+    const selectedSet = new Set(selected);
+    const toggle = (sn: string) => {
+        if (selectedSet.has(sn)) {
+            onChange(selected.filter(s => s !== sn));
+        } else {
+            if (selected.length >= quantity) return;
+            onChange([...selected, sn]);
+        }
+    };
+
+    return (
+        <div className="space-y-1" ref={ref}>
+            <Label className="text-xs font-medium flex items-center gap-1.5">
+                <Hash className="h-3.5 w-3.5 text-amber-500" />
+                SN / MAC
+                <span className={`font-normal ml-1 ${selected.length === quantity ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                    ({selected.length}/{quantity})
+                </span>
+            </Label>
+            <div className="relative">
+                <div
+                    className={`flex items-center justify-between gap-2 border rounded-md px-2 py-1.5 text-sm cursor-pointer transition-colors hover:border-foreground/30 ${open ? 'ring-2 ring-ring ring-offset-1' : ''}`}
+                    onClick={() => setOpen(o => !o)}
+                >
+                    <span className={`truncate ${selected.length === 0 ? 'text-muted-foreground' : 'font-mono text-xs'}`}>
+                        {selected.length === 0 ? 'Select SN numbers...' : selected.join(', ')}
+                    </span>
+                    <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+                </div>
+                {open && (
+                    <div className="absolute z-50 mt-1 w-full bg-popover border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                        {sns.map(sn => {
+                            const checked = selectedSet.has(sn);
+                            const disabled = !checked && selected.length >= quantity;
+                            const id = `sn-${idPrefix}-${sn}`;
+                            return (
+                                <label
+                                    key={sn}
+                                    htmlFor={id}
+                                    className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer text-sm transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent'}`}
+                                >
+                                    <Checkbox
+                                        id={id}
+                                        checked={checked}
+                                        disabled={disabled}
+                                        onCheckedChange={() => toggle(sn)}
+                                    />
+                                    <span className="font-mono text-xs truncate">{sn}</span>
+                                </label>
+                            );
+                        })}
+                        {quantity > 0 && selected.length === quantity && (
+                            <div className="px-3 py-1.5 text-[10px] text-emerald-600 dark:text-emerald-400 border-t">
+                                All selected — uncheck to change
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
@@ -378,6 +475,10 @@ export default function POSPage() {
                         taxPercent: si.taxPercent || 0,
                     },
                     quantity: si.quantity,
+                    selectedSNs: String(si.serialNumber || '')
+                        .split(/[\s,\-]+/)
+                        .map((s: string) => s.trim())
+                        .filter(Boolean),
                 };
             }).filter((ci: CartItem) => ci.product);
             setCart(items);
@@ -409,7 +510,7 @@ export default function POSPage() {
                 }
                 return currentCart.map(item => item.product.id === productId ? { ...item, quantity: item.quantity + 1 } : item);
             }
-            return [...currentCart, { product, quantity: 1 }];
+            return [...currentCart, { product, quantity: 1, selectedSNs: [] }];
         });
     }
 
@@ -435,7 +536,12 @@ export default function POSPage() {
             quantity = product.stock;
         }
 
-        setCart(currentCart => currentCart.map(item => item.product.id === productId ? { ...item, quantity } : item));
+        setCart(currentCart => currentCart.map(item => {
+            if (item.product.id !== productId) return item;
+            // Keep at most `quantity` selected SNs when the quantity shrinks.
+            const selectedSNs = item.selectedSNs.length > quantity ? item.selectedSNs.slice(0, quantity) : item.selectedSNs;
+            return { ...item, quantity, selectedSNs };
+        }));
     }
 
     const subtotal = cart.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
@@ -521,6 +627,49 @@ export default function POSPage() {
         return null;
     }, [isInstallment, existingInstallment, selectedPlan, subtotal, installmentPlans]);
 
+    // Build the expanded sale items: products with SNs send one sale item per
+    // selected SN (quantity 1 each), while serial-less products send a single
+    // quantity-based line. This matches what the POS backend consumes.
+    const buildExpandedItems = (item: CartItem) => {
+        const sns = item.selectedSNs.length > 0 ? item.selectedSNs : purchasedSNs(item.product);
+        if (sns.length === 0) {
+            return [{
+                productId: item.product.id,
+                productName: item.product.name,
+                quantity: item.quantity,
+                price: item.product.price,
+                taxPercent: Number(item.product.taxPercent) || 0,
+                serialNumber: '',
+            }];
+        }
+        return sns.map(sn => ({
+            productId: item.product.id,
+            productName: item.product.name,
+            quantity: 1,
+            price: item.product.price,
+            taxPercent: Number(item.product.taxPercent) || 0,
+            serialNumber: sn,
+        }));
+    };
+
+    // A product with serial numbers must have exactly `quantity` SNs checked
+    // before the bill can be completed or held.
+    const validateSelectedSNs = () => {
+        for (const item of cart) {
+            const sns = purchasedSNs(item.product);
+            if (sns.length === 0) continue;
+            if (item.quantity !== item.selectedSNs.length) {
+                toast({
+                    variant: 'destructive',
+                    title: `Select ${item.quantity} SN number${item.quantity > 1 ? 's' : ''}`,
+                    description: `Please select ${item.quantity} of ${sns.length} serial number(s) for ${item.product.name} in the order.`,
+                });
+                return false;
+            }
+        }
+        return true;
+    };
+
     const handleCompletePayment = async () => {
         if (!customerId) {
             toast({ variant: 'destructive', title: 'Customer not selected', description: 'Please select a customer to proceed.' });
@@ -531,29 +680,13 @@ export default function POSPage() {
             return;
         }
 
+        if (!validateSelectedSNs()) {
+            return;
+        }
+
         setIsProcessing(true);
         try {
-            const expandedItems = cart.flatMap(item => {
-                const sns = purchasedSNs(item.product);
-                if (sns.length === 0 || item.quantity <= 1) {
-                    return [{
-                        productId: item.product.id,
-                        productName: item.product.name,
-                        quantity: item.quantity,
-                        price: item.product.price,
-                        taxPercent: Number(item.product.taxPercent) || 0,
-                        serialNumber: sns[0] || '',
-                    }];
-                }
-                return Array.from({ length: Math.min(item.quantity, sns.length) }, (_, i) => ({
-                    productId: item.product.id,
-                    productName: item.product.name,
-                    quantity: 1,
-                    price: item.product.price,
-                    taxPercent: Number(item.product.taxPercent) || 0,
-                    serialNumber: sns[i] || sns[0],
-                }));
-            });
+            const expandedItems = cart.flatMap(item => buildExpandedItems(item));
 
             if (isInstallment && selectedPlanId && !existingInstallment) {
                 await api.post(`/pos/installment-sales?companyId=${companyId}`, {
@@ -627,29 +760,13 @@ export default function POSPage() {
             return;
         }
 
+        if (!validateSelectedSNs()) {
+            return;
+        }
+
         setIsProcessing(true);
         try {
-            const holdItems = cart.flatMap(item => {
-                const sns = purchasedSNs(item.product);
-                if (sns.length === 0 || item.quantity <= 1) {
-                    return [{
-                        productId: item.product.id,
-                        productName: item.product.name,
-                        quantity: item.quantity,
-                        price: item.product.price,
-                        taxPercent: Number(item.product.taxPercent) || 0,
-                        serialNumber: sns[0] || '',
-                    }];
-                }
-                return Array.from({ length: Math.min(item.quantity, sns.length) }, (_, i) => ({
-                    productId: item.product.id,
-                    productName: item.product.name,
-                    quantity: 1,
-                    price: item.product.price,
-                    taxPercent: Number(item.product.taxPercent) || 0,
-                    serialNumber: sns[i] || sns[0],
-                }));
-            });
+            const holdItems = cart.flatMap(item => buildExpandedItems(item));
             await api.post(`/pos/sales?companyId=${companyId}`, {
                 subscriberId: customerId,
                 subscriberName: selectedName || 'Unknown',
@@ -1028,23 +1145,15 @@ export default function POSPage() {
                                             )}
                                             <div className="flex-1 mx-3">
                                                 <p className="font-medium">{item.product.name}</p>
-                                                {(() => {
-                                                  const sns = purchasedSNs(item.product);
-                                                  if (sns.length === 0) return null;
-                                                  const startIdx = item.product.currentSerialIndex ?? 0;
-                                                  const endIdx = Math.min(startIdx + item.quantity - 1, sns.length - 1);
-                                                  const startSn = sns[startIdx] || sns[0];
-                                                  const endSn = sns[endIdx] || sns[0];
-                                                  const consumed = Math.min(item.quantity, sns.length - startIdx);
-                                                  return (
-                                                    <p className="text-[10px] font-mono text-muted-foreground truncate" title={sns.slice(startIdx, startIdx + item.quantity).join(', ')}>
-                                                      SN / MAC: {startIdx === endIdx || consumed <= 1
-                                                        ? `${startSn} (${startIdx + 1}/${sns.length})`
-                                                        : `${startSn} → ${endSn} (${consumed}/${sns.length})`
-                                                      }
-                                                    </p>
-                                                  );
-                                                })()}
+                                                <SNSSelect
+                                                    idPrefix={item.product.id}
+                                                    sns={purchasedSNs(item.product)}
+                                                    quantity={item.quantity}
+                                                    selected={item.selectedSNs}
+                                                    onChange={(next) => {
+                                                        setCart(currentCart => currentCart.map(it => it.product.id === item.product.id ? { ...it, selectedSNs: next } : it));
+                                                    }}
+                                                />
                                                 <p className="text-sm text-muted-foreground">PKR {item.product.price.toLocaleString()}</p>
                     <Input
                         type="number"

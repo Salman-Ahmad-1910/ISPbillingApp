@@ -35,6 +35,10 @@ func SetupRoutes(r *gin.Engine) {
 		c.Next()
 	})
 
+	// Every write / update / delete across all API groups lands in the audit
+	// trail (audit_logs) so the single System Log page captures all activity.
+	api.Use(middleware.AuditMiddleware())
+
 	// Accounts routes (temporarily public for testing)
 	accounts := api.Group("/accounts")
 	accounts.Use(func(c *gin.Context) {
@@ -98,7 +102,6 @@ func SetupRoutes(r *gin.Engine) {
 		// Custom users endpoint to handle password and role properly
 		adminUsers := admin.Group("/users")
 		adminUsers.Use(middleware.CompanyMiddleware(config.DB))
-		adminUsers.Use(middleware.AuditMiddleware())
 		{
 			adminUsers.GET("", controllers.GetAllUsers)
 			adminUsers.POST("", controllers.CreateSubUser)
@@ -116,7 +119,6 @@ func SetupRoutes(r *gin.Engine) {
 		recoveryOfficers := admin.Group("/recovery-officers")
 		recoveryOfficers.Use(middleware.AuthMiddleware())
 		recoveryOfficers.Use(middleware.CompanyMiddleware(config.DB))
-		recoveryOfficers.Use(middleware.AuditMiddleware())
 		{
 			recoveryOfficers.GET("", controllers.GetRecoveryOfficers)
 			recoveryOfficers.POST("", controllers.CreateSubUser)
@@ -137,7 +139,6 @@ func SetupRoutes(r *gin.Engine) {
 	protected := api.Group("/")
 	protected.Use(middleware.AuthMiddleware())
 	protected.Use(middleware.CompanyMiddleware(config.DB))
-	protected.Use(middleware.AuditMiddleware())
 
 	{
 		// Dashboard
@@ -344,7 +345,6 @@ billing.PUT("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "ed
 			c.Next()
 		})
 		dealers.Use(middleware.AuthMiddleware())
-		dealers.Use(middleware.AuditMiddleware())
 		{
 			dealers.POST("", controllers.CreateDealer)
 			// Register only GET, PUT for generic CRUD, DELETE uses custom logic
@@ -716,7 +716,6 @@ billing.PUT("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "ed
 		hr := api.Group("/hr")
 		hr.Use(middleware.AuthMiddleware())
 		hr.Use(middleware.CompanyMiddleware(config.DB))
-		hr.Use(middleware.AuditMiddleware())
 		hr.Use(func(c *gin.Context) {
 			// Get company ID from header first, then query parameter
 			companyIDHeader := c.GetHeader("x-company-id")

@@ -816,6 +816,7 @@ export type PurchaseItem = {
   productId: string;
   productName: string;
   quantity: number;
+  quantityEntered?: number;
   purchasePrice: number;
   sellingPrice: number;
   unitType: string;
@@ -826,6 +827,7 @@ export type PurchaseItem = {
   disc: number;
   expiryDate?: string;
   serialNumber?: string;
+  mergeExisting?: boolean;
 };
 
 export type Message = {

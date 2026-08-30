@@ -93,7 +93,10 @@ export const columns = ({ onEdit, onPay, onPrint, onDelete, companyName }: Purch
     id: 'quantity',
     header: 'Quantity',
     cell: ({ row }) => {
-      const totalQty = row.original.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+      const totalQty = row.original.items?.reduce(
+        (sum, item) => sum + (Number(item.quantityEntered) || item.quantity || 0),
+        0,
+      ) || 0;
       return <div className="font-medium">{totalQty}</div>;
     },
   },
