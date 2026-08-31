@@ -194,6 +194,7 @@ function SNSSelect({
 }) {
     const ref = useRef<HTMLDivElement>(null);
     const [open, setOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
         function handleClick(e: MouseEvent) {
@@ -210,6 +211,11 @@ function SNSSelect({
     }
 
     const selectedSet = new Set(selected);
+    const uniqueSns = Array.from(new Set(sns));
+    const filteredSns = searchTerm.trim()
+        ? uniqueSns.filter(sn => sn.toLowerCase().includes(searchTerm.trim().toLowerCase()))
+        : uniqueSns;
+
     const toggle = (sn: string) => {
         if (selectedSet.has(sn)) {
             onChange(selected.filter(s => s !== sn));
@@ -239,29 +245,48 @@ function SNSSelect({
                     <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
                 </div>
                 {open && (
-                    <div className="absolute z-50 mt-1 w-full bg-popover border rounded-md shadow-lg max-h-48 overflow-y-auto">
-                        {sns.map(sn => {
-                            const checked = selectedSet.has(sn);
-                            const disabled = !checked && selected.length >= quantity;
-                            const id = `sn-${idPrefix}-${sn}`;
-                            return (
-                                <label
-                                    key={sn}
-                                    htmlFor={id}
-                                    className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer text-sm transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent'}`}
-                                >
-                                    <Checkbox
-                                        id={id}
-                                        checked={checked}
-                                        disabled={disabled}
-                                        onCheckedChange={() => toggle(sn)}
-                                    />
-                                    <span className="font-mono text-xs truncate">{sn}</span>
-                                </label>
-                            );
-                        })}
+                    <div className="absolute z-50 mt-1 w-full bg-popover border rounded-md shadow-lg">
+                        <div className="p-2 border-b bg-popover">
+                            <div className="relative">
+                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                                <Input
+                                    autoFocus
+                                    placeholder="Search SN..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="h-8 pl-8 text-sm"
+                                />
+                            </div>
+                        </div>
+                        <div className="max-h-44 overflow-y-auto">
+                            {filteredSns.length === 0 ? (
+                                <div className="px-3 py-4 text-center text-xs text-muted-foreground">No matching SN found</div>
+                            ) : (
+                                filteredSns.map((sn, idx) => {
+                                    const checked = selectedSet.has(sn);
+                                    const disabled = !checked && selected.length >= quantity;
+                                    const id = `sn-${idPrefix}-${idx}`;
+                                    return (
+                                        <label
+                                            key={`${sn}-${idx}`}
+                                            htmlFor={id}
+                                            className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer text-sm transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent'}`}
+                                        >
+                                            <Checkbox
+                                                id={id}
+                                                checked={checked}
+                                                disabled={disabled}
+                                                onCheckedChange={() => toggle(sn)}
+                                            />
+                                            <span className="font-mono text-xs truncate">{sn}</span>
+                                        </label>
+                                    );
+                                })
+                            )}
+                        </div>
                         {quantity > 0 && selected.length === quantity && (
-                            <div className="px-3 py-1.5 text-[10px] text-emerald-600 dark:text-emerald-400 border-t">
+                            <div className="px-3 py-1.5 text-[10px] text-emerald-600 dark:text-emerald-400 border-t bg-popover">
                                 All selected — uncheck to change
                             </div>
                         )}
@@ -1145,24 +1170,31 @@ export default function POSPage() {
                                             )}
                                             <div className="flex-1 mx-3">
                                                 <p className="font-medium">{item.product.name}</p>
-                                                <SNSSelect
-                                                    idPrefix={item.product.id}
-                                                    sns={purchasedSNs(item.product)}
-                                                    quantity={item.quantity}
-                                                    selected={item.selectedSNs}
-                                                    onChange={(next) => {
-                                                        setCart(currentCart => currentCart.map(it => it.product.id === item.product.id ? { ...it, selectedSNs: next } : it));
-                                                    }}
-                                                />
-                                                <p className="text-sm text-muted-foreground">PKR {item.product.price.toLocaleString()}</p>
-                    <Input
-                        type="number"
-                        value={item.quantity}
-                        onChange={(e) => updateCartQuantity(item.product.id, parseInt(e.target.value) || 0)}
-                        className="h-8 w-20 mt-1"
-                        min="0"
-                        max={item.product.stock}
-                    />
+                                                <div className="flex items-center gap-3 mt-1 flex-wrap">
+                                                    <p className="text-sm text-muted-foreground">PKR {item.product.price.toLocaleString()}</p>
+                                                    <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                                                        Qty
+                                                        <Input
+                                                            type="number"
+                                                            value={item.quantity}
+                                                            onChange={(e) => updateCartQuantity(item.product.id, parseInt(e.target.value) || 0)}
+                                                            className="h-8 w-16"
+                                                            min="0"
+                                                            max={item.product.stock}
+                                                        />
+                                                    </label>
+                                                </div>
+                                                <div className="mt-2">
+                                                    <SNSSelect
+                                                        idPrefix={item.product.id}
+                                                        sns={purchasedSNs(item.product)}
+                                                        quantity={item.quantity}
+                                                        selected={item.selectedSNs}
+                                                        onChange={(next) => {
+                                                            setCart(currentCart => currentCart.map(it => it.product.id === item.product.id ? { ...it, selectedSNs: next } : it));
+                                                        }}
+                                                    />
+                                                </div>
                                             </div>
                                             <div className="flex flex-col items-end gap-2">
                                                 <p className="font-medium">PKR {(item.product.price * item.quantity).toLocaleString()}</p>

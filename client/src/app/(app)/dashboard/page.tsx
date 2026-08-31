@@ -389,6 +389,51 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
             </Link>
+            <Link href="/collection/paid-subscribers" className="block">
+              <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[140px] cursor-pointer h-full">
+                <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-green-500 to-emerald-500" />
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
+                  <CardTitle className="text-[11px] font-medium leading-tight">Paid Amount</CardTitle>
+                  <div className="rounded-lg p-1.5 bg-gradient-to-br from-green-500 to-emerald-500 text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md">
+                    <CircleDollarSign className="h-3 w-3" />
+                  </div>
+                </CardHeader>
+                <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
+                  <div className="text-2xl font-bold tracking-tight">PKR {(data?.paidAmount || 0).toLocaleString()}</div>
+                  <p className="text-xs text-muted-foreground mt-1">received from fully paid subscribers</p>
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href="/collection/paid-subscribers" className="block">
+              <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[140px] cursor-pointer h-full">
+                <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-lime-500 to-green-500" />
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
+                  <CardTitle className="text-[11px] font-medium leading-tight">Paid Subscribers</CardTitle>
+                  <div className="rounded-lg p-1.5 bg-gradient-to-br from-lime-500 to-green-500 text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md">
+                    <CheckCircle2 className="h-3 w-3" />
+                  </div>
+                </CardHeader>
+                <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
+                  <div className="text-2xl font-bold tracking-tight">{data?.subscribersStats?.paid || 0}</div>
+                  <p className="text-xs text-muted-foreground mt-1">subscribers who cleared their dues</p>
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href="/collection/advance-subscribers" className="block">
+              <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[140px] cursor-pointer h-full">
+                <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-yellow-500 to-amber-500" />
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">
+                  <CardTitle className="text-[11px] font-medium leading-tight">Advance Amount</CardTitle>
+                  <div className="rounded-lg p-1.5 bg-gradient-to-br from-yellow-500 to-amber-500 text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md">
+                    <Landmark className="h-3 w-3" />
+                  </div>
+                </CardHeader>
+                <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
+                  <div className="text-2xl font-bold tracking-tight">PKR {(data?.advanceAmount || 0).toLocaleString()}</div>
+                  <p className="text-xs text-muted-foreground mt-1">overpaid / advance credit</p>
+                </CardContent>
+              </Card>
+            </Link>
           </div>
         </div>
       )}

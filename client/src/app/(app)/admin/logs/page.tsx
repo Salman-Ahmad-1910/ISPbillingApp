@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CalendarIcon, Download, Search, Filter, RefreshCw, User, Activity, AlertTriangle, CheckCircle, ScrollText, Printer, RotateCcw, X, Hash, ShieldCheck } from 'lucide-react';
+import { CalendarIcon, Download, Search, Filter, RefreshCw, User, Activity, AlertTriangle, CheckCircle, ScrollText, Printer, RotateCcw, X, Hash, ShieldCheck, ChevronDown, ChevronRight, ListTree } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -76,6 +76,24 @@ const CONNECTION_TYPES = [
 
 const PAGE_SIZES = [10, 20, 50, 100];
 
+const SERIAL_PREVIEW_COUNT = 3;
+
+function splitSerials(serials: string): string[] {
+  return String(serials || '')
+    .split(/[\s,\-]+/)
+    .map((s) => s.trim())
+    .filter(Boolean) as string[];
+}
+
+function serialChips(serials: string[]) {
+  return serials.map((sn, i) => (
+    <Badge key={`${sn}-${i}`} variant="outline" className="text-[10px] font-mono">
+      <Hash className="h-2.5 w-2.5 mr-1" />
+      {sn}
+    </Badge>
+  ));
+}
+
 export default function LogsPage() {
   const { companyId, companies } = useCompany();
   const { toast } = useToast();
@@ -90,6 +108,7 @@ export default function LogsPage() {
   const [pages, setPages] = useState<string[]>([]);
   const [printOpen, setPrintOpen] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
 
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: new Date(new Date().setDate(new Date().getDate() - 7)),
@@ -249,6 +268,15 @@ export default function LogsPage() {
   ] : [];
 
   const canRestore = (log: LogEntry) => log.action === 'delete' && log.details?.entityId;
+
+  const toggleExpand = (id: string) => {
+    setExpandedLogs((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -466,6 +494,7 @@ export default function LogsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-8"></TableHead>
                   <TableHead>Timestamp</TableHead>
                   <TableHead>User</TableHead>
                   <TableHead>User Type</TableHead>
@@ -481,78 +510,99 @@ export default function LogsPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8">
+                    <TableCell colSpan={11} className="text-center py-8">
                       Loading logs...
                     </TableCell>
                   </TableRow>
                 ) : logsData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8">
+                    <TableCell colSpan={11} className="text-center py-8">
                       No logs found for the selected criteria.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  logsData.map((log) => (
-                    <TableRow key={log.id}>
-                      <TableCell className="whitespace-nowrap text-sm">
-                        {format(new Date(log.timestamp), 'dd MMM yyyy HH:mm:ss')}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{log.userName || '—'}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={cn('border flex items-center gap-1', ROLE_STYLES[log.userRole?.toLowerCase()] || 'bg-gray-100 text-gray-700 border-gray-200')}>
-                          <ShieldCheck className="h-3 w-3" />
-                          {log.userRole || '-'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell><Badge variant="secondary">{log.action}</Badge></TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Activity className="h-4 w-4 text-muted-foreground" />
-                          <span>{log.module}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{log.page || '-'}</TableCell>
-                      <TableCell>
-                        {log.serialNumbers ? (
-                          <div className="flex flex-wrap gap-1 max-w-[200px]">
-                            {log.serialNumbers.split(',').map((sn, i) => (
-                              <Badge key={i} variant="outline" className="text-[10px] font-mono">
-                                <Hash className="h-2.5 w-2.5 mr-1" />
-                                {sn.trim()}
-                              </Badge>
-                            ))}
+                  logsData.map((log) => {
+                    const serials = splitSerials(log.serialNumbers || '');
+                    const hasExtra = serials.length > SERIAL_PREVIEW_COUNT;
+                    const expanded = expandedLogs.has(log.id);
+                    const showAllSerials = expanded || !hasExtra;
+                    return (
+                      <TableRow
+                        key={log.id}
+                        className={`transition-colors ${hasExtra ? 'cursor-pointer hover:bg-muted/40' : ''}`}
+                        onClick={hasExtra ? () => toggleExpand(log.id) : undefined}
+                      >
+                        <TableCell className="text-center">
+                          {hasExtra ? (
+                            expanded ? (
+                              <ChevronDown className="h-4 w-4 text-muted-foreground mx-auto" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 text-muted-foreground mx-auto" />
+                            )
+                          ) : (
+                            <ListTree className="h-4 w-4 text-muted-foreground/40 mx-auto" />
+                          )}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-sm">
+                          {format(new Date(log.timestamp), 'dd MMM yyyy HH:mm:ss')}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium">{log.userName || '—'}</span>
                           </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="max-w-[260px]">
-                        <span className="line-clamp-2 text-sm">{log.description || '—'}</span>
-                      </TableCell>
-                      <TableCell>{getStatusBadge(log.status)}</TableCell>
-                      <TableCell className="text-center">
-                        {canRestore(log) ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
-                            onClick={() => handleRestore(log)}
-                            disabled={restoringId === log.id}
-                          >
-                            <RotateCcw className={`mr-1.5 h-3.5 w-3.5 ${restoringId === log.id ? 'animate-spin' : ''}`} />
-                            {restoringId === log.id ? 'Restoring...' : 'Restore'}
-                          </Button>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={cn('border flex items-center gap-1', ROLE_STYLES[log.userRole?.toLowerCase()] || 'bg-gray-100 text-gray-700 border-gray-200')}>
+                            <ShieldCheck className="h-3 w-3" />
+                            {log.userRole || '-'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell><Badge variant="secondary">{log.action}</Badge></TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Activity className="h-4 w-4 text-muted-foreground" />
+                            <span>{log.module}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{log.page || '-'}</TableCell>
+                        <TableCell>
+                          {serials.length > 0 ? (
+                            <div className="flex flex-wrap gap-1 max-w-[200px]">
+                              {serialChips(showAllSerials ? serials : serials.slice(0, SERIAL_PREVIEW_COUNT))}
+                              {!showAllSerials && (
+                                <Badge variant="secondary" className="text-[10px] cursor-pointer">
+                                  +{serials.length - SERIAL_PREVIEW_COUNT} more
+                                </Badge>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className={`${expanded ? 'max-w-none' : 'max-w-[260px]'}`}>
+                          <span className={cn('text-sm', !expanded && 'line-clamp-2')}>{log.description || '—'}</span>
+                        </TableCell>
+                        <TableCell>{getStatusBadge(log.status)}</TableCell>
+                        <TableCell className="text-center">
+                          {canRestore(log) ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+                              onClick={(e) => { e.stopPropagation(); handleRestore(log); }}
+                              disabled={restoringId === log.id}
+                            >
+                              <RotateCcw className={`mr-1.5 h-3.5 w-3.5 ${restoringId === log.id ? 'animate-spin' : ''}`} />
+                              {restoringId === log.id ? 'Restoring...' : 'Restore'}
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>

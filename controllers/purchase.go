@@ -782,6 +782,7 @@ pi.id                                           AS purchase_item_id,
 		WHERE pi.company_id = ?
 			AND pi.deleted_at IS NULL
 			AND pr.id IS NOT NULL
+			AND pr.deleted_at IS NULL
 		ORDER BY pi.product_name
 	`, companyID).Scan(&products).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch purchased products", "details": err.Error()})

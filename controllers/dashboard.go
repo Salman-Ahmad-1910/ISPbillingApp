@@ -97,6 +97,17 @@ func GetDashboardData(c *gin.Context) {
 	var paidCount int64
 	config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL AND remaining_amount <= 0`+packageClause, companyUUID).Scan(&paidCount)
 
+	// Paid amount = total payments received from subscribers who have fully
+	// cleared their dues in the current billing cycle.
+	var paidAmount float64
+	config.DB.Raw(`
+		SELECT COALESCE(SUM(CAST(p.amount AS numeric)), 0)
+		FROM payments p
+		JOIN connections c ON c.id = p.subscriber_id AND c.deleted_at IS NULL
+		WHERE p.company_id = ? AND p.deleted_at IS NULL AND c.remaining_amount <= 0
+	`+packageClause, companyUUID).Scan(&paidAmount)
+
+
 	var advanceCount int64
 	config.DB.Raw(`SELECT COUNT(*) FROM connections WHERE company_id = ? AND deleted_at IS NULL AND payment_status = 'advance'`+packageClause, companyUUID).Scan(&advanceCount)
 
@@ -206,6 +217,7 @@ func GetDashboardData(c *gin.Context) {
 		"totalCollectionMonth": totalCollectionMonth,
 		"totalCollection":      totalCollection,
 		"pendingAmount":        pendingAmount,
+		"paidAmount":           paidAmount,
 		"receivableAmount":     receivableAmount,
 		"receivedAllTime":      receivedAllTime,
 		"receivedThisMonth":    receivedThisMonth,
