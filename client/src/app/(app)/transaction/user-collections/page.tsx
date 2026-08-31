@@ -36,6 +36,8 @@ import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
+import { useUserPermissions } from '@/hooks/usePermissions';
+import { hasFeaturePermission, TOTAL_COLLECTED_PERMISSION } from '@/lib/permission-pages';
 import { smartMatchScore } from '@/lib/search';
 import { Loader2, MoreHorizontal, Wallet, DollarSign, UserCheck, Trash2, Pencil, Copy, FileText, Users, CalendarClock, Clock } from 'lucide-react';
 
@@ -74,6 +76,13 @@ export default function SubscriberCollectionsPage() {
   const currentCompany = companies.find(c => c.id === companyId);
   const { toast } = useToast();
   const { user } = useUser();
+  const { userRole, grantedPermissions, permissionsConfigured } = useUserPermissions();
+  const canViewTotalCollected = hasFeaturePermission(
+    grantedPermissions,
+    permissionsConfigured,
+    ['admin', 'owner', 'manager'].includes(userRole),
+    TOTAL_COLLECTED_PERMISSION,
+  );
   const queryClient = useQueryClient();
 
   const [selectedSubscriberId, setSelectedSubscriberId] = useState<string | null>(null);
@@ -487,17 +496,19 @@ export default function SubscriberCollectionsPage() {
             </div>
           </div>
         </div>
-        <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
-              <DollarSign className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">Total Collected</p>
-              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">PKR {totalAmount.toLocaleString()}</p>
+        {canViewTotalCollected && (
+          <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
+                <DollarSign className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Total Collected</p>
+                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">PKR {totalAmount.toLocaleString()}</p>
+              </div>
             </div>
           </div>
-        </div>
+        )}
         <Link href="/collection/pending-subscribers" className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:bg-accent/50 cursor-pointer block">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">

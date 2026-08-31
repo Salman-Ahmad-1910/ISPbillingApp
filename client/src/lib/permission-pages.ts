@@ -25,6 +25,7 @@ export const PERMISSION_DEFS: PermissionDef[] = [
   { id: '14079', name: 'New Collection', module: 'Transactions' },
   { id: '13308', name: 'Reprint Slip', module: 'Transactions' },
   { id: '13304', name: 'Subscribers Collections', module: 'Transactions' },
+  { id: '15335', name: 'Total Collected Card', module: 'Transactions' },
   { id: '13320', name: 'Bills Creator', module: 'Transactions' },
   { id: '13321', name: 'Dealers Collections', module: 'Transactions' },
   { id: '13357', name: 'Baddebt Collection', module: 'Transactions' },
@@ -94,6 +95,10 @@ export const PERMISSION_DEFS: PermissionDef[] = [
 // Permission id that controls whether a user can see the dashboard summary
 // section (subscriber overview + financial metric cards).
 export const DASHBOARD_SUMMARY_PERMISSION = '15334';
+
+// Permission id that controls whether a non-admin user can see the "Total
+// Collected" amount card on the Subscriber Collections page.
+export const TOTAL_COLLECTED_PERMISSION = '15335';
 
 // Feature-level permission check for a numeric permission id stored on the
 // user (user.permissions / grantedPermissions). When an admin has NOT
