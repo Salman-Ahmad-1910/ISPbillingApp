@@ -71,6 +71,15 @@ func findConnections(c *gin.Context) {
 		return
 	}
 
+	// Reflect the true outstanding (package fee - payments this month) on each
+	// returned row so the frontend shows/derives the correct remaining amount,
+	// even for fully-unpaid subscribers whose stored remaining_amount may be
+	// stale/zero at month boundaries.
+	monthStart := time.Now().Format("2006-01") + "-01"
+	for i := range connections {
+		connections[i].RemainingAmount = connectionOutstanding(connections[i], monthStart)
+	}
+
 	utils.SuccessResponse(c, "Connections retrieved", connections)
 }
 
