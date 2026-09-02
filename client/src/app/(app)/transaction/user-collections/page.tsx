@@ -134,7 +134,6 @@ export default function SubscriberCollectionsPage() {
     if (!q) return [];
     const all = connections as Connection[];
     return all
-      .filter(c => c.paymentStatus !== 'advance' && getPackagePrice(c) > 0)
       .map((c) => ({
         c,
         s: smartMatchScore(q, [c.internetId, c.id], [c.name], [c.cell, c.mobile]),
