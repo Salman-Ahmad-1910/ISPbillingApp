@@ -15,7 +15,9 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SubscriberSelect } from '@/components/ui/subscriber-select';
-import type { Complaint, Subscriber, Staff } from '@/lib/types';
+import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
+import { UserRound } from 'lucide-react';
+import type { Complaint, Subscriber, Staff, RecoveryOfficer } from '@/lib/types';
 import { complaintSchema } from '@/lib/schemas';
 import { Loader2 } from 'lucide-react';
 
@@ -25,12 +27,13 @@ interface ComplaintFormProps {
   complaint: Complaint | null;
   subscribers: Subscriber[];
   staff: Staff[];
+  recoveryOfficers: RecoveryOfficer[];
   onSave: (data: ComplaintFormValues) => void;
   onCancel: () => void;
   isSaving?: boolean;
 }
 
-export function ComplaintForm({ complaint, subscribers, staff, onSave, onCancel, isSaving }: ComplaintFormProps) {
+export function ComplaintForm({ complaint, subscribers, staff, recoveryOfficers, onSave, onCancel, isSaving }: ComplaintFormProps) {
   const form = useForm<ComplaintFormValues>({
     resolver: zodResolver(complaintSchema),
     defaultValues: complaint || {
@@ -41,6 +44,11 @@ export function ComplaintForm({ complaint, subscribers, staff, onSave, onCancel,
       assignedToId: 'unassigned',
     },
   });
+
+  const assigneeOptions = [
+    ...(staff || []).map((member) => ({ id: member.id, name: member.name, secondary: `${member.designation} (Staff)` })),
+    ...(recoveryOfficers || []).map((officer) => ({ id: officer.id, name: officer.name, secondary: 'Recovery Officer' })),
+  ];
 
   function onSubmit(values: ComplaintFormValues) {
     onSave(values);
@@ -137,21 +145,16 @@ export function ComplaintForm({ complaint, subscribers, staff, onSave, onCancel,
           render={({ field }) => (
             <FormItem>
               <FormLabel>Assign To</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value || ""}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Assign a staff member (optional)" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {staff.map((member) => (
-                    <SelectItem key={member.id} value={member.id}>
-                      {member.name} ({member.designation})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <FormControl>
+                <SearchableDropdown
+                  icon={UserRound}
+                  color="text-emerald-600"
+                  items={assigneeOptions}
+                  value={field.value === 'unassigned' ? '' : (field.value || '')}
+                  onValueChange={(id) => field.onChange(id || 'unassigned')}
+                  placeholder="Search staff or recovery officer..."
+                />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}

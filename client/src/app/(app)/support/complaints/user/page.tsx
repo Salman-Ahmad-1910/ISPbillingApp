@@ -20,12 +20,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Ticket, MoreHorizontal, Edit3, Trash2, Search, ListTodo, CircleCheck, CheckCircle2, Clock, Loader2, PlusCircle, AlertCircle, CircleDot } from 'lucide-react';
+import { Ticket, MoreHorizontal, Edit3, Trash2, Search, ListTodo, CircleCheck, CheckCircle2, Clock, Loader2, PlusCircle, AlertCircle, CircleDot, UserRound } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
-import type { Connection, Area, Complaint } from '@/lib/types';
+import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
+import type { Connection, Area, Complaint, Staff, RecoveryOfficer } from '@/lib/types';
 import { smartMatch } from '@/lib/search';
 import {
   STATUS_COLORS,
@@ -47,6 +48,15 @@ export default function SubscriberComplaintPage() {
   const { data: complaints = [], isLoading, refetch } = useGenericQuery<Complaint>('support/complaints', companyId ?? undefined);
   const { data: connections = [] } = useGenericQuery<Connection>('admin/connections', companyId ?? undefined);
   const { data: areas = [] } = useGenericQuery<Area>('network/areas', companyId ?? undefined);
+  const { data: staff = [] } = useGenericQuery<Staff>('hr/staff', companyId ?? undefined);
+  const { data: recoveryOfficers = [] } = useGenericQuery<RecoveryOfficer>('admin/recovery-officers', companyId ?? undefined);
+
+  const assigneeOptions = useMemo(() => {
+    const options: { id: string; name: string; secondary?: string }[] = [];
+    (staff as Staff[]).forEach((s) => options.push({ id: s.id, name: s.name, secondary: `${s.designation} (Staff)` }));
+    (recoveryOfficers as RecoveryOfficer[]).forEach((r) => options.push({ id: r.id, name: r.name, secondary: 'Recovery Officer' }));
+    return options;
+  }, [staff, recoveryOfficers]);
 
   const [pageSize, setPageSize] = useState('10');
   const [currentPage, setCurrentPage] = useState(1);
@@ -68,11 +78,15 @@ export default function SubscriberComplaintPage() {
   const [editComplaint, setEditComplaint] = useState<Complaint | null>(null);
   const [editDescription, setEditDescription] = useState('');
   const [editStatus, setEditStatus] = useState('');
+  const [editOperatorId, setEditOperatorId] = useState('');
   const [showEdit, setShowEdit] = useState(false);
   const [deleteComplaint, setDeleteComplaint] = useState<Complaint | null>(null);
   const [showDelete, setShowDelete] = useState(false);
   const [statusComplaint, setStatusComplaint] = useState<Complaint | null>(null);
   const [showStatus, setShowStatus] = useState(false);
+  const [allocateComplaint, setAllocateComplaint] = useState<Complaint | null>(null);
+  const [allocateOperatorId, setAllocateOperatorId] = useState('');
+  const [showAllocate, setShowAllocate] = useState(false);
 
   const kpiData = useMemo(() => [
     { title: 'Total Complaints', value: complaints.length, icon: ListTodo, gradient: 'from-blue-500 to-cyan-600' },
@@ -157,7 +171,7 @@ export default function SubscriberComplaintPage() {
         ...editComplaint,
         description: editDescription,
         status: editStatus,
-        assignedToId: editComplaint.assignedToId || null,
+        assignedToId: editOperatorId || null,
       });
       toast({ title: 'Success', description: 'Complaint updated.' });
       setShowEdit(false);
@@ -165,6 +179,26 @@ export default function SubscriberComplaintPage() {
       refetch();
     } catch (err: any) {
       toast({ variant: 'destructive', title: 'Error', description: err.response?.data?.message || 'Update failed' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleAllocate = async () => {
+    if (!allocateComplaint || !allocateOperatorId) return;
+    setIsSaving(true);
+    try {
+      await api.put(`/support/complaints/${allocateComplaint.id}`, {
+        ...allocateComplaint,
+        assignedToId: allocateOperatorId,
+      });
+      toast({ title: 'Success', description: `Complaint allocated successfully.` });
+      setShowAllocate(false);
+      setAllocateComplaint(null);
+      setAllocateOperatorId('');
+      refetch();
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Error', description: err.response?.data?.message || 'Allocation failed' });
     } finally {
       setIsSaving(false);
     }
@@ -266,24 +300,7 @@ export default function SubscriberComplaintPage() {
       <Card className="transition-all duration-300 hover:shadow-md">
         <CardContent className="pt-6">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Show</span>
-              <Select value={pageSize} onValueChange={(v) => { setPageSize(v); setCurrentPage(1); }}>
-                <SelectTrigger className="w-16">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent portal={false}>
-                  <SelectItem value="5">5</SelectItem>
-                  <SelectItem value="10">10</SelectItem>
-                  <SelectItem value="25">25</SelectItem>
-                  <SelectItem value="50">50</SelectItem>
-                  <SelectItem value="100">100</SelectItem>
-                </SelectContent>
-              </Select>
-              <span className="text-sm text-muted-foreground">entries</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="relative max-w-sm">
+            <div className="relative max-w-sm w-full sm:w-auto">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search by ID, subscriber or description..."
@@ -292,6 +309,7 @@ export default function SubscriberComplaintPage() {
                   className="pl-8"
                 />
               </div>
+            <div className="flex items-center gap-2">
               <Button onClick={() => setShowForm(true)} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm">
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Add Complaint
@@ -352,7 +370,11 @@ export default function SubscriberComplaintPage() {
                               <CircleDot className="mr-2 h-4 w-4" />
                               Status
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="data-[highlighted]:text-emerald-600" onClick={() => { setEditComplaint(item); setEditDescription(item.description); setEditStatus(item.status); setShowEdit(true); }}>
+                            <DropdownMenuItem className="data-[highlighted]:text-violet-600" onClick={() => { setAllocateComplaint(item); setAllocateOperatorId(item.assignedToId || ''); setShowAllocate(true); }}>
+                              <UserRound className="mr-2 h-4 w-4" />
+                              Allocate
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="data-[highlighted]:text-emerald-600" onClick={() => { setEditComplaint(item); setEditDescription(item.description); setEditStatus(item.status); setEditOperatorId(item.assignedToId || ''); setShowEdit(true); }}>
                               <Edit3 className="mr-2 h-4 w-4" />
                               Edit
                             </DropdownMenuItem>
@@ -371,9 +393,23 @@ export default function SubscriberComplaintPage() {
           </div>
 
           {filteredData.length > 0 && (
-            <div className="flex items-center justify-between mt-4">
-              <div className="text-sm text-muted-foreground">
-                Showing {((currentPage - 1) * parseInt(pageSize)) + 1} to {Math.min(currentPage * parseInt(pageSize), filteredData.length)} of {filteredData.length} entries
+            <div className="flex items-center justify-between mt-4 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <Select value={pageSize} onValueChange={(v) => { setPageSize(v); setCurrentPage(1); }}>
+                  <SelectTrigger className="w-16">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent portal={false}>
+                    <SelectItem value="5">5</SelectItem>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="text-sm text-muted-foreground">
+                  Showing {((currentPage - 1) * parseInt(pageSize)) + 1} to {Math.min(currentPage * parseInt(pageSize), filteredData.length)} of {filteredData.length} entries
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1}>Previous</Button>
@@ -518,6 +554,16 @@ export default function SubscriberComplaintPage() {
               <Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
             </div>
 
+            <SearchableDropdown
+              label="Assign To"
+              icon={UserRound}
+              color="text-emerald-600"
+              items={assigneeOptions}
+              value={operatorId}
+              onValueChange={setOperatorId}
+              placeholder="Search staff or recovery officer..."
+            />
+
             <div className="space-y-1">
               <Label>Complaint</Label>
               <Textarea
@@ -563,6 +609,15 @@ export default function SubscriberComplaintPage() {
               <Label>Description</Label>
               <Textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={3} />
             </div>
+            <SearchableDropdown
+              label="Assign To"
+              icon={UserRound}
+              color="text-emerald-600"
+              items={assigneeOptions}
+              value={editOperatorId}
+              onValueChange={setEditOperatorId}
+              placeholder="Search staff or recovery officer..."
+            />
             <div className="flex justify-end gap-3 pt-2">
               <Button variant="outline" onClick={() => { setShowEdit(false); setEditComplaint(null); }}>Cancel</Button>
               <Button onClick={handleEdit} disabled={isSaving} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white">Save</Button>
@@ -583,6 +638,36 @@ export default function SubscriberComplaintPage() {
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="outline" onClick={() => { setShowDelete(false); setDeleteComplaint(null); }}>Cancel</Button>
             <Button onClick={handleDeleteConfirm} disabled={isSaving} variant="destructive">{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Delete</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showAllocate} onOpenChange={(open) => { setShowAllocate(open); if (!open) setAllocateComplaint(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Allocate Complaint</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <Label>Complaint</Label>
+              <Input value={allocateComplaint ? `${allocateComplaint.subscriberName} - ${allocateComplaint.description}` : ''} readOnly />
+            </div>
+            <SearchableDropdown
+              label="Assign To"
+              icon={UserRound}
+              color="text-emerald-600"
+              items={assigneeOptions}
+              value={allocateOperatorId}
+              onValueChange={setAllocateOperatorId}
+              placeholder="Search staff or recovery officer..."
+            />
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={() => { setShowAllocate(false); setAllocateComplaint(null); }}>Cancel</Button>
+              <Button onClick={handleAllocate} disabled={isSaving || !allocateOperatorId} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white">
+                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Allocate
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

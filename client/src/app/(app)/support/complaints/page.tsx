@@ -8,7 +8,7 @@ import { LoadingSpinner } from '@/components/shared/loading-spinner';
 import { ClientPage } from './_components/client-page';
 import { useCompany } from '@/context/company-context';
 import { useMemo } from 'react';
-import type { Staff, Complaint, Subscriber } from '@/lib/types';
+import type { Staff, Complaint, Subscriber, RecoveryOfficer } from '@/lib/types';
 
 
 export default function ComplaintsPage() {
@@ -17,6 +17,7 @@ export default function ComplaintsPage() {
   const { data: complaints = [], isLoading: isLoadingComplaints } = useGenericQuery<Complaint>('support/complaints', companyId ?? undefined);
   const { data: subscribers = [], isLoading: isLoadingSubscribers } = useGenericQuery<Subscriber>('subscribers', companyId ?? undefined);
   const { data: staffData = [], isLoading: isLoadingStaff } = useGenericQuery<Staff>('hr/staff', companyId ?? undefined);
+  const { data: recoveryOfficers = [], isLoading: isLoadingOfficers } = useGenericQuery<RecoveryOfficer>('admin/recovery-officers', companyId ?? undefined);
 
   const kpiData = useMemo(() => [
     { title: 'Total Complaints', value: complaints.length, icon: MessageSquare, gradient: 'from-blue-500 to-cyan-600' },
@@ -47,7 +48,7 @@ export default function ComplaintsPage() {
     );
   }
 
-  if (isLoadingComplaints || isLoadingSubscribers || isLoadingStaff) {
+  if (isLoadingComplaints || isLoadingSubscribers || isLoadingStaff || isLoadingOfficers) {
     return <LoadingSpinner text="Loading complaints..." />;
   }
 
@@ -83,7 +84,7 @@ export default function ComplaintsPage() {
 
       <Card className="transition-all duration-300 hover:shadow-md">
         <CardContent className="p-0">
-          <ClientPage data={complaints} subscribers={subscribers} staff={staffData} />
+          <ClientPage data={complaints} subscribers={subscribers} staff={staffData} recoveryOfficers={recoveryOfficers} />
         </CardContent>
       </Card>
     </div>

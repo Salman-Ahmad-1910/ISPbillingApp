@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useCompany } from '@/context/company-context';
 import { z } from 'zod';
 
-import type { Complaint, Subscriber, Staff } from '@/lib/types';
+import type { Complaint, Subscriber, Staff, RecoveryOfficer } from '@/lib/types';
 import { complaintSchema } from '@/lib/schemas';
 import { smartMatch } from '@/lib/search';
 
@@ -29,9 +29,10 @@ interface ClientPageProps {
     data: Complaint[];
     subscribers: Subscriber[];
     staff: Staff[];
+    recoveryOfficers?: RecoveryOfficer[];
 }
 
-export function ClientPage({ data, subscribers, staff }: ClientPageProps) {
+export function ClientPage({ data, subscribers, staff, recoveryOfficers = [] }: ClientPageProps) {
     const { companyId } = useCompany();
     const { toast } = useToast();
     const queryClient = useQueryClient();
@@ -206,6 +207,7 @@ export function ClientPage({ data, subscribers, staff }: ClientPageProps) {
                                 isSaving={isSaving}
                                 subscribers={subscribers}
                                 staff={staff}
+                                recoveryOfficers={recoveryOfficers}
                             />
                         </DialogContent>
                     </Dialog>
