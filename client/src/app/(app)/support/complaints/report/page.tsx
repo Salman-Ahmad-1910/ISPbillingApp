@@ -10,7 +10,7 @@ import { FileText, Eye, Download, Printer, BarChart3, AlertCircle, CheckCircle2,
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import api from '@/lib/api';
-import type { Complaint } from '@/lib/types';
+import type { Complaint, Staff, RecoveryOfficer } from '@/lib/types';
 
 const statusColors: Record<string, string> = {
   'open': 'bg-yellow-100 text-yellow-800',
@@ -24,6 +24,15 @@ export default function ComplaintReportPage() {
   const { companyId, companies } = useCompany();
 
   const { data: complaints = [], isLoading } = useGenericQuery<Complaint>('support/complaints', companyId ?? undefined);
+  const { data: staff = [] } = useGenericQuery<Staff>('hr/staff', companyId ?? undefined);
+  const { data: recoveryOfficers = [] } = useGenericQuery<RecoveryOfficer>('admin/recovery-officers', companyId ?? undefined);
+
+  const operatorMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    (staff as Staff[]).forEach(s => { map[s.id] = `${s.name} (${s.designation})`; });
+    (recoveryOfficers as RecoveryOfficer[]).forEach(r => { map[r.id] = `${r.name} (Recovery Officer)`; });
+    return map;
+  }, [staff, recoveryOfficers]);
 
   const [category, setCategory] = useState('All');
   const [status, setStatus] = useState('All');
@@ -63,13 +72,14 @@ export default function ComplaintReportPage() {
   };
 
   const handleExportCSV = () => {
-    const headers = ['#', 'Subscriber', 'Description', 'Category', 'Status', 'Opened At'];
+    const headers = ['#', 'Subscriber', 'Description', 'Category', 'Status', 'Operator', 'Opened At'];
     const rows = filteredData.map((item, i) => [
       i + 1,
       item.subscriberName,
       `"${item.description.replace(/"/g, '""')}"`,
       item.category,
       item.status,
+      item.assignedToId ? (operatorMap[item.assignedToId] || 'Unknown') : '---',
       new Date(item.createdAt).toLocaleDateString(),
     ]);
 
@@ -174,13 +184,14 @@ export default function ComplaintReportPage() {
                 <th className="border border-gray-300 p-3 text-xs font-semibold uppercase tracking-wider text-left">Description</th>
                 <th className="border border-gray-300 p-3 text-xs font-semibold uppercase tracking-wider text-left">Category</th>
                 <th className="border border-gray-300 p-3 text-xs font-semibold uppercase tracking-wider text-left">Status</th>
+                <th className="border border-gray-300 p-3 text-xs font-semibold uppercase tracking-wider text-left">Operator</th>
                 <th className="border border-gray-300 p-3 text-xs font-semibold uppercase tracking-wider text-left">Opened At</th>
               </tr>
             </thead>
             <tbody>
               {filteredData.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="border border-gray-300 p-6 text-center text-gray-500">No complaints found.</td>
+                  <td colSpan={7} className="border border-gray-300 p-6 text-center text-gray-500">No complaints found.</td>
                 </tr>
               ) : (
                 filteredData.map((item, i) => (
@@ -190,6 +201,7 @@ export default function ComplaintReportPage() {
                     <td className="border border-gray-300 p-3 max-w-xs">{item.description}</td>
                     <td className="border border-gray-300 p-3 capitalize">{item.category}</td>
                     <td className="border border-gray-300 p-3 capitalize">{item.status}</td>
+                    <td className="border border-gray-300 p-3">{item.assignedToId ? (operatorMap[item.assignedToId] || 'Unknown') : '---'}</td>
                     <td className="border border-gray-300 p-3 text-gray-500">{new Date(item.createdAt).toLocaleDateString()}</td>
                   </tr>
                 ))
@@ -353,13 +365,14 @@ export default function ComplaintReportPage() {
                     <TableHead>Description</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Operator</TableHead>
                     <TableHead>Opened At</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredData.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         No complaint history found.
                       </TableCell>
                     </TableRow>
@@ -383,6 +396,7 @@ export default function ComplaintReportPage() {
                             {item.status}
                           </span>
                         </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{item.assignedToId ? (operatorMap[item.assignedToId] || 'Unknown') : '---'}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{new Date(item.createdAt).toLocaleDateString()}</TableCell>
                       </TableRow>
                     ))

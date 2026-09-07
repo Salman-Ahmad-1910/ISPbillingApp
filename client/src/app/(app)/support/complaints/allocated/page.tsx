@@ -20,13 +20,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { AlertCircle, ClipboardPen, MoreHorizontal, Edit3, Trash2, Search, ListTodo, CheckCircle2, CircleCheck, Clock, Loader2, CircleDot } from 'lucide-react';
+import { AlertCircle, ClipboardPen, MoreHorizontal, Edit3, Trash2, Search, ListTodo, CheckCircle2, CircleCheck, Clock, Loader2, CircleDot, UserRound } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/hooks/use-user';
 import api from '@/lib/api';
-import type { Complaint, Staff, Subscriber, Connection } from '@/lib/types';
+import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
+import type { Complaint, Staff, RecoveryOfficer } from '@/lib/types';
 import { smartMatch } from '@/lib/search';
 import {
   STATUS_COLORS,
@@ -48,8 +49,7 @@ export default function AllocatedComplaintPage() {
 
   const { data: complaints = [], isLoading, refetch } = useGenericQuery<Complaint>('support/complaints', companyId ?? undefined);
   const { data: staff = [] } = useGenericQuery<Staff>('hr/staff', companyId ?? undefined);
-  const { data: subscribers = [] } = useGenericQuery<Subscriber>('subscribers', companyId ?? undefined);
-  const { data: connections = [] } = useGenericQuery<Connection>('admin/connections', companyId ?? undefined);
+  const { data: recoveryOfficers = [] } = useGenericQuery<RecoveryOfficer>('admin/recovery-officers', companyId ?? undefined);
 
   const [category, setCategory] = useState('All');
   const [status, setStatus] = useState('All');
@@ -61,6 +61,7 @@ export default function AllocatedComplaintPage() {
   const [editComplaint, setEditComplaint] = useState<Complaint | null>(null);
   const [editDescription, setEditDescription] = useState('');
   const [editStatus, setEditStatus] = useState('');
+  const [editOperatorId, setEditOperatorId] = useState('');
   const [showEdit, setShowEdit] = useState(false);
   const [deleteComplaint, setDeleteComplaint] = useState<Complaint | null>(null);
   const [showDelete, setShowDelete] = useState(false);
@@ -70,36 +71,33 @@ export default function AllocatedComplaintPage() {
 
   const operatorMap = useMemo(() => {
     const map: Record<string, string> = {};
-    (staff as Staff[]).forEach(s => { map[s.id] = s.name; });
+    (staff as Staff[]).forEach(s => { map[s.id] = `${s.name} (${s.designation})`; });
+    (recoveryOfficers as RecoveryOfficer[]).forEach(r => { map[r.id] = `${r.name} (Recovery Officer)`; });
     return map;
-  }, [staff]);
+  }, [staff, recoveryOfficers]);
 
-  // Map subscriber/connection id -> allocated area id so complaints can be scoped
-  // to the area allocated to the currently logged-in staff member.
-  const entityAreaMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    (subscribers as Subscriber[]).forEach(s => { if (s.areaId) map[s.id] = s.areaId; });
-    (connections as Connection[]).forEach(c => { if (c.sublocalityId) map[c.id] = c.sublocalityId; });
-    return map;
-  }, [subscribers, connections]);
+  const assigneeOptions = useMemo(() => {
+    const options: { id: string; name: string; secondary?: string }[] = [];
+    (staff as Staff[]).forEach(s => options.push({ id: s.id, name: s.name, secondary: `${s.designation} (Staff)` }));
+    (recoveryOfficers as RecoveryOfficer[]).forEach(r => options.push({ id: r.id, name: r.name, secondary: 'Recovery Officer' }));
+    return options;
+  }, [staff, recoveryOfficers]);
 
-  const currentStaff = useMemo(() => {
-    if (!user?.id) return undefined;
-    return (staff as Staff[]).find(s => s.id === user.id);
-  }, [staff, user]);
+  const isMember = useMemo(() => {
+    if (!user?.id) return false;
+    return (staff as Staff[]).some(s => s.id === user.id) || (recoveryOfficers as RecoveryOfficer[]).some(r => r.id === user.id);
+  }, [staff, recoveryOfficers, user]);
 
-  const myAreaId = currentStaff?.areaId;
-
-  // Staff/operators only see complaints raised from subscribers of their own
-  // allocated area. Admins (no staff record) continue to see everything.
-  const areaScopedComplaints = useMemo(() => {
-    if (!currentStaff) return complaints as Complaint[];
-    if (!myAreaId) return [];
-    return (complaints as Complaint[]).filter(c => {
-      const area = entityAreaMap[c.subscriberId];
-      return !!area && area === myAreaId;
-    });
-  }, [complaints, entityAreaMap, currentStaff, myAreaId]);
+  // Only complaints that have been allocated (assignedToId set) belong on this
+  // page. A member (staff/recovery officer) sees only the complaints allocated
+  // to themselves; admins see every allocated complaint.
+  const allocatedComplaints = useMemo(() => {
+    const all = complaints as Complaint[];
+    if (isMember && user?.id) {
+      return all.filter(c => c.assignedToId === user.id);
+    }
+    return all.filter(c => !!c.assignedToId);
+  }, [complaints, isMember, user]);
 
   const handleEdit = async () => {
     if (!editComplaint) return;
@@ -109,7 +107,7 @@ export default function AllocatedComplaintPage() {
         ...editComplaint,
         description: editDescription,
         status: editStatus,
-        assignedToId: editComplaint.assignedToId || null,
+        assignedToId: editOperatorId || null,
       });
       toast({ title: 'Success', description: 'Complaint updated.' });
       setShowEdit(false);
@@ -139,16 +137,16 @@ export default function AllocatedComplaintPage() {
   };
 
   const kpiData = useMemo(() => [
-    { title: 'Total Complaints', value: areaScopedComplaints.length, icon: ListTodo, gradient: 'from-blue-500 to-cyan-600' },
-    { title: 'Open', value: areaScopedComplaints.filter(c => c.status === 'open').length, icon: CircleCheck, gradient: 'from-emerald-500 to-green-600' },
-    { title: 'Done', value: areaScopedComplaints.filter(c => c.status === 'done').length, icon: CheckCircle2, gradient: 'from-blue-500 to-cyan-600' },
-    { title: 'On Hold', value: areaScopedComplaints.filter(c => c.status === 'on-hold').length, icon: Clock, gradient: 'from-amber-500 to-orange-600' },
-    { title: 'Rejected', value: areaScopedComplaints.filter(c => c.status === 'reject').length, icon: AlertCircle, gradient: 'from-red-500 to-rose-600' },
-    { title: 'Closed', value: areaScopedComplaints.filter(c => c.status === 'closed').length, icon: CheckCircle2, gradient: 'from-gray-500 to-slate-600' },
-  ], [areaScopedComplaints]);
+    { title: 'Total Complaints', value: allocatedComplaints.length, icon: ListTodo, gradient: 'from-blue-500 to-cyan-600' },
+    { title: 'Open', value: allocatedComplaints.filter(c => c.status === 'open').length, icon: CircleCheck, gradient: 'from-emerald-500 to-green-600' },
+    { title: 'Done', value: allocatedComplaints.filter(c => c.status === 'done').length, icon: CheckCircle2, gradient: 'from-blue-500 to-cyan-600' },
+    { title: 'On Hold', value: allocatedComplaints.filter(c => c.status === 'on-hold').length, icon: Clock, gradient: 'from-amber-500 to-orange-600' },
+    { title: 'Rejected', value: allocatedComplaints.filter(c => c.status === 'reject').length, icon: AlertCircle, gradient: 'from-red-500 to-rose-600' },
+    { title: 'Closed', value: allocatedComplaints.filter(c => c.status === 'closed').length, icon: CheckCircle2, gradient: 'from-gray-500 to-slate-600' },
+  ], [allocatedComplaints]);
 
   const filteredData = useMemo(() => {
-    return areaScopedComplaints.filter((c) => {
+    return allocatedComplaints.filter((c) => {
       if (category !== 'All' && c.category !== category) return false;
       if (status !== 'All' && c.status !== status) return false;
       if (search && !smartMatch(search, [c.id], [c.subscriberName, c.description])) {
@@ -156,7 +154,7 @@ export default function AllocatedComplaintPage() {
       }
       return true;
     });
-  }, [areaScopedComplaints, category, status, search]);
+  }, [allocatedComplaints, category, status, search]);
 
   const totalPages = Math.ceil(filteredData.length / parseInt(pageSize));
   const paginatedData = filteredData.slice(
@@ -173,7 +171,7 @@ export default function AllocatedComplaintPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Allocated Complaint</h1>
-            <p className="text-sm text-muted-foreground">View complaints from subscribers of your allocated area</p>
+            <p className="text-sm text-muted-foreground">View and manage complaints allocated to you</p>
           </div>
         </div>
         <div className="h-0.5 bg-gradient-to-r from-emerald-500/50 via-green-500/30 to-transparent" />
@@ -195,7 +193,7 @@ export default function AllocatedComplaintPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Allocated Complaint</h1>
-            <p className="text-sm text-muted-foreground">View complaints from subscribers of your allocated area</p>
+            <p className="text-sm text-muted-foreground">View and manage complaints allocated to you</p>
           </div>
         </div>
         <div className="h-0.5 bg-gradient-to-r from-emerald-500/50 via-green-500/30 to-transparent" />
@@ -219,7 +217,7 @@ export default function AllocatedComplaintPage() {
         </div>
         <div>
             <h1 className="text-2xl font-bold tracking-tight">Allocated Complaint</h1>
-            <p className="text-sm text-muted-foreground">View complaints from subscribers of your allocated area</p>
+            <p className="text-sm text-muted-foreground">View and manage complaints allocated to you</p>
         </div>
       </div>
 
@@ -362,7 +360,7 @@ export default function AllocatedComplaintPage() {
                               <CircleDot className="mr-2 h-4 w-4" />
                               Status
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="data-[highlighted]:text-emerald-600" onClick={() => { setEditComplaint(item); setEditDescription(item.description); setEditStatus(item.status); setShowEdit(true); }}>
+                            <DropdownMenuItem className="data-[highlighted]:text-emerald-600" onClick={() => { setEditComplaint(item); setEditDescription(item.description); setEditStatus(item.status); setEditOperatorId(item.assignedToId || ''); setShowEdit(true); }}>
                               <Edit3 className="mr-2 h-4 w-4" />
                               Edit
                             </DropdownMenuItem>
@@ -415,6 +413,15 @@ export default function AllocatedComplaintPage() {
               <Label>Description</Label>
               <Textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={3} />
             </div>
+            <SearchableDropdown
+              label="Assign To"
+              icon={UserRound}
+              color="text-emerald-600"
+              items={assigneeOptions}
+              value={editOperatorId}
+              onValueChange={setEditOperatorId}
+              placeholder="Search staff or recovery officer..."
+            />
             <div className="flex justify-end gap-3 pt-2">
               <Button variant="outline" onClick={() => { setShowEdit(false); setEditComplaint(null); }}>Cancel</Button>
               <Button onClick={handleEdit} disabled={isSaving} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white">Save</Button>
