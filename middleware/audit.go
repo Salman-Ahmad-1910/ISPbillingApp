@@ -52,6 +52,12 @@ func AuditMiddleware() gin.HandlerFunc {
 		}
 
 		userID, role, userName := currentActor(c)
+		// The audit_logs table has a NOT NULL foreign key on users.id, so an
+		// anonymous request (e.g. a failed login with no valid token) cannot be
+		// attributed to a real actor. Skip it rather than failing the insert.
+		if userID == uuid.Nil {
+			return
+		}
 		action, module := determineActionAndModule(method, c.Request.URL.Path)
 		page := extractPageFromPath(c.Request.URL.Path)
 
@@ -87,6 +93,9 @@ func AuditMiddleware() gin.HandlerFunc {
 
 // LogAction creates a manual audit log entry (for use in controllers)
 func LogAction(userID, companyID uuid.UUID, action, module, description, ipAddress, userAgent string) {
+	if userID == uuid.Nil {
+		return
+	}
 	logEntry := models.SystemLog{
 		UserID:      userID,
 		CompanyID:   companyID,

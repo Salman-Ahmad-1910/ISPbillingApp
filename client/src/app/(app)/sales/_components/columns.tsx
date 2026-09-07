@@ -32,6 +32,7 @@ interface SaleItem {
   productName: string;
   quantity: number;
   price: number;
+  originalPrice?: number;
   saleTax?: number;
   wthTax?: number;
   serialNumber?: string;
@@ -72,6 +73,13 @@ export function getColumns(onDelete?: (id: string) => void, onPay?: (sale: Sale)
         const method = row.original.paymentMethod;
         const isInstallment = row.original.isInstallment;
         const isHold = row.original.status === 'hold';
+        // A line is a "good sale" when its selling price exceeds the product's
+        // original list price captured at sale time.
+        const isGoodSale = (row.original.items || []).some(i => {
+          const originalPrice = Number((i as any).originalPrice) || 0;
+          const salePrice = Number(i.price) || 0;
+          return originalPrice > 0 && salePrice > originalPrice;
+        });
         return (
           <div className="flex items-center gap-1.5">
             {isHold ? (
@@ -81,6 +89,11 @@ export function getColumns(onDelete?: (id: string) => void, onPay?: (sale: Sale)
             ) : (
               <Badge variant="outline">
                 {method}
+              </Badge>
+            )}
+            {isGoodSale && (
+              <Badge variant="secondary" className="text-[10px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
+                Good Sale
               </Badge>
             )}
             {isInstallment && (

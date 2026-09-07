@@ -155,6 +155,7 @@ type SaleItem struct {
 	ProductName  string    `gorm:"type:varchar(255)" json:"productName"`
 	Quantity     int       `gorm:"not null" json:"quantity"`
 	Price        float64   `gorm:"type:decimal(10,2);not null" json:"price"`
+	OriginalPrice float64  `gorm:"type:decimal(10,2);default:0" json:"originalPrice"` // product list price at sale time
 	TaxPercent   float64   `gorm:"type:decimal(5,2);not null;default:0" json:"taxPercent"` // tax % applied to this line
 	SaleTax      float64   `gorm:"type:decimal(10,2);default:0" json:"saleTax"`
 	WthTax       float64   `gorm:"type:decimal(10,2);default:0" json:"wthTax"`

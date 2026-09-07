@@ -74,10 +74,11 @@ type posSaleItem struct {
 	ProductName string    `json:"productName"`
 	Quantity    int       `json:"quantity"`
 	Price       float64   `json:"price"`
+	OriginalPrice float64 `json:"originalPrice"`
 	TaxPercent  float64   `json:"taxPercent"`
 	SaleTax     float64   `json:"saleTax"`
 	WthTax      float64   `json:"wthTax"`
-	SerialNumber string   `json:"serialNumber"`
+	SerialNumber string    `json:"serialNumber"`
 }
 
 type installmentRequest struct {
@@ -124,6 +125,7 @@ func CreatePOSSale(c *gin.Context) {
 			ProductName:  it.ProductName,
 			Quantity:     it.Quantity,
 			Price:        it.Price,
+			OriginalPrice: it.OriginalPrice,
 			TaxPercent:   it.TaxPercent,
 			SaleTax:      it.SaleTax,
 			WthTax:       it.WthTax,
@@ -285,6 +287,7 @@ func CreateInstallmentSale(c *gin.Context) {
 			ProductName:  it.ProductName,
 			Quantity:     it.Quantity,
 			Price:        it.Price,
+			OriginalPrice: it.OriginalPrice,
 			TaxPercent:   it.TaxPercent,
 			SaleTax:      it.SaleTax,
 			WthTax:       it.WthTax,

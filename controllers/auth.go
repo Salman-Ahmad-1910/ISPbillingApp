@@ -3,6 +3,7 @@ package controllers
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"awesomeProject/config"
 	"awesomeProject/models"
@@ -44,6 +45,13 @@ func Login(c *gin.Context) {
 		utils.ErrorResponse(c, 400, "Validation failed", err.Error())
 		return
 	}
+
+	// Normalize credentials so logins work the same from any browser/device:
+	// strip stray whitespace (autofill/keyboard artifacts) while keeping the
+	// email lookup case-insensitive. The password compare below is also run
+	// against the trimmed value.
+	req.Email = strings.TrimSpace(req.Email)
+	req.Password = strings.TrimSpace(req.Password)
 
 	var user models.User
 	// Accept any status — the password check is the real gatekeeper.

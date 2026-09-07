@@ -15,15 +15,16 @@ import (
 // they unlock. When a user has been granted any of these permissions, the RBAC
 // middleware treats them as authorized for the mapped module(s).
 var grantedPermissionModules = map[string][]string{
-	// Transactions -> billing
-	"13304": {"billing"}, // Users Collections
-	"14079": {"billing"}, // New Collection
-	"13305": {"billing"}, // Allocated Collection
-	"13321": {"billing"}, // Dealers Collections
-	"13357": {"billing"}, // Baddebt Collection
-	"13324": {"billing"}, // Transaction Type
-	"13308": {"billing"}, // Reprint Slip
-	"13320": {"billing"}, // Bills Creator
+	// Transactions -> billing. These pages also load network/areas for the
+	// area dropdowns, so they unlock the network module too.
+	"13304": {"billing", "network"}, // Subscribers Collections
+	"14079": {"billing", "network"}, // New Collection
+	"13305": {"billing"},            // Allocated Collection
+	"13321": {"billing", "network"}, // Dealers Collections
+	"13357": {"billing", "network"}, // Baddebt Collection
+	"13324": {"billing"},            // Transaction Type
+	"13308": {"billing", "network"}, // Reprint Slip
+	"13320": {"billing", "network"}, // Bills Creator
 
 	// Area -> network
 	"13309": {"network"},

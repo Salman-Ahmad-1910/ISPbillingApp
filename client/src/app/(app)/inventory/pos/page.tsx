@@ -49,6 +49,7 @@ import { SerialEntriesTable } from '@/components/shared/serial-entries';
 interface CartItem {
     product: Product;
     quantity: number;
+    price: number; // editable unit selling price (defaults to product.price)
     selectedSNs: string[];
 }
 
@@ -502,6 +503,7 @@ export default function POSPage() {
                         taxPercent: si.taxPercent || 0,
                     },
                     quantity: si.quantity,
+                    price: si.price,
                     selectedSNs: String(si.serialNumber || '')
                         .split(/[\s,\-]+/)
                         .map((s: string) => s.trim())
@@ -537,7 +539,7 @@ export default function POSPage() {
                 }
                 return currentCart.map(item => item.product.id === productId ? { ...item, quantity: item.quantity + 1 } : item);
             }
-            return [...currentCart, { product, quantity: 1, selectedSNs: [] }];
+            return [...currentCart, { product, quantity: 1, price: product.price, selectedSNs: [] }];
         });
     }
 
@@ -571,9 +573,19 @@ export default function POSPage() {
         }));
     }
 
-    const subtotal = cart.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
+    // Update the editable unit selling price of a cart line. Falls back to the
+    // product's list price whenever the input is cleared/invalid.
+    const updateCartPrice = (productId: string, price: number) => {
+        const product = posProducts.find(p => p.id === productId);
+        const normalized = isNaN(price) ? (product?.price ?? 0) : Math.max(price, 0);
+        setCart(currentCart => currentCart.map(item =>
+            item.product.id === productId ? { ...item, price: normalized } : item
+        ));
+    }
+
+    const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
     const tax = cart.reduce(
-      (acc, item) => acc + (item.product.price * item.quantity) * ((Number(item.product.taxPercent) || 0) / 100),
+      (acc, item) => acc + (item.price * item.quantity) * ((Number(item.product.taxPercent) || 0) / 100),
       0
     );
 
@@ -668,7 +680,8 @@ export default function POSPage() {
                 productId: item.product.id,
                 productName: item.product.name,
                 quantity: item.quantity,
-                price: item.product.price,
+                price: item.price,
+                originalPrice: item.product.price,
                 taxPercent: Number(item.product.taxPercent) || 0,
                 serialNumber: '',
             }];
@@ -677,7 +690,8 @@ export default function POSPage() {
             productId: item.product.id,
             productName: item.product.name,
             quantity: 1,
-            price: item.product.price,
+            price: item.price,
+            originalPrice: item.product.price,
             taxPercent: Number(item.product.taxPercent) || 0,
             serialNumber: sn,
         }));
@@ -1177,7 +1191,17 @@ export default function POSPage() {
                                             <div className="flex-1 mx-3">
                                                 <p className="font-medium">{item.product.name}</p>
                                                 <div className="flex items-center gap-3 mt-1 flex-wrap">
-                                                    <p className="text-sm text-muted-foreground">PKR {item.product.price.toLocaleString()}</p>
+                                                    <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                                                        Price
+                                                        <Input
+                                                            type="number"
+                                                            value={item.price}
+                                                            onChange={(e) => updateCartPrice(item.product.id, parseFloat(e.target.value))}
+                                                            className="h-8 w-24"
+                                                            min="0"
+                                                            step="any"
+                                                        />
+                                                    </label>
                                                     <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                                                         Qty
                                                         <Input
@@ -1203,7 +1227,7 @@ export default function POSPage() {
                                                 </div>
                                             </div>
                                             <div className="flex flex-col items-end gap-2">
-                                                <p className="font-medium">PKR {(item.product.price * item.quantity).toLocaleString()}</p>
+                                                <p className="font-medium">PKR {(item.price * item.quantity).toLocaleString()}</p>
                                                 <div className="flex items-center gap-1">
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger asChild>

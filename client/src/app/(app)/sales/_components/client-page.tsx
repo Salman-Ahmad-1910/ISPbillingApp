@@ -45,6 +45,7 @@ interface Sale {
     productName: string;
     quantity: number;
     price: number;
+    originalPrice?: number;
     saleTax?: number;
     wthTax?: number;
     serialNumber?: string;
@@ -376,6 +377,16 @@ export function ClientPage({ data }: ClientPageProps) {
                 <div className="flex gap-2 mt-2 flex-wrap">
                   <Badge variant="outline" className="capitalize text-xs">{viewSale.paymentMethod}</Badge>
                   <Badge variant="secondary" className="text-xs">#{viewSale.id}</Badge>
+                  {viewSale.status === 'hold' && (
+                    <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">Hold</Badge>
+                  )}
+                  {(viewSale.items || []).some(i => {
+                    const originalPrice = Number((i as any).originalPrice) || 0;
+                    const salePrice = Number(i.price) || 0;
+                    return originalPrice > 0 && salePrice > originalPrice;
+                  }) && (
+                    <Badge variant="secondary" className="text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">Good Sale</Badge>
+                  )}
                   {viewSale.isInstallment && (
                     <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">Installment</Badge>
                   )}

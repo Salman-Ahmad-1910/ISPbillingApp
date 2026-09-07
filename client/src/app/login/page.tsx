@@ -28,8 +28,8 @@ function LoginPageContent() {
     setError("");
 
     const formData = new FormData(e.currentTarget as HTMLFormElement);
-    const email = formData.get('email');
-    const password = formData.get('password');
+    const email = String(formData.get('email') ?? '').trim();
+    const password = String(formData.get('password') ?? '').trim();
 
     try {
       const response = await api.post('/auth/login', { email, password });
