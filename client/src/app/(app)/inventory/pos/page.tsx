@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { useCompany } from '@/context/company-context';
+import { useUser } from '@/hooks/use-user';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 
 import { PlusCircle, Trash2, CreditCard, Landmark, CircleDollarSign, Loader2, ShoppingCart, Search, Users, UserRound, Handshake, CalendarDays, Receipt, MoreVertical, Hash, ChevronDown } from 'lucide-react';
@@ -299,6 +300,7 @@ function SNSSelect({
 
 export default function POSPage() {
     const { companyId, companies } = useCompany();
+    const { user } = useUser();
     const { toast } = useToast();
     const queryClient = useQueryClient();
 
@@ -578,13 +580,17 @@ export default function POSPage() {
     // The active company's POS discount settings cap how much the cashier can
     // discount. The limit is a percentage of the selling-price total; when the
     // unlimited checkbox is on, the full selling-price total is the cap.
+    // The discount limit only applies to non-admin users; admins are exempt and
+    // can apply any discount up to the full selling-price total.
     const activeCompany = companies.find(c => c.id === companyId);
     const posDiscountPercent = activeCompany?.posDiscountPercent ?? 0;
     const posDiscountUnlimited = !!activeCompany?.posDiscountUnlimited;
+    const isAdmin = user?.role === 'admin';
     const maxDiscount = useMemo(() => {
+      if (isAdmin) return subtotal;
       if (posDiscountUnlimited) return subtotal;
       return Math.round((subtotal * posDiscountPercent) / 100);
-    }, [subtotal, posDiscountPercent, posDiscountUnlimited]);
+    }, [subtotal, posDiscountPercent, posDiscountUnlimited, isAdmin]);
 
     useEffect(() => {
       if (discount > maxDiscount) setDiscount(maxDiscount);

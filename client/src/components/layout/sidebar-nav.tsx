@@ -292,7 +292,11 @@ function filterNavItems(items: NavItem[], hasPermission: (perm: string) => boole
         return false;
       }
       if (item.allowedRoles && !item.allowedRoles.includes(userRole)) {
-        return false;
+        // Admin-granted per-user permission for this page overrides the
+        // hardcoded allowedRoles list (admin assignment wins over role defaults).
+        if (!(allowedHrefs && item.href && allowedHrefs.has(item.href))) {
+          return false;
+        }
       }
       if (item.minimumRole) {
         if (item.minimumRole === 'admin') {

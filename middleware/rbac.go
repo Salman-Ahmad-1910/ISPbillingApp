@@ -41,9 +41,9 @@ var grantedPermissionModules = map[string][]string{
 	// Dealers Profile -> dealers
 	"13318": {"dealers"},
 
-	// Recovery Officer -> hr / network (officers page loads network/areas)
+	// Recovery Officer -> hr / network (officers form loads network/areas)
 	"13317": {"hr", "network"},
-	"13319": {"hr"},
+	"13319": {"hr", "network"}, // Area Allocation (areas page loads network/areas)
 
 	// Complaints -> support
 	"15323": {"support"},
@@ -98,8 +98,11 @@ var grantedPermissionModules = map[string][]string{
 	"15321": {"inventory"},
 	"15314": {"inventory"},
 
-	// Point Of Sale / Sales -> pos, sales, billing (sales page records via billing/payments)
-	"15315": {"pos", "sales", "billing"},
+	// Sales -> pos / sales / crm / inventory (Sales section pages)
+	"15315": {"pos", "sales", "billing"},          // Sales
+	"15336": {"crm"},                              // Sales > Customers
+	"15337": {"sales", "crm"},                     // Sales > Installment Plans
+	"15338": {"pos", "sales", "crm", "inventory"}, // Sales > Point of Sale
 }
 
 // checkUserGrantedPermission verifies whether the user has been granted, via the
