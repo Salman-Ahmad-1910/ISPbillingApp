@@ -130,7 +130,7 @@ export const PERMISSION_PAGES: Record<string, string[]> = {
   '13315': ['/crm/subscriber-detail'],
   '13316': ['/subscribers/inquiries'],
   '13351': ['/crm/subscriber-detail'],
-  '13318': ['/franchise/my-dealers'],
+  '13318': ['/franchise/my-dealers', '/franchise/my-dealers/dashboard'],
   '13317': ['/recovery-officers-management/officers'],
   '13319': ['/recovery-officers-management/areas'],
   '13305': ['/transaction/allocated-collections'],

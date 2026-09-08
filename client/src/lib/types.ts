@@ -275,6 +275,7 @@ export type DealerFranchise = {
 export type Dealer = {
   id: string;
   name: string;
+  email: string;
   phone: string;
   cnic: string;
   address?: string;

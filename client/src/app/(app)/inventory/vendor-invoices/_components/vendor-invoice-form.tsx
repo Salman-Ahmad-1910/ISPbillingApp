@@ -404,6 +404,7 @@ export function VendorInvoiceForm({
                       onValueChange={(value) => updateEntry(index, 'productId', value)}
                       placeholder="Search product..."
                       allowClear
+                      matchContainsOnly
                     />
                   </div>
                   {entry.productId && (

@@ -34,6 +34,8 @@ interface DealerFormValues {
   cnic: string;
   address: string;
   joiningDate: string;
+  commissionRate: string;
+  walletBalance: string;
 }
 
 interface ClientPageProps {
@@ -67,6 +69,8 @@ export function ClientPage({ data }: ClientPageProps) {
     cnic: '',
     address: '',
     joiningDate: '',
+    commissionRate: '',
+    walletBalance: '',
   });
 
   // Fetch companies and areas for dropdowns
@@ -89,6 +93,8 @@ export function ClientPage({ data }: ClientPageProps) {
         cnic: selectedDealer.cnic,
         address: (selectedDealer as any).address || '',
         joiningDate: (selectedDealer as any).joiningDate || '',
+        commissionRate: selectedDealer.commissionRate?.toString() || '',
+        walletBalance: selectedDealer.walletBalance?.toString() || '',
       });
     } else {
       setFormData({
@@ -101,12 +107,14 @@ export function ClientPage({ data }: ClientPageProps) {
         cnic: '',
         address: '',
         joiningDate: '',
+        commissionRate: '',
+        walletBalance: '',
       });
     }
   }, [selectedDealer, companyId]);
 
   const filteredData = useMemo(() => dealers.filter(dealer =>
-    smartMatch(filter, [dealer.cnic, dealer.phone], [dealer.name])
+    smartMatch(filter, [dealer.cnic, dealer.phone, dealer.id], [dealer.name])
   ), [dealers, filter]);
 
   // Pagination helpers
@@ -165,7 +173,8 @@ export function ClientPage({ data }: ClientPageProps) {
         ...formData,
         email: `${formData.internetId || formData.name.toLowerCase().replace(/\s/g, '.')}@dealer.local`,
         password: 'dealer123',
-        commissionRate: 0,
+        commissionRate: parseFloat(formData.commissionRate) || 0,
+        walletBalance: parseFloat(formData.walletBalance) || 0,
       };
 
       if (selectedDealer) {
@@ -201,6 +210,8 @@ export function ClientPage({ data }: ClientPageProps) {
       cnic: '',
       address: '',
       joiningDate: '',
+      commissionRate: '',
+      walletBalance: '',
     });
   };
 
@@ -244,7 +255,7 @@ export function ClientPage({ data }: ClientPageProps) {
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Filter by name, CNIC, or phone..."
+              placeholder="Filter by ID, name, CNIC, or phone..."
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               className="max-w-sm pl-8"
@@ -380,6 +391,27 @@ export function ClientPage({ data }: ClientPageProps) {
                     value={formData.address}
                     onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
                   />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Commission Rate (%)</Label>
+                    <Input
+                      type="number"
+                      placeholder="e.g., 10"
+                      value={formData.commissionRate}
+                      onChange={(e) => setFormData(prev => ({ ...prev, commissionRate: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Wallet Balance (PKR)</Label>
+                    <Input
+                      type="number"
+                      placeholder="e.g., 5000"
+                      value={formData.walletBalance}
+                      onChange={(e) => setFormData(prev => ({ ...prev, walletBalance: e.target.value }))}
+                    />
+                  </div>
                 </div>
 
                 <div className="flex justify-end gap-2 pt-4">

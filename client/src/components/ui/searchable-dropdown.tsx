@@ -21,6 +21,10 @@ interface SearchableDropdownProps {
   color?: string;
   allowClear?: boolean;
   className?: string;
+  // When true, matches the query anywhere inside the values (prefix, middle,
+  // or suffix) with no minimum query length. Defaults to smartMatch (IDs
+  // prefix-first, names only after 3+ chars).
+  matchContainsOnly?: boolean;
 }
 
 export function SearchableDropdown({
@@ -33,6 +37,7 @@ export function SearchableDropdown({
   color,
   allowClear = true,
   className,
+  matchContainsOnly = false,
 }: SearchableDropdownProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -42,8 +47,17 @@ export function SearchableDropdown({
 
   const filtered = useMemo(() => {
     if (!query) return items;
+    if (matchContainsOnly) {
+      const q = query.trim().toLowerCase();
+      if (!q) return items;
+      return items.filter((i) =>
+        [i.id, i.name, i.secondary].some(
+          (v) => v !== null && v !== undefined && String(v).toLowerCase().includes(q)
+        )
+      );
+    }
     return items.filter((i) => smartMatch(query, [i.id], [i.name, i.secondary]));
-  }, [items, query]);
+  }, [items, query, matchContainsOnly]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -78,7 +92,7 @@ export function SearchableDropdown({
               setQuery(e.target.value);
               setOpen(true);
             }}
-            onFocus={() => setOpen(true)}
+            onMouseDown={() => setOpen(true)}
           />
           {allowClear && value && (
             <button

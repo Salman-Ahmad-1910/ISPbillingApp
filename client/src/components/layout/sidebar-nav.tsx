@@ -152,6 +152,7 @@ const navItems: NavItemGroup[] = [
     title: 'Dealer Management',
     items: [
       { title: 'My Dealers', href: '/franchise/my-dealers', icon: Users, allowedRoles: ['admin', 'manager'] },
+      { title: 'Dealer Dashboard', href: '/franchise/my-dealers/dashboard', icon: LayoutDashboard, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer'] },
       {
         title: 'Reports',
         icon: FolderClosed,
