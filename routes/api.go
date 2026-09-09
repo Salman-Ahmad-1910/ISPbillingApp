@@ -81,6 +81,8 @@ func SetupRoutes(r *gin.Engine) {
 	{
 		auth.POST("/login", controllers.Login)
 		auth.POST("/signup", controllers.Register)
+		auth.POST("/forgot-password", controllers.ForgotPassword)
+		auth.POST("/reset-password", controllers.ResetPassword)
 	}
 
 	// Protected routes that don't require company context

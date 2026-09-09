@@ -1,6 +1,10 @@
 package models
 
-import "github.com/google/uuid"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 // UserCompany represents the many-to-many relationship between users and companies
 type UserCompany struct {
@@ -25,4 +29,9 @@ type User struct {
 	// Relationships
 	UserCompanies []UserCompany `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE;" json:"userCompanies"`
 	CreatedUsers  []User        `gorm:"foreignKey:CreatedBy" json:"createdUsers,omitempty"`
+
+	// Password reset OTP (bcrypt hashed)
+	ResetOTP         string    `gorm:"type:varchar(255)" json:"-"`
+	ResetOTPExpiry   time.Time `json:"-"`
+	ResetOTPAttempts int       `gorm:"default:0" json:"-"`
 }

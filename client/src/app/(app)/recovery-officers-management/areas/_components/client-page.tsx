@@ -135,8 +135,10 @@ export function ClientPage({ data, recoveryOfficers }: ClientPageProps) {
   };
 
   const moveSingleToRight = () => {
-    if (leftSelected.length === 0 || !selectedOfficerId) return;
-    moveAreas(leftSelected, selectedOfficerId);
+    if (!selectedOfficerId) return;
+    const ids = leftSelected.length > 0 ? leftSelected : leftAreas.slice(0, 1).map(a => a.id);
+    if (ids.length === 0) return;
+    moveAreas(ids, selectedOfficerId);
   };
 
   const moveAllToRight = () => {
@@ -145,8 +147,9 @@ export function ClientPage({ data, recoveryOfficers }: ClientPageProps) {
   };
 
   const moveSingleToLeft = () => {
-    if (rightSelected.length === 0) return;
-    moveAreas(rightSelected, null);
+    const ids = rightSelected.length > 0 ? rightSelected : rightAreas.slice(0, 1).map(a => a.id);
+    if (ids.length === 0) return;
+    moveAreas(ids, null);
   };
 
   const moveAllToLeft = () => {
@@ -229,8 +232,8 @@ export function ClientPage({ data, recoveryOfficers }: ClientPageProps) {
                   variant="outline"
                   size="sm"
                   onClick={moveSingleToRight}
-                  disabled={leftSelected.length === 0 || isSaving}
-                  title="Move selected to assigned"
+                  disabled={leftAreas.length === 0 || isSaving}
+                  title="Move selected (or first) to assigned"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
@@ -247,8 +250,8 @@ export function ClientPage({ data, recoveryOfficers }: ClientPageProps) {
                   variant="outline"
                   size="sm"
                   onClick={moveSingleToLeft}
-                  disabled={rightSelected.length === 0 || isSaving}
-                  title="Move selected back"
+                  disabled={rightAreas.length === 0 || isSaving}
+                  title="Move selected (or first) back"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>

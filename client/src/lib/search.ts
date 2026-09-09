@@ -1,7 +1,7 @@
 export type SearchableValue = string | number | null | undefined;
  
 // Minimum query length before we fall back to searching names when no ID matches.
-export const NAME_SEARCH_MIN_LENGTH = 3;
+export const NAME_SEARCH_MIN_LENGTH = 1;
  
 const startsWithNormalized = (q: string) => (v: SearchableValue) =>
   v !== null && v !== undefined && String(v).toLowerCase().startsWith(q);

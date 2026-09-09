@@ -12,6 +12,7 @@ import api from '@/lib/api';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { resetUserCache } from '@/hooks/use-user';
+import { MessageDialog } from '@/components/shared/message-dialog';
 
 function LoginPageContent() {
   const router = useRouter();
@@ -19,13 +20,13 @@ function LoginPageContent() {
   const isRegistered = searchParams.get('registered') === 'true';
 
   const [isLoading, setIsLoading] = React.useState(false);
-  const [error, setError] = React.useState("");
+  const [errorDialog, setErrorDialog] = React.useState<{ open: boolean; message: string }>({ open: false, message: '' });
+  const [registeredOpen, setRegisteredOpen] = React.useState(isRegistered);
   const [showPassword, setShowPassword] = React.useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setError("");
 
     const formData = new FormData(e.currentTarget as HTMLFormElement);
     const email = String(formData.get('email') ?? '').trim();
@@ -46,7 +47,10 @@ function LoginPageContent() {
       // Redirect to dashboard
       router.push('/dashboard');
     } catch (err: any) {
-      setError(err.response?.data?.message || "Invalid credentials. Please try again.");
+      setErrorDialog({
+        open: true,
+        message: err?.response?.data?.message || "Invalid credentials. Please try again.",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -89,16 +93,6 @@ function LoginPageContent() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {isRegistered && (
-                <div className="bg-green-50 text-green-700 text-sm p-3 rounded-md mb-4 border border-green-200">
-                  Registration successful! Please sign in with your credentials.
-                </div>
-              )}
-              {error && (
-                <div className="bg-red-50 text-red-700 text-sm p-3 rounded-md mb-4 border border-red-200">
-                  {error}
-                </div>
-              )}
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="email" className="text-gray-700">Email</Label>
@@ -114,7 +108,7 @@ function LoginPageContent() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="password" className="text-gray-700">Password</Label>
-                    <Link href="#" className="text-xs text-gray-600 hover:text-gray-900">Forgot password?</Link>
+                    <Link href="/forgot-password" className="text-xs text-gray-600 hover:text-gray-900">Forgot password?</Link>
                   </div>
                   <div className="relative">
                     <Input
@@ -211,6 +205,22 @@ function LoginPageContent() {
           </div>
         </div>
       </div>
+
+      <MessageDialog
+        open={registeredOpen}
+        onClose={() => setRegisteredOpen(false)}
+        type="success"
+        title="Registration Successful"
+        message="Your account has been created. Please sign in with your credentials."
+        confirmLabel="Sign In"
+      />
+      <MessageDialog
+        open={errorDialog.open}
+        onClose={() => setErrorDialog({ open: false, message: '' })}
+        type="error"
+        title="Sign In Failed"
+        message={errorDialog.message}
+      />
     </div>
   );
 }

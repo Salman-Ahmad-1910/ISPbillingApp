@@ -47,10 +47,10 @@ func Login(c *gin.Context) {
 	}
 
 	// Normalize credentials so logins work the same from any browser/device:
-	// strip stray whitespace (autofill/keyboard artifacts) while keeping the
-	// email lookup case-insensitive. The password compare below is also run
-	// against the trimmed value.
-	req.Email = strings.TrimSpace(req.Email)
+	// strip stray whitespace (autofill/keyboard artifacts) and treat emails
+	// case-insensitively. The password compare below is also run against the
+	// trimmed value.
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 	req.Password = strings.TrimSpace(req.Password)
 
 	var user models.User
@@ -364,6 +364,22 @@ func Register(c *gin.Context) {
 		return
 	}
 
+	// Normalize email to lowercase so registration and login are
+	// case-insensitive and the same email can never be created twice with
+	// different casing.
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+
+	// Reject duplicate emails up front (case-insensitive) with a clear message.
+	var existing int64
+	if err := config.DB.Model(&models.User{}).Where("LOWER(email) = ?", req.Email).Count(&existing).Error; err != nil {
+		utils.ErrorResponse(c, 500, "Failed to check email availability", nil)
+		return
+	}
+	if existing > 0 {
+		utils.ErrorResponse(c, 409, "Email already exists", nil)
+		return
+	}
+
 	// fmt.Println("RegisterRequest: ", req)
 	// Atomic transaction
 	tx := config.DB.Begin()
@@ -457,6 +473,13 @@ func Register(c *gin.Context) {
 	}
 	if err := tx.Create(&user).Error; err != nil {
 		tx.Rollback()
+		// Race-condition safety: two signups with the same email (any casing)
+		// arriving simultaneously bypass the pre-check above, so surface any
+		// unique-constraint violation as a clean "email exists" error too.
+		if strings.Contains(strings.ToLower(err.Error()), "duplicate") || strings.Contains(strings.ToLower(err.Error()), "unique") {
+			utils.ErrorResponse(c, 409, "Email already exists", nil)
+			return
+		}
 		utils.ErrorResponse(c, 500, "Failed to create user", err.Error())
 		return
 	}

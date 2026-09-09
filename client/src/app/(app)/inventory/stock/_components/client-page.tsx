@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { smartMatch } from '@/lib/search';
+import { smartSearch } from '@/lib/search';
 
 import { DataTable } from './data-table';
 import { columns } from './columns';
@@ -25,8 +25,10 @@ export function ClientPage({ data }: ClientPageProps) {
         setItems(data);
     }, [data]);
 
-    const filteredData = useMemo(() => items.filter(item =>
-        smartMatch(filter, [item.serialNumber], [item.name, item.vendorName])
+    const filteredData = useMemo(() => smartSearch(
+        filter,
+        items,
+        (item) => [[item.serialNumber], [item.name]]
     ), [items, filter]);
 
     const totalPages = Math.ceil(filteredData.length / pageSize);
@@ -76,7 +78,7 @@ export function ClientPage({ data }: ClientPageProps) {
         <div className="p-6">
             <div className="flex items-center justify-between mb-4">
                 <Input
-                    placeholder="Filter by product, vendor, or SN/MAC..."
+                    placeholder="Filter by product or SN/MAC..."
                     value={filter}
                     onChange={(e) => setFilter(e.target.value)}
                     className="max-w-sm"

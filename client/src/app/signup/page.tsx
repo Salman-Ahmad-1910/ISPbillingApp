@@ -9,18 +9,19 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import * as React from 'react';
 import api from '@/lib/api';
+import { MessageDialog } from '@/components/shared/message-dialog';
 
 export default function SignupPage() {
   const router = useRouter();
 
   const [isLoading, setIsLoading] = React.useState(false);
-  const [error, setError] = React.useState("");
+  const [errorDialog, setErrorDialog] = React.useState<{ open: boolean; title: string; message: string }>({ open: false, title: '', message: '' });
+  const [successOpen, setSuccessOpen] = React.useState(false);
   const [showPassword, setShowPassword] = React.useState(false);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setError("");
 
     const formData = new FormData(e.currentTarget as HTMLFormElement);
     const data = Object.fromEntries(formData.entries());
@@ -36,13 +37,15 @@ export default function SignupPage() {
       const { token } = response.data.data;
       if (token) {
         localStorage.setItem('token', token);
-        router.push('/dashboard');
-      } else {
-        // Fallback if no token returned
-        // router.push('/login?registered=true');
       }
+      setSuccessOpen(true);
     } catch (err: any) {
-      setError(err.response?.data?.message || "Registration failed. Please try again.");
+      const isDuplicate = err?.response?.status === 409;
+      setErrorDialog({
+        open: true,
+        title: isDuplicate ? 'Email already exists' : 'Registration Failed',
+        message: err?.response?.data?.message || "Registration failed. Please try again.",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -76,11 +79,6 @@ export default function SignupPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {error && (
-                <div className="bg-red-50 text-red-700 text-sm p-3 rounded-md mb-4 border border-red-200">
-                  {error}
-                </div>
-              )}
               <form onSubmit={handleSignup} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="name" className="text-gray-700">Full Name</Label>
@@ -235,6 +233,23 @@ export default function SignupPage() {
           </div>
         </div>
       </div>
+
+      <MessageDialog
+        open={errorDialog.open}
+        onClose={() => setErrorDialog({ open: false, title: '', message: '' })}
+        type="error"
+        title={errorDialog.title}
+        message={errorDialog.message}
+      />
+      <MessageDialog
+        open={successOpen}
+        onClose={() => setSuccessOpen(false)}
+        type="success"
+        title="Account Created"
+        message="Your account has been created successfully. You will be redirected to your dashboard."
+        confirmLabel="Go to Dashboard"
+        onConfirm={() => router.push('/dashboard')}
+      />
     </div>
   );
 }
