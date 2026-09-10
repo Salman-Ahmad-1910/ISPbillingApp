@@ -54,11 +54,17 @@ func Login(c *gin.Context) {
 	req.Password = strings.TrimSpace(req.Password)
 
 	var user models.User
-	// Accept any status — the password check is the real gatekeeper.
-	// Use ILIKE for case-insensitive email match.
 	if err := config.DB.Preload("UserCompanies.Company").Where("LOWER(email) = LOWER(?)", req.Email).First(&user).Error; err != nil {
 		log.Printf("Login failed for email=%s: %v", req.Email, err)
 		utils.ErrorResponse(c, 401, "Invalid credentials or inactive user", nil)
+		return
+	}
+
+	// Block accounts that are not active (inactive, suspended, deactivated).
+	// The admin controls this status; such users cannot log in until reactivated.
+	if user.Status != "" && user.Status != "active" {
+		log.Printf("Login blocked for %s: status=%s", req.Email, user.Status)
+		utils.ErrorResponse(c, 403, "Your account is not active. Please contact your administrator.", nil)
 		return
 	}
 
@@ -78,14 +84,6 @@ func Login(c *gin.Context) {
 			} else {
 				user.Password = string(hashedPassword)
 			}
-		}
-	}
-
-	// Set user status back to active when logging in
-	if user.Status != "active" {
-		if err := config.DB.Model(&models.User{}).Where("id = ?", user.ID).Update("status", "active").Error; err != nil {
-			log.Printf("Failed to update user status to active: %v", err)
-			// Continue anyway, but log the error
 		}
 	}
 

@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PlusCircle, Users, FileSpreadsheet } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { useToast } from '@/hooks/use-toast';
 import { useCompany } from '@/context/company-context';
 import { z } from 'zod';
 import type { Connection, Area, DistributionBox, Package, Company, Splitter } from '@/lib/types';
@@ -20,6 +19,7 @@ import { DataTable } from './data-table';
 import { getColumns } from './columns';
 import { ConnectionForm } from './connection-form';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
+import { ActionFeedbackDialog } from '@/components/shared/action-feedback-dialog';
 import { ImportExportDialog } from './import-export-dialog';
 import { smartMatch } from '@/lib/search';
 import { DeactivateDialog } from './deactivate-dialog';
@@ -34,7 +34,6 @@ interface ClientPageProps {
 
 export function ClientPage({ connections, initialConnectionId, initialPackageName }: ClientPageProps) {
   const { companyId } = useCompany();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -43,6 +42,7 @@ export function ClientPage({ connections, initialConnectionId, initialPackageNam
   const [isDeactivateDialogOpen, setIsDeactivateDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; title: string; message: string } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [pageInput, setPageInput] = useState('');
@@ -171,24 +171,27 @@ export function ClientPage({ connections, initialConnectionId, initialPackageNam
     }
   };
 
+  const errorMessage = (error: any, fallback: string) =>
+    error?.response?.data?.message || error?.message || fallback;
+
   const handleSave = async (formData: ConnectionFormValues) => {
     setIsSaving(true);
     try {
       if (selectedConnection) {
         await api.put(`/admin/connections/${selectedConnection.id}?companyId=${companyId}`, formData);
-        toast({ title: "Success", description: "Subscriber updated successfully." });
+        setFeedback({ type: 'success', title: 'Success', message: 'Subscriber updated successfully.' });
       } else {
         await api.post(`/admin/connections?companyId=${companyId}`, { ...formData, companyId });
-        toast({ title: "Success", description: "Subscriber added successfully." });
+        setFeedback({ type: 'success', title: 'Success', message: 'Subscriber added successfully.' });
       }
       queryClient.invalidateQueries({ queryKey: ['admin/connections', companyId] });
       setIsFormOpen(false);
       setSelectedConnection(null);
     } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: "Error",
-        description: error.response?.data?.message || "Failed to save subscriber"
+      setFeedback({
+        type: 'error',
+        title: 'Error',
+        message: errorMessage(error, 'Failed to save subscriber')
       });
     } finally {
       setIsSaving(false);
@@ -204,15 +207,15 @@ export function ClientPage({ connections, initialConnectionId, initialPackageNam
     if (selectedConnection) {
       try {
         await api.delete(`/admin/connections/${selectedConnection.id}?companyId=${companyId}`);
-        toast({ title: "Success", description: "Subscriber deleted successfully." });
+        setFeedback({ type: 'success', title: 'Success', message: 'Subscriber deleted successfully.' });
         queryClient.invalidateQueries({ queryKey: ['admin/connections', companyId] });
         setIsDeleteDialogOpen(false);
         setSelectedConnection(null);
       } catch (error: any) {
-        toast({
-          variant: 'destructive',
-          title: "Error",
-          description: error.response?.data?.message || "Failed to delete subscriber"
+        setFeedback({
+          type: 'error',
+          title: 'Error',
+          message: errorMessage(error, 'Failed to delete subscriber')
         });
       }
     }
@@ -237,15 +240,15 @@ export function ClientPage({ connections, initialConnectionId, initialPackageNam
         comments: comments,
         leavingDate: new Date().toISOString(),
       });
-      toast({ title: "Success", description: "Subscriber deactivated successfully." });
+      setFeedback({ type: 'success', title: 'Success', message: 'Subscriber deactivated successfully.' });
       queryClient.invalidateQueries({ queryKey: ['admin/connections', companyId] });
       setIsDeactivateDialogOpen(false);
       setSelectedConnection(null);
     } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: "Error",
-        description: error.response?.data?.message || "Failed to deactivate subscriber"
+      setFeedback({
+        type: 'error',
+        title: 'Error',
+        message: errorMessage(error, 'Failed to deactivate subscriber')
       });
     } finally {
       setIsDeactivating(false);
@@ -512,6 +515,14 @@ export function ClientPage({ connections, initialConnectionId, initialPackageNam
         connections={connections}
         areas={areas}
         companies={companies}
+      />
+
+      <ActionFeedbackDialog
+        open={feedback !== null}
+        type={feedback?.type}
+        title={feedback?.title ?? ''}
+        message={feedback?.message ?? ''}
+        onClose={() => setFeedback(null)}
       />
     </>
   );

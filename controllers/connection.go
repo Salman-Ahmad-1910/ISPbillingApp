@@ -179,13 +179,15 @@ func createConnection(c *gin.Context) {
 		TransactionId:       input.TransactionId,
 	}
 
+	oneTime := input.InstallationAmount + input.OtherAmount
+
 	switch input.ConnectionType {
 	case "tv_cable":
-		conn.RemainingAmount = input.Amount
+		conn.RemainingAmount = input.Amount + oneTime
 	case "internet":
-		conn.RemainingAmount = input.SameAmount
+		conn.RemainingAmount = input.SameAmount + oneTime
 	default:
-		conn.RemainingAmount = input.Amount + input.SameAmount
+		conn.RemainingAmount = input.Amount + input.SameAmount + oneTime
 	}
 	conn.CompanyID = companyID
 

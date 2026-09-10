@@ -30,6 +30,7 @@ type Dealer struct {
 	ParentDealerID *uuid.UUID `gorm:"type:uuid" json:"parentDealerId"`
 	AreaID          *uuid.UUID `gorm:"type:uuid" json:"areaId"`
 	AreaName        string     `gorm:"type:varchar(255)" json:"areaName"`
+	Status          string     `gorm:"type:varchar(20);default:'active'" json:"status"` // active, inactive, suspended, deactivated
 	LastPaymentDate *string    `gorm:"type:varchar(50)" json:"lastPaymentDate"`
 	RemainingAmount float64    `gorm:"type:decimal(10,2);default:0" json:"remainingAmount"`
 }

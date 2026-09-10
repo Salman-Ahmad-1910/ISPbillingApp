@@ -5,11 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PlusCircle, Search, ChevronLeft, ChevronRight, ArrowRight, Handshake } from 'lucide-react';
+import { PlusCircle, Search, ChevronLeft, ChevronRight, ArrowRight, Handshake, ShieldCheck } from 'lucide-react';
 import type { Dealer, Company, Area } from '@/lib/types';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
-import { useToast } from '@/hooks/use-toast';
 import { DataTable } from './data-table';
 import { getColumns } from './columns';
 import {
@@ -20,6 +19,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
+import { ActionFeedbackDialog } from '@/components/shared/action-feedback-dialog';
   import api from '@/lib/api';
   import { smartMatch } from '@/lib/search';
 import { useQueryClient } from '@tanstack/react-query';
@@ -29,6 +29,9 @@ interface DealerFormValues {
   name: string;
   cell: string;
   phone: string;
+  email: string;
+  password: string;
+  status: string;
   companyId: string;
   localityId: string;
   cnic: string;
@@ -44,7 +47,6 @@ interface ClientPageProps {
 
 export function ClientPage({ data }: ClientPageProps) {
   const { companyId } = useCompany();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [dealers, setDealers] = useState<Dealer[]>(data);
   const [filter, setFilter] = useState('');
@@ -52,6 +54,17 @@ export function ClientPage({ data }: ClientPageProps) {
   const [selectedDealer, setSelectedDealer] = useState<Dealer | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [statusDealer, setStatusDealer] = useState<Dealer | null>(null);
+  const [statusValue, setStatusValue] = useState<string>('active');
+  const [isStatusUpdating, setIsStatusUpdating] = useState(false);
+  const [feedback, setFeedback] = useState<{
+    type: 'success' | 'error' | 'info';
+    title: string;
+    message: string;
+  } | null>(null);
+
+  const errorMessage = (error: any, fallback: string) =>
+    error?.response?.data?.message || error?.message || fallback;
 
   // Advanced pagination state
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -64,6 +77,9 @@ export function ClientPage({ data }: ClientPageProps) {
     name: '',
     cell: '',
     phone: '',
+    email: '',
+    password: '',
+    status: 'active',
     companyId: companyId || '',
     localityId: '',
     cnic: '',
@@ -88,6 +104,9 @@ export function ClientPage({ data }: ClientPageProps) {
         name: selectedDealer.name,
         cell: (selectedDealer as any).cell || '',
         phone: selectedDealer.phone,
+        email: selectedDealer.email || '',
+        password: '',
+        status: selectedDealer.status || 'active',
         companyId: selectedDealer.companyId,
         localityId: (selectedDealer as any).localityId || '',
         cnic: selectedDealer.cnic,
@@ -102,6 +121,9 @@ export function ClientPage({ data }: ClientPageProps) {
         name: '',
         cell: '',
         phone: '',
+        email: '',
+        password: '',
+        status: 'active',
         companyId: companyId || '',
         localityId: '',
         cnic: '',
@@ -162,37 +184,51 @@ export function ClientPage({ data }: ClientPageProps) {
   }, [filter]);
 
   const handleSave = async () => {
+    const requiresPassword = !selectedDealer;
     if (!formData.name || !formData.phone || !formData.cnic) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Please fill in all required fields.' });
+      setFeedback({ type: 'error', title: 'Error', message: 'Please fill in all required fields.' });
+      return;
+    }
+    if (!formData.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      setFeedback({ type: 'error', title: 'Error', message: 'Please enter a valid email address.' });
+      return;
+    }
+    if (requiresPassword && (!formData.password || formData.password.length < 6)) {
+      setFeedback({ type: 'error', title: 'Error', message: 'Password is required and must be at least 6 characters.' });
       return;
     }
 
     setIsSaving(true);
     try {
-      const payload = {
+      const payload: Record<string, any> = {
         ...formData,
-        email: `${formData.internetId || formData.name.toLowerCase().replace(/\s/g, '.')}@dealer.local`,
-        password: 'dealer123',
+        email: formData.email.trim().toLowerCase(),
+        status: formData.status || 'active',
         commissionRate: parseFloat(formData.commissionRate) || 0,
         walletBalance: parseFloat(formData.walletBalance) || 0,
       };
+      if (formData.password) {
+        payload.password = formData.password;
+      } else {
+        delete payload.password;
+      }
 
       if (selectedDealer) {
         await api.put(`/dealers/${selectedDealer.id}?companyId=${companyId}`, payload);
-        toast({ title: 'Success', description: 'Dealer updated successfully.' });
+        setFeedback({ type: 'success', title: 'Success', message: 'Dealer updated successfully.' });
       } else {
         await api.post(`/dealers?companyId=${companyId}`, payload);
-        toast({ title: 'Success', description: 'Dealer added successfully.' });
+        setFeedback({ type: 'success', title: 'Success', message: 'Dealer added successfully.' });
       }
       queryClient.invalidateQueries({ queryKey: ['dealers', companyId] });
       setIsFormOpen(false);
       setSelectedDealer(null);
       resetForm();
     } catch (error: any) {
-      toast({
-        variant: 'destructive',
+      setFeedback({
+        type: 'error',
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to save dealer',
+        message: errorMessage(error, 'Failed to save dealer'),
       });
     } finally {
       setIsSaving(false);
@@ -205,6 +241,9 @@ export function ClientPage({ data }: ClientPageProps) {
       name: '',
       cell: '',
       phone: '',
+      email: '',
+      password: '',
+      status: 'active',
       companyId: companyId || '',
       localityId: '',
       cnic: '',
@@ -225,14 +264,14 @@ export function ClientPage({ data }: ClientPageProps) {
       try {
         await api.delete(`/dealers/${selectedDealer.id}?companyId=${companyId}`);
         queryClient.invalidateQueries({ queryKey: ['dealers', companyId] });
-        toast({ title: 'Success', description: 'Dealer deleted successfully.' });
         setIsDeleteDialogOpen(false);
         setSelectedDealer(null);
+        setFeedback({ type: 'success', title: 'Success', message: 'Dealer deleted successfully.' });
       } catch (error: any) {
-        toast({
-          variant: 'destructive',
+        setFeedback({
+          type: 'error',
           title: 'Error',
-          description: error.response?.data?.message || 'Failed to delete dealer',
+          message: errorMessage(error, 'Failed to delete dealer'),
         });
       }
     }
@@ -243,9 +282,35 @@ export function ClientPage({ data }: ClientPageProps) {
     setIsDeleteDialogOpen(true);
   };
 
+  const openStatusDialog = (dealer: Dealer) => {
+    setSelectedDealer(dealer);
+    setStatusDealer(dealer);
+    setStatusValue(dealer.status || 'active');
+  };
+
+  const handleStatusChange = async () => {
+    if (!statusDealer || !statusValue) return;
+    setIsStatusUpdating(true);
+    try {
+      await api.put(`/dealers/${statusDealer.id}?companyId=${companyId}`, { status: statusValue });
+      queryClient.invalidateQueries({ queryKey: ['dealers', companyId] });
+      setStatusDealer(null);
+      setFeedback({ type: 'success', title: 'Success', message: `Dealer status updated to "${statusValue}".` });
+    } catch (error: any) {
+      setFeedback({
+        type: 'error',
+        title: 'Error',
+        message: errorMessage(error, 'Failed to update dealer status'),
+      });
+    } finally {
+      setIsStatusUpdating(false);
+    }
+  };
+
   const columns = getColumns({
     onEdit: handleEdit,
     onDelete: openDeleteDialog,
+    onStatus: openStatusDialog,
   });
 
   return (
@@ -323,6 +388,47 @@ export function ClientPage({ data }: ClientPageProps) {
                       value={formData.phone}
                       onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
                     />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Email *</Label>
+                    <Input
+                      type="email"
+                      placeholder="dealer@example.com"
+                      value={formData.email}
+                      onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Password {!selectedDealer && '*'}</Label>
+                    <Input
+                      type="password"
+                      placeholder={selectedDealer ? 'Leave blank to keep current' : 'At least 6 characters'}
+                      value={formData.password}
+                      onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select
+                      value={formData.status}
+                      onValueChange={(val) => setFormData(prev => ({ ...prev, status: val }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                        <SelectItem value="suspended">Suspended</SelectItem>
+                        <SelectItem value="deactivated">Deactivated</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
@@ -536,6 +642,64 @@ export function ClientPage({ data }: ClientPageProps) {
         onClose={() => setIsDeleteDialogOpen(false)}
         onDelete={handleDelete}
         itemName={selectedDealer?.name}
+      />
+
+      <Dialog open={!!statusDealer} onOpenChange={(open) => { if (!open) setStatusDealer(null); }}>
+        <DialogContent className="max-w-sm rounded-xl shadow-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-sm">
+                <ShieldCheck className="h-4 w-4" />
+              </div>
+              Change Status
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Update the status for <span className="font-medium text-foreground">{statusDealer?.name}</span>. The dealer's login access is enabled only when the status is <span className="font-medium text-foreground">Active</span>.
+            </p>
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={statusValue} onValueChange={(val) => setStatusValue(val)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="suspended">Suspended</SelectItem>
+                  <SelectItem value="deactivated">Deactivated</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStatusDealer(null)}
+                className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:border-rose-800 dark:hover:bg-rose-950/30 transition-all duration-300"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleStatusChange}
+                disabled={isStatusUpdating || !statusValue || statusValue === (statusDealer?.status || 'active')}
+                className="bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 shadow-sm transition-all duration-300 hover:shadow-md"
+              >
+                {isStatusUpdating ? 'Updating...' : 'Update Status'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <ActionFeedbackDialog
+        open={!!feedback}
+        onClose={() => setFeedback(null)}
+        type={feedback?.type}
+        title={feedback?.title || ''}
+        message={feedback?.message || ''}
       />
     </>
   );

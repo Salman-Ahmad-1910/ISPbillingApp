@@ -2,8 +2,10 @@
 
 import { type ColumnDef } from '@tanstack/react-table';
 import type { Dealer } from '@/lib/types';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,9 +18,17 @@ import {
 interface ColumnsProps {
   onEdit: (dealer: Dealer) => void;
   onDelete: (dealer: Dealer) => void;
+  onStatus: (dealer: Dealer) => void;
 }
 
-export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<Dealer>[] => [
+const statusBadgeClass: Record<string, string> = {
+  active: 'bg-green-100 text-green-700',
+  inactive: 'bg-yellow-100 text-yellow-700',
+  suspended: 'bg-orange-100 text-orange-700',
+  deactivated: 'bg-red-100 text-red-700',
+};
+
+export const getColumns = ({ onEdit, onDelete, onStatus }: ColumnsProps): ColumnDef<Dealer>[] => [
   {
     accessorKey: 'id',
     header: 'ID',
@@ -57,6 +67,18 @@ export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<Dealer
     ),
   },
   {
+    accessorKey: 'status',
+    header: 'Status',
+    cell: ({ row }) => {
+      const status = row.original.status || 'active';
+      return (
+        <Badge className={cn('font-medium capitalize', statusBadgeClass[status] || 'bg-gray-100 text-gray-700')}>
+          {status}
+        </Badge>
+      );
+    },
+  },
+  {
     id: 'actions',
     cell: ({ row }) => {
       const dealer = row.original;
@@ -73,6 +95,10 @@ export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<Dealer
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuItem onClick={() => onEdit(dealer)} className="data-[highlighted]:text-emerald-600">
                 Edit Dealer
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onStatus(dealer)} className="data-[highlighted]:text-blue-600">
+                <ShieldCheck className="h-4 w-4" />
+                Change Status
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive data-[highlighted]:text-red-600" onClick={() => onDelete(dealer)}>

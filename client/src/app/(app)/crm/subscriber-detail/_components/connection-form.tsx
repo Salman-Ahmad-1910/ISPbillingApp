@@ -179,6 +179,8 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
   const otherAmount = form.watch('otherAmount');
   const packageCable = form.watch('packageCable');
   const packageInternet = form.watch('packageInternet');
+  const amount = form.watch('amount');
+  const sameAmount = form.watch('sameAmount');
 
   const showCable = connectionType === 'both' || connectionType === 'tv_cable';
   const showInternet = connectionType === 'both' || connectionType === 'internet';
@@ -210,9 +212,8 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
   const cablePackagePrice = packagePrice(selectedCablePkg);
   const internetPackagePrice = packagePrice(selectedInternetPkg);
 
-  const baseAmount = (installationAmount || 0) + (otherAmount || 0);
-  const cableBase = baseAmount + cablePackagePrice;
-  const internetBase = baseAmount + internetPackagePrice;
+  const cableBase = cablePackagePrice;
+  const internetBase = internetPackagePrice;
 
   React.useEffect(() => {
     if (discount === 'custom') return;
@@ -266,20 +267,6 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
                 <FormControl>
                   <Input placeholder="e.g., INT-001" {...field} />
                 </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="transactionId"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Transaction ID</FormLabel>
-                <FormControl>
-                  <Input placeholder="e.g., TXN-001" {...field} />
-                </FormControl>
-                <p className="text-[11px] text-muted-foreground">Unique ID used for bank/easypaisa payments</p>
                 <FormMessage />
               </FormItem>
             )}
@@ -667,7 +654,7 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
                   )}
                   {selectedCablePkg && (
                     <p className="text-xs text-muted-foreground">
-                      {selectedCablePkg.name} = {cablePackagePrice} + {installationAmount || 0} + {otherAmount || 0} = {cableBase}
+                      {selectedCablePkg.name} fee = PKR {cablePackagePrice}
                     </p>
                   )}
                   <FormMessage />
@@ -759,7 +746,7 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
                   )}
                   {selectedInternetPkg && (
                     <p className="text-xs text-muted-foreground">
-                      {selectedInternetPkg.name} = {internetPackagePrice} + {installationAmount || 0} + {otherAmount || 0} = {internetBase}
+                      {selectedInternetPkg.name} fee = PKR {internetPackagePrice}
                     </p>
                   )}
                   <FormMessage />
@@ -768,6 +755,15 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
             />
           </div>
         </div>
+
+        {selectedCablePkg && selectedInternetPkg && (
+          <div className="rounded-lg border border-border bg-muted/40 p-4">
+            <p className="text-sm font-medium">Total Amount</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {selectedCablePkg.name} (PKR {amount || 0}) + {selectedInternetPkg.name} (PKR {sameAmount || 0}) + Installation (PKR {installationAmount || 0}) + Other (PKR {otherAmount || 0}) = PKR {(amount || 0) + (sameAmount || 0) + (installationAmount || 0) + (otherAmount || 0)}
+            </p>
+          </div>
+        )}
 
         <FormField
           control={form.control}

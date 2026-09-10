@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"strings"
 	"time"
 
 	"awesomeProject/config"
@@ -22,6 +23,10 @@ func CreateDealer(c *gin.Context) {
 
 	companyID, _ := c.Get("companyID")
 	dealer.CompanyID = companyID.(uuid.UUID)
+
+	if dealer.Status == "" {
+		dealer.Status = "active"
+	}
 
 	// Check if email already exists in users table
 	var existingUser models.User
@@ -50,7 +55,7 @@ func CreateDealer(c *gin.Context) {
 			Name:      dealer.Name,
 			Email:     dealer.Email,
 			Password:  hashedPassword,
-			Status:    "active",
+			Status:    dealer.Status,
 			Role:      "dealer",
 			CreatedBy: nil, // Will be set by the current user if needed
 		}
@@ -95,6 +100,10 @@ func CreateSubDealer(c *gin.Context) {
 	subDealer.CompanyID = companyID.(uuid.UUID)
 	// Note: ParentDealerID should be set in the request to indicate this is a sub-dealer
 
+	if subDealer.Status == "" {
+		subDealer.Status = "active"
+	}
+
 	// Check if email already exists in users table
 	var existingUser models.User
 	if err := config.DB.Where("email = ?", subDealer.Email).First(&existingUser).Error; err == nil {
@@ -122,7 +131,7 @@ func CreateSubDealer(c *gin.Context) {
 			Name:      subDealer.Name,
 			Email:     subDealer.Email,
 			Password:  hashedPassword,
-			Status:    "active",
+			Status:    subDealer.Status,
 			Role:      "sub_dealer",
 			CreatedBy: nil, // Will be set by the current user if needed
 		}
@@ -153,6 +162,148 @@ func CreateSubDealer(c *gin.Context) {
 	// Don't return password in response
 	subDealer.Password = ""
 	utils.CreatedResponse(c, "Sub-dealer created successfully", subDealer)
+}
+
+// UpdateDealerRequest holds the updatable fields for a dealer
+type UpdateDealerRequest struct {
+	Name           string     `json:"name"`
+	Phone          string     `json:"phone"`
+	Email          string     `json:"email"`
+	Password       *string    `json:"password"`
+	Cnic           string     `json:"cnic"`
+	Address        string     `json:"address"`
+	Status         string     `json:"status"`
+	CommissionRate *float64   `json:"commissionRate"`
+	WalletBalance  *float64   `json:"walletBalance"`
+	FranchiseID    *uuid.UUID `json:"franchiseId"`
+	ParentDealerID *string    `json:"parentDealerId"`
+	AreaID         *uuid.UUID `json:"areaId"`
+}
+
+// UpdateDealer updates a dealer and its linked user account (email, status,
+// and hashed password when a new one is provided).
+func UpdateDealer(c *gin.Context) {
+	companyID := c.MustGet("companyID").(uuid.UUID)
+	id := c.Param("id")
+
+	var req UpdateDealerRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, 400, "Invalid input", err.Error())
+		return
+	}
+
+	var dealer models.Dealer
+	if err := config.DB.Where("id = ? AND company_id = ?", id, companyID).First(&dealer).Error; err != nil {
+		utils.ErrorResponse(c, 404, "Dealer not found", err.Error())
+		return
+	}
+
+	// Linked user account (dealer login identity)
+	var user models.User
+	userFound := true
+	if err := config.DB.Where("email = ?", dealer.Email).First(&user).Error; err != nil {
+		userFound = false
+	}
+
+	if req.Name != "" {
+		dealer.Name = req.Name
+	}
+	if req.Phone != "" {
+		dealer.Phone = req.Phone
+	}
+	newEmail := strings.ToLower(strings.TrimSpace(req.Email))
+	if newEmail != "" {
+		if newEmail != strings.ToLower(dealer.Email) {
+			var clash models.User
+			if err := config.DB.Where("LOWER(email) = LOWER(?)", newEmail).First(&clash).Error; err == nil && (!userFound || clash.ID != user.ID) {
+				utils.ErrorResponse(c, 400, "Email already exists", "A user with this email already exists in the system")
+				return
+			}
+		}
+		dealer.Email = newEmail
+	}
+	if req.Cnic != "" {
+		dealer.Cnic = req.Cnic
+	}
+	dealer.Address = req.Address
+	if req.Status != "" {
+		dealer.Status = req.Status
+	}
+	if req.CommissionRate != nil {
+		dealer.CommissionRate = *req.CommissionRate
+	}
+	if req.WalletBalance != nil {
+		dealer.WalletBalance = *req.WalletBalance
+	}
+	if req.FranchiseID != nil {
+		dealer.FranchiseID = req.FranchiseID
+	}
+	if req.AreaID != nil {
+		dealer.AreaID = req.AreaID
+	}
+	if req.ParentDealerID != nil {
+		if *req.ParentDealerID == "" || *req.ParentDealerID == "none" {
+			dealer.ParentDealerID = nil
+		} else if pid, err := uuid.Parse(*req.ParentDealerID); err == nil {
+			dealer.ParentDealerID = &pid
+		}
+	}
+
+	hashedPassword := ""
+	if req.Password != nil && *req.Password != "" {
+		hash, err := utils.HashPassword(*req.Password)
+		if err != nil {
+			utils.ErrorResponse(c, 500, "Failed to hash password", err.Error())
+			return
+		}
+		hashedPassword = hash
+		dealer.Password = hash
+	}
+
+	err := config.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(&dealer).Error; err != nil {
+			return err
+		}
+
+		updates := map[string]interface{}{
+			"name":   dealer.Name,
+			"email":  dealer.Email,
+			"status": dealer.Status,
+		}
+		if hashedPassword != "" {
+			updates["password"] = hashedPassword
+		}
+
+		if userFound {
+			return tx.Model(&models.User{}).Where("id = ?", user.ID).Updates(updates).Error
+		}
+
+		// No linked user found - create one so the dealer can log in
+		newUser := models.User{
+			Name:     dealer.Name,
+			Email:    dealer.Email,
+			Password: dealer.Password,
+			Status:   dealer.Status,
+			Role:     "dealer",
+		}
+		if err := tx.Create(&newUser).Error; err != nil {
+			return err
+		}
+		userCompany := models.UserCompany{
+			UserID:    newUser.ID,
+			CompanyID: dealer.CompanyID,
+			UserRole:  "dealer",
+		}
+		return tx.Create(&userCompany).Error
+	})
+
+	if err != nil {
+		utils.ErrorResponse(c, 500, "Failed to update dealer", err.Error())
+		return
+	}
+
+	dealer.Password = ""
+	utils.SuccessResponse(c, "Dealer updated successfully", dealer)
 }
 
 // CreateDealerCollection handles creating a dealer collection and updating the dealer's lastPaymentDate, walletBalance, and remainingAmount

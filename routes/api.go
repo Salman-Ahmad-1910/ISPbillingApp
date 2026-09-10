@@ -353,7 +353,7 @@ billing.PUT("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "ed
 			crud := controllers.GenericCRUD[models.Dealer]{IsScoped: true}
 			dealers.GET("", crud.FindAll)
 			dealers.GET("/:id", crud.FindOne)
-			dealers.PUT("/:id", crud.Update)
+			dealers.PUT("/:id", controllers.UpdateDealer)
 			dealers.DELETE("/:id", controllers.DeleteDealer)
 			controllers.RegisterGenericCRUD[models.DealerFranchise](dealers, "/franchises")
 			dcCRUD := controllers.GenericCRUD[models.DealerCollection]{IsScoped: true}

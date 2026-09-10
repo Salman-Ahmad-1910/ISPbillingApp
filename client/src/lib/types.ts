@@ -286,6 +286,7 @@ export type Dealer = {
   parentDealerId?: string; // If it's a sub-dealer
   areaId?: string;
   areaName?: string;
+  status?: string;
   lastPaymentDate?: string;
   remainingAmount?: number;
   createdAt: string;
