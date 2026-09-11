@@ -32,6 +32,26 @@ func parseVendorInvoiceSNs(raw string) []string {
 	return result
 }
 
+// parseVendorInvoiceModels splits a whitespace/comma-delimited model string into
+// individual models. Unlike serial numbers, models may contain dashes (e.g.
+// TL-WA801ND), so those are never treated as delimiters.
+func parseVendorInvoiceModels(raw string) []string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	re := regexp.MustCompile(`[\s,]+`)
+	parts := re.Split(raw, -1)
+	var result []string
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			result = append(result, p)
+		}
+	}
+	return result
+}
+
 // vendorInvoiceItemPrices returns the effective purchase and selling prices for
 // a vendor invoice item, falling back to the legacy UnitPrice field when the
 // dedicated price fields are not populated.
@@ -51,36 +71,62 @@ func vendorInvoiceItemPrices(item models.VendorInvoiceItem) (purchase, selling f
 // change. Serial-number-tracked products keep stock == number of SNs; quantity-only
 // (no-SN) products keep an independent integer stock that is adjusted by qtyDelta.
 // addSNs/removeSNs alter the SN list (either may be nil). qtyDelta is positive when
-// inventory is received and negative when it is reverted/removed.
-func applyVendorInvoiceInventory(tx *gorm.DB, companyID, productID uuid.UUID, addSNs, removeSNs []string, qtyDelta int) error {
+// inventory is received and negative when it is reverted/removed. Models are kept
+// parallel to the SN list: addModels/removeModels pair index-for-index with
+// addSNs/removeSNs and are merged positionally.
+func applyVendorInvoiceInventory(tx *gorm.DB, companyID, productID uuid.UUID, addSNs, removeSNs, addModels, removeModels []string, qtyDelta int) error {
 	var prod models.Product
 	if err := tx.Where("id = ? AND company_id = ?", productID, companyID).First(&prod).Error; err != nil {
 		return err
 	}
 
 	allSNs := prod.ParseSerialNumbers()
-	merged := append([]string{}, allSNs...)
+	allModels := prod.ParseModels()
+
+	// Remove requested SNs and their positionally-matching models. Each removed
+	// SN consumes the first unused occurrence so repeated values stay aligned.
 	removeSet := make(map[string]bool, len(removeSNs))
 	for _, sn := range removeSNs {
 		removeSet[sn] = true
 	}
+	consumed := make([]bool, len(allSNs))
 	if len(removeSet) > 0 {
-		filtered := merged[:0]
-		for _, sn := range merged {
-			if !removeSet[sn] {
-				filtered = append(filtered, sn)
+		for _, rsn := range removeSNs {
+			for i := 0; i < len(allSNs); i++ {
+				if !consumed[i] && allSNs[i] == rsn {
+					consumed[i] = true
+					break
+				}
 			}
 		}
-		merged = filtered
 	}
+	merged := make([]string, 0, len(allSNs))
+	mergedModels := make([]string, 0, len(allSNs))
+	for i, sn := range allSNs {
+		if consumed[i] {
+			continue
+		}
+		merged = append(merged, sn)
+		m := ""
+		if i < len(allModels) {
+			m = allModels[i]
+		}
+		mergedModels = append(mergedModels, m)
+	}
+
 	addSet := make(map[string]bool, len(merged))
 	for _, sn := range merged {
 		addSet[sn] = true
 	}
-	for _, sn := range addSNs {
+	for j, sn := range addSNs {
 		if !addSet[sn] {
 			addSet[sn] = true
 			merged = append(merged, sn)
+			m := ""
+			if j < len(addModels) {
+				m = addModels[j]
+			}
+			mergedModels = append(mergedModels, m)
 		}
 	}
 
@@ -90,6 +136,7 @@ func applyVendorInvoiceInventory(tx *gorm.DB, companyID, productID uuid.UUID, ad
 			Where("id = ? AND company_id = ?", productID, companyID).
 			Updates(map[string]interface{}{
 				"serial_number": strings.Join(merged, ", "),
+				"model":         strings.Join(mergedModels, "\n"),
 				"stock":         len(merged),
 			}).Error
 	}
@@ -137,8 +184,9 @@ func CreateVendorInvoice(c *gin.Context) {
 	// adds it to the product's available inventory (buying from a vendor
 	// increases stock). Duplicate SNs within the same invoice are rejected.
 	type validatedItem struct {
-		item models.VendorInvoiceItem
-		sns  []string
+		item   models.VendorInvoiceItem
+		sns    []string
+		models []string
 	}
 	var validItems []validatedItem
 	type productSNSet struct {
@@ -205,8 +253,10 @@ func CreateVendorInvoice(c *gin.Context) {
 				UnitType:      item.UnitType,
 				Subtotal:      purchasePrice * float64(qty),
 				SerialNumber:  strings.Join(validSNs, ", "),
+				Model:         strings.TrimSpace(item.Model),
 			},
 			sns: validSNs,
+			models: parseVendorInvoiceModels(item.Model),
 		})
 	}
 
@@ -257,8 +307,9 @@ func CreateVendorInvoice(c *gin.Context) {
 		// products; quantity-only (no-SN) products have their integer stock
 		// incremented by the bought quantity.
 		type productDelta struct {
-			addSNs   []string
-			qtyDelta int
+			addSNs    []string
+			addModels []string
+			qtyDelta  int
 		}
 		deltas := map[string]*productDelta{}
 		for _, vi := range validItems {
@@ -270,6 +321,7 @@ func CreateVendorInvoice(c *gin.Context) {
 			}
 			if len(vi.sns) > 0 {
 				pd.addSNs = append(pd.addSNs, vi.sns...)
+				pd.addModels = append(pd.addModels, vi.models...)
 			} else {
 				pd.qtyDelta += vi.item.Quantity
 			}
@@ -277,7 +329,7 @@ func CreateVendorInvoice(c *gin.Context) {
 
 		for key, pd := range deltas {
 			productID, _ := uuid.Parse(key)
-			if err := applyVendorInvoiceInventory(tx, invoice.CompanyID, productID, pd.addSNs, nil, pd.qtyDelta); err != nil {
+			if err := applyVendorInvoiceInventory(tx, invoice.CompanyID, productID, pd.addSNs, nil, pd.addModels, nil, pd.qtyDelta); err != nil {
 				tx.Rollback()
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update product inventory", "details": err.Error()})
 				return
@@ -408,8 +460,9 @@ func UpdateVendorInvoice(c *gin.Context) {
 	// 1. Revert the previous invoice's effect on products: remove its SNs and
 	// subtract its quantity-only stock so the new items can be applied cleanly.
 	type revertDelta struct {
-		removeSNs []string
-		qtyDelta  int
+		removeSNs    []string
+		removeModels []string
+		qtyDelta     int
 	}
 	reverts := map[string]*revertDelta{}
 	for _, item := range existingInvoice.Items {
@@ -422,6 +475,7 @@ func UpdateVendorInvoice(c *gin.Context) {
 		sns := parseVendorInvoiceSNs(item.SerialNumber)
 		if len(sns) > 0 {
 			rd.removeSNs = append(rd.removeSNs, sns...)
+			rd.removeModels = append(rd.removeModels, parseVendorInvoiceModels(item.Model)...)
 		} else {
 			rd.qtyDelta -= item.Quantity
 		}
@@ -429,7 +483,7 @@ func UpdateVendorInvoice(c *gin.Context) {
 
 	for key, rd := range reverts {
 		productID, _ := uuid.Parse(key)
-		if err := applyVendorInvoiceInventory(tx, existingInvoice.CompanyID, productID, nil, rd.removeSNs, rd.qtyDelta); err != nil {
+		if err := applyVendorInvoiceInventory(tx, existingInvoice.CompanyID, productID, nil, rd.removeSNs, nil, rd.removeModels, rd.qtyDelta); err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to revert product inventory", "details": err.Error()})
 			return
@@ -458,8 +512,9 @@ func UpdateVendorInvoice(c *gin.Context) {
 
 	// 4. Validate and collect SNs from new items (same ADD logic as CreateVendorInvoice)
 	type validatedItem struct {
-		item models.VendorInvoiceItem
-		sns  []string
+		item   models.VendorInvoiceItem
+		sns    []string
+		models []string
 	}
 	var validItems []validatedItem
 	type productSNSet struct {
@@ -525,8 +580,10 @@ func UpdateVendorInvoice(c *gin.Context) {
 				UnitType:      item.UnitType,
 				Subtotal:      purchasePrice * float64(qty),
 				SerialNumber:  strings.Join(validSNs, ", "),
+				Model:         strings.TrimSpace(item.Model),
 			},
 			sns: validSNs,
+			models: parseVendorInvoiceModels(item.Model),
 		})
 	}
 
@@ -561,8 +618,9 @@ func UpdateVendorInvoice(c *gin.Context) {
 
 	// 6. Apply the new items to products (buying from a vendor increases stock).
 	type productDelta struct {
-		addSNs   []string
-		qtyDelta int
+		addSNs    []string
+		addModels []string
+		qtyDelta  int
 	}
 	deltas := map[string]*productDelta{}
 	for _, vi := range validItems {
@@ -574,6 +632,7 @@ func UpdateVendorInvoice(c *gin.Context) {
 		}
 		if len(vi.sns) > 0 {
 			pd.addSNs = append(pd.addSNs, vi.sns...)
+			pd.addModels = append(pd.addModels, vi.models...)
 		} else {
 			pd.qtyDelta += vi.item.Quantity
 		}
@@ -581,7 +640,7 @@ func UpdateVendorInvoice(c *gin.Context) {
 
 	for key, pd := range deltas {
 		productID, _ := uuid.Parse(key)
-		if err := applyVendorInvoiceInventory(tx, existingInvoice.CompanyID, productID, pd.addSNs, nil, pd.qtyDelta); err != nil {
+		if err := applyVendorInvoiceInventory(tx, existingInvoice.CompanyID, productID, pd.addSNs, nil, pd.addModels, nil, pd.qtyDelta); err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update product inventory", "details": err.Error()})
 			return
@@ -636,8 +695,9 @@ func DeleteVendorInvoice(c *gin.Context) {
 	// Revert the invoice's effect on products: remove its SNs and subtract its
 	// quantity-only stock.
 	type revertDelta struct {
-		removeSNs []string
-		qtyDelta  int
+		removeSNs    []string
+		removeModels []string
+		qtyDelta     int
 	}
 	reverts := map[string]*revertDelta{}
 	for _, item := range existingInvoice.Items {
@@ -650,6 +710,7 @@ func DeleteVendorInvoice(c *gin.Context) {
 		sns := parseVendorInvoiceSNs(item.SerialNumber)
 		if len(sns) > 0 {
 			rd.removeSNs = append(rd.removeSNs, sns...)
+			rd.removeModels = append(rd.removeModels, parseVendorInvoiceModels(item.Model)...)
 		} else {
 			rd.qtyDelta -= item.Quantity
 		}
@@ -657,7 +718,7 @@ func DeleteVendorInvoice(c *gin.Context) {
 
 	for key, rd := range reverts {
 		productID, _ := uuid.Parse(key)
-		if err := applyVendorInvoiceInventory(tx, existingInvoice.CompanyID, productID, nil, rd.removeSNs, rd.qtyDelta); err != nil {
+		if err := applyVendorInvoiceInventory(tx, existingInvoice.CompanyID, productID, nil, rd.removeSNs, nil, rd.removeModels, rd.qtyDelta); err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to revert product inventory", "details": err.Error()})
 			return

@@ -82,6 +82,18 @@ func RunMigrations() {
 		log.Println("Warning: failed to alter vendor_invoice_items.serial_number to TEXT:", err)
 	}
 
+	// Alter model columns to text for unlimited length
+	for _, q := range []string{
+		"ALTER TABLE products ALTER COLUMN model TYPE TEXT",
+		"ALTER TABLE vendor_invoice_items ALTER COLUMN model TYPE TEXT",
+		"ALTER TABLE purchase_items ALTER COLUMN model TYPE TEXT",
+		"ALTER TABLE sale_items ALTER COLUMN model TYPE TEXT",
+	} {
+		if err := config.DB.Exec(q).Error; err != nil {
+			log.Println("Warning: failed to alter model column to TEXT:", err)
+		}
+	}
+
 	// Partial unique index: only enforce uniqueness on non-empty serial numbers
 	if err := config.DB.Exec(`
 		CREATE UNIQUE INDEX IF NOT EXISTS idx_purchase_items_serial_number_unique

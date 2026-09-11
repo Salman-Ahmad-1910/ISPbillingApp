@@ -36,6 +36,7 @@ interface SaleItem {
   saleTax?: number;
   wthTax?: number;
   serialNumber?: string;
+  model?: string;
 }
 
 export function getColumns(onDelete?: (id: string) => void, onPay?: (sale: Sale) => void): ColumnDef<Sale>[] {
@@ -157,6 +158,48 @@ export function getColumns(onDelete?: (id: string) => void, onPay?: (sale: Sale)
             {uniqueSerials.slice(0, 2).map((sn, i) => (
               <div key={i} className="text-xs font-mono truncate">
                 {sn}
+              </div>
+            ))}
+            <div className="text-[10px] text-muted-foreground">+{total - 2} more (total {total})</div>
+          </div>
+        );
+      },
+    },
+    {
+      id: 'model',
+      header: 'Model',
+      cell: ({ row }) => {
+        const items = row.original.items || [];
+        const models = items
+          .map(i => i.model)
+          .filter(Boolean)
+          .flatMap(s =>
+            String(s)
+              .split(/[\s,\n\r\t,]+/)
+              .map(x => x.trim())
+              .filter(Boolean),
+          );
+        const uniqueModels = [...new Set(models)];
+        if (uniqueModels.length === 0) {
+          return <div className="text-xs text-muted-foreground">—</div>;
+        }
+        const total = uniqueModels.length;
+        if (total <= 3) {
+          return (
+            <div className="space-y-0.5 max-w-[200px]">
+              {uniqueModels.map((m, i) => (
+                <div key={i} className="text-xs truncate text-sky-700 dark:text-sky-300" title={m}>
+                  {m}
+                </div>
+              ))}
+            </div>
+          );
+        }
+        return (
+          <div className="space-y-0.5 max-w-[200px]" title={uniqueModels.join(', ')}>
+            {uniqueModels.slice(0, 2).map((m, i) => (
+              <div key={i} className="text-xs truncate text-sky-700 dark:text-sky-300">
+                {m}
               </div>
             ))}
             <div className="text-[10px] text-muted-foreground">+{total - 2} more (total {total})</div>

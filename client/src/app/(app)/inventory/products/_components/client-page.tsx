@@ -76,6 +76,10 @@ export function ClientPage({ data }: ClientPageProps) {
       representative.stock = group.reduce((sum, p) => sum + (p.stock || 0), 0);
       const allSns = group.flatMap(p => (p.serialNumber || '').split(',').map(s => s.trim()).filter(Boolean));
       representative.serialNumber = [...new Set(allSns)].join(', ');
+      const allModels = group.flatMap(p =>
+        (p.model || '').split(/[\s,\n\r\t,]+/).map((s: string) => s.trim()).filter(Boolean)
+      );
+      representative.model = allModels.join(', ');
       return representative;
     });
   }, [products]);
@@ -255,16 +259,24 @@ export function ClientPage({ data }: ClientPageProps) {
           columns={columns}
           data={getPaginatedData()}
           getRowCanExpand={(product) => parseSerialNumbers(product.serialNumber).length > 1}
-          renderExpanded={(product) => (
-            <SerialEntriesTable
-              entries={parseSerialNumbers(product.serialNumber).map((sn, i) => ({
-                key: `${product.id}-${i}-${sn}`,
-                productName: product.name,
-                serialNumber: sn,
-                price: product.salePrice ?? product.price,
-              }))}
-            />
-          )}
+          renderExpanded={(product) => {
+            const sns = parseSerialNumbers(product.serialNumber);
+            const models = (product.model || '')
+              .split(/[\s,\n\r\t,]+/)
+              .map((s: string) => s.trim())
+              .filter(Boolean);
+            return (
+              <SerialEntriesTable
+                entries={sns.map((sn, i) => ({
+                  key: `${product.id}-${i}-${sn}`,
+                  productName: product.name,
+                  serialNumber: sn,
+                  model: models.length === 1 ? models[0] : models[i],
+                  price: product.salePrice ?? product.price,
+                }))}
+              />
+            );
+          }}
         />
                 
                 {/* Advanced Pagination */}

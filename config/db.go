@@ -187,6 +187,24 @@ func RunMigrations() {
 	`)
 	log.Println("Purchase item entered quantity backfilled")
 
+	// Backfill product models for products bought before the Model field existed:
+	// aggregate the models of their vendor-invoice items in creation order so the
+	// existing products table and expanded SN rows show models.
+	DB.Exec(`
+		UPDATE products p
+		SET model = agg.models
+		FROM (
+			SELECT vi.product_id, string_agg(vi.model, E'\n' ORDER BY vi.created_at) AS models
+			FROM vendor_invoice_items vi
+			WHERE vi.deleted_at IS NULL AND vi.model IS NOT NULL AND trim(vi.model) <> ''
+			GROUP BY vi.product_id
+		) agg
+		WHERE p.id = agg.product_id
+			AND p.deleted_at IS NULL
+			AND (p.model IS NULL OR trim(p.model) = '')
+	`)
+	log.Println("Product models backfilled")
+
 	// Drop old columns from installment_plans that no longer exist in the model
 	DB.Exec("ALTER TABLE installment_plans DROP COLUMN IF EXISTS product_id")
 	DB.Exec("ALTER TABLE installment_plans DROP COLUMN IF EXISTS product_name")

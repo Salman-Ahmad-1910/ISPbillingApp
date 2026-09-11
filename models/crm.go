@@ -66,6 +66,8 @@ type Product struct {
 	SerialNumber       string  `gorm:"type:text" json:"serialNumber"`
 	NoSerialNumber     bool    `gorm:"not null;default:false" json:"noSerialNumber"`
 	CurrentSerialIndex int     `gorm:"not null;default:0" json:"currentSerialIndex"`
+	Model              string  `gorm:"type:text" json:"model"`
+	CurrentModelIndex  int     `gorm:"not null;default:0" json:"currentModelIndex"`
 }
 
 func (p *Product) ParseSerialNumbers() []string {
@@ -106,6 +108,34 @@ func (p *Product) AdvanceSerialNumber() string {
 		p.CurrentSerialIndex++
 	}
 	return current
+}
+
+func (p *Product) ParseModels() []string {
+	if p.Model == "" {
+		return nil
+	}
+	parts := strings.FieldsFunc(p.Model, func(r rune) bool {
+		return r == ',' || r == '\n' || r == '\r' || r == '\t'
+	})
+	var result []string
+	for _, s := range parts {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			result = append(result, s)
+		}
+	}
+	return result
+}
+
+func (p *Product) GetCurrentModel() string {
+	models := p.ParseModels()
+	if len(models) == 0 {
+		return p.Model
+	}
+	if p.CurrentModelIndex >= 0 && p.CurrentModelIndex < len(models) {
+		return models[p.CurrentModelIndex]
+	}
+	return models[0]
 }
 
 // SerialNumberPool - Pool of serial numbers to be auto-assigned to products
@@ -160,6 +190,7 @@ type SaleItem struct {
 	SaleTax      float64   `gorm:"type:decimal(10,2);default:0" json:"saleTax"`
 	WthTax       float64   `gorm:"type:decimal(10,2);default:0" json:"wthTax"`
 	SerialNumber string    `gorm:"type:text" json:"serialNumber"`
+	Model        string    `gorm:"type:text" json:"model"`
 }
 
 // SubscriberInstallment tracks an installment agreement for a subscriber on a sale.

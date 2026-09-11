@@ -19,6 +19,11 @@ function parseSerialNumbers(raw: string): string[] {
   return raw.split(/[\s,\-]+/).map(s => s.trim()).filter(Boolean);
 }
 
+function parseModels(raw: string): string[] {
+  if (!raw.trim()) return [];
+  return raw.split(/[\s,\n\r\t,]+/).map(s => s.trim()).filter(Boolean);
+}
+
 interface FormEntry {
   productId: string;
   productName: string;
@@ -94,6 +99,7 @@ export function VendorInvoiceForm({
       id: p.id,
       name: p.name,
       totalSNs: parseSerialNumbers(p.serialNumber || '').length,
+      totalModels: parseModels(p.model || '').length,
     }));
   }, [products]);
 
@@ -139,6 +145,8 @@ export function VendorInvoiceForm({
         productTypeName: product.productTypeName ?? '',
         serialNumber: combined,
         currentSerialIndex: product.currentSerialIndex ?? 0,
+        model: product.model ?? '',
+        currentModelIndex: product.currentModelIndex ?? 0,
       });
       queryClient.invalidateQueries({ queryKey: ['inventory/products', companyId] });
       queryClient.invalidateQueries({ queryKey: ['inventory/purchased-products', companyId] });
@@ -171,6 +179,22 @@ export function VendorInvoiceForm({
     return allSNs.filter(sn => !usedByOthers.has(sn));
   }, [products, entries]);
 
+  const getAvailableModels = useCallback((productId: string, excludeEntryIndex: number): string[] => {
+    const product = products.find(p => p.id === productId);
+    if (!product) return [];
+    const allModels = parseModels(product.model || '');
+    const usedByOthers = new Set<string>();
+    entries.forEach((entry, i) => {
+      if (i === excludeEntryIndex) return;
+      if (entry.productId === productId) {
+        entry.expandedItems.forEach(item => {
+          if (item.model) parseModels(item.model).forEach(m => usedByOthers.add(m));
+        });
+      }
+    });
+    return allModels.filter(m => !usedByOthers.has(m));
+  }, [products, entries]);
+
   const findProductIdForSN = useCallback((productName: string, sn: string): string => {
     const match = products.find(p => p.name === productName && parseSerialNumbers(p.serialNumber || '').includes(sn));
     return match?.id || '';
@@ -195,6 +219,7 @@ export function VendorInvoiceForm({
       });
       const allSNs = parseSerialNumbers(product.serialNumber || '');
       const availableSNs = allSNs.filter(sn => !usedByOthers.has(sn));
+      const availableModels = parseModels(product.model || '').filter(m => !usedByOthers.has(m));
       const maxQty = availableSNs.length;
       // No-SN products are quantity-only: don't cap quantity to the (zero) SN count.
       const qty = availableSNs.length > 0
@@ -202,6 +227,7 @@ export function VendorInvoiceForm({
         : Math.max(1, updated[index].quantity || 1);
       const selectedSNs = availableSNs.slice(0, qty);
       const snString = selectedSNs.join(', ');
+      const modelString = availableModels.slice(0, qty).join(', ');
       updated[index] = {
         ...updated[index],
         productId: value,
@@ -220,12 +246,14 @@ export function VendorInvoiceForm({
           unitType: product.unitType,
           subtotal: unitPrice * qty,
           serialNumber: snString,
+          model: modelString,
         }],
       };
     } else if (field === 'quantity') {
       const productId = updated[index].productId;
       if (!productId) return;
       const availableSNs = getAvailableSNs(productId, index);
+      const availableModels = getAvailableModels(productId, index);
       const maxQty = availableSNs.length;
       // No-SN products are quantity-only: allow any positive quantity.
       const qty = availableSNs.length > 0
@@ -234,6 +262,7 @@ export function VendorInvoiceForm({
       const unitPrice = updated[index].unitPrice;
       const sellingPrice = updated[index].sellingPrice;
       const snString = availableSNs.slice(0, qty).join(', ');
+      const modelString = availableModels.slice(0, qty).join(', ');
       updated[index] = {
         ...updated[index],
         quantity: qty,
@@ -247,6 +276,7 @@ export function VendorInvoiceForm({
           unitType: updated[index].unitType,
           subtotal: unitPrice * qty,
           serialNumber: snString,
+          model: modelString,
         }],
       };
     } else if (field === 'unitPrice') {

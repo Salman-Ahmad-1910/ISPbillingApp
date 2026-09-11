@@ -105,6 +105,22 @@ export const columns = ({ onEdit, onDelete, onPrint, products = [] }: VendorInvo
     },
   },
   {
+    id: 'model',
+    header: 'Model',
+    cell: ({ row }) => {
+      const models = String(row.original.item.model || '')
+        .split(/[\s,\n\r\t,]+/)
+        .map((s: string) => s.trim())
+        .filter(Boolean);
+      if (models.length === 0) return <div className="text-xs text-muted-foreground">—</div>;
+      return (
+        <div className="text-xs text-sky-700 dark:text-sky-300 max-w-[200px] truncate" title={models.join(', ')}>
+          {models[0]}{models.length > 1 ? ` +${models.length - 1}` : ''}
+        </div>
+      );
+    },
+  },
+  {
     id: 'quantity',
     header: () => <div className="text-center">Qty</div>,
     cell: ({ row }) => (
@@ -190,7 +206,7 @@ export function flattenInvoiceItems(invoices: any[]): FlatRow[] {
     if (items.length === 0) {
       rows.push({
         invoice,
-        item: { productId: '', productName: '—', quantity: 0, unitPrice: 0, purchasePrice: 0, sellingPrice: 0, unitType: '', subtotal: invoice.totalAmount, serialNumber: '' } as any,
+        item: { productId: '', productName: '—', quantity: 0, unitPrice: 0, purchasePrice: 0, sellingPrice: 0, unitType: '', subtotal: invoice.totalAmount, serialNumber: '', model: '' } as any,
         isFirst: true,
         itemCount: 0,
       });
@@ -198,7 +214,7 @@ export function flattenInvoiceItems(invoices: any[]): FlatRow[] {
     }
 
     // Group items by productId so each product is listed once in the summary.
-    const grouped = new Map<string, { productName: string; quantity: number; unitPrice: number; unitType: string; subtotal: number; serialNumbers: string[] }>();
+    const grouped = new Map<string, { productName: string; quantity: number; unitPrice: number; unitType: string; subtotal: number; serialNumbers: string[]; models: string[] }>();
     for (const item of items) {
       const key = item.productId;
       if (grouped.has(key)) {
@@ -209,8 +225,13 @@ export function flattenInvoiceItems(invoices: any[]): FlatRow[] {
           const sns = item.serialNumber.split(/[\s,\-]+/).map((s: string) => s.trim()).filter(Boolean);
           g.serialNumbers.push(...sns);
         }
+        if (item.model) {
+          const ms = String(item.model).split(/[\s,\n\r\t,]+/).map((s: string) => s.trim()).filter(Boolean);
+          g.models.push(...ms);
+        }
       } else {
         const sns = item.serialNumber ? item.serialNumber.split(/[\s,\-]+/).map((s: string) => s.trim()).filter(Boolean) : [];
+        const ms = item.model ? String(item.model).split(/[\s,\n\r\t,]+/).map((s: string) => s.trim()).filter(Boolean) : [];
         grouped.set(key, {
           productName: item.productName,
           quantity: item.quantity,
@@ -218,6 +239,7 @@ export function flattenInvoiceItems(invoices: any[]): FlatRow[] {
           unitType: item.unitType,
           subtotal: item.subtotal,
           serialNumbers: sns,
+          models: ms,
         });
       }
     }
@@ -226,6 +248,7 @@ export function flattenInvoiceItems(invoices: any[]): FlatRow[] {
     const productNames = groups.map(([, g]) => g.productName).join(', ');
     const totalQty = groups.reduce((s, [, g]) => s + g.quantity, 0);
     const jsons = groups.map(([key, g]) => ({ productId: key, serialNumbers: g.serialNumbers }));
+    const allModels = groups.flatMap(([, g]) => g.models);
 
     rows.push({
       invoice,
@@ -242,6 +265,7 @@ export function flattenInvoiceItems(invoices: any[]): FlatRow[] {
           .filter((j) => j.serialNumbers.length > 0)
           .flatMap((j) => j.serialNumbers)
           .join(', '),
+        model: allModels.join(', '),
       } as any,
       isFirst: true,
       itemCount: grouped.size,

@@ -17,6 +17,9 @@ export interface PurchasedProduct {
   purchaseDate: string;
   batch: string;
   serialNumber?: string;
+  model?: string;
+  productModel?: string;
+  currentModelIndex?: number;
 }
 
 export const columns: ColumnDef<PurchasedProduct, unknown>[] = [
@@ -52,6 +55,19 @@ export const columns: ColumnDef<PurchasedProduct, unknown>[] = [
       if (sns.length === 0) return <span className="text-xs font-mono text-muted-foreground">\u2014</span>;
       const display = sns.length === 1 ? sns[0] : `${sns[0]} (1/${sns.length})`;
       return <span className="text-xs font-mono" title={sns.join(', ')}>{display}</span>;
+    },
+  },
+  {
+    accessorKey: 'model',
+    header: 'Model',
+    cell: ({ row }) => {
+      const models = (row.original.model || row.original.productModel || '')
+        .split(/[\s,\n\r\t,]+/)
+        .map((s: string) => s.trim())
+        .filter(Boolean);
+      if (models.length === 0) return <span className="text-xs text-muted-foreground">\u2014</span>;
+      const display = models.length === 1 ? models[0] : `${models[0]} +${models.length - 1}`;
+      return <span className="text-xs text-sky-700 dark:text-sky-300" title={models.join(', ')}>{display}</span>;
     },
   },
   {

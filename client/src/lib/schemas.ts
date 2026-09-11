@@ -76,6 +76,9 @@ export const productSchema = z.object({
   serialNumber: z.string().optional(),
   currentSerialIndex: z.coerce.number().min(0).optional().default(0),
   noSerialNumber: z.boolean().optional().default(false),
+  model: z.string().optional(),
+  noModel: z.boolean().optional().default(false),
+  currentModelIndex: z.coerce.number().min(0).optional().default(0),
 });
 
 export const vendorSchema = z.object({
@@ -98,6 +101,7 @@ export const vendorInvoiceItemSchema = z.object({
   unitType: z.string().min(1, 'Unit type is required'),
   subtotal: z.coerce.number().min(0, 'Subtotal must be positive'),
   serialNumber: z.string().optional(),
+  model: z.string().optional(),
 });
 
 export const vendorInvoiceSchema = z.object({
@@ -506,6 +510,7 @@ export const purchaseItemSchema = z.object({
   disc: z.coerce.number().min(0).optional().default(0),
   expiryDate: z.string().optional(),
   serialNumber: z.string().optional(),
+  model: z.string().optional(),
   mergeExisting: z.boolean().optional().default(false),
 });
 

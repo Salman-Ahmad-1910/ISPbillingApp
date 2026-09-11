@@ -10,7 +10,7 @@ import { useCompany } from '@/context/company-context';
 import { useUser } from '@/hooks/use-user';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 
-import { PlusCircle, Trash2, CreditCard, Landmark, CircleDollarSign, Loader2, ShoppingCart, Search, Users, UserRound, Handshake, CalendarDays, Receipt, MoreVertical, Hash, ChevronDown } from 'lucide-react';
+import { PlusCircle, Trash2, CreditCard, Landmark, CircleDollarSign, Loader2, ShoppingCart, Search, Users, UserRound, Handshake, CalendarDays, Receipt, MoreVertical, Hash, ChevronDown, Tag, CheckCircle2, XCircle } from 'lucide-react';
 import Image from 'next/image';
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -51,6 +51,7 @@ interface CartItem {
     quantity: number;
     price: number; // editable unit selling price (defaults to product.price)
     selectedSNs: string[];
+    selectedModels: string[];
 }
 
 // SNs available for selling come from the purchase item (what was bought and
@@ -58,6 +59,16 @@ interface CartItem {
 function purchasedSNs(product: any): string[] {
     return String(product?.serialNumber || product?.productSerialNumber || '')
         .split(/[\s,\-]+/)
+        .map((s: string) => s.trim())
+        .filter(Boolean);
+}
+
+// Models available for selling come from the purchase item, falling back to the
+// product list for legacy data. Models can contain dashes (e.g. TL-WA801ND) so
+// they are only split on whitespace/comma, never on dashes.
+function purchasedModels(product: any): string[] {
+    return String(product?.model || product?.productModel || '')
+        .split(/[\s,\n\r\t,]+/)
         .map((s: string) => s.trim())
         .filter(Boolean);
 }
@@ -299,6 +310,124 @@ function SNSSelect({
     );
 }
 
+function ModelSelect({
+    idPrefix,
+    models,
+    quantity,
+    selected,
+    onChange,
+}: {
+    idPrefix: string;
+    models: string[];
+    quantity: number;
+    selected: string[];
+    onChange: (next: string[]) => void;
+}) {
+    const ref = useRef<HTMLDivElement>(null);
+    const [open, setOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    useEffect(() => {
+        function handleClick(e: MouseEvent) {
+            if (ref.current && !ref.current.contains(e.target as Node)) {
+                setOpen(false);
+            }
+        }
+        document.addEventListener('mousedown', handleClick);
+        return () => document.removeEventListener('mousedown', handleClick);
+    }, []);
+
+    if (models.length === 0) {
+        return null;
+    }
+
+    const selectedSet = new Set(selected);
+    const uniqueModels = Array.from(new Set(models));
+    const filteredModels = searchTerm.trim()
+        ? uniqueModels.filter(m => m.toLowerCase().includes(searchTerm.trim().toLowerCase()))
+        : uniqueModels;
+
+    const toggle = (m: string) => {
+        if (selectedSet.has(m)) {
+            onChange(selected.filter(s => s !== m));
+        } else {
+            if (selected.length >= quantity) return;
+            onChange([...selected, m]);
+        }
+    };
+
+    return (
+        <div className="space-y-1" ref={ref}>
+            <Label className="text-xs font-medium flex items-center gap-1.5">
+                <Tag className="h-3.5 w-3.5 text-sky-500" />
+                Model
+                <span className={`font-normal ml-1 ${selected.length === quantity ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                    ({selected.length}/{quantity})
+                </span>
+            </Label>
+            <div className="relative">
+                <div
+                    className={`flex items-center justify-between gap-2 border rounded-md px-2 py-1.5 text-sm cursor-pointer transition-colors hover:border-foreground/30 ${open ? 'ring-2 ring-ring ring-offset-1' : ''}`}
+                    onClick={() => setOpen(o => !o)}
+                >
+                    <span className={`truncate ${selected.length === 0 ? 'text-muted-foreground' : 'text-xs'}`}>
+                        {selected.length === 0 ? 'Select models...' : selected.join(', ')}
+                    </span>
+                    <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+                </div>
+                {open && (
+                    <div className="absolute z-50 mt-1 w-full bg-popover border rounded-md shadow-lg">
+                        <div className="p-2 border-b bg-popover">
+                            <div className="relative">
+                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                                <Input
+                                    autoFocus
+                                    placeholder="Search model..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="h-8 pl-8 text-sm"
+                                />
+                            </div>
+                        </div>
+                        <div className="max-h-44 overflow-y-auto">
+                            {filteredModels.length === 0 ? (
+                                <div className="px-3 py-4 text-center text-xs text-muted-foreground">No matching model found</div>
+                            ) : (
+                                filteredModels.map((m, idx) => {
+                                    const checked = selectedSet.has(m);
+                                    const disabled = !checked && selected.length >= quantity;
+                                    const id = `model-${idPrefix}-${idx}`;
+                                    return (
+                                        <label
+                                            key={`${m}-${idx}`}
+                                            htmlFor={id}
+                                            className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer text-sm transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent'}`}
+                                        >
+                                            <Checkbox
+                                                id={id}
+                                                checked={checked}
+                                                disabled={disabled}
+                                                onCheckedChange={() => toggle(m)}
+                                            />
+                                            <span className="text-xs truncate">{m}</span>
+                                        </label>
+                                    );
+                                })
+                            )}
+                        </div>
+                        {quantity > 0 && selected.length === quantity && (
+                            <div className="px-3 py-1.5 text-[10px] text-emerald-600 dark:text-emerald-400 border-t bg-popover">
+                                All selected — uncheck to change
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 export default function POSPage() {
     const { companyId, companies } = useCompany();
     const { user } = useUser();
@@ -334,6 +463,14 @@ export default function POSPage() {
     const [productToDelete, setProductToDelete] = useState<any | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const [snEntriesProduct, setSnEntriesProduct] = useState<Product | null>(null);
+
+    interface OrderResult {
+        type: 'success' | 'error';
+        title: string;
+        description: string;
+        details?: { items: number; total: number };
+    }
+    const [orderResult, setOrderResult] = useState<OrderResult | null>(null);
 
     const confirmDeleteProduct = async () => {
         if (!productToDelete) return;
@@ -457,6 +594,8 @@ export default function POSPage() {
         if (!purchasedProducts) return [];
         const mergeSNField = (a: any, b: any) =>
             [String(a || '').trim(), String(b || '').trim()].filter(Boolean).join(', ');
+        const mergeModelField = (a: any, b: any) =>
+            [String(a || '').trim(), String(b || '').trim()].filter(Boolean).join(', ');
         const byId = new Map<string, any>();
         for (const p of purchasedProducts as any[]) {
             const normalized = {
@@ -477,6 +616,8 @@ export default function POSPage() {
                 // count always equals the stock.
                 serialNumber: mergeSNField(existing.serialNumber, normalized.serialNumber),
                 productSerialNumber: mergeSNField(existing.productSerialNumber, normalized.productSerialNumber),
+                model: mergeModelField(existing.model, normalized.model),
+                productModel: mergeModelField(existing.productModel, normalized.productModel),
                 image: existing.image || normalized.image,
             });
         }
@@ -508,6 +649,10 @@ export default function POSPage() {
                         .split(/[\s,\-]+/)
                         .map((s: string) => s.trim())
                         .filter(Boolean),
+                    selectedModels: String(si.model || '')
+                        .split(/[\s,\n\r\t,]+/)
+                        .map((s: string) => s.trim())
+                        .filter(Boolean),
                 };
             }).filter((ci: CartItem) => ci.product);
             setCart(items);
@@ -518,29 +663,27 @@ export default function POSPage() {
     const addToCart = (productId: string) => {
         const product = posProducts.find(p => p.id === productId);
         if (!product || product.stock === 0) {
-            toast({
-                variant: 'destructive',
+            setOrderResult({
+                type: 'error',
                 title: 'Out of Stock',
                 description: `${product?.name} is currently out of stock.`,
             });
             return;
         }
 
-        setCart(currentCart => {
-            const existingItem = currentCart.find(item => item.product.id === productId);
-            if (existingItem) {
-                if (existingItem.quantity >= product.stock) {
-                    toast({
-                        variant: 'destructive',
-                        title: 'Stock Limit Reached',
-                        description: `You cannot add more of ${product.name}.`,
-                    });
-                    return currentCart;
-                }
-                return currentCart.map(item => item.product.id === productId ? { ...item, quantity: item.quantity + 1 } : item);
-            }
-            return [...currentCart, { product, quantity: 1, price: product.price, selectedSNs: [] }];
-        });
+        const existingItem = cart.find(item => item.product.id === productId);
+        if (existingItem && existingItem.quantity >= product.stock) {
+            setOrderResult({
+                type: 'error',
+                title: 'Stock Limit Reached',
+                description: `You cannot add more of ${product.name}.`,
+            });
+            return;
+        }
+
+        setCart(currentCart => existingItem
+            ? currentCart.map(item => item.product.id === productId ? { ...item, quantity: item.quantity + 1 } : item)
+            : [...currentCart, { product, quantity: 1, price: product.price, selectedSNs: [], selectedModels: [] }]);
     }
 
     const removeFromCart = (productId: string) => {
@@ -557,8 +700,8 @@ export default function POSPage() {
         }
 
         if (quantity > product.stock) {
-            toast({
-                variant: 'destructive',
+            setOrderResult({
+                type: 'error',
                 title: 'Stock Limit Exceeded',
                 description: `Only ${product.stock} units of ${product.name} available.`,
             });
@@ -569,7 +712,8 @@ export default function POSPage() {
             if (item.product.id !== productId) return item;
             // Keep at most `quantity` selected SNs when the quantity shrinks.
             const selectedSNs = item.selectedSNs.length > quantity ? item.selectedSNs.slice(0, quantity) : item.selectedSNs;
-            return { ...item, quantity, selectedSNs };
+            const selectedModels = item.selectedModels.length > quantity ? item.selectedModels.slice(0, quantity) : item.selectedModels;
+            return { ...item, quantity, selectedSNs, selectedModels };
         }));
     }
 
@@ -675,6 +819,7 @@ export default function POSPage() {
     // quantity-based line. This matches what the POS backend consumes.
     const buildExpandedItems = (item: CartItem) => {
         const sns = item.selectedSNs.length > 0 ? item.selectedSNs : purchasedSNs(item.product);
+        const models = item.selectedModels.length > 0 ? item.selectedModels : [];
         if (sns.length === 0) {
             return [{
                 productId: item.product.id,
@@ -684,9 +829,10 @@ export default function POSPage() {
                 originalPrice: item.product.price,
                 taxPercent: Number(item.product.taxPercent) || 0,
                 serialNumber: '',
+                model: models[0] || '',
             }];
         }
-        return sns.map(sn => ({
+        return sns.map((sn, i) => ({
             productId: item.product.id,
             productName: item.product.name,
             quantity: 1,
@@ -694,18 +840,19 @@ export default function POSPage() {
             originalPrice: item.product.price,
             taxPercent: Number(item.product.taxPercent) || 0,
             serialNumber: sn,
+            model: models[i] || '',
         }));
     };
 
     // A product with serial numbers must have exactly `quantity` SNs checked
-    // before the bill can be completed or held.
+    // before the bill can be completed or held. Model selection is optional.
     const validateSelectedSNs = () => {
         for (const item of cart) {
             const sns = purchasedSNs(item.product);
             if (sns.length === 0) continue;
             if (item.quantity !== item.selectedSNs.length) {
-                toast({
-                    variant: 'destructive',
+                setOrderResult({
+                    type: 'error',
                     title: `Select ${item.quantity} SN number${item.quantity > 1 ? 's' : ''}`,
                     description: `Please select ${item.quantity} of ${sns.length} serial number(s) for ${item.product.name} in the order.`,
                 });
@@ -717,11 +864,11 @@ export default function POSPage() {
 
     const handleCompletePayment = async () => {
         if (!customerId) {
-            toast({ variant: 'destructive', title: 'Customer not selected', description: 'Please select a customer to proceed.' });
+            setOrderResult({ type: 'error', title: 'Customer not selected', description: 'Please select a customer to proceed.' });
             return;
         }
         if (!paymentMethod) {
-            toast({ variant: 'destructive', title: 'Payment method not selected', description: 'Please select a payment method.' });
+            setOrderResult({ type: 'error', title: 'Payment method not selected', description: 'Please select a payment method.' });
             return;
         }
 
@@ -769,9 +916,11 @@ export default function POSPage() {
             queryClient.invalidateQueries({ queryKey: ['billing/payments'] });
             queryClient.invalidateQueries({ queryKey: ['dashboard'] });
 
-            toast({
+            setOrderResult({
+                type: 'success',
                 title: isInstallment ? 'Installment Sale Created!' : 'Sale Completed!',
                 description: isInstallment ? 'First installment has been paid.' : 'The transaction has been recorded successfully.',
+                details: { items: cart.length, total },
             });
 
             setCart([]);
@@ -785,9 +934,9 @@ export default function POSPage() {
             setExistingInstallment(null);
             setDiscount(0);
         } catch (error: any) {
-            toast({
-                variant: 'destructive',
-                title: 'Error',
+            setOrderResult({
+                type: 'error',
+                title: 'Payment Failed',
                 description: error.response?.data?.message || error.response?.data?.error || 'Failed to process sale',
             });
         } finally {
@@ -797,11 +946,7 @@ export default function POSPage() {
 
     const handleHoldBill = async () => {
         if (!customerId) {
-            toast({
-                variant: 'destructive',
-                title: 'Customer not selected',
-                description: 'Please select a customer to hold a bill.',
-            });
+            setOrderResult({ type: 'error', title: 'Customer not selected', description: 'Please select a customer to hold a bill.' });
             return;
         }
 
@@ -829,9 +974,11 @@ export default function POSPage() {
             queryClient.invalidateQueries({ queryKey: ['inventory/purchased-products', companyId] });
             queryClient.invalidateQueries({ queryKey: ['inventory/products', companyId] });
 
-            toast({
+            setOrderResult({
+                type: 'success',
                 title: 'Bill On Hold',
                 description: 'This bill has been held and can be paid later.',
+                details: { items: cart.length, total },
             });
 
             setCart([]);
@@ -845,9 +992,9 @@ export default function POSPage() {
             setExistingInstallment(null);
             setDiscount(0);
         } catch (error: any) {
-            toast({
-                variant: 'destructive',
-                title: 'Error',
+            setOrderResult({
+                type: 'error',
+                title: 'Hold Failed',
                 description: error.response?.data?.message || error.response?.data?.error || 'Failed to hold bill',
             });
         } finally {
@@ -859,7 +1006,7 @@ export default function POSPage() {
         if (!existingInstallment || !customerId) return;
         const payAmount = Number(existingInstallment.installmentAmount) || (Number(existingInstallment.totalAmount) / Number(existingInstallment.totalInstallments)) || 0;
         if (payAmount <= 0) {
-            toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Installment amount is zero.' });
+            setOrderResult({ type: 'error', title: 'Invalid Amount', description: 'Installment amount is zero.' });
             return;
         }
 
@@ -886,13 +1033,14 @@ export default function POSPage() {
             queryClient.invalidateQueries({ queryKey: ['billing/payments'] });
             queryClient.invalidateQueries({ queryKey: ['dashboard'] });
 
-            toast({
+            setOrderResult({
+                type: 'success',
                 title: 'Installment Paid!',
                 description: `PKR ${payAmount.toLocaleString()} paid. Next installment: #${(existingInstallment.paidInstallments || 0) + 1}`,
             });
         } catch (error: any) {
-            toast({
-                variant: 'destructive',
+            setOrderResult({
+                type: 'error',
                 title: 'Payment Failed',
                 description: error.response?.data?.message || error.response?.data?.error || 'Failed to record installment payment',
             });
@@ -983,6 +1131,17 @@ export default function POSPage() {
                                             </p>
                                           );
                                         })()}
+                                        {(() => {
+                                          const models = purchasedModels(product);
+                                          if (models.length === 0) return null;
+                                          const midx = product.currentModelIndex ?? 0;
+                                          const currentModel = models[midx] || models[0];
+                                          return (
+                                            <p className="text-[10px] font-medium text-sky-700 dark:text-sky-300 truncate mt-0.5" title={models.join(', ')}>
+                                              Model: {currentModel}{models.length > 1 ? ` (+${models.length - 1})` : ''}
+                                            </p>
+                                          );
+                                        })()}
                                     </div>
                                 </Card>
                                 );
@@ -1026,10 +1185,49 @@ export default function POSPage() {
                                     key: `${snEntriesProduct.id}-${i}-${sn}`,
                                     productName: snEntriesProduct.name,
                                     serialNumber: sn,
+                                    model: purchasedModels(snEntriesProduct)[i] || '',
                                     price: snEntriesProduct.price,
                                 }))}
                             />
                         )}
+                    </DialogContent>
+                </Dialog>
+
+                <Dialog open={!!orderResult} onOpenChange={(o) => { if (!o) setOrderResult(null); }}>
+                    <DialogContent className="max-w-md rounded-xl shadow-lg">
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-3">
+                                <div className={`rounded-full p-2.5 ${orderResult?.type === 'success' ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400' : 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400'}`}>
+                                    {orderResult?.type === 'success' ? <CheckCircle2 className="h-6 w-6" /> : <XCircle className="h-6 w-6" />}
+                                </div>
+                                <span>{orderResult?.title}</span>
+                            </DialogTitle>
+                            <DialogDescription className="pt-1">
+                                {orderResult?.description}
+                            </DialogDescription>
+                        </DialogHeader>
+                        {orderResult?.type === 'success' && orderResult.details && (
+                            <div className="flex flex-col gap-2 rounded-lg border bg-muted/40 p-3 text-sm">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-muted-foreground">Items</span>
+                                    <span className="font-semibold">{orderResult.details.items}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-muted-foreground">Total</span>
+                                    <span className="font-semibold">PKR {orderResult.details.total.toLocaleString()}</span>
+                                </div>
+                            </div>
+                        )}
+                        <div className="flex justify-end gap-2 pt-2">
+                            <Button
+                                onClick={() => setOrderResult(null)}
+                                className={orderResult?.type === 'success'
+                                    ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700'
+                                    : 'bg-gradient-to-r from-red-500 to-rose-600 text-white hover:from-red-600 hover:to-rose-700'}
+                            >
+                                {orderResult?.type === 'success' ? 'Done' : 'Close'}
+                            </Button>
+                        </div>
                     </DialogContent>
                 </Dialog>
 
@@ -1214,7 +1412,7 @@ export default function POSPage() {
                                                         />
                                                     </label>
                                                 </div>
-                                                <div className="mt-2">
+                                                <div className="mt-2 grid grid-cols-1 gap-2 items-start">
                                                     <SNSSelect
                                                         idPrefix={item.product.id}
                                                         sns={purchasedSNs(item.product)}
@@ -1222,6 +1420,15 @@ export default function POSPage() {
                                                         selected={item.selectedSNs}
                                                         onChange={(next) => {
                                                             setCart(currentCart => currentCart.map(it => it.product.id === item.product.id ? { ...it, selectedSNs: next } : it));
+                                                        }}
+                                                    />
+                                                    <ModelSelect
+                                                        idPrefix={item.product.id}
+                                                        models={purchasedModels(item.product)}
+                                                        quantity={item.quantity}
+                                                        selected={item.selectedModels}
+                                                        onChange={(next) => {
+                                                            setCart(currentCart => currentCart.map(it => it.product.id === item.product.id ? { ...it, selectedModels: next } : it));
                                                         }}
                                                     />
                                                 </div>

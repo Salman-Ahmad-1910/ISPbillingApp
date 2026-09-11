@@ -68,6 +68,24 @@ export const columns = ({ onEdit, onDelete }: ProductColumnsProps): ColumnDef<Pr
     },
   },
   {
+    accessorKey: 'model',
+    header: 'Model',
+    cell: ({ row }) => {
+      const product = row.original;
+      const model = product.model || '';
+      const models = model.split(/[\s,\n\r\t,]+/).map((s: string) => s.trim()).filter(Boolean);
+      if (models.length === 0) return <div className="text-xs text-muted-foreground">-</div>;
+      const idx = product.currentModelIndex ?? 0;
+      const current = models[idx] || models[0];
+      return (
+        <div className="text-xs text-muted-foreground" title={model}>
+          <span className="font-medium text-sky-700 dark:text-sky-300">{current}</span>
+          {models.length > 1 ? ` +${models.length - 1}` : ''}
+        </div>
+      );
+    },
+  },
+  {
     accessorKey: 'stock',
     header: () => <div className="text-right">Stock</div>,
     cell: ({ row }) => {

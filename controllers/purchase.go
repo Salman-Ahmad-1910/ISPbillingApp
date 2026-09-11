@@ -268,6 +268,7 @@ func CreatePurchase(c *gin.Context) {
 				Disc:          item.Disc,
 				ExpiryDate:    item.ExpiryDate,
 				SerialNumber:  item.SerialNumber,
+				Model:         strings.TrimSpace(item.Model),
 			}
 			if err := tx.Create(&newItem).Error; err != nil {
 				tx.Rollback()
@@ -365,6 +366,11 @@ func mergePurchaseItemInto(tx *gorm.DB, companyID uuid.UUID, item *models.Purcha
 	subtotal := item.PurchasePrice * float64(quantity)
 	serialText := strings.Join(append(parseVendorInvoiceSNs(target.SerialNumber), itemSNs...), ", ")
 
+	modelText := target.Model
+	if strings.TrimSpace(item.Model) != "" {
+		modelText = strings.Trim(strings.Join([]string{target.Model, item.Model}, ", "), ", ")
+	}
+
 	if err := tx.Model(&models.PurchaseItem{}).
 		Where("id = ? AND deleted_at IS NULL", target.ID).
 		Updates(map[string]interface{}{
@@ -372,6 +378,7 @@ func mergePurchaseItemInto(tx *gorm.DB, companyID uuid.UUID, item *models.Purcha
 			"quantity_entered": target.QuantityEntered + item.Quantity,
 			"subtotal":         subtotal,
 			"serial_number":    serialText,
+			"model":            modelText,
 		}).Error; err != nil {
 		return false, err
 	}
@@ -477,10 +484,38 @@ func UpdatePurchase(c *gin.Context) {
 	// Revert old items before updating: SN-bearing items give their SNs back to
 	// the vendor invoice items. No-SN items are owned by the vendor invoice (it
 	// holds the stock), so a purchase update does not touch product stock.
+	// SNs that stay in the updated purchase are left untouched: re-returning and
+	// re-consuming them would reject SNs whose originating vendor invoice item no
+	// longer exists (e.g. the vendor invoice was deleted after this purchase was
+	// recorded).
+	oldByProduct := map[uuid.UUID]map[string]bool{}
 	for _, oldItem := range oldItems {
-		oldSNs := parseVendorInvoiceSNs(oldItem.SerialNumber)
-		if len(oldSNs) > 0 {
-			if err := returnSNsToVendorInvoices(tx, existingPurchase.CompanyID, oldItem.ProductID, oldSNs); err != nil {
+		if oldByProduct[oldItem.ProductID] == nil {
+			oldByProduct[oldItem.ProductID] = map[string]bool{}
+		}
+		for _, sn := range parseVendorInvoiceSNs(oldItem.SerialNumber) {
+			oldByProduct[oldItem.ProductID][sn] = true
+		}
+	}
+	newByProduct := map[uuid.UUID]map[string]bool{}
+	for _, item := range updateData.Items {
+		if newByProduct[item.ProductID] == nil {
+			newByProduct[item.ProductID] = map[string]bool{}
+		}
+		for _, sn := range parseVendorInvoiceSNs(item.SerialNumber) {
+			newByProduct[item.ProductID][sn] = true
+		}
+	}
+
+	for productID, oldSet := range oldByProduct {
+		var removed []string
+		for sn := range oldSet {
+			if !newByProduct[productID][sn] {
+				removed = append(removed, sn)
+			}
+		}
+		if len(removed) > 0 {
+			if err := returnSNsToVendorInvoices(tx, existingPurchase.CompanyID, productID, removed); err != nil {
 				tx.Rollback()
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to return serial numbers to vendor invoice"})
 				return
@@ -522,9 +557,16 @@ func UpdatePurchase(c *gin.Context) {
 	for _, item := range updateData.Items {
 		itemSNs := parseVendorInvoiceSNs(item.SerialNumber)
 
-		// Consume the SNs from the vendor invoice items they belong to.
-		if len(itemSNs) > 0 {
-			if err := consumeSNsFromVendorInvoices(tx, existingPurchase.CompanyID, item.ProductID, itemSNs); err != nil {
+		// Consume only the SNs that are genuinely new to this purchase. SNs the
+		// purchase already holds stay untouched (see the revert logic above).
+		var toConsume []string
+		for _, sn := range itemSNs {
+			if !oldByProduct[item.ProductID][sn] {
+				toConsume = append(toConsume, sn)
+			}
+		}
+		if len(toConsume) > 0 {
+			if err := consumeSNsFromVendorInvoices(tx, existingPurchase.CompanyID, item.ProductID, toConsume); err != nil {
 				tx.Rollback()
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
@@ -551,6 +593,7 @@ func UpdatePurchase(c *gin.Context) {
 			Disc:          item.Disc,
 			ExpiryDate:    item.ExpiryDate,
 			SerialNumber:  item.SerialNumber,
+			Model:         strings.TrimSpace(item.Model),
 		}
 		newItem.ID = uuid.New()
 		newItem.CreatedAt = time.Now()
@@ -770,6 +813,9 @@ pi.id                                           AS purchase_item_id,
 			pi.serial_number                              AS serial_number,
 			COALESCE(pr.serial_number, '')                 AS product_serial_number,
 			COALESCE(pr.current_serial_index, 0)           AS current_serial_index,
+			pi.model                                      AS model,
+			COALESCE(pr.model, '')                         AS product_model,
+			COALESCE(pr.current_model_index, 0)            AS current_model_index,
 			p.bill_id                                     AS bill_id,
 			p.purchase_number                             AS purchase_number,
 			p.vendor_name                                 AS vendor_name,

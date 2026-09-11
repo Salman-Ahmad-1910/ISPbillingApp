@@ -621,6 +621,10 @@ export type Product = {
   productSerialNumber?: string;
   currentSerialIndex?: number;
   noSerialNumber?: boolean;
+  model?: string;
+  productModel?: string;
+  noModel?: boolean;
+  currentModelIndex?: number;
 };
 
 export type SerialNumberPoolEntry = {
@@ -672,6 +676,7 @@ export type VendorInvoiceItem = {
   unitType: string;
   subtotal: number;
   serialNumber?: string;
+  model?: string;
 };
 
 export type InstallmentPlan = {
@@ -829,6 +834,7 @@ export type PurchaseItem = {
   disc: number;
   expiryDate?: string;
   serialNumber?: string;
+  model?: string;
   mergeExisting?: boolean;
 };
 

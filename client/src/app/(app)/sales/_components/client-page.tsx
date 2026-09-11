@@ -49,6 +49,7 @@ interface Sale {
     saleTax?: number;
     wthTax?: number;
     serialNumber?: string;
+    model?: string;
   }[];
 }
 
@@ -146,6 +147,7 @@ export function ClientPage({ data }: ClientPageProps) {
       saleTax: Number(i.saleTax) || 0,
       wthTax: Number(i.wthTax) || 0,
       serialNumber: i.serialNumber || '',
+      model: i.model || '',
     })),
   });
 
@@ -320,11 +322,17 @@ export function ClientPage({ data }: ClientPageProps) {
               renderExpanded={(sale) => {
                 const entries = [];
                 for (const item of sale.items || []) {
-                  for (const sn of parseSerialNumbers(item.serialNumber)) {
+                  const sns = parseSerialNumbers(item.serialNumber);
+                  const models = String(item.model || '')
+                    .split(/[\s,\n\r\t,]+/)
+                    .map(s => s.trim())
+                    .filter(Boolean);
+                  for (let j = 0; j < sns.length; j++) {
                     entries.push({
-                      key: `${item.id}-${sn}`,
+                      key: `${item.id}-${sns[j]}`,
                       productName: item.productName,
-                      serialNumber: sn,
+                      serialNumber: sns[j],
+                      model: models[j] || '',
                       price: Number(item.price) || 0,
                     });
                   }
@@ -403,6 +411,7 @@ export function ClientPage({ data }: ClientPageProps) {
                     const taxPercent = Number((item as any).taxPercent) || 0;
                     const sst = net * (taxPercent / 100);
                     const sn = String(item.serialNumber || '').trim();
+                    const model = String(item.model || '').trim();
 
                     return (
                       <div key={item.id || idx} className="border rounded-lg overflow-hidden">
@@ -412,6 +421,11 @@ export function ClientPage({ data }: ClientPageProps) {
                           <span className="font-mono text-xs font-semibold">{sn ? sn : '—'}</span>
                         </div>
                         <div className="px-3.5 py-2.5 space-y-1.5">
+                          {/* Line 1b: Model */}
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Model</span>
+                            <span className="font-medium text-sky-700 dark:text-sky-300 text-right">{model ? model : '—'}</span>
+                          </div>
                           {/* Line 2: product name */}
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Product</span>

@@ -18,6 +18,7 @@ export interface SerialEntry {
   serialNumber: string;
   price?: number;
   extra?: string;
+  model?: string;
 }
 
 const fmt = (n?: number) =>
@@ -41,6 +42,9 @@ export function SerialEntriesTable({ entries }: { entries: SerialEntry[] }) {
             <th className="py-1 pr-2 font-medium">#</th>
             <th className="py-1 pr-2 font-medium">Product</th>
             <th className="py-1 pr-2 font-medium">SN / MAC</th>
+            {entries.some((e) => e.model) && (
+              <th className="py-1 pr-2 font-medium">Model</th>
+            )}
             <th className="py-1 pr-2 font-medium text-right">Price</th>
             {entries.some((e) => e.extra) && (
               <th className="py-1 pr-2 font-medium text-right">Qty</th>
@@ -55,6 +59,9 @@ export function SerialEntriesTable({ entries }: { entries: SerialEntry[] }) {
               </td>
               <td className="py-1 pr-2 font-medium">{e.productName}</td>
               <td className="py-1 pr-2 font-mono">{e.serialNumber}</td>
+              {entries.some((x) => x.model) && (
+                <td className="py-1 pr-2 text-sky-700 dark:text-sky-300">{e.model || ''}</td>
+              )}
               <td className="py-1 pr-2 text-right">{fmt(e.price)}</td>
               {entries.some((x) => x.extra) && (
                 <td className="py-1 pr-2 text-right">{e.extra}</td>

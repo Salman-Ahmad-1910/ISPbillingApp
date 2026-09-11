@@ -36,6 +36,14 @@ function parseSerialNumbers(raw: string): string[] {
     .filter(Boolean);
 }
 
+function parseModels(raw: string): string[] {
+  if (!raw.trim()) return [];
+  return raw
+    .split(/[\s,\n\r\t,]+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
 type ProductFormValues = z.infer<typeof productSchema>;
 
 interface ProductFormProps {
@@ -72,6 +80,9 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
         serialNumber: product.serialNumber || '',
         currentSerialIndex: product.currentSerialIndex ?? 0,
         noSerialNumber: product.noSerialNumber ?? false,
+        model: product.model || '',
+        noModel: product.noModel ?? false,
+        currentModelIndex: product.currentModelIndex ?? 0,
     } : {
       productId: '',
       name: '',
@@ -91,15 +102,21 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
       serialNumber: '',
       currentSerialIndex: 0,
       noSerialNumber: false,
+      model: '',
+      noModel: false,
+      currentModelIndex: 0,
     },
   });
 
   const noSn = form.watch('noSerialNumber');
+  const noModel = form.watch('noModel');
 
   const brandIdValue = form.watch('brandId');
   const productTypeIdValue = form.watch('productTypeId');
   const serialNumberValue = form.watch('serialNumber');
   const currentSerialIndex = form.watch('currentSerialIndex');
+  const modelValue = form.watch('model');
+  const currentModelIndex = form.watch('currentModelIndex');
 
   const parsedSnCount = useMemo(() => parseSerialNumbers(serialNumberValue || '').length, [serialNumberValue]);
   const currentSn = useMemo(() => {
@@ -108,11 +125,20 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
     return sns[currentSerialIndex ?? 0] || sns[0];
   }, [serialNumberValue, currentSerialIndex]);
 
+  const parsedModelCount = useMemo(() => parseModels(modelValue || '').length, [modelValue]);
+  const currentModel = useMemo(() => {
+    const models = parseModels(modelValue || '');
+    if (models.length === 0) return '';
+    return models[currentModelIndex ?? 0] || models[0];
+  }, [modelValue, currentModelIndex]);
+
   useEffect(() => {
     if (!product && parsedSnCount > 0) {
       form.setValue('stock', parsedSnCount);
+    } else if (!product && parsedSnCount === 0 && parsedModelCount > 0) {
+      form.setValue('stock', parsedModelCount);
     }
-  }, [parsedSnCount, product, form]);
+  }, [parsedSnCount, parsedModelCount, product, form]);
 
   useEffect(() => {
     const brand = brands.find(b => b.id === brandIdValue);
@@ -156,6 +182,8 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
         productTypeName: product.productTypeName ?? '',
         serialNumber: combined,
         currentSerialIndex: product.currentSerialIndex ?? 0,
+        model: product.model ?? '',
+        currentModelIndex: product.currentModelIndex ?? 0,
       });
       form.setValue('serialNumber', combined);
       form.setValue('stock', newStock);
@@ -378,6 +406,59 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                   Add More SNs
                 </Button>
               )}
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="model"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Model Numbers</FormLabel>
+              {!product && (
+                <div className="flex items-center gap-2 mb-2">
+                  <Checkbox
+                    id="noModel"
+                    checked={noModel}
+                    onCheckedChange={(checked) => {
+                      const val = !!checked;
+                      form.setValue('noModel', val);
+                      if (val) {
+                        form.setValue('model', '');
+                      }
+                    }}
+                  />
+                  <label htmlFor="noModel" className="text-sm font-medium leading-none cursor-pointer">
+                    Add without model number
+                  </label>
+                </div>
+              )}
+              {product && currentModel && (
+                <div className="p-2 bg-sky-50 dark:bg-sky-950 rounded-md border border-sky-200 dark:border-sky-800">
+                  <p className="text-xs text-sky-700 dark:text-sky-300 font-medium">Current Model (will be sold next)</p>
+                  <p className="text-sm font-mono font-semibold text-sky-800 dark:text-sky-200 mt-0.5">{currentModel}</p>
+                </div>
+              )}
+              <FormControl>
+                <Textarea
+                  placeholder="e.g., TL-WA801ND, TL-WR840N&#10;Netis WF2419&#10;TP-Link Archer C6"
+                  className="min-h-[80px] font-mono"
+                  {...field}
+                  disabled={noModel}
+                />
+              </FormControl>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">
+                  {noModel ? 'This product has no model numbers.' : 'Separate multiple models with comma or new line (one per unit)'}
+                </p>
+                {parsedModelCount > 0 && (
+                  <span className="text-xs font-medium text-sky-600">
+                    {parsedModelCount} model{parsedModelCount !== 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
               <FormMessage />
             </FormItem>
           )}

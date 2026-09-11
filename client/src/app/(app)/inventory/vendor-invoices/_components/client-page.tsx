@@ -244,11 +244,17 @@ export function ClientPage({ data }: ClientPageProps) {
           const entries = [];
           const items = row.invoice?.items || [];
           for (const item of items) {
-            for (const sn of parseSerialNumbers(item.serialNumber)) {
+            const sns = parseSerialNumbers(item.serialNumber);
+            const models = String(item.model || '')
+              .split(/[\s,\n\r\t,]+/)
+              .map((s: string) => s.trim())
+              .filter(Boolean);
+            for (let i = 0; i < sns.length; i++) {
               entries.push({
-                key: `${item.productId}-${sn}`,
+                key: `${item.productId}-${i}`,
                 productName: item.productName,
-                serialNumber: sn,
+                serialNumber: sns[i],
+                model: models.length === 1 ? models[0] : models[i],
                 price: item.purchasePrice ?? item.unitPrice,
               });
             }

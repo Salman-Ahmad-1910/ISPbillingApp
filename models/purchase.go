@@ -63,6 +63,7 @@ type PurchaseItem struct {
 	Disc          float64   `gorm:"type:decimal(10,2);default:0" json:"disc"`
 	ExpiryDate    string    `gorm:"type:varchar(50)" json:"expiryDate"`
 	SerialNumber  string    `gorm:"type:text" json:"serialNumber"`
+	Model         string    `gorm:"type:text" json:"model"`
 	MergeExisting bool      `gorm:"default:false" json:"mergeExisting"`
 }
 
@@ -85,5 +86,8 @@ type PurchasedProduct struct {
 	SerialNumber         string  `json:"serialNumber"`
 	ProductSerialNumber  string  `json:"productSerialNumber"`
 	CurrentSerialIndex   int     `json:"currentSerialIndex"`
+	Model                string  `json:"model"`
+	ProductModel         string  `json:"productModel"`
+	CurrentModelIndex    int     `json:"currentModelIndex"`
 	Image                string  `json:"image"`
 }

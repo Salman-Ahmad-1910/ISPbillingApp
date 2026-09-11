@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -18,16 +18,92 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Purchase, Vendor, Product } from '@/lib/types';
 import { purchaseSchema } from '@/lib/schemas';
-import { Loader2, Store, Package } from 'lucide-react';
+import { Loader2, Store, Package, Upload } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
+import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
+import api from '@/lib/api';
+import { backendImageUrl } from '@/lib/utils';
 
 type PurchaseFormValues = z.infer<typeof purchaseSchema>;
 
 function parseSerialNumbers(raw: string): string[] {
   if (!raw || !raw.trim()) return [];
   return raw.split(/[\s,\-]+/).map(s => s.trim()).filter(Boolean);
+}
+
+// Uploads/replaces the image for a product (shared across inventory / POS).
+function ProductImageUpload({ productId, image }: { productId: string; image?: string | null }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [uploading, setUploading] = useState(false);
+  const [preview, setPreview] = useState<string | undefined>(backendImageUrl(image));
+
+  useEffect(() => {
+    setPreview(backendImageUrl(image));
+  }, [image]);
+
+  const handleUpload = async (file: File) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      const res = await api.post(`/upload/product-image/${productId}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const path = res.data?.data?.image || res.data?.image;
+      if (path) setPreview(backendImageUrl(path));
+      queryClient.invalidateQueries({ queryKey: ['inventory/products'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory/purchased-products'] });
+      toast({ title: 'Image uploaded', description: 'Product image updated successfully.' });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Upload failed',
+        description: error.response?.data?.message || error.response?.data?.error || 'Could not upload image.',
+      });
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  };
+
+  return (
+    <div
+      className="relative flex h-14 w-14 shrink-0 cursor-pointer overflow-hidden rounded-md border bg-muted/40"
+      title="Upload product image"
+      onClick={() => inputRef.current?.click()}
+    >
+      {preview ? (
+        <img src={preview} alt="Product" className="h-full w-full object-cover" />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+          {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+        </div>
+      )}
+      {uploading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+          <Loader2 className="h-4 w-4 animate-spin text-white" />
+        </div>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/jpg"
+        className="hidden"
+        disabled={uploading}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleUpload(file);
+        }}
+        onClick={(e) => e.stopPropagation()}
+      />
+    </div>
+  );
 }
 
 interface VendorProduct {
@@ -191,8 +267,13 @@ export function PurchaseForm({
   }, [selectedVendorId, vendorInvoices, products, usedSNsByOtherPurchases]);
 
   const getAvailableSNs = (productId: string, excludeIndex: number): string[] => {
+    // SNs this line already carries stay available while editing, even if their
+    // originating vendor invoice item no longer exists.
+    const kept = items[excludeIndex] && items[excludeIndex].productId === productId
+      ? parseSerialNumbers(items[excludeIndex].serialNumber || '')
+      : [];
     const vp = vendorProducts.find(p => p.productId === productId);
-    if (!vp) return [];
+    if (!vp) return kept;
     const usedByOthers = new Set<string>();
     items.forEach((item, i) => {
       if (i === excludeIndex) return;
@@ -200,7 +281,10 @@ export function PurchaseForm({
         parseSerialNumbers(item.serialNumber).forEach(sn => usedByOthers.add(sn));
       }
     });
-    return vp.allSNs.filter(sn => !usedByOthers.has(sn));
+    const available = vp.allSNs.filter(sn => !usedByOthers.has(sn));
+    const have = new Set(available);
+    kept.forEach(sn => { if (!have.has(sn)) available.push(sn); });
+    return available;
   };
 
   const addItem = (productId: string) => {
@@ -379,12 +463,18 @@ export function PurchaseForm({
                   <div key={index} className="border rounded-lg p-3 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm">{item.productName}</span>
-                        {sns.length > 0 && (
-                          <span className="font-mono text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded">
-                            {sns.length === 1 ? `SN: ${sns[0]}` : `${sns[0]} (1/${sns.length})`}
-                          </span>
-                        )}
+                        <ProductImageUpload
+                          productId={item.productId}
+                          image={products.find(p => p.id === item.productId)?.image}
+                        />
+                        <div className="flex flex-col gap-1">
+                          <span className="font-medium text-sm">{item.productName}</span>
+                          {sns.length > 0 && (
+                            <span className="font-mono text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded w-fit">
+                              {sns.length === 1 ? `SN: ${sns[0]}` : `${sns[0]} (1/${sns.length})`}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <Button type="button" variant="outline" size="sm" onClick={() => removeItem(index)}>
                         Remove
