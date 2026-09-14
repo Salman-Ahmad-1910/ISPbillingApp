@@ -79,7 +79,7 @@ export interface SaleFilters {
   fromDate: string;
   toDate: string;
   salesType: 'all' | 'good' | 'bad';
-  paymentType: 'all' | 'normal' | 'installment';
+  paymentType: 'all' | 'normal' | 'installment' | 'hold';
   search: string;
 }
 
@@ -359,6 +359,7 @@ export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) 
                     <SelectItem value="all">All Payments</SelectItem>
                     <SelectItem value="normal">Normal</SelectItem>
                     <SelectItem value="installment">Installments</SelectItem>
+                    <SelectItem value="hold">Hold</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

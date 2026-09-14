@@ -551,6 +551,8 @@ func GetPOSSales(c *gin.Context) {
 	}
 
 	switch paymentType := strings.ToLower(strings.TrimSpace(c.Query("paymentType"))); paymentType {
+	case "hold":
+		db = db.Where("sales.status = ?", "hold")
 	case "normal":
 		db = db.Where("sales.is_installment = ?", false)
 	case "installment":
