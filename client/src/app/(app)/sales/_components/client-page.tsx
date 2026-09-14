@@ -1,10 +1,13 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { useCompany } from '@/context/company-context';
 import api from '@/lib/api';
 import {
@@ -68,11 +71,21 @@ interface InstallmentInfo {
 
 interface ClientPageProps {
   data: Sale[];
+  filters: SaleFilters;
+  onFiltersChange: (filters: SaleFilters) => void;
+}
+
+export interface SaleFilters {
+  fromDate: string;
+  toDate: string;
+  salesType: 'all' | 'good' | 'bad';
+  paymentType: 'all' | 'normal' | 'installment';
+  search: string;
 }
 
 const fmtPKR = (n: number) => new Intl.NumberFormat('en-US').format(Number(n) || 0);
 
-export function ClientPage({ data }: ClientPageProps) {
+export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) {
   const { companies } = useCompany();
   const { companyId } = useCompany();
   const { toast } = useToast();
@@ -84,7 +97,6 @@ export function ClientPage({ data }: ClientPageProps) {
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [isPrintOpen, setIsPrintOpen] = useState(false);
 
-  const [filter, setFilter] = useState('');
   const [isAddingToCollection, setIsAddingToCollection] = useState(false);
   const [viewSaleInstallment, setViewSaleInstallment] = useState<InstallmentInfo | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -120,15 +132,6 @@ export function ClientPage({ data }: ClientPageProps) {
     })();
     return () => { cancelled = true; };
   }, [viewSale?.id, viewSale?.isInstallment, viewSale?.subscriberId, companyId]);
-
-  const filteredData = useMemo(() => {
-    if (!filter.trim()) return data;
-    const q = filter.trim().toLowerCase();
-    return data.filter((sale) =>
-      String(sale.id || '').toLowerCase().startsWith(q) ||
-      String(sale.subscriberName || '').toLowerCase().startsWith(q)
-    );
-  }, [data, filter]);
 
   const toReceipt = (s: Sale): SaleReceiptData => ({
     id: s.id,
@@ -304,17 +307,83 @@ export function ClientPage({ data }: ClientPageProps) {
         </CardHeader>
         <CardContent className="p-0">
           <div className="p-4 pb-0">
-            <Input
-              placeholder="Search by sales ID or customer name..."
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="max-w-sm"
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+              <div className="xl:col-span-1">
+                <Input
+                  placeholder="Search by sale ID or customer name..."
+                  value={filters.search}
+                  onChange={(e) => onFiltersChange({ ...filters, search: e.target.value })}
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <Input
+                  type="date"
+                  value={filters.fromDate}
+                  onChange={(e) => onFiltersChange({ ...filters, fromDate: e.target.value })}
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <Input
+                  type="date"
+                  value={filters.toDate}
+                  onChange={(e) => onFiltersChange({ ...filters, toDate: e.target.value })}
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <Select
+                  value={filters.salesType}
+                  onValueChange={(val) => onFiltersChange({ ...filters, salesType: val as SaleFilters['salesType'] })}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Sales type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Sales</SelectItem>
+                    <SelectItem value="good">Good Sales</SelectItem>
+                    <SelectItem value="bad">Bad Sales</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Select
+                  value={filters.paymentType}
+                  onValueChange={(val) => onFiltersChange({ ...filters, paymentType: val as SaleFilters['paymentType'] })}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Payment type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Payments</SelectItem>
+                    <SelectItem value="normal">Normal</SelectItem>
+                    <SelectItem value="installment">Installments</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 mt-3">
+              <p className="text-xs text-muted-foreground">
+                Showing {data.length} sale{data.length === 1 ? '' : 's'}
+              </p>
+              <div className="flex-1" />
+              {(filters.fromDate || filters.toDate || filters.salesType !== 'all' || filters.paymentType !== 'all' || filters.search) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onFiltersChange({ fromDate: '', toDate: '', salesType: 'all', paymentType: 'all', search: '' })}
+                  className="text-xs"
+                >
+                  Clear Filters
+                </Button>
+              )}
+            </div>
           </div>
           <div className="p-4">
             <DataTable
               columns={columns}
-              data={filteredData}
+              data={data}
               onRowClick={handleRowClick}
               getRowCanExpand={(sale) =>
                 (sale.items || []).some((item) => parseSerialNumbers(item.serialNumber).length > 1)

@@ -4,14 +4,41 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { Loader2, ShoppingCart, TrendingUp, DollarSign, Receipt } from 'lucide-react';
 
-import { ClientPage } from './_components/client-page';
+import { ClientPage, type SaleFilters } from './_components/client-page';
 import { useCompany } from '@/context/company-context';
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 
 export default function SalesPage() {
   const { companyId } = useCompany();
+  const [filters, setFilters] = useState<SaleFilters>({
+    fromDate: '',
+    toDate: '',
+    salesType: 'all',
+    paymentType: 'all',
+    search: '',
+  });
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  const { data: sales = [], isLoading } = useGenericQuery<any>('pos/sales', companyId ?? undefined);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(filters.search), 500);
+    return () => clearTimeout(t);
+  }, [filters.search]);
+
+  const params = useMemo(() => {
+    const p: Record<string, string> = {};
+    if (filters.fromDate) p.fromDate = filters.fromDate;
+    if (filters.toDate) p.toDate = filters.toDate;
+    if (filters.salesType && filters.salesType !== 'all') p.salesType = filters.salesType;
+    if (filters.paymentType && filters.paymentType !== 'all') p.paymentType = filters.paymentType;
+    if (debouncedSearch.trim()) p.search = debouncedSearch.trim();
+    return p;
+  }, [filters, debouncedSearch]);
+
+  const { data: sales = [], isLoading } = useGenericQuery<any>(
+    'pos/sales',
+    companyId ?? undefined,
+    Object.keys(params).length > 0 ? params : undefined,
+  );
 
   const totalRevenue = useMemo(() => {
     if (!Array.isArray(sales)) return 0;
@@ -88,7 +115,7 @@ export default function SalesPage() {
 
       <Card className="transition-all duration-300 hover:shadow-md">
         <CardContent className="p-0">
-          <ClientPage data={sales} />
+          <ClientPage data={sales} filters={filters} onFiltersChange={setFilters} />
         </CardContent>
       </Card>
     </div>

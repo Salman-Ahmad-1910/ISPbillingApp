@@ -525,16 +525,45 @@ func PayInstallment(c *gin.Context) {
 	utils.SuccessResponse(c, "Installment payment recorded", inst)
 }
 
-// GetPOSSales returns all sales for the current company with their line items preloaded.
+// GetPOSSales returns all sales for the current company with their line items
+// preloaded. Supports backend filtering via query params:
+//   - fromDate / toDate   (YYYY-MM-DD, inclusive on sales.date)
+//   - salesType           (good | bad)
+//   - paymentType         (normal | installment)
+//   - search              (matches sale id or subscriber name)
 func GetPOSSales(c *gin.Context) {
 	companyID := c.MustGet("companyID").(uuid.UUID)
 
+	db := config.DB.Scopes(models.TenantScope(companyID))
+
+	if fromDate := strings.TrimSpace(c.Query("fromDate")); fromDate != "" {
+		db = db.Where("LEFT(sales.date, 10) >= ?", fromDate)
+	}
+	if toDate := strings.TrimSpace(c.Query("toDate")); toDate != "" {
+		db = db.Where("LEFT(sales.date, 10) <= ?", toDate)
+	}
+
+	switch salesType := strings.ToLower(strings.TrimSpace(c.Query("salesType"))); salesType {
+	case "good":
+		db = db.Where("EXISTS (SELECT 1 FROM sale_items si WHERE si.sale_id = sales.id AND si.original_price > 0 AND si.price > si.original_price)")
+	case "bad":
+		db = db.Where("NOT EXISTS (SELECT 1 FROM sale_items si WHERE si.sale_id = sales.id AND si.original_price > 0 AND si.price > si.original_price)")
+	}
+
+	switch paymentType := strings.ToLower(strings.TrimSpace(c.Query("paymentType"))); paymentType {
+	case "normal":
+		db = db.Where("sales.is_installment = ?", false)
+	case "installment":
+		db = db.Where("sales.is_installment = ?", true)
+	}
+
+	if q := strings.TrimSpace(c.Query("search")); q != "" {
+		like := strings.ToLower(q) + "%"
+		db = db.Where("LOWER(sales.subscriber_name) LIKE ? OR LOWER(sales.id::text) LIKE ?", like, like)
+	}
+
 	var sales []models.Sale
-	if err := config.DB.
-		Scopes(models.TenantScope(companyID)).
-		Preload("Items").
-		Order("created_at DESC").
-		Find(&sales).Error; err != nil {
+	if err := db.Preload("Items").Order("created_at DESC").Find(&sales).Error; err != nil {
 		utils.ErrorResponse(c, 500, "Failed to fetch sales", err.Error())
 		return
 	}
