@@ -19,14 +19,14 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
-import { Printer } from 'lucide-react';
-import { Loader2 } from 'lucide-react';
+import { Printer, Loader2, RotateCcw } from 'lucide-react';
 import { printSaleReceipt, type SaleReceiptData } from './sale-receipt';
 import { getColumns } from './columns';
 import { DataTable } from './data-table';
 import { SerialEntriesTable, parseSerialNumbers } from '@/components/shared/serial-entries';
 import type { Company } from '@/lib/types';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
+import { ActionFeedbackDialog } from '@/components/shared/action-feedback-dialog';
 
 interface Sale {
   id: string;
@@ -100,6 +100,13 @@ export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) 
   const [isAddingToCollection, setIsAddingToCollection] = useState(false);
   const [viewSaleInstallment, setViewSaleInstallment] = useState<InstallmentInfo | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [returnTarget, setReturnTarget] = useState<Sale | null>(null);
+  const [isReturning, setIsReturning] = useState(false);
+  const [feedback, setFeedback] = useState<{
+    type: 'success' | 'error' | 'info';
+    title: string;
+    message: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!viewSale?.isInstallment || !viewSale?.subscriberId || !companyId) {
@@ -252,6 +259,39 @@ export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) 
     setDeleteTarget(id);
   };
 
+  const openReturnDialog = (sale: Sale) => {
+    setReturnTarget(sale);
+  };
+
+  const handleReturn = async () => {
+    if (!returnTarget) return;
+    setIsReturning(true);
+    try {
+      await api.post(`/pos/sales/${returnTarget.id}/return?companyId=${companyId}`);
+      invalidateInventoryQueries();
+      setReturnTarget(null);
+      setViewSale((prev) =>
+        prev && prev.id === returnTarget.id ? { ...prev, status: 'returned' } : prev,
+      );
+      setFeedback({
+        type: 'success',
+        title: 'Sale Returned',
+        message: `The sale has been marked as returned and all items/SNs have been restored to stock.`,
+      });
+    } catch (error: any) {
+      setFeedback({
+        type: 'error',
+        title: 'Error',
+        message: errorMsg(error, 'Failed to return this sale'),
+      });
+    } finally {
+      setIsReturning(false);
+    }
+  };
+
+  const errorMsg = (error: any, fallback: string) =>
+    error?.response?.data?.message || error?.response?.data?.error || error?.message || fallback;
+
   const invalidateInventoryQueries = () => {
     queryClient.invalidateQueries({ queryKey: ['pos/sales', companyId] });
     queryClient.invalidateQueries({ queryKey: ['pos/sales'] });
@@ -294,7 +334,7 @@ export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) 
     }
   };
 
-  const columns = getColumns(handleDelete, handlePayHold);
+  const columns = getColumns(handleDelete, handlePayHold, openReturnDialog);
 
   const viewSubtotal = viewSale ? (Number(viewSale.totalAmount) || 0) - (Number(viewSale.taxAmount) || 0) : 0;
   const viewTotalItems = viewSale ? (viewSale.items || []).reduce((sum, i) => sum + (Number(i.quantity) || 0), 0) : 0;
@@ -625,7 +665,7 @@ export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) 
                     {isAddingToCollection ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
                     Add to Collection
                   </Button>
-                  <Button variant="secondary" size="sm" onClick={() => setViewSale(null)}>Close</Button>
+<Button variant="secondary" size="sm" onClick={() => setViewSale(null)}>Close</Button>
                 </div>
               </div>
             </>
@@ -638,6 +678,69 @@ export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) 
         onClose={() => setDeleteTarget(null)}
         onDelete={confirmDelete}
         itemName="this sale"
+      />
+
+      <Dialog open={!!returnTarget} onOpenChange={(open) => { if (!open) setReturnTarget(null); }}>
+        <DialogContent className="max-w-lg rounded-xl shadow-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-sm">
+                <RotateCcw className="h-4 w-4" />
+              </div>
+              Return Sale
+            </DialogTitle>
+            <DialogDescription>
+              Confirm the customer returned this sale. All items/SNs will be restored to stock and the sale will be marked as returned.
+            </DialogDescription>
+          </DialogHeader>
+          {returnTarget && (
+            <div className="rounded-lg border p-4 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Customer</span>
+                <span className="font-medium">{returnTarget.subscriberName || 'Walk-in'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Date</span>
+                <span>{returnTarget.date ? new Date(returnTarget.date).toLocaleDateString() : 'N/A'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Items</span>
+                <span className="font-medium">
+                  {(returnTarget.items || []).map(i => `${i.productName} x${i.quantity}`).join(', ')}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Total</span>
+                <span className="font-semibold">PKR {fmtPKR(returnTarget.totalAmount)}</span>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:justify-end pt-2">
+            <Button variant="outline" onClick={() => setReturnTarget(null)} disabled={isReturning}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleReturn}
+              disabled={isReturning}
+              className="min-w-28"
+            >
+              {isReturning ? (
+                <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Returning...</>
+              ) : (
+                'Confirm Return'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ActionFeedbackDialog
+        open={!!feedback}
+        onClose={() => setFeedback(null)}
+        type={feedback?.type}
+        title={feedback?.title || ''}
+        message={feedback?.message || ''}
       />
     </div>
   );

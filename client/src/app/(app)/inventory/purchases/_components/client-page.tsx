@@ -54,7 +54,10 @@ export function ClientPage({ data }: ClientPageProps) {
   const filteredPurchases = useMemo(() => {
     if (!searchTerm) return data;
     return data.filter(purchase =>
-      smartMatch(searchTerm, [purchase.purchaseNumber, purchase.billId], [purchase.vendorName])
+      smartMatch(searchTerm, [purchase.purchaseNumber, purchase.billId], [
+        purchase.vendorName,
+        ...(purchase.items?.map((item) => item.productName) ?? []),
+      ])
     );
   }, [data, searchTerm]);
 

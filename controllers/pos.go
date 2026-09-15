@@ -632,6 +632,54 @@ func DeletePOSSale(c *gin.Context) {
 	utils.SuccessResponse(c, "Sale deleted successfully", nil)
 }
 
+// ReturnPOSSale marks a completed, non-installment sale as returned and
+// restores every sold item/SN back to inventory (purchase items, product stock
+// and serial lists) so the goods can be sold again. The original sale record is
+// kept for history and flagged with status "returned".
+func ReturnPOSSale(c *gin.Context) {
+	companyID := c.MustGet("companyID").(uuid.UUID)
+	id := c.Param("id")
+
+	var sale models.Sale
+	if err := config.DB.
+		Scopes(models.TenantScope(companyID)).
+		Preload("Items").
+		Where("id = ?", id).
+		First(&sale).Error; err != nil {
+		utils.ErrorResponse(c, 404, "Sale not found", err.Error())
+		return
+	}
+
+	if sale.Status == "returned" {
+		utils.ErrorResponse(c, 400, "Sale already returned", "This sale has already been returned.")
+		return
+	}
+	if sale.Status == "hold" {
+		utils.ErrorResponse(c, 400, "Hold bill cannot be returned", "Delete the hold bill instead to restore its stock.")
+		return
+	}
+	if sale.IsInstallment {
+		utils.ErrorResponse(c, 400, "Installment sale cannot be returned", "Installment sales must be managed through their installment plan.")
+		return
+	}
+
+	err := config.DB.Transaction(func(tx *gorm.DB) error {
+		if err := revertSaleStock(tx, companyID, sale); err != nil {
+			return err
+		}
+		return tx.Model(&models.Sale{}).
+			Where("id = ?", sale.ID).
+			Update("status", "returned").Error
+	})
+	if err != nil {
+		utils.ErrorResponse(c, 500, "Failed to return sale", err.Error())
+		return
+	}
+
+	sale.Status = "returned"
+	utils.SuccessResponse(c, "Sale returned successfully, stock restored", sale)
+}
+
 // revertSaleStock returns a held sale's items back to inventory. It restores
 // each sold SN to the purchase items that drive the point-of-sale list and, if
 // the SN was consumed from the product record itself (legacy path), back to

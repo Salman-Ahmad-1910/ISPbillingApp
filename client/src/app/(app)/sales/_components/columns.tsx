@@ -9,7 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Pencil, Trash2, BadgeCheck } from 'lucide-react';
+import { MoreHorizontal, Pencil, Trash2, BadgeCheck, RotateCcw } from 'lucide-react';
 
 interface Sale {
   id: string;
@@ -39,7 +39,7 @@ interface SaleItem {
   model?: string;
 }
 
-export function getColumns(onDelete?: (id: string) => void, onPay?: (sale: Sale) => void): ColumnDef<Sale>[] {
+export function getColumns(onDelete?: (id: string) => void, onPay?: (sale: Sale) => void, onReturn?: (sale: Sale) => void): ColumnDef<Sale>[] {
   return [
     {
       accessorKey: 'id',
@@ -74,6 +74,7 @@ export function getColumns(onDelete?: (id: string) => void, onPay?: (sale: Sale)
         const method = row.original.paymentMethod;
         const isInstallment = row.original.isInstallment;
         const isHold = row.original.status === 'hold';
+        const isReturned = row.original.status === 'returned';
         // A line is a "good sale" when its selling price exceeds the product's
         // original list price captured at sale time.
         const isGoodSale = (row.original.items || []).some(i => {
@@ -86,6 +87,10 @@ export function getColumns(onDelete?: (id: string) => void, onPay?: (sale: Sale)
             {isHold ? (
               <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
                 Hold
+              </Badge>
+            ) : isReturned ? (
+              <Badge variant="secondary" className="text-[10px] bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300">
+                Returned
               </Badge>
             ) : (
               <Badge variant="outline">
@@ -285,6 +290,17 @@ export function getColumns(onDelete?: (id: string) => void, onPay?: (sale: Sale)
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete
               </DropdownMenuItem>
+              {sale.status !== 'hold' && sale.status !== 'returned' && !sale.isInstallment && (
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onReturn?.(sale);
+                  }}
+                >
+                  <RotateCcw className="mr-2 h-4 w-4 text-blue-600" />
+                  Return
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         );

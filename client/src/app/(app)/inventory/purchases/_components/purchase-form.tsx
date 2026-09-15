@@ -34,6 +34,11 @@ function parseSerialNumbers(raw: string): string[] {
   return raw.split(/[\s,\-]+/).map(s => s.trim()).filter(Boolean);
 }
 
+function parseModels(raw: string): string[] {
+  if (!raw || !raw.trim()) return [];
+  return raw.split(/[\s,\n\r\t,]+/).map(s => s.trim()).filter(Boolean);
+}
+
 // Uploads/replaces the image for a product (shared across inventory / POS).
 function ProductImageUpload({ productId, image }: { productId: string; image?: string | null }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -113,6 +118,7 @@ interface VendorProduct {
   sellingPrice: number;
   unitType: string;
   allSNs: string[];
+  allModels: string[];
   vendorInvoiceId: string;
   invoiceNumber: string;
   batch: string;
@@ -232,6 +238,7 @@ export function PurchaseForm({
       if (vi.vendorId !== selectedVendorId || !vi.items) continue;
       for (const item of vi.items) {
         const itemSNs = parseSerialNumbers(item.serialNumber || '');
+        const itemModels = parseModels(item.model || '');
         const product = products.find(p => p.id === item.productId);
         // A product is quantity-only (no SN) when its flag says so, or when the
         // vendor invoice item carries no serial numbers. The flag is authoritative
@@ -239,14 +246,25 @@ export function PurchaseForm({
         const isNoSN = !!product?.noSerialNumber || itemSNs.length === 0;
 
         // The purchase page sources its products/SNs from the vendor invoice
-        // items. For SN-tracked items only unconsumed SNs remain. For
-        // quantity-only (no-SN) products the item is always available.
-        const unconsumedSNs = itemSNs.filter(sn => !usedSNsByOtherPurchases.has(sn));
+        // items. For SN-tracked items only unconsumed SNs remain (paired with
+        // their model). For quantity-only (no-SN) products the item is always
+        // available.
+        const unconsumedSNs: string[] = [];
+        const unconsumedModels: string[] = [];
+        itemSNs.forEach((sn, i) => {
+          if (!usedSNsByOtherPurchases.has(sn)) {
+            unconsumedSNs.push(sn);
+            unconsumedModels.push(itemModels[i] || '');
+          }
+        });
         if (!isNoSN && unconsumedSNs.length === 0) continue;
 
         const existing = productMap.get(item.productId);
         if (existing) {
-          if (!isNoSN) existing.allSNs.push(...unconsumedSNs);
+          if (!isNoSN) {
+            existing.allSNs.push(...unconsumedSNs);
+            existing.allModels.push(...unconsumedModels);
+          }
         } else {
           const unitPrice = item.purchasePrice || item.unitPrice || 0;
           productMap.set(item.productId, {
@@ -256,6 +274,7 @@ export function PurchaseForm({
             sellingPrice: item.sellingPrice || unitPrice,
             unitType: item.unitType || product?.unitType || 'piece',
             allSNs: isNoSN ? [] : [...unconsumedSNs],
+            allModels: isNoSN ? [] : [...unconsumedModels],
             vendorInvoiceId: vi.id,
             invoiceNumber: vi.invoiceNumber || '',
             batch: vi.batch || '',
@@ -292,10 +311,47 @@ export function PurchaseForm({
     if (!vp) return;
     const isNoSN = vp.allSNs.length === 0;
     const currentItems = form.getValues('items');
+
+    // If the same product is already on the form, merge into that line instead
+    // of adding a duplicate: bump quantity, append the next available SN with
+    // its model, and recompute the subtotal.
+    const existingIndex = currentItems.findIndex(it => it.productId === productId);
+    if (existingIndex >= 0) {
+      const item = { ...currentItems[existingIndex] };
+      const qty = Math.max(1, Number(item.quantity) || 1);
+      if (isNoSN) {
+        item.quantity = qty + 1;
+        item.subtotal = item.quantity * item.purchasePrice;
+      } else {
+        const currentSNs = parseSerialNumbers(item.serialNumber || '');
+        const haveSNs = new Set(currentSNs);
+        const availableSNs = getAvailableSNs(productId, existingIndex).filter(sn => !haveSNs.has(sn));
+        if (availableSNs.length > 0) {
+          const nextSN = availableSNs[0];
+          const modelIndex = vp.allSNs.indexOf(nextSN);
+          const nextModel = modelIndex >= 0 ? vp.allModels[modelIndex] || '' : '';
+          currentSNs.push(nextSN);
+          item.serialNumber = currentSNs.join(', ');
+          item.model = [parseModels(item.model || '').join(','), nextModel]
+            .filter(m => m)
+            .join(', ');
+          item.quantity = currentSNs.length;
+          item.subtotal = item.quantity * item.purchasePrice;
+        }
+      }
+      const updated = [...currentItems];
+      updated[existingIndex] = item;
+      form.setValue('items', updated, { shouldDirty: true, shouldTouch: true });
+      return;
+    }
+
     const availableSNs = getAvailableSNs(productId, currentItems.length);
     const maxQty = isNoSN ? 99999 : (availableSNs.length || 1);
     const qty = isNoSN ? 1 : Math.min(1, availableSNs.length || 1);
     const snString = isNoSN ? '' : availableSNs.slice(0, qty).join(', ');
+    const firstSN = availableSNs[0] || '';
+    const modelIndex = isNoSN ? -1 : vp.allSNs.indexOf(firstSN);
+    const modelString = isNoSN || modelIndex < 0 ? '' : vp.allModels[modelIndex] || '';
     const newItem = {
       productId,
       productName: vp.productName,
@@ -305,6 +361,7 @@ export function PurchaseForm({
       unitType: vp.unitType,
       focNormal: 'normal',
       serialNumber: snString,
+      model: modelString,
       subtotal: vp.unitPrice * qty,
       saleTax: 0,
       wthTax: 0,
@@ -335,9 +392,16 @@ export function PurchaseForm({
       const qty = isNoSN
         ? Math.max(1, Number(value) || 1)
         : Math.max(1, Math.min(Number(value) || 1, maxQty));
-      const snString = isNoSN ? '' : availableSNs.slice(0, qty).join(', ');
+      const selectedSNs = availableSNs.slice(0, qty);
+      const snString = isNoSN ? '' : selectedSNs.join(', ');
+      const selectedModels = selectedSNs.map(sn => {
+        if (!vp) return '';
+        const mIndex = vp.allSNs.indexOf(sn);
+        return mIndex >= 0 ? (vp.allModels[mIndex] || '') : '';
+      }).filter(Boolean);
       item.quantity = qty;
       item.serialNumber = snString;
+      item.model = selectedModels.join(', ');
       item.subtotal = qty * item.purchasePrice;
     } else {
       (item as any)[field] = value;
@@ -472,6 +536,13 @@ export function PurchaseForm({
                           {sns.length > 0 && (
                             <span className="font-mono text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded w-fit">
                               {sns.length === 1 ? `SN: ${sns[0]}` : `${sns[0]} (1/${sns.length})`}
+                            </span>
+                          )}
+                          {parseModels(item.model || '').length > 0 && (
+                            <span className="font-mono text-xs bg-violet-50 text-violet-700 px-1.5 py-0.5 rounded w-fit">
+                              {parseModels(item.model || '').length === 1
+                                ? `Model: ${parseModels(item.model || '')[0]}`
+                                : `Model: ${parseModels(item.model || '')[0]} (1/${parseModels(item.model || '').length})`}
                             </span>
                           )}
                         </div>
