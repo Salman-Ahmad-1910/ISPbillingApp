@@ -15,6 +15,7 @@ import { purchaseSchema } from '@/lib/schemas';
 import { DataTable } from './data-table';
 import { columns as getColumns } from './columns';
 import { PurchaseForm } from './purchase-form';
+import { AddQuantityDialog, type AddQuantityPayload } from './add-quantity-dialog';
 import { SerialEntriesTable, parseSerialNumbers } from '@/components/shared/serial-entries';
 import { exportToExcel, printTableReport, fmtPKR, type ExportColumn } from '@/components/shared/table-export';
 import { CollectionPagination } from '@/components/shared/collection-pagination';
@@ -45,6 +46,7 @@ export function ClientPage({ data }: ClientPageProps) {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Purchase | null>(null);
+  const [addQtyTarget, setAddQtyTarget] = useState<Purchase | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [pageSize, setPageSize] = useState<string>('10');
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -156,6 +158,37 @@ export function ClientPage({ data }: ClientPageProps) {
     },
   });
 
+  const addQuantityMutation = useMutation({
+    mutationFn: async ({ purchaseId, payload }: { purchaseId: string; payload: AddQuantityPayload }) => {
+      const response = await api.post(`/inventory/purchases/${purchaseId}/add-quantity`, payload);
+      return response.data;
+    },
+    onSuccess: (data: any) => {
+      const updated = data?.data;
+      if (updated) {
+        queryClient.setQueryData<Purchase[]>(['inventory/purchases', companyId], (old = []) =>
+          old.map(p => (p.id === updated.id ? updated : p)),
+        );
+      }
+      queryClient.invalidateQueries({ queryKey: ['inventory/purchases', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['inventory/purchased-products', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['inventory/products', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['inventory/vendor-invoices', companyId] });
+      setAddQtyTarget(null);
+      toast({
+        title: "Success",
+        description: "Quantity added to purchase",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.response?.data?.error || error.response?.data?.message || "Failed to add quantity",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSave = async (values: PurchaseFormValues) => {
     setIsSaving(true);
     try {
@@ -188,13 +221,23 @@ export function ClientPage({ data }: ClientPageProps) {
     setDeleteTarget(purchase);
   };
 
+  const handleAddQuantity = (purchase: Purchase) => {
+    setAddQtyTarget(purchase);
+  };
+
+  const handleSaveAddQuantity = (payload: AddQuantityPayload) => {
+    if (addQtyTarget) {
+      addQuantityMutation.mutate({ purchaseId: addQtyTarget.id, payload });
+    }
+  };
+
   const confirmDelete = () => {
     if (deleteTarget) {
       deleteMutation.mutate(deleteTarget.id);
     }
   };
 
-  const columns = getColumns({ onEdit: handleEdit, onPay: handlePay, onPrint: handlePrint, onDelete: handleDelete, companyName });
+  const columns = getColumns({ onEdit: handleEdit, onPay: handlePay, onPrint: handlePrint, onDelete: handleDelete, onAddQuantity: handleAddQuantity, companyName });
 
   const company = companyName ? ({ id: companyId, name: companyName } as unknown as Company) : null;
 
@@ -329,6 +372,14 @@ export function ClientPage({ data }: ClientPageProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AddQuantityDialog
+        purchase={addQtyTarget}
+        open={!!addQtyTarget}
+        onOpenChange={(open) => !open && setAddQtyTarget(null)}
+        onSave={handleSaveAddQuantity}
+        isSaving={addQuantityMutation.isPending}
+      />
 
     </div>
   );

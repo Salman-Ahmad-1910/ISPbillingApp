@@ -678,6 +678,182 @@ func UpdatePurchaseStatus(c *gin.Context) {
 	})
 }
 
+// AddPurchaseQuantity adds more quantity (and optionally more serial numbers /
+// model numbers) to an existing purchase item line of a purchase. Quantity is
+// added to the purchase item holding the product, syncing its
+// quantity/quantity_entered/subtotal and the owning purchase's totals. SNs are
+// consumed from the vendor invoices that hold them (the same SN chain purchase
+// creation enforces), so the added stock reflects in the stock and POS pages
+// which read from purchase_items.
+func AddPurchaseQuantity(c *gin.Context) {
+	db := config.DB
+	id := c.Param("id")
+
+	purchaseUUID, err := uuid.Parse(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid purchase ID"})
+		return
+	}
+
+	companyID := c.MustGet("companyID").(uuid.UUID)
+
+	var body struct {
+		ProductID      uuid.UUID `json:"productId"`
+		Quantity       int       `json:"quantity"`
+		SerialNumber   string    `json:"serialNumber"`
+		Model          string    `json:"model"`
+		NoSerialNumber bool      `json:"noSerialNumber"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if body.ProductID == uuid.Nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Product is required"})
+		return
+	}
+
+	var purchase models.Purchase
+	if err := db.Preload("Items").
+		Where("id = ? AND company_id = ?", purchaseUUID, companyID).
+		First(&purchase).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Purchase not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch purchase"})
+		return
+	}
+
+	var purchaseItem *models.PurchaseItem
+	for i := range purchase.Items {
+		if purchase.Items[i].ProductID == body.ProductID {
+			purchaseItem = &purchase.Items[i]
+			break
+		}
+	}
+	if purchaseItem == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Product is not part of this purchase"})
+		return
+	}
+
+	var product models.Product
+	if err := db.Where("id = ? AND company_id = ?", body.ProductID, companyID).First(&product).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Product not found"})
+		return
+	}
+
+	newSNs := parseVendorInvoiceSNs(body.SerialNumber)
+	newModelText := strings.TrimSpace(body.Model)
+
+	// The "add without serial number" checkbox lets the user add quantity
+	// without serial numbers even for an SN-tracked product. Otherwise an
+	// SN-tracked product always needs serial numbers so the added quantity
+	// matches the SN count (mirroring the product form's SN -> stock rule).
+	isNoSN := body.NoSerialNumber || product.NoSerialNumber
+
+	addedQty := body.Quantity
+	if isNoSN {
+		if addedQty <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Quantity must be at least 1"})
+			return
+		}
+		newSNs = nil
+	} else {
+		if len(newSNs) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Enter at least one serial number"})
+			return
+		}
+		addedQty = len(newSNs)
+	}
+
+	tx := db.Begin()
+	if tx.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start transaction"})
+		return
+	}
+
+	// Consume the SNs from the vendor invoices that hold them. This validates
+	// that each SN is available and rejects SNs already used by another
+	// purchase, keeping the product -> vendor invoice -> purchase -> sale chain
+	// consistent.
+	if len(newSNs) > 0 {
+		if err := consumeSNsFromVendorInvoices(tx, companyID, body.ProductID, newSNs); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	existingSNs := parseVendorInvoiceSNs(purchaseItem.SerialNumber)
+	newSerialText := purchaseItem.SerialNumber
+	if len(newSNs) > 0 {
+		have := make(map[string]bool, len(existingSNs))
+		for _, sn := range existingSNs {
+			have[sn] = true
+		}
+		for _, sn := range newSNs {
+			if have[sn] {
+				tx.Rollback()
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Serial number %s already exists on this purchase line", sn)})
+				return
+			}
+		}
+		newSerialText = strings.Join(append(existingSNs, newSNs...), ", ")
+	}
+
+	// Models are appended whenever provided, whether paired with SNs or on
+	// their own (quantity-only / no-SN lines).
+	newModelText = strings.Trim(strings.Join([]string{purchaseItem.Model, newModelText}, ", "), ", ")
+
+	newQuantity := purchaseItem.Quantity + addedQty
+	newSubtotal := purchaseItem.PurchasePrice * float64(newQuantity)
+	delta := purchaseItem.PurchasePrice * float64(addedQty)
+
+	if err := tx.Model(&models.PurchaseItem{}).
+		Where("id = ? AND deleted_at IS NULL", purchaseItem.ID).
+		Updates(map[string]interface{}{
+			"quantity":         newQuantity,
+			"quantity_entered": purchaseItem.QuantityEntered + addedQty,
+			"subtotal":         newSubtotal,
+			"serial_number":    newSerialText,
+			"model":            newModelText,
+		}).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update purchase item", "details": err.Error()})
+		return
+	}
+
+	if err := tx.Model(&models.Purchase{}).
+		Where("id = ? AND deleted_at IS NULL", purchaseUUID).
+		Updates(map[string]interface{}{
+			"total_amount":     gorm.Expr("total_amount + ?", delta),
+			"remaining_amount": gorm.Expr("remaining_amount + ?", delta),
+		}).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update purchase total"})
+		return
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit transaction"})
+		return
+	}
+
+	var completePurchase models.Purchase
+	if err := db.Preload("Items").Where("id = ?", purchaseUUID).First(&completePurchase).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch complete purchase"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "Quantity added to purchase",
+		"data":    completePurchase,
+	})
+}
+
 func DeletePurchase(c *gin.Context) {
 	db := config.DB
 	id := c.Param("id")

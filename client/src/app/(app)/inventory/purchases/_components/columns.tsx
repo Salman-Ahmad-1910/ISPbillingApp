@@ -3,7 +3,7 @@
 import { type ColumnDef } from '@tanstack/react-table';
 import type { Purchase } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
-import { Pencil, Printer, DollarSign, Trash2, MoreHorizontal } from 'lucide-react';
+import { Pencil, Printer, DollarSign, Trash2, MoreHorizontal, PackagePlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -21,6 +21,7 @@ interface PurchaseColumnsProps {
   onPay: (purchase: Purchase) => void;
   onPrint: (purchase: Purchase, format: 'a4' | 'thermal') => void;
   onDelete: (purchase: Purchase) => void;
+  onAddQuantity: (purchase: Purchase) => void;
   companyName?: string | null;
 }
 
@@ -30,7 +31,7 @@ const statusVariant: Record<string, 'default' | 'secondary' | 'destructive'> = {
   partial: 'secondary',
 };
 
-export const columns = ({ onEdit, onPay, onPrint, onDelete, companyName }: PurchaseColumnsProps): ColumnDef<Purchase>[] => [
+export const columns = ({ onEdit, onPay, onPrint, onDelete, onAddQuantity, companyName }: PurchaseColumnsProps): ColumnDef<Purchase>[] => [
   {
     accessorKey: 'billId',
     header: 'Bill ID',
@@ -132,6 +133,10 @@ export const columns = ({ onEdit, onPay, onPrint, onDelete, companyName }: Purch
             <DropdownMenuItem onClick={() => onEdit(purchase)}>
               <Pencil className="mr-2 h-4 w-4" />
               Edit
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onAddQuantity(purchase)}>
+              <PackagePlus className="mr-2 h-4 w-4 text-emerald-600" />
+              Add Quantity
             </DropdownMenuItem>
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>

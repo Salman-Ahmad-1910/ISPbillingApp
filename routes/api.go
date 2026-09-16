@@ -640,6 +640,7 @@ billing.PUT("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "ed
 			inventory.GET("/purchases/:id", controllers.GetPurchaseByID)
 			inventory.POST("/purchases", controllers.CreatePurchase)
 			inventory.PUT("/purchases/:id", controllers.UpdatePurchase)
+			inventory.POST("/purchases/:id/add-quantity", controllers.AddPurchaseQuantity)
 			inventory.PATCH("/purchases/:id/status", controllers.UpdatePurchaseStatus)
 			inventory.DELETE("/purchases/:id", controllers.DeletePurchase)
 			inventory.GET("/purchased-products", controllers.GetPurchasedProducts)
