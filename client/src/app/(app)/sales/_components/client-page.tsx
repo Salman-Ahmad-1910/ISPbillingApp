@@ -452,6 +452,14 @@ export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) 
                 Showing {data.length} sale{data.length === 1 ? '' : 's'}
               </p>
               <div className="flex-1" />
+              <Button variant="outline" size="sm" onClick={handleExportXlsx} className="text-xs">
+                <FileSpreadsheet className="mr-1.5 h-4 w-4" />
+                Excel
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleExportPdf} className="text-xs">
+                <FileDown className="mr-1.5 h-4 w-4" />
+                PDF
+              </Button>
               {(filters.fromDate || filters.toDate || filters.salesType !== 'all' || filters.paymentType !== 'all' || filters.search) && (
                 <Button
                   variant="outline"
