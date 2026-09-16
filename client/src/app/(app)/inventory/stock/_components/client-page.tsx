@@ -5,6 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { smartSearch } from '@/lib/search';
+import { FileSpreadsheet, FileDown } from 'lucide-react';
+import { exportToExcel, printTableReport, fmtPKR, type ExportColumn } from '@/components/shared/table-export';
 
 import { DataTable } from './data-table';
 import { columns } from './columns';
@@ -37,6 +39,27 @@ export function ClientPage({ data }: ClientPageProps) {
         const startIndex = (currentPage - 1) * pageSize;
         const endIndex = startIndex + pageSize;
         return filteredData.slice(startIndex, endIndex);
+    };
+
+    const exportColumns: ExportColumn[] = [
+        { key: 'serialNumber', header: 'SN / MAC' },
+        { key: 'name', header: 'Product' },
+        { key: 'entryDate', header: 'Entry Date' },
+        { key: 'status', header: 'Status' },
+    ];
+
+    const handleExportXlsx = () => {
+        exportToExcel(filteredData, exportColumns, `Stock-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Stock');
+    };
+
+    const handleExportPdf = () => {
+        printTableReport({
+            title: 'Stock Report',
+            subtitle: `As of ${new Date().toLocaleDateString()}`,
+            company: null,
+            columns: exportColumns,
+            rows: getPaginatedData(),
+        });
     };
 
     const getVisiblePages = () => {
@@ -77,12 +100,22 @@ export function ClientPage({ data }: ClientPageProps) {
     return (
         <div className="p-6">
             <div className="flex items-center justify-between mb-4">
-                <Input
-                    placeholder="Filter by product or SN/MAC..."
-                    value={filter}
-                    onChange={(e) => setFilter(e.target.value)}
-                    className="max-w-sm"
-                />
+                <div className="flex items-center gap-2">
+                    <Input
+                        placeholder="Filter by product or SN/MAC..."
+                        value={filter}
+                        onChange={(e) => setFilter(e.target.value)}
+                        className="max-w-sm"
+                    />
+                    <Button variant="outline" onClick={handleExportXlsx}>
+                        <FileSpreadsheet className="mr-2 h-4 w-4" />
+                        Excel
+                    </Button>
+                    <Button variant="outline" onClick={handleExportPdf}>
+                        <FileDown className="mr-2 h-4 w-4" />
+                        PDF
+                    </Button>
+                </div>
             </div>
             <DataTable columns={columns} data={getPaginatedData()} />
 

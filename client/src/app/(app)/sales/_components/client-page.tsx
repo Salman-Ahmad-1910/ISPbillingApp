@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,14 +19,17 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
-import { Printer, Loader2, RotateCcw } from 'lucide-react';
+import { Printer, Loader2, RotateCcw, FileSpreadsheet, FileDown } from 'lucide-react';
 import { printSaleReceipt, type SaleReceiptData } from './sale-receipt';
+import { exportToExcel, printTableReport, fmtPKR, type ExportColumn } from '@/components/shared/table-export';
 import { getColumns } from './columns';
 import { DataTable } from './data-table';
 import { SerialEntriesTable, parseSerialNumbers } from '@/components/shared/serial-entries';
+import { CollectionPagination } from '@/components/shared/collection-pagination';
 import type { Company } from '@/lib/types';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 import { ActionFeedbackDialog } from '@/components/shared/action-feedback-dialog';
+import { ReplaceSaleDialog } from './replace-sale-dialog';
 
 interface Sale {
   id: string;
@@ -78,7 +81,7 @@ interface ClientPageProps {
 export interface SaleFilters {
   fromDate: string;
   toDate: string;
-  salesType: 'all' | 'good' | 'bad';
+  salesType: 'all' | 'good' | 'bad' | 'replaced';
   paymentType: 'all' | 'normal' | 'installment' | 'hold';
   search: string;
 }
@@ -102,6 +105,9 @@ export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) 
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [returnTarget, setReturnTarget] = useState<Sale | null>(null);
   const [isReturning, setIsReturning] = useState(false);
+  const [replaceTarget, setReplaceTarget] = useState<Sale | null>(null);
+  const [pageSize, setPageSize] = useState<string>('10');
+  const [currentPage, setCurrentPage] = useState<number>(1);
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'error' | 'info';
     title: string;
@@ -334,7 +340,43 @@ export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) 
     }
   };
 
-  const columns = getColumns(handleDelete, handlePayHold, openReturnDialog);
+  const columns = getColumns(handleDelete, handlePayHold, openReturnDialog, (sale) => setReplaceTarget(sale));
+
+  const pagedSales = useMemo(() => {
+    if (pageSize === 'all') return data;
+    const size = parseInt(pageSize, 10) || 10;
+    const start = (currentPage - 1) * size;
+    return data.slice(start, start + size);
+  }, [data, pageSize, currentPage]);
+
+  const exportColumns: ExportColumn[] = [
+    { key: 'id', header: 'Sale ID' },
+    { key: 'subscriberName', header: 'Customer', getValue: (r) => String((r as any).subscriberName ?? (r as any).customerName ?? '') },
+    { key: 'date', header: 'Date' },
+    { key: 'totalAmount', header: 'Amount', getValue: (r) => fmtPKR(Number((r as any).totalAmount) || 0) },
+    { key: 'taxAmount', header: 'Tax', getValue: (r) => fmtPKR(Number((r as any).taxAmount) || 0) },
+    { key: 'paymentType', header: 'Payment' },
+    { key: 'salesType', header: 'Type' },
+    { key: 'status', header: 'Status', getValue: (r) => String((r as any).status ?? '') },
+  ];
+
+  const handleExportXlsx = () => {
+    exportToExcel(data, exportColumns, `Sales-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Sales');
+  };
+
+  const handleExportPdf = () => {
+    printTableReport({
+      title: 'Sales Report',
+      subtitle: `As of ${new Date().toLocaleDateString()}`,
+      company,
+      columns: exportColumns,
+      rows: pagedSales,
+    });
+  };
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, pageSize]);
 
   const viewSubtotal = viewSale ? (Number(viewSale.totalAmount) || 0) - (Number(viewSale.taxAmount) || 0) : 0;
   const viewTotalItems = viewSale ? (viewSale.items || []).reduce((sum, i) => sum + (Number(i.quantity) || 0), 0) : 0;
@@ -384,6 +426,7 @@ export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) 
                     <SelectItem value="all">All Sales</SelectItem>
                     <SelectItem value="good">Good Sales</SelectItem>
                     <SelectItem value="bad">Bad Sales</SelectItem>
+                    <SelectItem value="replaced">Replaced</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -424,8 +467,9 @@ export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) 
           <div className="p-4">
             <DataTable
               columns={columns}
-              data={data}
+              data={pagedSales}
               onRowClick={handleRowClick}
+              pagination={false}
               getRowCanExpand={(sale) =>
                 (sale.items || []).some((item) => parseSerialNumbers(item.serialNumber).length > 1)
               }
@@ -449,6 +493,15 @@ export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) 
                 }
                 return <SerialEntriesTable entries={entries} />;
               }}
+            />
+          </div>
+          <div className="px-4 pb-4">
+            <CollectionPagination
+              total={data.length}
+              pageSize={pageSize}
+              setPageSize={setPageSize}
+              currentPage={currentPage}
+              setCurrentPage={setCurrentPage}
             />
           </div>
         </CardContent>
@@ -497,6 +550,12 @@ export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) 
                   <Badge variant="secondary" className="text-xs">#{viewSale.id}</Badge>
                   {viewSale.status === 'hold' && (
                     <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">Hold</Badge>
+                  )}
+                  {viewSale.status === 'returned' && (
+                    <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300">Returned</Badge>
+                  )}
+                  {viewSale.status === 'replaced' && (
+                    <Badge variant="secondary" className="text-xs bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-300">Replaced</Badge>
                   )}
                   {(viewSale.items || []).some(i => {
                     const originalPrice = Number((i as any).originalPrice) || 0;
@@ -734,6 +793,12 @@ export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ReplaceSaleDialog
+        sale={replaceTarget}
+        onClose={() => setReplaceTarget(null)}
+        onSuccess={invalidateInventoryQueries}
+      />
 
       <ActionFeedbackDialog
         open={!!feedback}

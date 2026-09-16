@@ -678,6 +678,7 @@ billing.PUT("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "ed
 			pos.GET("/sales/:id", controllers.GetPOSSale)
 			pos.DELETE("/sales/:id", controllers.DeletePOSSale)
 			pos.POST("/sales/:id/return", controllers.ReturnPOSSale)
+			pos.POST("/sales/:id/replace", controllers.ReplacePOSSale)
 			pos.PATCH("/sales/:id/status", controllers.UpdatePOSSaleStatus)
 			pos.GET("/installment/:subscriberId", controllers.GetSubscriberInstallment)
 			pos.PUT("/installment/:id/pay", controllers.PayInstallment)

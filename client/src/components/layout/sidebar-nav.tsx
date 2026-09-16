@@ -82,6 +82,7 @@ import {
   TrendingUp,
   Cpu,
   AppWindow,
+  RefreshCw,
 } from 'lucide-react';
 import type { NavItem, NavItemGroup } from '@/lib/types';
 import { CircleDollarSign as AppIcon } from 'lucide-react';
@@ -132,6 +133,7 @@ const navItems: NavItemGroup[] = [
     title: 'Sales',
     items: [
       { title: 'Sales', href: '/sales', icon: ShoppingCart, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
+      { title: 'Replaced Products', href: '/sales/replaced', icon: RefreshCw, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
       { title: 'Customers', href: '/sales/customers', icon: UserRound, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
       { title: 'Installment Plans', href: '/sales/installment-plans', icon: FileCog, allowedRoles: ['admin', 'manager'] },
       { title: 'Point of Sale', href: '/inventory/pos', icon: ShoppingCart, allowedRoles: ['admin', 'manager', 'dealer'] },

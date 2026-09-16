@@ -11,6 +11,7 @@ interface DataTableProps<TData, TValue> {
   onRowClick?: (row: TData) => void;
   getRowCanExpand?: (row: TData) => boolean;
   renderExpanded?: (row: TData) => ReactNode;
+  pagination?: boolean;
 }
 
 export function DataTable<TData, TValue>({
@@ -19,6 +20,7 @@ export function DataTable<TData, TValue>({
   onRowClick,
   getRowCanExpand,
   renderExpanded,
+  pagination = true,
 }: DataTableProps<TData, TValue>) {
   return (
     <ExpandableDataTable
@@ -27,7 +29,7 @@ export function DataTable<TData, TValue>({
       onRowClick={onRowClick}
       getRowCanExpand={getRowCanExpand}
       renderExpanded={renderExpanded}
-      pagination
+      pagination={pagination}
       emptyMessage="No sales found."
     />
   );

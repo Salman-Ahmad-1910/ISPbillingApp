@@ -4,6 +4,7 @@ import (
 	"awesomeProject/config"
 	"awesomeProject/models"
 	"awesomeProject/utils"
+	"encoding/json"
 	"regexp"
 	"strconv"
 	"strings"
@@ -143,78 +144,8 @@ func CreatePOSSale(c *gin.Context) {
 		}
 
 		// Decrement stock from purchase_items and product stock for each sold product.
-		for _, it := range req.Items {
-			qty := it.Quantity
-			if qty <= 0 {
-				continue
-			}
-
-			soldSNs := parsePOSsoldSNs(it.SerialNumber, qty)
-
-			// Consume the sold SNs from the purchase items holding them. When
-			// this succeeds the product itself is left untouched: its stock was
-			// already consumed when the vendor invoice took the SNs.
-			fromPurchase := false
-			if len(soldSNs) > 0 {
-				var err error
-				fromPurchase, err = consumeSNsFromPurchaseItems(tx, companyID, it.ProductID, soldSNs)
-				if err != nil {
-					return err
-				}
-			}
-
-			// Legacy fallback for items without SNs on purchase items.
-			if !fromPurchase {
-				result := tx.Exec(`
-					UPDATE purchase_items
-					SET quantity = GREATEST(quantity - ?, 0)
-					WHERE id IN (
-						SELECT id FROM purchase_items
-						WHERE product_id = ? AND company_id = ? AND deleted_at IS NULL
-						ORDER BY quantity DESC
-						LIMIT 1
-					)
-				`, qty, it.ProductID, companyID)
-				if result.Error != nil {
-					return result.Error
-				}
-
-				// Also decrement Product.stock so inventory status page stays in sync.
-				if err := tx.Model(&models.Product{}).
-					Where("id = ? AND company_id = ?", it.ProductID, companyID).
-					Update("stock", gorm.Expr("GREATEST(stock - ?, 0)", qty)).Error; err != nil {
-					return err
-				}
-
-				// Remove consumed SNs from products.serial_number.
-				if it.SerialNumber != "" {
-					var prod models.Product
-					if err := tx.Where("id = ? AND company_id = ?", it.ProductID, companyID).First(&prod).Error; err == nil {
-						allSNs := prod.ParseSerialNumbers()
-						if len(allSNs) > 0 {
-							consumedSet := make(map[string]bool, len(soldSNs))
-							for _, sn := range soldSNs {
-								consumedSet[sn] = true
-							}
-							var remaining []string
-							for _, sn := range allSNs {
-								if !consumedSet[sn] {
-									remaining = append(remaining, sn)
-								}
-							}
-							remainingStr := strings.Join(remaining, ", ")
-							if err := tx.Model(&models.Product{}).
-								Where("id = ? AND company_id = ?", it.ProductID, companyID).
-								Updates(map[string]interface{}{
-									"serial_number":         remainingStr,
-									"current_serial_index":  0,
-								}).Error; err != nil {
-								return err
-							}
-						}
-					}
-				}
-			}
+		if err := consumeSaleStock(tx, companyID, req.Items); err != nil {
+			return err
 		}
 		return nil
 	})
@@ -224,6 +155,87 @@ func CreatePOSSale(c *gin.Context) {
 	}
 
 	utils.CreatedResponse(c, "Sale recorded", sale)
+}
+
+// consumeSaleStock decrements stock for each sold item: serial numbers are
+// consumed from the purchase items holding them (falling back to the product's
+// own serial list), and serial-less quantities are deducted from the most
+// stocked purchase item + the product's stock counter.
+func consumeSaleStock(tx *gorm.DB, companyID uuid.UUID, items []posSaleItem) error {
+	for _, it := range items {
+		qty := it.Quantity
+		if qty <= 0 {
+			continue
+		}
+
+		soldSNs := parsePOSsoldSNs(it.SerialNumber, qty)
+
+		// Consume the sold SNs from the purchase items holding them. When
+		// this succeeds the product itself is left untouched: its stock was
+		// already consumed when the vendor invoice took the SNs.
+		fromPurchase := false
+		if len(soldSNs) > 0 {
+			var err error
+			fromPurchase, err = consumeSNsFromPurchaseItems(tx, companyID, it.ProductID, soldSNs)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Legacy fallback for items without SNs on purchase items.
+		if !fromPurchase {
+			result := tx.Exec(`
+				UPDATE purchase_items
+				SET quantity = GREATEST(quantity - ?, 0)
+				WHERE id IN (
+					SELECT id FROM purchase_items
+					WHERE product_id = ? AND company_id = ? AND deleted_at IS NULL
+					ORDER BY quantity DESC
+					LIMIT 1
+				)
+			`, qty, it.ProductID, companyID)
+			if result.Error != nil {
+				return result.Error
+			}
+
+			// Also decrement Product.stock so inventory status page stays in sync.
+			if err := tx.Model(&models.Product{}).
+				Where("id = ? AND company_id = ?", it.ProductID, companyID).
+				Update("stock", gorm.Expr("GREATEST(stock - ?, 0)", qty)).Error; err != nil {
+				return err
+			}
+
+			// Remove consumed SNs from products.serial_number.
+			if it.SerialNumber != "" {
+				var prod models.Product
+				if err := tx.Where("id = ? AND company_id = ?", it.ProductID, companyID).First(&prod).Error; err == nil {
+					allSNs := prod.ParseSerialNumbers()
+					if len(allSNs) > 0 {
+						consumedSet := make(map[string]bool, len(soldSNs))
+						for _, sn := range soldSNs {
+							consumedSet[sn] = true
+						}
+						var remaining []string
+						for _, sn := range allSNs {
+							if !consumedSet[sn] {
+								remaining = append(remaining, sn)
+							}
+						}
+						remainingStr := strings.Join(remaining, ", ")
+						if err := tx.Model(&models.Product{}).
+							Where("id = ? AND company_id = ?", it.ProductID, companyID).
+							Updates(map[string]interface{}{
+								"serial_number":        remainingStr,
+								"current_serial_index": 0,
+							}).Error; err != nil {
+							return err
+						}
+					}
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // CreateInstallmentSale creates a sale with an installment plan for the subscriber.
@@ -548,6 +560,8 @@ func GetPOSSales(c *gin.Context) {
 		db = db.Where("EXISTS (SELECT 1 FROM sale_items si WHERE si.sale_id = sales.id AND si.original_price > 0 AND si.price > si.original_price)")
 	case "bad":
 		db = db.Where("NOT EXISTS (SELECT 1 FROM sale_items si WHERE si.sale_id = sales.id AND si.original_price > 0 AND si.price > si.original_price)")
+	case "replaced":
+		db = db.Where("sales.status = ?", "replaced")
 	}
 
 	switch paymentType := strings.ToLower(strings.TrimSpace(c.Query("paymentType"))); paymentType {
@@ -678,6 +692,145 @@ func ReturnPOSSale(c *gin.Context) {
 
 	sale.Status = "returned"
 	utils.SuccessResponse(c, "Sale returned successfully, stock restored", sale)
+}
+
+// ReplacePOSSale replaces a completed, non-installment sale with a new product.
+// It works like a return-plus-new-sale executed atomically in a single
+// transaction: the old sale's stock is restored (revertSaleStock), the old sale
+// is marked as "replaced", and a brand new sale is created for the replacement
+// product (its stock being consumed via the normal POS sale path). The new sale
+// is itself labelled "replaced" so it can be distinguished from regular sales.
+func ReplacePOSSale(c *gin.Context) {
+	companyID := c.MustGet("companyID").(uuid.UUID)
+	id := c.Param("id")
+
+	var req posSaleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, 400, "Invalid input data", err.Error())
+		return
+	}
+	if len(req.Items) == 0 {
+		utils.ErrorResponse(c, 400, "Replacement must contain at least one item", "no items")
+		return
+	}
+
+	var sale models.Sale
+	if err := config.DB.
+		Scopes(models.TenantScope(companyID)).
+		Preload("Items").
+		Where("id = ?", id).
+		First(&sale).Error; err != nil {
+		utils.ErrorResponse(c, 404, "Sale not found", err.Error())
+		return
+	}
+
+	if sale.Status == "returned" {
+		utils.ErrorResponse(c, 400, "Sale already returned", "This sale has already been returned.")
+		return
+	}
+	if sale.Status == "replaced" {
+		utils.ErrorResponse(c, 400, "Sale already replaced", "This sale has already been replaced.")
+		return
+	}
+	if sale.Status == "hold" {
+		utils.ErrorResponse(c, 400, "Hold bill cannot be replaced", "Delete the hold bill instead to restore its stock.")
+		return
+	}
+	if sale.IsInstallment {
+		utils.ErrorResponse(c, 400, "Installment sale cannot be replaced", "Installment sales must be managed through their installment plan.")
+		return
+	}
+
+	// Build the replacement items (installed onto the existing sale row).
+	replacementItems := make([]models.SaleItem, 0, len(req.Items))
+	for _, it := range req.Items {
+		replacementItems = append(replacementItems, models.SaleItem{
+			ProductID:     it.ProductID,
+			ProductName:   it.ProductName,
+			Quantity:      it.Quantity,
+			Price:         it.Price,
+			OriginalPrice: it.OriginalPrice,
+			TaxPercent:    it.TaxPercent,
+			SaleTax:       it.SaleTax,
+			WthTax:        it.WthTax,
+			SerialNumber:  it.SerialNumber,
+			Model:         it.Model,
+		})
+	}
+
+	// Snapshot the ORIGINAL sale (items + totals) so the replaced page can show
+	// what the entry looked like before the replacement.
+	originalSnapshot := struct {
+		TotalAmount   float64          `json:"totalAmount"`
+		TaxAmount     float64          `json:"taxAmount"`
+		PaymentMethod string           `json:"paymentMethod"`
+		Date          string           `json:"date"`
+		Discount      float64          `json:"discount"`
+		Items         []models.SaleItem `json:"items"`
+	}{
+		TotalAmount:   sale.TotalAmount,
+		TaxAmount:     sale.TaxAmount,
+		PaymentMethod: sale.PaymentMethod,
+		Date:          sale.Date,
+		Discount:      sale.Discount,
+		Items:         sale.Items,
+	}
+	snapshotBytes, err := json.Marshal(originalSnapshot)
+	if err != nil {
+		utils.ErrorResponse(c, 500, "Failed to snapshot original sale", err.Error())
+		return
+	}
+
+	err = config.DB.Transaction(func(tx *gorm.DB) error {
+		// Restore the replaced product's stock (same as a full return).
+		if err := revertSaleStock(tx, companyID, sale); err != nil {
+			return err
+		}
+		// Consume the new product's stock (same as a fresh POS sale).
+		if err := consumeSaleStock(tx, companyID, req.Items); err != nil {
+			return err
+		}
+		// Delete the original sale items, then attach the replacement items.
+		if err := tx.Where("sale_id = ?", sale.ID).Delete(&models.SaleItem{}).Error; err != nil {
+			return err
+		}
+		for i := range replacementItems {
+			replacementItems[i].SaleID = sale.ID
+		}
+		if err := tx.Create(&replacementItems).Error; err != nil {
+			return err
+		}
+		// Overwrite the existing sale with the replacement details + mark replaced.
+		updates := map[string]interface{}{
+			"subscriber_name": req.SubscriberName,
+			"total_amount":    req.TotalAmount,
+			"tax_amount":      req.TaxAmount,
+			"discount":        req.Discount,
+			"payment_method":  req.PaymentMethod,
+			"date":            req.Date,
+			"is_installment":  false,
+			"status":          "replaced",
+			"replaced_from":   string(snapshotBytes),
+		}
+		if err := tx.Model(&models.Sale{}).Scopes(models.TenantScope(companyID)).Where("id = ?", sale.ID).Updates(updates).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		utils.ErrorResponse(c, 500, "Failed to replace sale", err.Error())
+		return
+	}
+
+	// Reload the replaced sale with its new items for the response.
+	if err := config.DB.Scopes(models.TenantScope(companyID)).Preload("Items").Where("id = ?", sale.ID).First(&sale).Error; err != nil {
+		utils.ErrorResponse(c, 500, "Failed to load replaced sale", err.Error())
+		return
+	}
+
+	utils.CreatedResponse(c, "Sale replaced successfully", gin.H{
+		"sale": sale,
+	})
 }
 
 // revertSaleStock returns a held sale's items back to inventory. It restores

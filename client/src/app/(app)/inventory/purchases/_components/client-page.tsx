@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { PlusCircle, Search, AlertTriangle } from 'lucide-react';
+import { PlusCircle, Search, AlertTriangle, FileSpreadsheet, FileDown } from 'lucide-react';
 import type { Purchase, Vendor, Product, Company } from '@/lib/types';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
@@ -16,6 +16,7 @@ import { DataTable } from './data-table';
 import { columns as getColumns } from './columns';
 import { PurchaseForm } from './purchase-form';
 import { SerialEntriesTable, parseSerialNumbers } from '@/components/shared/serial-entries';
+import { exportToExcel, printTableReport, fmtPKR, type ExportColumn } from '@/components/shared/table-export';
 import { CollectionPagination } from '@/components/shared/collection-pagination';
 import {
   Dialog,
@@ -37,7 +38,7 @@ interface ClientPageProps {
 }
 
 export function ClientPage({ data }: ClientPageProps) {
-  const { companyId, companyName } = useCompany();
+  const { companyId, companyName, companies } = useCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
@@ -195,6 +196,36 @@ export function ClientPage({ data }: ClientPageProps) {
 
   const columns = getColumns({ onEdit: handleEdit, onPay: handlePay, onPrint: handlePrint, onDelete: handleDelete, companyName });
 
+  const company = companyName ? ({ id: companyId, name: companyName } as unknown as Company) : null;
+
+  const exportColumns: ExportColumn[] = [
+    { key: 'billId', header: 'Bill #' },
+    { key: 'vendorName', header: 'Vendor' },
+    {
+      key: 'items',
+      header: 'Products',
+      getValue: (row) => (row as Purchase).items?.map((i) => i.productName).join(', '),
+    },
+    { key: 'quantity', header: 'Qty', getValue: (row) => (row as Purchase).items?.reduce((s, i) => s + (i.quantity ?? 0), 0) || '' },
+    { key: 'amount', header: 'Amount', getValue: (row) => fmtPKR((row as any).amount ?? (row as any).totalAmount ?? 0) },
+    { key: 'date', header: 'Date' },
+    { key: 'status', header: 'Status' },
+  ];
+
+  const handleExportXlsx = () => {
+    exportToExcel(filteredPurchases, exportColumns, `Purchases-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Purchases');
+  };
+
+  const handleExportPdf = () => {
+    printTableReport({
+      title: 'Purchase List',
+      subtitle: `As of ${new Date().toLocaleDateString()}`,
+      company,
+      columns: exportColumns,
+      rows: pagedPurchases,
+    });
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4 px-6 pt-6">
@@ -207,10 +238,20 @@ export function ClientPage({ data }: ClientPageProps) {
             className="pl-8"
           />
         </div>
-        <Button onClick={handleAddNew} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700">
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Add Purchase
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleExportXlsx}>
+            <FileSpreadsheet className="mr-2 h-4 w-4" />
+            Excel
+          </Button>
+          <Button variant="outline" onClick={handleExportPdf}>
+            <FileDown className="mr-2 h-4 w-4" />
+            PDF
+          </Button>
+          <Button onClick={handleAddNew} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700">
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Add Purchase
+          </Button>
+        </div>
       </div>
 
       <DataTable

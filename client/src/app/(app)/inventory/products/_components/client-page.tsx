@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PlusCircle, Search, X } from 'lucide-react';
+import { PlusCircle, Search, X, FileSpreadsheet, FileDown } from 'lucide-react';
 import type { Product } from '@/lib/types';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
@@ -13,6 +13,7 @@ import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { z } from 'zod';
 import { productSchema } from '@/lib/schemas';
 import { useToast } from '@/hooks/use-toast';
+import { exportToExcel, printTableReport, fmtPKR } from '@/components/shared/table-export';
 
 import { DataTable } from './data-table';
 import { columns as getColumns } from './columns';
@@ -39,7 +40,8 @@ interface ClientPageProps {
 }
 
 export function ClientPage({ data }: ClientPageProps) {
-  const { companyId } = useCompany();
+  const { companyId, companies } = useCompany();
+  const company = companies.find((c) => c.id === companyId) || null;
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [products, setProducts] = useState<Product[]>(data);
@@ -136,6 +138,35 @@ export function ClientPage({ data }: ClientPageProps) {
         setCurrentPage(1);
     }, [filter]);
 
+  const exportColumns = [
+    { key: 'productId', header: 'Product ID' },
+    { key: 'name', header: 'Product Name' },
+    { key: 'brandName', header: 'Brand' },
+    { key: 'productTypeName', header: 'Product Type', getValue: (r: Product) => r.productTypeName || r.category || '-' },
+    { key: 'serialNumber', header: 'SN / MAC', getValue: (r: Product) => r.serialNumber || '' },
+    { key: 'model', header: 'Model', getValue: (r: Product) => r.model || '' },
+    { key: 'stock', header: 'Stock', getValue: (r: Product) => r.stock || 0 },
+    { key: 'discount', header: 'Discount', getValue: (r: Product) => (r.discount ? `PKR ${fmtPKR(r.discount)}` : '-') },
+  ];
+
+  const handleExportXlsx = () => {
+    exportToExcel(filteredData, exportColumns, 'products', 'Products', toast);
+  };
+
+  const handleExportPdf = () => {
+    printTableReport({
+      title: 'Products Report',
+      subtitle: 'Inventory Products',
+      company,
+      columns: exportColumns,
+      rows: getPaginatedData(),
+      footer: [
+        { label: 'Total Products', value: getPaginatedData().length },
+        { label: 'Total Stock', value: getPaginatedData().reduce((s, p) => s + (p.stock || 0), 0) },
+      ],
+    });
+  };
+
   const handleSave = async (data: ProductFormValues) => {
     setIsSaving(true);
     try {
@@ -229,6 +260,12 @@ export function ClientPage({ data }: ClientPageProps) {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="default" onClick={handleExportXlsx} className="text-xs">
+              <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5 text-emerald-600" /> Excel
+            </Button>
+            <Button variant="outline" size="default" onClick={handleExportPdf} className="text-xs">
+              <FileDown className="mr-1.5 h-3.5 w-3.5" /> PDF
+            </Button>
             <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
             <DialogTrigger asChild>
               <Button onClick={() => setSelectedProduct(null)} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700">
