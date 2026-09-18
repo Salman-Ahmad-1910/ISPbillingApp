@@ -174,7 +174,7 @@ type Sale struct {
 	IsInstallment  bool       `gorm:"default:false" json:"isInstallment"`
 	Status         string     `gorm:"type:varchar(20);default:'completed'" json:"status"`
 	Discount       float64    `gorm:"type:decimal(10,2);default:0" json:"discount"`
-	ReplacedFrom   string     `gorm:"type:jsonb" json:"replacedFrom"` // snapshot of the ORIGINAL items captured when this sale was replaced
+	ReplacedFrom   string     `gorm:"type:jsonb;default:null" json:"replacedFrom"` // snapshot of the ORIGINAL items captured when this sale was replaced
 	Items          []SaleItem `gorm:"foreignKey:SaleID;constraint:OnDelete:CASCADE" json:"items"`
 }
 
