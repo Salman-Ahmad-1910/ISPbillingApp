@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CircleDollarSign, Users, Wallet, Clock, CheckCircle2, XCircle, ArrowUpRight, LayoutDashboard, Landmark, CreditCard, ChevronDown, ChevronUp, TrendingUp, Calendar, Banknote, AlertTriangle } from 'lucide-react';
+import { CircleDollarSign, Users, Wallet, Clock, CheckCircle2, XCircle, ArrowUpRight, LayoutDashboard, Landmark, CreditCard, ChevronDown, ChevronUp, TrendingUp, Calendar, Banknote, AlertTriangle, Tv } from 'lucide-react';
 import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -220,7 +220,9 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
                   <div className="text-2xl font-bold tracking-tight">{data?.subscribersStats?.total || 0}</div>
-                  <p className="text-xs text-muted-foreground mt-1">all subscribers</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {packageType === 'both' ? 'all' : packageType === 'tv_cable' ? 'TV cable' : 'internet'} subscribers
+                  </p>
                 </CardContent>
               </Card>
             </Link>
@@ -235,7 +237,9 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
                   <div className="text-2xl font-bold tracking-tight">{data?.subscribersStats?.active || 0}</div>
-                  <p className="text-xs text-muted-foreground mt-1">in {companyName}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {packageType === 'both' ? '' : packageType === 'tv_cable' ? 'TV cable ' : 'internet '}in {companyName}
+                  </p>
                 </CardContent>
               </Card>
             </Link>
@@ -271,8 +275,8 @@ export default function DashboardPage() {
             </Link>
           </div>
 
-          {/* Month Selector */}
-          <div className="flex items-center gap-3">
+          {/* Month & Connection Type Selectors */}
+          <div className="flex flex-wrap items-center gap-3">
             <Calendar className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm font-medium text-muted-foreground">For the month of</span>
             <Select value={selectedMonth} onValueChange={(v) => setSelectedMonth(v)}>
@@ -295,6 +299,19 @@ export default function DashboardPage() {
                 ))}
               </SelectContent>
             </Select>
+            <div className="flex items-center gap-2 ml-auto">
+              <Tv className="h-4 w-4 text-muted-foreground" />
+              <Select value={packageType} onValueChange={(v) => setPackageType(v as 'both' | 'internet' | 'tv_cable')}>
+                <SelectTrigger className="w-[140px] h-8 text-xs">
+                  <SelectValue placeholder="Connection Type" />
+                </SelectTrigger>
+                <SelectContent portal={false}>
+                  <SelectItem value="both">All Types</SelectItem>
+                  <SelectItem value="tv_cable">TV Cable</SelectItem>
+                  <SelectItem value="internet">Internet</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* Financial Metrics — 6 cards in 2 rows of 3 */}

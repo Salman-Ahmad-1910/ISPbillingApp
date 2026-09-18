@@ -6,9 +6,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Clock, ArrowLeft, Users, Wallet, Loader2, Search, Tv, Wifi, Layers } from 'lucide-react';
+import { Clock, ArrowLeft, Users, Wallet, Loader2, Search, Tv, Wifi, Layers, FileSpreadsheet, FileDown } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import api from '@/lib/api';
 import type { Connection, Area, DistributionBox, Package, Company } from '@/lib/types';
@@ -16,6 +17,7 @@ import { ConnectionFilterBar } from '@/components/shared/connection-filter-bar';
 import { defaultConnectionFilters, type ConnectionFilterState } from '@/lib/connection-filters';
 import { DateRangeFilter } from '@/components/shared/date-range-filter';
 import { CollectionPagination } from '@/components/shared/collection-pagination';
+import { exportToExcel, printTableReport, fmtPKR, type ExportColumn } from '@/components/shared/table-export';
 
 function getPackagePrice(c: Connection): number {
   const cable = Number(c.amount) || 0;
@@ -26,7 +28,8 @@ function getPackagePrice(c: Connection): number {
 }
 
 export default function PendingSubscribersPage() {
-  const { companyId } = useCompany();
+  const { companyId, companyName } = useCompany();
+  const { toast } = useToast();
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filters, setFilters] = useState<ConnectionFilterState>(defaultConnectionFilters());
@@ -107,6 +110,94 @@ export default function PendingSubscribersPage() {
 
   const setFilter = (key: keyof ConnectionFilterState, value: string) =>
     setFilters(f => ({ ...f, [key]: value }));
+
+  const fetchAllPendingForExport = useCallback(async (): Promise<Connection[]> => {
+    if (!companyId) return [];
+    const res = await api.get('/collection/pending-subscribers', {
+      params: {
+        companyId,
+        search: debouncedSearch || undefined,
+        sublocality: filters.sublocality,
+        status: filters.status,
+        type: filters.type,
+        box: filters.box,
+        package: filters.package,
+        discount: filters.discount,
+        provider: filters.provider,
+        sortBy: filters.sortBy,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+        page: 1,
+        pageSize: 'all',
+      },
+    });
+    return res.data?.data?.subscribers || [];
+  }, [companyId, debouncedSearch, filters, dateFrom, dateTo]);
+
+  const exportColumns: ExportColumn[] = [
+    { key: 'name', header: 'Subscriber' },
+    {
+      key: 'internetId',
+      header: 'Internet ID',
+      getValue: (row) => (row as Connection).internetId || (row as Connection).id?.slice(0, 8) || '',
+    },
+    {
+      key: 'cell',
+      header: 'Contact',
+      getValue: (row) => (row as Connection).cell || (row as Connection).mobile || '---',
+    },
+    { key: 'address', header: 'Address' },
+    {
+      key: 'package',
+      header: 'Package',
+      getValue: (row) => (row as Connection).packageInternet || (row as Connection).packageCable || '---',
+    },
+    {
+      key: 'fee',
+      header: 'Package Fee',
+      align: 'right',
+      getValue: (row) => fmtPKR(getPackagePrice(row as Connection)),
+    },
+    {
+      key: 'remaining',
+      header: 'Remaining',
+      align: 'right',
+      getValue: (row) => fmtPKR(Number((row as Connection).remainingAmount) || getPackagePrice(row as Connection)),
+    },
+    { key: 'status', header: 'Status', getValue: () => 'Pending' },
+  ];
+
+  const company = companyName ? ({ id: companyId, name: companyName } as unknown as Company) : null;
+
+  const handleExportXlsx = async () => {
+    try {
+      const rows = await fetchAllPendingForExport();
+      exportToExcel(
+        rows,
+        exportColumns,
+        `Pending-Subscribers-${new Date().toISOString().slice(0, 10)}`,
+        'Pending Subscribers',
+        toast,
+      );
+    } catch {
+      toast({ title: 'Export failed', description: 'Could not load pending subscribers.', variant: 'destructive' });
+    }
+  };
+
+  const handleExportPdf = async () => {
+    try {
+      const rows = await fetchAllPendingForExport();
+      printTableReport({
+        title: 'Pending Subscribers List',
+        subtitle: `As of ${new Date().toLocaleDateString()}`,
+        company,
+        columns: exportColumns,
+        rows,
+      });
+    } catch {
+      toast({ title: 'Print failed', description: 'Could not load pending subscribers.', variant: 'destructive' });
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -229,14 +320,26 @@ export default function PendingSubscribersPage() {
         onToChange={(v) => setDateTo(v)}
       />
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name, ID, or internet ID..."
-          className="pl-9"
-        />
+      <div className="flex items-center justify-between gap-4">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name, ID, or internet ID..."
+            className="pl-9"
+          />
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="outline" onClick={handleExportXlsx}>
+            <FileSpreadsheet className="mr-2 h-4 w-4" />
+            Excel
+          </Button>
+          <Button variant="outline" onClick={handleExportPdf}>
+            <FileDown className="mr-2 h-4 w-4" />
+            PDF
+          </Button>
+        </div>
       </div>
 
       <Card>
