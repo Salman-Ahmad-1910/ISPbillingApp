@@ -836,6 +836,22 @@ export type PurchaseItem = {
   serialNumber?: string;
   model?: string;
   mergeExisting?: boolean;
+  history?: PurchaseQuantityHistory[];
+};
+
+export type PurchaseQuantityHistory = {
+  id: string;
+  purchaseId: string;
+  purchaseItemId: string;
+  productId: string;
+  quantityBefore: number;
+  quantityAdded: number;
+  serialNumbersAdded?: string;
+  modelsAdded?: string;
+  unitPrice: number;
+  createdAt: string;
+  updatedAt: string;
+  companyId: string;
 };
 
 export type Message = {

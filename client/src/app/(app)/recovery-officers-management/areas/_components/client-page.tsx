@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MapPinned, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft } from 'lucide-react';
+import { MapPinned, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft, Save, RotateCcw, Loader2 } from 'lucide-react';
 import type { Area, RecoveryOfficer } from '@/lib/types';
 import { useCompany } from '@/context/company-context';
 import { useToast } from '@/hooks/use-toast';
@@ -43,20 +43,53 @@ export function ClientPage({ data, recoveryOfficers }: ClientPageProps) {
   const [selectedOfficerId, setSelectedOfficerId] = useState('');
   const [leftSelected, setLeftSelected] = useState<string[]>([]);
   const [rightSelected, setRightSelected] = useState<string[]>([]);
+  // Staged (not yet saved) changes for the selected officer:
+  // stagedRightIds = areas moved left -> right (to be assigned),
+  // stagedLeftIds   = areas moved right -> left (to be unassigned).
+  const [stagedRightIds, setStagedRightIds] = useState<string[]>([]);
+  const [stagedLeftIds, setStagedLeftIds] = useState<string[]>([]);
 
   const selectedOfficer = recoveryOfficers.find(o => o.id === selectedOfficerId);
 
-  // Areas not assigned to any officer (fully available)
-  const leftAreas = useMemo(() =>
+  // Areas not assigned to any officer (globally available pool)
+  const availableAreas = useMemo(() =>
     data.filter(a => !a.recoveryOfficerId),
     [data]
   );
 
-  // Areas assigned to the selected officer
-  const rightAreas = useMemo(() =>
+  // Areas currently assigned to the selected officer (from the server)
+  const assignedAreas = useMemo(() =>
     data.filter(a => a.recoveryOfficerId === selectedOfficerId),
     [data, selectedOfficerId]
   );
+
+  // Left list: available pool minus staged assignments, plus assigned areas staged to unassign
+  const leftAreas = useMemo(() => {
+    const unassigned = availableAreas.filter(a => !stagedRightIds.includes(a.id));
+    const returned = assignedAreas.filter(a => stagedLeftIds.includes(a.id));
+    return [...unassigned, ...returned];
+  }, [availableAreas, assignedAreas, stagedRightIds, stagedLeftIds]);
+
+  // Right list: assigned areas (minus staged unassignments) plus staged additions
+  const rightAreas = useMemo(() => {
+    const kept = assignedAreas.filter(a => !stagedLeftIds.includes(a.id));
+    const added = availableAreas.filter(a => stagedRightIds.includes(a.id));
+    return [...kept, ...added];
+  }, [availableAreas, assignedAreas, stagedRightIds, stagedLeftIds]);
+
+  const stagedChangeCount = stagedRightIds.length + stagedLeftIds.length;
+
+  const resetStaging = () => {
+    setStagedRightIds([]);
+    setStagedLeftIds([]);
+    setLeftSelected([]);
+    setRightSelected([]);
+  };
+
+  const handleOfficerChange = (id: string) => {
+    setSelectedOfficerId(id);
+    resetStaging();
+  };
 
   const handleSave = async (formData: any) => {
     if (!selectedArea) return;
@@ -102,58 +135,49 @@ export function ClientPage({ data, recoveryOfficers }: ClientPageProps) {
     onDelete: openDeleteDialog,
   });
 
-  const moveAreas = async (areaIds: string[], targetOfficerId: string | null) => {
-    if (areaIds.length === 0) return;
-    setIsSaving(true);
-    let count = 0;
-    try {
-      for (const areaId of areaIds) {
-        const area = data.find(a => a.id === areaId)!;
-        await api.put(`/network/areas/${areaId}`, {
-          id: areaId,
-          city: area.city,
-          zone: area.zone,
-          locality: area.locality,
-          subLocality: area.subLocality || '',
-          recoveryOfficerId: targetOfficerId,
-          companyId: companyId,
-        });
-        count++;
-      }
-      queryClient.invalidateQueries({ queryKey: ['network/areas', companyId, undefined] });
-      toast({ title: 'Success', description: `${count} area(s) updated.` });
-      setLeftSelected([]);
-      setRightSelected([]);
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: `Failed after ${count} area(s): ${error.response?.data?.message || error.message}`,
-      });
-      console.error('PUT area error', error.response?.data, error);
-    } finally { setIsSaving(false); }
+  // Stage (client-side only) areas to be assigned to the selected officer.
+  const stageToRight = (ids: string[]) => {
+    if (!selectedOfficerId || ids.length === 0) return;
+    const nextRight = [...stagedRightIds];
+    for (const id of ids) {
+      if (!nextRight.includes(id)) nextRight.push(id);
+    }
+    // Cancelling any staged unassignment prevents one area going to two officers.
+    setStagedLeftIds(prev => prev.filter(id => !ids.includes(id)));
+    setStagedRightIds(nextRight);
+    setLeftSelected(prev => prev.filter(id => !ids.includes(id)));
+    setRightSelected([]);
+  };
+
+  // Stage (client-side only) areas to be unassigned from the selected officer.
+  const stageToLeft = (ids: string[]) => {
+    if (ids.length === 0) return;
+    const nextLeft = [...stagedLeftIds];
+    for (const id of ids) {
+      if (!nextLeft.includes(id)) nextLeft.push(id);
+    }
+    setStagedRightIds(prev => prev.filter(id => !ids.includes(id)));
+    setStagedLeftIds(nextLeft);
+    setRightSelected(prev => prev.filter(id => !ids.includes(id)));
+    setLeftSelected([]);
   };
 
   const moveSingleToRight = () => {
-    if (!selectedOfficerId) return;
     const ids = leftSelected.length > 0 ? leftSelected : leftAreas.slice(0, 1).map(a => a.id);
-    if (ids.length === 0) return;
-    moveAreas(ids, selectedOfficerId);
+    stageToRight(ids);
   };
 
   const moveAllToRight = () => {
-    if (!selectedOfficerId) return;
-    moveAreas(leftAreas.map(a => a.id), selectedOfficerId);
+    stageToRight(leftAreas.map(a => a.id));
   };
 
   const moveSingleToLeft = () => {
     const ids = rightSelected.length > 0 ? rightSelected : rightAreas.slice(0, 1).map(a => a.id);
-    if (ids.length === 0) return;
-    moveAreas(ids, null);
+    stageToLeft(ids);
   };
 
   const moveAllToLeft = () => {
-    moveAreas(rightAreas.map(a => a.id), null);
+    stageToLeft(rightAreas.map(a => a.id));
   };
 
   const toggleLeft = (id: string) => {
@@ -166,6 +190,42 @@ export function ClientPage({ data, recoveryOfficers }: ClientPageProps) {
     setRightSelected(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
+  };
+
+  // Persist the staged changes for the selected officer with a single Save.
+  const handleSaveAssignments = async () => {
+    if (!selectedOfficerId || stagedChangeCount === 0) return;
+    setIsSaving(true);
+    let count = 0;
+    try {
+      const updates: { id: string; recoveryOfficerId: string | null }[] = [
+        ...stagedRightIds.map(id => ({ id, recoveryOfficerId: selectedOfficerId })),
+        ...stagedLeftIds.map(id => ({ id, recoveryOfficerId: null })),
+      ];
+      for (const u of updates) {
+        const area = data.find(a => a.id === u.id)!;
+        await api.put(`/network/areas/${u.id}`, {
+          id: u.id,
+          city: area.city,
+          zone: area.zone,
+          locality: area.locality,
+          subLocality: area.subLocality || '',
+          recoveryOfficerId: u.recoveryOfficerId,
+          companyId: companyId,
+        });
+        count++;
+      }
+      queryClient.invalidateQueries({ queryKey: ['network/areas', companyId] });
+      toast({ title: 'Success', description: `${count} area(s) assigned.` });
+      resetStaging();
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: `Failed after ${count} area(s): ${error.response?.data?.message || error.message}`,
+      });
+      console.error('PUT area error', error.response?.data, error);
+    } finally { setIsSaving(false); }
   };
 
   return (
@@ -181,7 +241,7 @@ export function ClientPage({ data, recoveryOfficers }: ClientPageProps) {
         <CardContent>
           <div className="mb-4 max-w-xs">
             <Label className="text-xs text-muted-foreground">Select Recovery Officer</Label>
-            <Select value={selectedOfficerId} onValueChange={setSelectedOfficerId}>
+            <Select value={selectedOfficerId} onValueChange={handleOfficerChange}>
               <SelectTrigger className="w-full h-9 mt-1">
                 <SelectValue placeholder="Choose a recovery officer" />
               </SelectTrigger>
@@ -290,6 +350,32 @@ export function ClientPage({ data, recoveryOfficers }: ClientPageProps) {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center justify-end gap-3 border-t pt-4">
+                <p className="text-xs text-muted-foreground mr-auto">
+                  {stagedChangeCount > 0
+                    ? `${stagedChangeCount} pending change(s) - click Save to apply them to ${selectedOfficer?.name || 'this officer'}.`
+                    : 'No pending changes. Use the arrow buttons to move areas, then press Save.'}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={resetStaging}
+                  disabled={stagedChangeCount === 0 || isSaving}
+                >
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  Reset
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSaveAssignments}
+                  disabled={stagedChangeCount === 0 || isSaving}
+                  className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700"
+                >
+                  {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  {isSaving ? 'Saving...' : 'Save Assignments'}
+                </Button>
               </div>
             </div>
           )}

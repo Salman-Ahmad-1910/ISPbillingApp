@@ -123,6 +123,7 @@ func RunMigrations() {
 		&models.InventoryStatus{},
 		&models.Purchase{},
 		&models.PurchaseItem{},
+		&models.PurchaseQuantityHistory{},
 		&models.DistributionBox{},
 		&models.Connection{},
 		&models.ConnectionStatusChange{},

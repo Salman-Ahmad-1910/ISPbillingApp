@@ -61,10 +61,26 @@ type PurchaseItem struct {
 	SaleTax       float64   `gorm:"type:decimal(10,2);default:0" json:"saleTax"`
 	WthTax        float64   `gorm:"type:decimal(10,2);default:0" json:"wthTax"`
 	Disc          float64   `gorm:"type:decimal(10,2);default:0" json:"disc"`
-	ExpiryDate    string    `gorm:"type:varchar(50)" json:"expiryDate"`
-	SerialNumber  string    `gorm:"type:text" json:"serialNumber"`
-	Model         string    `gorm:"type:text" json:"model"`
-	MergeExisting bool      `gorm:"default:false" json:"mergeExisting"`
+	ExpiryDate    string                      `gorm:"type:varchar(50)" json:"expiryDate"`
+	SerialNumber  string                      `gorm:"type:text" json:"serialNumber"`
+	Model         string                      `gorm:"type:text" json:"model"`
+	MergeExisting bool                        `gorm:"default:false" json:"mergeExisting"`
+	History       []PurchaseQuantityHistory    `gorm:"foreignKey:PurchaseItemID;constraint:OnDelete:CASCADE" json:"history"`
+}
+
+// PurchaseQuantityHistory - records every "add quantity" operation performed on
+// a purchase item, including the serial / model numbers added and the unit
+// price, stamped with the date and time of the operation.
+type PurchaseQuantityHistory struct {
+	TenantModel
+	PurchaseID         uuid.UUID `gorm:"type:uuid;not null;index" json:"purchaseId"`
+	PurchaseItemID     uuid.UUID `gorm:"type:uuid;not null;index" json:"purchaseItemId"`
+	ProductID          uuid.UUID `gorm:"type:uuid;not null;index" json:"productId"`
+	QuantityBefore     int       `gorm:"not null;default:0" json:"quantityBefore"`
+	QuantityAdded      int       `gorm:"not null" json:"quantityAdded"`
+	SerialNumbersAdded string    `gorm:"type:text" json:"serialNumbersAdded"`
+	ModelsAdded        string    `gorm:"type:text" json:"modelsAdded"`
+	UnitPrice          float64   `gorm:"type:decimal(10,2);not null;default:0" json:"unitPrice"`
 }
 
 // PurchasedProduct - Product info derived entirely from purchase_items.

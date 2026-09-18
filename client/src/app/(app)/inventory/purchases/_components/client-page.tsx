@@ -17,6 +17,7 @@ import { columns as getColumns } from './columns';
 import { PurchaseForm } from './purchase-form';
 import { AddQuantityDialog, type AddQuantityPayload } from './add-quantity-dialog';
 import { SerialEntriesTable, parseSerialNumbers } from '@/components/shared/serial-entries';
+import { QuantityHistoryTable } from './quantity-history-table';
 import { exportToExcel, printTableReport, fmtPKR, type ExportColumn } from '@/components/shared/table-export';
 import { CollectionPagination } from '@/components/shared/collection-pagination';
 import {
@@ -301,9 +302,33 @@ export function ClientPage({ data }: ClientPageProps) {
         columns={columns}
         data={pagedPurchases}
         getRowCanExpand={(purchase) =>
-          (purchase.items || []).some((item) => parseSerialNumbers(item.serialNumber).length > 1)
+          (purchase.items || []).some(
+            (item) =>
+              (item.history?.length ?? 0) > 0 ||
+              parseSerialNumbers(item.serialNumber).length > 1
+          )
         }
         renderExpanded={(purchase) => {
+          const historyRows = [];
+          for (const item of purchase.items || []) {
+            for (const h of item.history || []) {
+              historyRows.push({
+                key: `${item.id}-${h.id}`,
+                dateTime: h.createdAt,
+                productName: item.productName,
+                quantityBefore: h.quantityBefore,
+                quantityAdded: h.quantityAdded,
+                unitPrice: h.unitPrice,
+                serials: h.serialNumbersAdded || '',
+                models: h.modelsAdded || '',
+              });
+            }
+          }
+          historyRows.sort((a, b) => String(a.dateTime).localeCompare(String(b.dateTime)));
+          if (historyRows.length > 0) {
+            return <QuantityHistoryTable rows={historyRows} />;
+          }
+
           const entries = [];
           for (const item of purchase.items || []) {
             for (const sn of parseSerialNumbers(item.serialNumber)) {

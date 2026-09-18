@@ -5,7 +5,6 @@ import { Loader2, PackagePlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -38,7 +37,6 @@ export interface AddQuantityPayload {
   quantity: number;
   serialNumber: string;
   model: string;
-  noSerialNumber: boolean;
 }
 
 interface AddQuantityDialogProps {
@@ -59,8 +57,6 @@ export function AddQuantityDialog({
   const items = purchase?.items || [];
 
   const [selectedProductId, setSelectedProductId] = useState('');
-  const [noSerialNumber, setNoSerialNumber] = useState(false);
-  const [noModel, setNoModel] = useState(false);
   const [snRaw, setSnRaw] = useState('');
   const [modelRaw, setModelRaw] = useState('');
   const [quantity, setQuantity] = useState('1');
@@ -68,8 +64,6 @@ export function AddQuantityDialog({
   useEffect(() => {
     if (open && purchase) {
       setSelectedProductId(purchase.items?.[0]?.productId || '');
-      setNoSerialNumber(false);
-      setNoModel(false);
       setSnRaw('');
       setModelRaw('');
       setQuantity('1');
@@ -78,28 +72,12 @@ export function AddQuantityDialog({
 
   const selectedItem = items.find(i => i.productId === selectedProductId);
 
-  const parsedSNs = useMemo(() => parseSerialNumbers(snRaw), [snRaw]);
-  const parsedModels = useMemo(() => parseModels(modelRaw), [modelRaw]);
-  const snCount = parsedSNs.length;
-  const modelCount = parsedModels.length;
+  // Serial numbers, model numbers and quantity are fully independent fields.
+  const snCount = useMemo(() => parseSerialNumbers(snRaw).length, [snRaw]);
+  const modelCount = useMemo(() => parseModels(modelRaw).length, [modelRaw]);
+  const qty = Number(quantity) || 0;
 
-  // SNs and models are paired per unit. When serial numbers are being added the
-  // quantity follows the SN count; otherwise, when only models are added, it
-  // follows the model count. When neither is being added, the manual quantity
-  // field is used.
-  let effectiveQuantity = 0;
-  let derived = false;
-  if (!noSerialNumber && snCount > 0) {
-    effectiveQuantity = snCount;
-    derived = true;
-  } else if (!noModel && modelCount > 0) {
-    effectiveQuantity = modelCount;
-    derived = true;
-  } else if (noSerialNumber && noModel) {
-    effectiveQuantity = Math.max(1, Number(quantity) || 1);
-  }
-
-  const canSave = !!selectedProductId && effectiveQuantity >= 1;
+  const canSave = !!selectedProductId && qty >= 1;
 
   const existingSNs = useMemo(
     () => parseSerialNumbers(selectedItem?.serialNumber || ''),
@@ -114,10 +92,9 @@ export function AddQuantityDialog({
     if (!selectedProductId) return;
     onSave({
       productId: selectedProductId,
-      quantity: effectiveQuantity,
-      serialNumber: noSerialNumber ? '' : snRaw,
-      model: noModel ? '' : modelRaw,
-      noSerialNumber,
+      quantity: Math.max(1, qty),
+      serialNumber: snRaw,
+      model: modelRaw,
     });
   };
 
@@ -187,90 +164,55 @@ export function AddQuantityDialog({
               )}
 
               <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="addQtyNoSn"
-                    checked={noSerialNumber}
-                    onCheckedChange={(checked) => {
-                      const val = !!checked;
-                      setNoSerialNumber(val);
-                      if (val) setSnRaw('');
-                    }}
-                  />
-                  <label htmlFor="addQtyNoSn" className="text-sm font-medium leading-none cursor-pointer">
-                    Add without serial numbers
-                  </label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="addQtyNoModel"
-                    checked={noModel}
-                    onCheckedChange={(checked) => {
-                      const val = !!checked;
-                      setNoModel(val);
-                      if (val) setModelRaw('');
-                    }}
-                  />
-                  <label htmlFor="addQtyNoModel" className="text-sm font-medium leading-none cursor-pointer">
-                    Add without model numbers
-                  </label>
-                </div>
+                <label className="text-sm font-medium">Additional Quantity</label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Adds this many units to the purchase. Independent of SN / model
+                  numbers below.
+                </p>
               </div>
 
-              {!noSerialNumber && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">SN / Model Numbers</label>
-                  <Textarea
-                    placeholder="e.g., SN-1001 SN-1002 SN-1003"
-                    value={snRaw}
-                    onChange={(e) => setSnRaw(e.target.value)}
-                    className="min-h-[80px] font-mono"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Separate with comma, space, or dash. Each SN adds one unit of quantity.
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Serial Numbers</label>
+                <Textarea
+                  placeholder="e.g., SN-1001, SN-1002, SN-1003"
+                  value={snRaw}
+                  onChange={(e) => setSnRaw(e.target.value)}
+                  className="min-h-[80px] font-mono"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Optional. Separate with comma, space, or dash. Each SN is recorded
+                  as-is; any serial number is accepted.
+                </p>
+                {snCount > 0 && (
+                  <p className="text-xs font-medium text-emerald-600">
+                    {snCount} serial number(s) will be recorded
                   </p>
-                  {snCount > 0 && (
-                    <p className="text-xs font-medium text-emerald-600">
-                      {snCount} SN(s) → +{snCount} quantity
-                    </p>
-                  )}
-                </div>
-              )}
+                )}
+              </div>
 
-              {!noModel && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Model Numbers</label>
-                  <Textarea
-                    placeholder="e.g., Model-X Model-Y"
-                    value={modelRaw}
-                    onChange={(e) => setModelRaw(e.target.value)}
-                    className="min-h-[80px] font-mono"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Optional. Paired with SNs by order. Separate with comma, space, or new line.
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Model Numbers</label>
+                <Textarea
+                  placeholder="e.g., Model-X, Model-Y"
+                  value={modelRaw}
+                  onChange={(e) => setModelRaw(e.target.value)}
+                  className="min-h-[80px] font-mono"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Optional. Separate with comma, space, or new line.
+                </p>
+                {modelCount > 0 && (
+                  <p className="text-xs font-medium text-emerald-600">
+                    {modelCount} model number(s) will be recorded
                   </p>
-                  {modelCount > 0 && (
-                    <p className="text-xs font-medium text-emerald-600">
-                      {modelCount} model(s){snCount > 0 ? ' (paired)' : ` → +${modelCount} quantity`}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {(noSerialNumber && noModel) && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Additional Quantity</label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Adds this many units without serial numbers / model numbers.
-                  </p>
-                </div>
-              )}
+                )}
+              </div>
             </>
           )}
         </div>
@@ -285,7 +227,7 @@ export function AddQuantityDialog({
             className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700"
           >
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isSaving ? 'Adding...' : `Add ${effectiveQuantity || ''} Quantity`}
+            {isSaving ? 'Adding...' : `Add ${qty || ''} Quantity`}
           </Button>
         </DialogFooter>
       </DialogContent>
