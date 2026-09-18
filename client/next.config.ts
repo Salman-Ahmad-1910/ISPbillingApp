@@ -9,6 +9,14 @@ const nextConfig: NextConfig = {
   output: 'export',
   distDir: isExportBuild ? '.next-export' : '.next',
   trailingSlash: true,
+  async redirects() {
+    return [
+      { source: '/auth/login', destination: '/login', permanent: false },
+      { source: '/auth/register', destination: '/signup', permanent: false },
+      { source: '/auth/signup', destination: '/signup', permanent: false },
+      { source: '/auth/:path*', destination: '/:path*', permanent: false },
+    ];
+  },
   typescript: {
     ignoreBuildErrors: true,
   },
