@@ -598,32 +598,46 @@ export default function POSPage() {
             [String(a || '').trim(), String(b || '').trim()].filter(Boolean).join(', ');
         const mergeModelField = (a: any, b: any) =>
             [String(a || '').trim(), String(b || '').trim()].filter(Boolean).join(', ');
-        const byId = new Map<string, any>();
+        // Group by product NAME (case-insensitive) so every distinct product
+        // gets its own card, matching the Stock page. The backend already
+        // returns one row per name, so this is a safety net: it folds legacy
+        // same-name duplicate rows together while guaranteeing that two
+        // different products are never collapsed into one card — regardless of
+        // how the rows are keyed in the response.
+        const byName = new Map<string, any>();
         for (const p of purchasedProducts as any[]) {
+            const key = String(p.name || '').trim().toLowerCase();
+            const ids = p.id ? [String(p.id)] : [];
             const normalized = {
                 ...p,
                 stock: Number(p.stock) || 0,
                 price: Number(p.price) || 0,
                 taxPercent: Number(p.taxPercent) || 0,
+                ids,
             };
-            const existing = byId.get(p.id);
+            const existing = byName.get(key);
             if (!existing) {
-                byId.set(p.id, normalized);
+                byName.set(key, normalized);
                 continue;
             }
-            byId.set(p.id, {
+            byName.set(key, {
                 ...existing,
+                // Most recent row's representative product id, matching how the
+                // backend picks the id for a name group.
+                id: normalized.id,
+                ids: [...existing.ids, ...ids].filter(Boolean),
                 stock: existing.stock + normalized.stock,
-                // Merge SN lists from all purchase lines so the displayed SN
-                // count always equals the stock.
+                // Merge SN lists from all rows so the displayed SN count always
+                // equals the stock.
                 serialNumber: mergeSNField(existing.serialNumber, normalized.serialNumber),
                 productSerialNumber: mergeSNField(existing.productSerialNumber, normalized.productSerialNumber),
                 model: mergeModelField(existing.model, normalized.model),
                 productModel: mergeModelField(existing.productModel, normalized.productModel),
                 image: existing.image || normalized.image,
+                purchaseItemId: normalized.purchaseItemId,
             });
         }
-        return Array.from(byId.values());
+        return Array.from(byName.values());
     }, [purchasedProducts]);
 
     const filteredProducts = useMemo(() => {
@@ -634,7 +648,9 @@ export default function POSPage() {
     useEffect(() => {
         if (existingInstallment && pendingSaleItems.length > 0 && posProducts.length > 0) {
             const items: CartItem[] = pendingSaleItems.map((si: any) => {
-                const product = posProducts.find(p => p.id === si.productId);
+                const product = posProducts.find(p =>
+                    p.id === si.productId || (Array.isArray(p.ids) && p.ids.includes(si.productId))
+                );
                 return {
                     product: product || {
                         id: si.productId,
