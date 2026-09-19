@@ -32,7 +32,7 @@ export default function StockPage() {
         </div>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Stock</h1>
-          <p className="text-sm text-muted-foreground">View all products purchased and their current stock.</p>
+          <p className="text-sm text-muted-foreground">Products grouped by name. Stock is derived (purchased minus sold) and matches the POS page.</p>
         </div>
       </div>
 
@@ -45,7 +45,7 @@ export default function StockPage() {
               <Boxes className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-xs font-medium text-muted-foreground">Total Items</p>
+              <p className="text-xs font-medium text-muted-foreground">Total Products</p>
               <p className="text-2xl font-bold">{Array.isArray(products) ? products.length : 0}</p>
             </div>
           </div>

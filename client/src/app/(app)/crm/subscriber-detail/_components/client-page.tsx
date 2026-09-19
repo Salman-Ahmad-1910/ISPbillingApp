@@ -23,6 +23,7 @@ import { ActionFeedbackDialog } from '@/components/shared/action-feedback-dialog
 import { ImportExportDialog } from './import-export-dialog';
 import { smartMatch } from '@/lib/search';
 import { DeactivateDialog } from './deactivate-dialog';
+import { useCrudPermissions } from '@/hooks/usePermissions';
 
 type ConnectionFormValues = z.infer<typeof connectionSchema>;
 
@@ -35,6 +36,7 @@ interface ClientPageProps {
 export function ClientPage({ connections, initialConnectionId, initialPackageName }: ClientPageProps) {
   const { companyId } = useCompany();
   const queryClient = useQueryClient();
+  const { canCreate, canUpdate, canDelete } = useCrudPermissions();
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedConnection, setSelectedConnection] = useState<Connection | null>(null);
@@ -259,6 +261,8 @@ export function ClientPage({ connections, initialConnectionId, initialPackageNam
     onEdit: handleEdit,
     onDelete: openDeleteDialog,
     onDeactivate: openDeactivateDialog,
+    canUpdate,
+    canDelete,
   });
 
   return (
@@ -381,6 +385,7 @@ export function ClientPage({ connections, initialConnectionId, initialPackageNam
               <FileSpreadsheet className="mr-2 h-4 w-4" />
               Import/Export
             </Button>
+            {canCreate && (
             <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
             <DialogTrigger asChild>
               <Button onClick={() => setSelectedConnection(null)} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700">
@@ -410,6 +415,7 @@ export function ClientPage({ connections, initialConnectionId, initialPackageNam
               />
             </DialogContent>
             </Dialog>
+            )}
           </div>
         </div>
 

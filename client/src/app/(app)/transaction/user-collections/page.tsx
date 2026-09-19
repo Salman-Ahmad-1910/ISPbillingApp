@@ -36,7 +36,7 @@ import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
-import { useUserPermissions } from '@/hooks/usePermissions';
+import { useUserPermissions, useCrudPermissions } from '@/hooks/usePermissions';
 import { hasFeaturePermission, TOTAL_COLLECTED_PERMISSION, PENDING_AMOUNT_PERMISSION, PENDING_SUBSCRIBERS_PERMISSION } from '@/lib/permission-pages';
 import { smartMatchScore } from '@/lib/search';
 import { Loader2, MoreHorizontal, Wallet, DollarSign, UserCheck, Trash2, Pencil, Copy, FileText, Users, CalendarClock, Clock } from 'lucide-react';
@@ -77,6 +77,7 @@ export default function SubscriberCollectionsPage() {
   const { toast } = useToast();
   const { user } = useUser();
   const { userRole, grantedPermissions, permissionsConfigured } = useUserPermissions();
+  const { canCreate, canUpdate, canDelete } = useCrudPermissions();
   const canViewTotalCollected = hasFeaturePermission(
     grantedPermissions,
     permissionsConfigured,
@@ -289,30 +290,25 @@ export default function SubscriberCollectionsPage() {
       .reduce((sum: number, p: Payment) => sum + (Number(p.amount) || 0), 0);
   }, [selectedSubscriber, subscriberPayments]);
 
-  const remainingAmount = useMemo(() => {
-    if (!selectedSubscriber || !packageFee) return packageFee;
-    return packageFee - totalReceivedThisMonth;
-    // Negative = overpaid (advance), Positive = underpaid (pending), Zero = fully paid
-  }, [selectedSubscriber, packageFee, totalReceivedThisMonth]);
-
-  // Actual outstanding dues stored on the connection (matches the dashboard
-  // "Pending Subscribers" card and /collection/pending-subscribers).
+  // Remaining = the subscriber's stored balance (established by Bill Creator
+  // and the "Create balance" option, reduced by payments). Matches the
+  // dashboard "Pending Subscribers" card and /collection/pending-subscribers.
   const storedRemaining = useMemo(
     () => (selectedSubscriber ? Number(selectedSubscriber.remainingAmount) || 0 : 0),
     [selectedSubscriber],
   );
 
   const displayRemaining = useMemo(() => {
-    return Math.max(0, remainingAmount);
-  }, [remainingAmount]);
+    return Math.max(0, storedRemaining);
+  }, [storedRemaining]);
 
   const advanceAmount = useMemo(() => {
     return storedRemaining < 0 ? Math.abs(storedRemaining) : 0;
   }, [storedRemaining]);
 
   const afterPaymentRemaining = useMemo(() => {
-    return Math.max(0, remainingAmount - receiveAmount);
-  }, [remainingAmount, receiveAmount]);
+    return Math.max(0, displayRemaining - receiveAmount);
+  }, [displayRemaining, receiveAmount]);
 
   const handlePromiseSave = async () => {
     if (!selectedSubscriber || !user) return;
@@ -663,12 +659,10 @@ export default function SubscriberCollectionsPage() {
                   <div>
                     {advanceAmount > 0 ? (
                       <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300">Advance</Badge>
-                    ) : storedRemaining > 0 ? (
+                    ) : displayRemaining > 0 ? (
                       <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300">Pending</Badge>
-                    ) : remainingAmount > 0 ? (
-                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300">Unpaid This Month</Badge>
                     ) : packageFee > 0 ? (
-                      <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-amerald-300">Full</Badge>
+                      <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300">Full</Badge>
                     ) : (
                       <span className="text-muted-foreground text-sm">---</span>
                     )}
@@ -683,14 +677,18 @@ export default function SubscriberCollectionsPage() {
                 <span>Receiving as: <span className="font-medium text-foreground">{recoveryOfficerName}</span></span>
               </div>
               <div className="flex-1" />
-              <Button variant="outline" onClick={() => setShowPromiseDialog(true)}>
-                <CalendarClock className="mr-2 h-4 w-4" />
-                Make Promise
-              </Button>
-              <Button onClick={() => { setSelectedPromiseId(null); setReceiveAmount(displayRemaining); setReceiveMethod('cash'); setReceiveTransactionId(''); setShowReceiveDialog(true); }} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
-                <DollarSign className="mr-2 h-4 w-4" />
-                Receive Payment
-              </Button>
+              {canCreate && (
+                <Button variant="outline" onClick={() => setShowPromiseDialog(true)}>
+                  <CalendarClock className="mr-2 h-4 w-4" />
+                  Make Promise
+                </Button>
+              )}
+              {canCreate && (
+                <Button onClick={() => { setSelectedPromiseId(null); setReceiveAmount(displayRemaining); setReceiveMethod('cash'); setReceiveTransactionId(''); setShowReceiveDialog(true); }} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
+                  <DollarSign className="mr-2 h-4 w-4" />
+                  Receive Payment
+                </Button>
+              )}
             </div>
 
             <div className="p-4">
@@ -748,10 +746,12 @@ export default function SubscriberCollectionsPage() {
                           <TableCell className="py-1.5 px-1.5 whitespace-nowrap">{promise.collectorName || recoveryOfficerName}</TableCell>
                           <TableCell className="py-1.5 px-1.5">
                             <div className="flex items-center gap-1">
+                              {canCreate && (
                               <Button variant="outline" size="sm" className="h-6 px-2 text-[10px] text-emerald-600 hover:text-emerald-700" onClick={() => handleReceivePromise(promise)}>
                                 <DollarSign className="mr-1 h-3 w-3" />
                                 Receive
                               </Button>
+                            )}
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                   <Button variant="ghost" size="icon" className="h-6 w-6">
@@ -777,10 +777,12 @@ export default function SubscriberCollectionsPage() {
                                     <Copy className="mr-2 h-4 w-4" />
                                     Duplicate Slip
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleDeletePromise(promise.id)} className="text-red-600">
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Delete
-                                  </DropdownMenuItem>
+                                  {canDelete && (
+                                    <DropdownMenuItem onClick={() => handleDeletePromise(promise.id)} className="text-red-600">
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  )}
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </div>
@@ -815,10 +817,12 @@ export default function SubscriberCollectionsPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleEditOpen(payment)}>
-                                  <Pencil className="mr-2 h-4 w-4" />
-                                  Edit
-                                </DropdownMenuItem>
+                                {canUpdate && (
+                                  <DropdownMenuItem onClick={() => handleEditOpen(payment)}>
+                                    <Pencil className="mr-2 h-4 w-4" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                )}
                                 <DropdownMenuItem onClick={() => {
                                   setPrintPromise(null);
                                   setPrintPayment(payment);
@@ -837,10 +841,12 @@ export default function SubscriberCollectionsPage() {
                                   <Copy className="mr-2 h-4 w-4" />
                                   Duplicate Print
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDelete(payment.id)} className="text-red-600">
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Delete
-                                </DropdownMenuItem>
+                                {canDelete && (
+                                  <DropdownMenuItem onClick={() => handleDelete(payment.id)} className="text-red-600">
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>

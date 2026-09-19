@@ -39,6 +39,7 @@ import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
+import { useCrudPermissions } from '@/hooks/usePermissions';
 import { CalendarIcon, Loader2, MoreHorizontal, PlusCircle, ClipboardPen, Users, DollarSign } from 'lucide-react';
 
 import type { Subscriber, Payment } from '@/lib/types';
@@ -61,6 +62,7 @@ export default function AllocatedCollectionsPage() {
   const { companyId } = useCompany();
   const { toast } = useToast();
   const { user } = useUser();
+  const { canCreate, canUpdate, canDelete } = useCrudPermissions();
 
   const [selectedSubscriberId, setSelectedSubscriberId] = useState<string | null>(null);
   const [showNewAmountDialog, setShowNewAmountDialog] = useState(false);
@@ -332,14 +334,18 @@ export default function AllocatedCollectionsPage() {
                 />
               </div>
               <div className="flex items-end gap-2">
-                <Button onClick={() => setShowPromiseDateDialog(true)} className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white hover:from-blue-600 hover:to-cyan-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  Promise Date
-                </Button>
-                <Button onClick={() => setShowNewAmountDialog(true)} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  New Amount
-                </Button>
+                {canCreate && (
+                  <Button onClick={() => setShowPromiseDateDialog(true)} className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white hover:from-blue-600 hover:to-cyan-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    Promise Date
+                  </Button>
+                )}
+                {canCreate && (
+                  <Button onClick={() => setShowNewAmountDialog(true)} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    New Amount
+                  </Button>
+                )}
               </div>
             </div>
 

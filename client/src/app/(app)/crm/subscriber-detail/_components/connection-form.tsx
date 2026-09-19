@@ -181,6 +181,22 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
   const packageInternet = form.watch('packageInternet');
   const amount = form.watch('amount');
   const sameAmount = form.watch('sameAmount');
+  const balanceDays = form.watch('balanceDays');
+
+  // Monthly package fee for the selected connection type (matches getPackagePrice).
+  const packageFeeTotal = React.useMemo(() => {
+    const cable = Number(amount) || 0;
+    const internet = Number(sameAmount) || 0;
+    if (connectionType === 'tv_cable') return cable;
+    if (connectionType === 'internet') return internet;
+    return cable + internet;
+  }, [connectionType, amount, sameAmount]);
+
+  // Opening balance = package fee prorated for the remaining days of the month (fee / 30 * days).
+  const openingBalance = React.useMemo(() => {
+    if (!createBalance || !(Number(balanceDays) > 0)) return 0;
+    return Math.round((packageFeeTotal / 30) * Number(balanceDays) * 100) / 100;
+  }, [createBalance, balanceDays, packageFeeTotal]);
 
   const showCable = connectionType === 'both' || connectionType === 'tv_cable';
   const showInternet = connectionType === 'both' || connectionType === 'internet';
@@ -794,6 +810,12 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
                   <Input type="number" value={field.value ?? ''} onChange={e => field.onChange(parseInt(e.target.value) || 0)} />
                 </FormControl>
                 <FormMessage />
+                <p className="text-xs text-muted-foreground">
+                  Opening balance: PKR {openingBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {packageFeeTotal > 0 && balanceDays > 0 && (
+                    <span> (PKR {packageFeeTotal.toLocaleString()} ÷ 30 × {balanceDays} days)</span>
+                  )}
+                </p>
               </FormItem>
             )}
           />

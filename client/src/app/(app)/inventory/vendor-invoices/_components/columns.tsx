@@ -1,7 +1,7 @@
 'use client';
 
 import { type ColumnDef } from '@tanstack/react-table';
-import type { VendorInvoice, VendorInvoiceItem, Product } from '@/lib/types';
+import type { VendorInvoice, VendorInvoiceItem } from '@/lib/types';
 import { parseSerialNumbers } from '@/components/shared/serial-entries';
 import { MoreHorizontal, Calendar, Building2, Printer, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -25,10 +25,11 @@ interface VendorInvoiceColumnsProps {
   onEdit: (invoice: VendorInvoice) => void;
   onDelete: (invoice: VendorInvoice) => void;
   onPrint: (invoice: VendorInvoice) => void;
-  products?: Product[];
+  canUpdate?: boolean;
+  canDelete?: boolean;
 }
 
-export const columns = ({ onEdit, onDelete, onPrint, products = [] }: VendorInvoiceColumnsProps): ColumnDef<FlatRow>[] => [
+export const columns = ({ onEdit, onDelete, onPrint, canUpdate = true, canDelete = true }: VendorInvoiceColumnsProps): ColumnDef<FlatRow>[] => [
   {
     id: 'index',
     header: '#',
@@ -85,21 +86,12 @@ export const columns = ({ onEdit, onDelete, onPrint, products = [] }: VendorInvo
       const sns = parseSerialNumbers(item.serialNumber);
       if (sns.length === 0) return <div className="text-xs font-mono text-muted-foreground">—</div>;
 
-      // Remaining = the purchased SNs of this row that have not yet been sold.
-      // The product carries the full aggregated SN list plus a pointer
-      // (currentSerialIndex) to the first <sold> N SNs of that list.
-      let remaining = sns.length;
-      const product = products.find((p) => p.id === item.productId);
-      if (product) {
-        const productSNs = parseSerialNumbers(product.serialNumber);
-        const consumed = Math.min(product.currentSerialIndex ?? 0, productSNs.length);
-        const consumedSet = new Set(productSNs.slice(0, consumed));
-        remaining = sns.filter((sn) => !consumedSet.has(sn)).length;
-      }
-
+      // Vendor invoice items are static records, so every SN purchased on this
+      // row is shown: `firstSN (n/total)`. The Stock page derives the available
+      // pool from purchased minus sold instead.
       return (
         <div className="text-xs font-mono text-muted-foreground" title={item.serialNumber}>
-          {sns.length === 1 ? sns[0] : `${sns[0]} (${remaining}/${sns.length})`}
+          {sns.length === 1 ? sns[0] : `${sns[0]} (${sns.length}/${sns.length})`}
         </div>
       );
     },
@@ -179,15 +171,21 @@ export const columns = ({ onEdit, onDelete, onPrint, products = [] }: VendorInvo
                 <Printer className="mr-2 h-4 w-4" />
                 Print
               </DropdownMenuItem>
+              {canUpdate && (
               <DropdownMenuItem onClick={() => onEdit(invoice)}>
                 <Pencil className="mr-2 h-4 w-4" />
                 Edit
               </DropdownMenuItem>
+              )}
+              {canDelete && (
+              <>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive" onClick={() => onDelete(invoice)}>
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete
               </DropdownMenuItem>
+              </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

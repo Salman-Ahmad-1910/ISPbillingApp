@@ -186,10 +186,11 @@ func CreatePayment(c *gin.Context) {
 		return
 	}
 
-	// Recompute the connection balance from this month's payment data so the
-	// Paid/Pending/Overdue cards and pages stay in sync.
+	// Decrement the subscriber's stored remaining balance so the
+	// Paid/Pending/Overdue cards and pages stay in sync. A payment above the
+	// remaining balance rolls over into advance (negative remaining).
 	if payment.SubscriberID != nil {
-		recomputeConnectionBalance(*payment.SubscriberID)
+		adjustConnectionBalance(*payment.SubscriberID, -payment.Amount)
 	}
 
 	// Allocate the payment against the connection's unpaid invoices
@@ -252,6 +253,8 @@ func UpdatePayment(c *gin.Context) {
 		return
 	}
 
+	oldAmount := payment.Amount
+
 	if err := c.ShouldBindJSON(&payment); err != nil {
 		utils.ErrorResponse(c, 400, "Invalid input", err.Error())
 		return
@@ -273,7 +276,7 @@ func UpdatePayment(c *gin.Context) {
 	}
 
 	if payment.SubscriberID != nil {
-		recomputeConnectionBalance(*payment.SubscriberID)
+		adjustConnectionBalance(*payment.SubscriberID, oldAmount-payment.Amount)
 	}
 
 	utils.SuccessResponse(c, "Payment updated successfully", payment)
@@ -325,47 +328,28 @@ func DeletePayment(c *gin.Context) {
 	}
 
 	if payment.SubscriberID != nil {
-		recomputeConnectionBalance(*payment.SubscriberID)
+		adjustConnectionBalance(*payment.SubscriberID, payment.Amount)
 	}
 
 	utils.SuccessResponse(c, "Payment deleted successfully", nil)
 }
 
-// recomputeConnectionBalance recomputes a connection's remaining_amount,
-// payment_status and last_payment_date from the payments recorded for it in the
-// current billing month. This keeps the Paid/Pending/Overdue dashboard cards and
-// pages in sync with the actual payment data regardless of which code path
-// created, updated or deleted the payment.
-func recomputeConnectionBalance(subscriberID uuid.UUID) {
+// adjustConnectionBalance applies a delta to a connection's stored
+// remaining_amount (e.g. -amount when a payment is received, +amount when a
+// payment is deleted) and refreshes payment_status / last_payment_date so the
+// Paid/Pending/Overdue dashboard cards and pages stay in sync.
+func adjustConnectionBalance(subscriberID uuid.UUID, delta float64) {
 	var conn models.Connection
 	if err := config.DB.Where("id = ?", subscriberID).First(&conn).Error; err != nil {
 		return
 	}
 
-	packageFee := conn.Amount
-	switch conn.ConnectionType {
-	case "internet":
-		packageFee = conn.SameAmount
-	case "both", "tv_cable":
-		packageFee = conn.Amount + conn.SameAmount
-	}
-
-	now := time.Now()
-	startOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-	startOfMonthStr := startOfMonth.Format("2006-01-02")
-
-	var totalReceived float64
-	config.DB.Raw(
-		"SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) FROM payments WHERE subscriber_id = ? AND payment_date >= ?",
-		subscriberID, startOfMonthStr,
-	).Scan(&totalReceived)
-
-	newRemaining := packageFee - totalReceived
+	newRemaining := conn.RemainingAmount + delta
 
 	paymentStatus := ""
-	if newRemaining > 0 && packageFee > 0 {
+	if newRemaining > 0 {
 		paymentStatus = "pending"
-	} else if newRemaining < 0 && packageFee > 0 {
+	} else if newRemaining < 0 {
 		paymentStatus = "advance"
 	}
 

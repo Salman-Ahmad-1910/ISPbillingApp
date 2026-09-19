@@ -835,7 +835,6 @@ export type PurchaseItem = {
   expiryDate?: string;
   serialNumber?: string;
   model?: string;
-  mergeExisting?: boolean;
   history?: PurchaseQuantityHistory[];
 };
 

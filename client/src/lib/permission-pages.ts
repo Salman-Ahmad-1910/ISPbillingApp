@@ -95,6 +95,9 @@ export const PERMISSION_DEFS: PermissionDef[] = [
   { id: '13338', name: 'Subscriber Rights', module: 'Settings' },
   { id: '13337', name: 'Configurations', module: 'Settings' },
   { id: '15334', name: 'Dashboard Summary', module: 'Dashboard' },
+  { id: '15362', name: 'Add / Create', module: 'CRUD' },
+  { id: '15363', name: 'Update / Edit', module: 'CRUD' },
+  { id: '15364', name: 'Delete', module: 'CRUD' },
 ];
 
 // Permission id that controls whether a user can see the dashboard summary
@@ -112,6 +115,19 @@ export const PENDING_AMOUNT_PERMISSION = '15360';
 // Permission id that controls whether a user can see the "Pending Subscribers"
 // card on the Subscriber Collections page.
 export const PENDING_SUBSCRIBERS_PERMISSION = '15361';
+
+// Permission id that controls whether a user can create/add records anywhere
+// in the app. When this is granted (web checkbox selected on the Roles &
+// Permissions page), Add/Create buttons are visible; otherwise they are hidden.
+export const CAN_CREATE_PERMISSION = '15362';
+
+// Permission id that controls whether a user can update/edit records anywhere
+// in the app. Hides Edit/Update buttons when not granted.
+export const CAN_UPDATE_PERMISSION = '15363';
+
+// Permission id that controls whether a user can delete records anywhere in
+// the app. Hides Delete buttons when not granted.
+export const CAN_DELETE_PERMISSION = '15364';
 
 // Feature-level permission check for a numeric permission id stored on the
 // user (user.permissions / grantedPermissions). When an admin has NOT

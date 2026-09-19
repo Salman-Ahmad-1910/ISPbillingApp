@@ -157,10 +157,11 @@ func CreatePOSSale(c *gin.Context) {
 	utils.CreatedResponse(c, "Sale recorded", sale)
 }
 
-// consumeSaleStock decrements stock for each sold item: serial numbers are
-// consumed from the purchase items holding them (falling back to the product's
-// own serial list), and serial-less quantities are deducted from the most
-// stocked purchase item + the product's stock counter.
+// consumeSaleStock keeps the legacy product-level stock counters in sync with
+// a sale. Purchase and vendor-invoice records are static documents (their
+// quantity, serial numbers and models never change), so sold quantity is
+// tracked exclusively by the sale_items rows; the POS page and the Stock page
+// both derive the available quantity from (purchased - sold).
 func consumeSaleStock(tx *gorm.DB, companyID uuid.UUID, items []posSaleItem) error {
 	for _, it := range items {
 		qty := it.Quantity
@@ -170,69 +171,45 @@ func consumeSaleStock(tx *gorm.DB, companyID uuid.UUID, items []posSaleItem) err
 
 		soldSNs := parsePOSsoldSNs(it.SerialNumber, qty)
 
-		// Consume the sold SNs from the purchase items holding them. When
-		// this succeeds the product itself is left untouched: its stock was
-		// already consumed when the vendor invoice took the SNs.
-		fromPurchase := false
-		if len(soldSNs) > 0 {
-			var err error
-			fromPurchase, err = consumeSNsFromPurchaseItems(tx, companyID, it.ProductID, soldSNs)
-			if err != nil {
-				return err
+		// Serial-bearing sale: remove the sold SNs from products.serial_number
+		// and sync the product's own stock counter with the remaining pool.
+		if it.SerialNumber != "" && len(soldSNs) > 0 {
+			var prod models.Product
+			if err := tx.Where("id = ? AND company_id = ?", it.ProductID, companyID).First(&prod).Error; err != nil {
+				continue
 			}
-		}
-
-		// Legacy fallback for items without SNs on purchase items.
-		if !fromPurchase {
-			result := tx.Exec(`
-				UPDATE purchase_items
-				SET quantity = GREATEST(quantity - ?, 0)
-				WHERE id IN (
-					SELECT id FROM purchase_items
-					WHERE product_id = ? AND company_id = ? AND deleted_at IS NULL
-					ORDER BY quantity DESC
-					LIMIT 1
-				)
-			`, qty, it.ProductID, companyID)
-			if result.Error != nil {
-				return result.Error
+			allSNs := prod.ParseSerialNumbers()
+			if len(allSNs) == 0 {
+				continue
 			}
-
-			// Also decrement Product.stock so inventory status page stays in sync.
-			if err := tx.Model(&models.Product{}).
-				Where("id = ? AND company_id = ?", it.ProductID, companyID).
-				Update("stock", gorm.Expr("GREATEST(stock - ?, 0)", qty)).Error; err != nil {
-				return err
+			consumedSet := make(map[string]bool, len(soldSNs))
+			for _, sn := range soldSNs {
+				consumedSet[sn] = true
 			}
-
-			// Remove consumed SNs from products.serial_number.
-			if it.SerialNumber != "" {
-				var prod models.Product
-				if err := tx.Where("id = ? AND company_id = ?", it.ProductID, companyID).First(&prod).Error; err == nil {
-					allSNs := prod.ParseSerialNumbers()
-					if len(allSNs) > 0 {
-						consumedSet := make(map[string]bool, len(soldSNs))
-						for _, sn := range soldSNs {
-							consumedSet[sn] = true
-						}
-						var remaining []string
-						for _, sn := range allSNs {
-							if !consumedSet[sn] {
-								remaining = append(remaining, sn)
-							}
-						}
-						remainingStr := strings.Join(remaining, ", ")
-						if err := tx.Model(&models.Product{}).
-							Where("id = ? AND company_id = ?", it.ProductID, companyID).
-							Updates(map[string]interface{}{
-								"serial_number":        remainingStr,
-								"current_serial_index": 0,
-							}).Error; err != nil {
-							return err
-						}
-					}
+			var remaining []string
+			for _, sn := range allSNs {
+				if !consumedSet[sn] {
+					remaining = append(remaining, sn)
 				}
 			}
+			if err := tx.Model(&models.Product{}).
+				Where("id = ? AND company_id = ?", it.ProductID, companyID).
+				Updates(map[string]interface{}{
+					"serial_number":        strings.Join(remaining, ", "),
+					"stock":               len(remaining),
+					"current_serial_index": 0,
+				}).Error; err != nil {
+				return err
+			}
+			continue
+		}
+
+		// Serial-less sale: decrement the product stock counter only. The
+		// purchase records are never touched.
+		if err := tx.Model(&models.Product{}).
+			Where("id = ? AND company_id = ?", it.ProductID, companyID).
+			Update("stock", gorm.Expr("GREATEST(stock - ?, 0)", qty)).Error; err != nil {
+			return err
 		}
 	}
 	return nil
@@ -358,69 +335,11 @@ func CreateInstallmentSale(c *gin.Context) {
 			return err
 		}
 
-		// Decrement stock and consume SNs
-		for _, it := range req.Items {
-			qty := it.Quantity
-			if qty <= 0 {
-				continue
-			}
-
-			soldSNs := parsePOSsoldSNs(it.SerialNumber, qty)
-
-			// Consume the sold SNs from the purchase items holding them.
-			fromPurchase := false
-			if len(soldSNs) > 0 {
-				var err error
-				fromPurchase, err = consumeSNsFromPurchaseItems(tx, companyID, it.ProductID, soldSNs)
-				if err != nil {
-					return err
-				}
-			}
-
-			// Legacy fallback for items without SNs on purchase items.
-			if !fromPurchase {
-				result := tx.Exec(`
-					UPDATE purchase_items
-					SET quantity = GREATEST(quantity - ?, 0)
-					WHERE id IN (
-						SELECT id FROM purchase_items
-						WHERE product_id = ? AND company_id = ? AND deleted_at IS NULL
-						ORDER BY quantity DESC
-						LIMIT 1
-					)
-				`, qty, it.ProductID, companyID)
-				if result.Error != nil {
-					return result.Error
-				}
-
-				if it.SerialNumber != "" {
-					var prod models.Product
-					if err := tx.Where("id = ? AND company_id = ?", it.ProductID, companyID).First(&prod).Error; err == nil {
-						allSNs := prod.ParseSerialNumbers()
-						if len(allSNs) > 0 {
-							consumedSet := make(map[string]bool, len(soldSNs))
-							for _, sn := range soldSNs {
-								consumedSet[sn] = true
-							}
-							var remaining []string
-							for _, sn := range allSNs {
-								if !consumedSet[sn] {
-									remaining = append(remaining, sn)
-								}
-							}
-							remainingStr := strings.Join(remaining, ", ")
-							if err := tx.Model(&models.Product{}).
-								Where("id = ? AND company_id = ?", it.ProductID, companyID).
-								Updates(map[string]interface{}{
-									"serial_number":         remainingStr,
-									"current_serial_index":  0,
-								}).Error; err != nil {
-								return err
-							}
-						}
-					}
-				}
-			}
+		// Keep the legacy product stock counters in sync. Purchase and
+		// vendor-invoice records are static; sold quantity is tracked by the
+		// sale_items rows.
+		if err := consumeSaleStock(tx, companyID, req.Items); err != nil {
+			return err
 		}
 		return nil
 	})

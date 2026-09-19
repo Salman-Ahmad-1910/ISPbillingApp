@@ -40,6 +40,7 @@ import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
+import { useCrudPermissions } from '@/hooks/usePermissions';
 import { Loader2, MoreHorizontal, Handshake, Wallet, DollarSign, UserCheck, Trash2, Pencil, Receipt, Copy, FileText } from 'lucide-react';
 
 import type { Dealer, DealerCollection, Area, RecoveryOfficer } from '@/lib/types';
@@ -62,6 +63,7 @@ export default function DealersCollectionsPage() {
   const currentCompany = companies.find(c => c.id === companyId);
   const { toast } = useToast();
   const { user } = useUser();
+  const { canCreate, canUpdate, canDelete } = useCrudPermissions();
 
   const [selectedDealerId, setSelectedDealerId] = useState<string | null>(null);
   const [showReceiveDialog, setShowReceiveDialog] = useState(false);
@@ -383,10 +385,12 @@ export default function DealersCollectionsPage() {
                 <span>Receiving as: <span className="font-medium text-foreground">{recoveryOfficerName}</span></span>
               </div>
               <div className="flex-1" />
+              {canCreate && (
               <Button onClick={() => setShowReceiveDialog(true)} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
                 <DollarSign className="mr-2 h-4 w-4" />
                 Receive Payment
               </Button>
+            )}
             </div>
 
             <div className="p-4">
@@ -446,14 +450,18 @@ export default function DealersCollectionsPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleEditOpen(col, index + 1)}>
-                                  <Pencil className="mr-2 h-4 w-4" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleToggleStatus(col)}>
-                                  <Receipt className="mr-2 h-4 w-4" />
-                                  {col.settlementStatus === 'settled' ? 'Mark Unpaid' : 'Mark Paid'}
-                                </DropdownMenuItem>
+                                {canUpdate && (
+                                  <DropdownMenuItem onClick={() => handleEditOpen(col, index + 1)}>
+                                    <Pencil className="mr-2 h-4 w-4" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                )}
+                                {canUpdate && (
+                                  <DropdownMenuItem onClick={() => handleToggleStatus(col)}>
+                                    <Receipt className="mr-2 h-4 w-4" />
+                                    {col.settlementStatus === 'settled' ? 'Mark Unpaid' : 'Mark Paid'}
+                                  </DropdownMenuItem>
+                                )}
                                 <DropdownMenuItem onClick={() => {
                                   setPrintCollection(col);
                                   setPrintBillNo(index + 1);
@@ -472,10 +480,12 @@ export default function DealersCollectionsPage() {
                                   <Copy className="mr-2 h-4 w-4" />
                                   Duplicate Print
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDelete(col.id)} className="text-red-600">
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Delete
-                                </DropdownMenuItem>
+                                {canDelete && (
+                                  <DropdownMenuItem onClick={() => handleDelete(col.id)} className="text-red-600">
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>

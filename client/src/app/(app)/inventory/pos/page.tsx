@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { useCompany } from '@/context/company-context';
 import { useUser } from '@/hooks/use-user';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { useCrudPermissions } from '@/hooks/usePermissions';
 
 import { PlusCircle, Trash2, CreditCard, Landmark, CircleDollarSign, Loader2, ShoppingCart, Search, Users, UserRound, Handshake, CalendarDays, Receipt, MoreVertical, Hash, ChevronDown, Tag, CheckCircle2, XCircle } from 'lucide-react';
 import Image from 'next/image';
@@ -433,6 +434,7 @@ export default function POSPage() {
     const { user } = useUser();
     const { toast } = useToast();
     const queryClient = useQueryClient();
+    const { canCreate, canDelete } = useCrudPermissions();
 
     const { data: purchasedProducts = [] } = useGenericQuery<any>('inventory/purchased-products', companyId ?? undefined);
     const { data: customersData = [] } = useGenericQuery<any>('crm/customers', companyId ?? undefined);
@@ -1075,6 +1077,7 @@ export default function POSPage() {
                                     return (
                                     <Card key={product.purchaseItemId || product.id} className="overflow-hidden cursor-pointer group/product transition-all duration-300 hover:-translate-y-1 hover:shadow-lg" onClick={() => addToCart(product.id)}>
                                         <div className="aspect-square bg-muted relative">
+                                            {canDelete && (
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
                                                     <Button
@@ -1096,6 +1099,7 @@ export default function POSPage() {
                                                     </DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
+                                            )}
                                             {imgSrc ? (
                                                 <Image src={imgSrc} width={200} height={200} alt={product.name} className="object-cover w-full h-full" unoptimized />
                                             ) : (
@@ -1556,6 +1560,7 @@ export default function POSPage() {
                                             <Button variant={paymentMethod === 'bank' ? 'default' : 'outline'} onClick={() => setPaymentMethod('bank')} className="transition-all duration-300 hover:scale-105"><Landmark className="mr-2 h-4 w-4" /> Bank</Button>
                                             <Button variant={paymentMethod === 'cash' ? 'default' : 'outline'} onClick={() => setPaymentMethod('cash')} className="transition-all duration-300 hover:scale-105"><CircleDollarSign className="mr-2 h-4 w-4" /> Cash</Button>
                                         </div>
+                                        {canCreate && (
                                         <Button
                                             size="lg"
                                             disabled={isProcessing || (!existingInstallment && (cart.length === 0 || !selectedPlanId)) || (!!existingInstallment && (!installmentDetails || installmentDetails.remainingInstallments <= 0))}
@@ -1572,6 +1577,7 @@ export default function POSPage() {
                                                 : `Pay Installment - PKR ${installmentDetails?.amountPerInstallment.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
                                             }
                                         </Button>
+                                        )}
                                     </>
                                 ) : (
                                     <>
@@ -1582,6 +1588,7 @@ export default function POSPage() {
                                             <Button variant={paymentMethod === 'cash' ? 'default' : 'outline'} onClick={() => setPaymentMethod('cash')} className="transition-all duration-300 hover:scale-105"><CircleDollarSign className="mr-2 h-4 w-4" /> Cash</Button>
                                         </div>
                                         <div className="grid grid-cols-2 gap-2">
+                                            {canCreate && (
                                             <Button
                                                 variant="outline"
                                                 size="lg"
@@ -1591,6 +1598,8 @@ export default function POSPage() {
                                             >
                                                 Hold Bill
                                             </Button>
+                                            )}
+                                            {canCreate && (
                                             <Button
                                                 size="lg"
                                                 disabled={cart.length === 0 || isProcessing}
@@ -1600,6 +1609,7 @@ export default function POSPage() {
                                                 {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                                 {isProcessing ? 'Processing...' : 'Complete Payment'}
                                             </Button>
+                                            )}
                                         </div>
                                     </>
                                 )}

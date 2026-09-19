@@ -11,6 +11,7 @@ import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { Loader2, PlusCircle, Trash2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { useCrudPermissions } from '@/hooks/usePermissions';
 
 import { DataTable } from './data-table';
 import { getColumns } from './columns';
@@ -50,6 +51,7 @@ export function ClientPage() {
   const { companyId } = useCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { canCreate, canUpdate, canDelete } = useCrudPermissions();
 
   const { data: connectionsData, isLoading } = useGenericQuery<Connection>('admin/connections', companyId ?? undefined);
   const { data: areasData } = useGenericQuery<Area>('network/areas', companyId ?? undefined);
@@ -325,22 +327,26 @@ export function ClientPage() {
 
           <div className="flex items-center gap-2 ml-auto">
             <span className="text-sm text-muted-foreground">{billRows.length} entry(ies) | {billRows.reduce((sum, r) => sum + r.subscribers, 0)} subscriber(s)</span>
-            <Button
-              onClick={handleCreate}
-              disabled={isCreating || billRows.length === 0}
-              className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700"
-            >
-              {isCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
-              Create
-            </Button>
-            <Button
-              onClick={handleDelete}
-              disabled={isDeleting || billRows.length === 0}
-              variant="destructive"
-            >
-              {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-              Delete
-            </Button>
+            {canCreate && (
+              <Button
+                onClick={handleCreate}
+                disabled={isCreating || billRows.length === 0}
+                className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700"
+              >
+                {isCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+                Create
+              </Button>
+            )}
+            {canDelete && (
+              <Button
+                onClick={handleDelete}
+                disabled={isDeleting || billRows.length === 0}
+                variant="destructive"
+              >
+                {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                Delete
+              </Button>
+            )}
           </div>
         </div>
 

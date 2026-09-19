@@ -23,6 +23,8 @@ interface PurchaseColumnsProps {
   onDelete: (purchase: Purchase) => void;
   onAddQuantity: (purchase: Purchase) => void;
   companyName?: string | null;
+  canUpdate?: boolean;
+  canDelete?: boolean;
 }
 
 const statusVariant: Record<string, 'default' | 'secondary' | 'destructive'> = {
@@ -31,7 +33,7 @@ const statusVariant: Record<string, 'default' | 'secondary' | 'destructive'> = {
   partial: 'secondary',
 };
 
-export const columns = ({ onEdit, onPay, onPrint, onDelete, onAddQuantity, companyName }: PurchaseColumnsProps): ColumnDef<Purchase>[] => [
+export const columns = ({ onEdit, onPay, onPrint, onDelete, onAddQuantity, companyName, canUpdate = true, canDelete = true }: PurchaseColumnsProps): ColumnDef<Purchase>[] => [
   {
     accessorKey: 'billId',
     header: 'Bill ID',
@@ -130,10 +132,12 @@ export const columns = ({ onEdit, onPay, onPrint, onDelete, onAddQuantity, compa
               <DollarSign className="mr-2 h-4 w-4 text-green-600" />
               Pay
             </DropdownMenuItem>
+            {canUpdate && (
             <DropdownMenuItem onClick={() => onEdit(purchase)}>
               <Pencil className="mr-2 h-4 w-4" />
               Edit
             </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={() => onAddQuantity(purchase)}>
               <PackagePlus className="mr-2 h-4 w-4 text-emerald-600" />
               Add Quantity
@@ -152,11 +156,15 @@ export const columns = ({ onEdit, onPay, onPrint, onDelete, onAddQuantity, compa
                 </DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
+            {canDelete && (
+            <>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => onDelete(purchase)} className="text-destructive">
               <Trash2 className="mr-2 h-4 w-4" />
               Delete
             </DropdownMenuItem>
+            </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       );

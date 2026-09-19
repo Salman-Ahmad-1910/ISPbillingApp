@@ -18,6 +18,7 @@ import { DataTable } from './data-table';
 import { getColumns } from './columns';
 import { CorporateCustomerForm } from './corporate-customer-form';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
+import { useCrudPermissions } from '@/hooks/usePermissions';
 
 
 import { useQueryClient } from '@tanstack/react-query';
@@ -34,6 +35,7 @@ export function ClientPage({ data }: ClientPageProps) {
     const { companyId } = useCompany();
     const { toast } = useToast();
     const queryClient = useQueryClient();
+    const { canCreate, canUpdate, canDelete } = useCrudPermissions();
     const [customers, setCustomers] = useState<CorporateCustomer[]>(data);
     const [filter, setFilter] = useState('');
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -155,6 +157,8 @@ export function ClientPage({ data }: ClientPageProps) {
     const columns = getColumns({
         onEdit: handleEdit,
         onDelete: openDeleteDialog,
+        canUpdate,
+        canDelete,
     });
 
 
@@ -207,6 +211,7 @@ export function ClientPage({ data }: ClientPageProps) {
                             className="max-w-sm pl-8"
                         />
                     </div>
+                    {canCreate && (
                     <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
                         <DialogTrigger asChild>
                             <Button onClick={() => setSelectedCustomer(null)} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
@@ -231,6 +236,7 @@ export function ClientPage({ data }: ClientPageProps) {
                             />
                         </DialogContent>
                     </Dialog>
+                    )}
                 </div>
                 <DataTable columns={columns} data={getPaginatedData()} />
                 

@@ -17,9 +17,11 @@ interface ConnectionColumnsProps {
   onEdit: (connection: Connection) => void;
   onDelete: (connection: Connection) => void;
   onDeactivate: (connection: Connection) => void;
+  canUpdate?: boolean;
+  canDelete?: boolean;
 }
 
-export const getColumns = ({ onEdit, onDelete, onDeactivate }: ConnectionColumnsProps): ColumnDef<Connection>[] => [
+export const getColumns = ({ onEdit, onDelete, onDeactivate, canUpdate = true, canDelete = true }: ConnectionColumnsProps): ColumnDef<Connection>[] => [
   {
     accessorKey: 'internetId',
     header: 'Internet ID',
@@ -101,14 +103,20 @@ export const getColumns = ({ onEdit, onDelete, onDeactivate }: ConnectionColumns
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              {canUpdate && (
               <DropdownMenuItem onClick={() => onEdit(connection)} className="data-[highlighted]:text-emerald-600">Edit subscriber</DropdownMenuItem>
+              )}
               {connection.status !== 'deactivated' && (
                 <DropdownMenuItem onClick={() => onDeactivate(connection)} className="data-[highlighted]:text-amber-600">Deactivate subscriber</DropdownMenuItem>
               )}
+              {canDelete && (
+                <>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive data-[highlighted]:text-red-600" onClick={() => onDelete(connection)}>
                 Delete subscriber
               </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

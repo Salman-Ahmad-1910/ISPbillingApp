@@ -1,6 +1,7 @@
 import { useUser } from '@/hooks/use-user';
 import type { User } from '@/lib/types';
 import { hasPermission, hasAnyPermission, hasAllPermissions, getUserPermissions, hasMinimumRole, ROLES } from '@/lib/permissions';
+import { hasFeaturePermission, CAN_CREATE_PERMISSION, CAN_UPDATE_PERMISSION, CAN_DELETE_PERMISSION } from '@/lib/permission-pages';
 
 export function usePermissions(user: User | null) {
   const userRole = user?.role || ROLES.STAFF;
@@ -40,4 +41,20 @@ export function useUserPermissions() {
     actualUser = user as User | null;
   }
   return usePermissions(actualUser);
+}
+
+// CRUD (Add/Create, Update, Delete) operation permissions. These are controlled
+// by the "CRUD" checkboxes on the Roles & Permissions page. Admin and Owner
+// roles always bypass, exactly like hasFeaturePermission.
+export function useCrudPermissions() {
+  const perms = useUserPermissions();
+  const isAdmin = perms.isAdmin() || perms.userRole === ROLES.OWNER;
+  const granted = perms.grantedPermissions || [];
+  const configured = perms.permissionsConfigured;
+
+  return {
+    canCreate: hasFeaturePermission(granted, configured, isAdmin, CAN_CREATE_PERMISSION),
+    canUpdate: hasFeaturePermission(granted, configured, isAdmin, CAN_UPDATE_PERMISSION),
+    canDelete: hasFeaturePermission(granted, configured, isAdmin, CAN_DELETE_PERMISSION),
+  };
 }

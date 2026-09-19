@@ -19,6 +19,7 @@ import { DataTable } from './data-table';
 import { getColumns } from './columns';
 import { InquiryForm } from './inquiry-form';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
+import { useCrudPermissions } from '@/hooks/usePermissions';
 
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
@@ -36,6 +37,7 @@ export function ClientPage({ data, areas, boxes, packages }: ClientPageProps) {
     const { companyId } = useCompany();
     const { toast } = useToast();
     const queryClient = useQueryClient();
+    const { canCreate, canUpdate, canDelete } = useCrudPermissions();
     const [inquiries, setInquiries] = useState<Inquiry[]>(data);
     const [searchQuery, setSearchQuery] = useState('');
     const [filterSublocality, setFilterSublocality] = useState('all');
@@ -194,6 +196,8 @@ export function ClientPage({ data, areas, boxes, packages }: ClientPageProps) {
     const columns = getColumns({
         onEdit: handleEdit,
         onDelete: openDeleteDialog,
+        canUpdate,
+        canDelete,
     });
 
     const months = [
@@ -326,6 +330,7 @@ export function ClientPage({ data, areas, boxes, packages }: ClientPageProps) {
                         </Button>
                     </div>
                     <div className="flex-1" />
+                    {canCreate && (
                     <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
                         <DialogTrigger asChild>
                             <Button onClick={() => setSelectedInquiry(null)} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
@@ -355,6 +360,7 @@ export function ClientPage({ data, areas, boxes, packages }: ClientPageProps) {
                             </ScrollArea>
                         </DialogContent>
                     </Dialog>
+                    )}
                 </div>
 
                 <div className="flex items-center justify-between">

@@ -7,6 +7,7 @@ import type { VendorInvoice, Vendor, Product } from '@/lib/types';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
+import { useCrudPermissions } from '@/hooks/usePermissions';
 
 import { z } from 'zod';
 import { vendorInvoiceSchema } from '@/lib/schemas';
@@ -39,6 +40,7 @@ export function ClientPage({ data }: ClientPageProps) {
   const { companyId } = useCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { canCreate, canUpdate, canDelete } = useCrudPermissions();
   const [invoices, setInvoices] = useState<VendorInvoice[]>(data);
 
   useEffect(() => {
@@ -182,7 +184,7 @@ export function ClientPage({ data }: ClientPageProps) {
     setIsFormOpen(true);
   };
 
-  const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, onPrint: handlePrint, products });
+  const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, onPrint: handlePrint, canUpdate, canDelete });
 
   return (
     <div className="space-y-4">
@@ -222,10 +224,12 @@ export function ClientPage({ data }: ClientPageProps) {
             />
           </div>
         </div>
+        {canCreate && (
         <Button onClick={handleAddNew} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700">
           <PlusCircle className="mr-2 h-4 w-4" />
           Buy a Product
         </Button>
+        )}
       </div>
 
       {/* Data Table - flattened so each SN is a separate row */}

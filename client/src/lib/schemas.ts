@@ -511,7 +511,6 @@ export const purchaseItemSchema = z.object({
   expiryDate: z.string().optional(),
   serialNumber: z.string().optional(),
   model: z.string().optional(),
-  mergeExisting: z.boolean().optional().default(false),
 });
 
 export const purchaseSchema = z.object({

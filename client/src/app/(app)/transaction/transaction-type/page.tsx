@@ -29,6 +29,7 @@ import {
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
+import { useCrudPermissions } from '@/hooks/usePermissions';
 import api from '@/lib/api';
 import { smartMatch } from '@/lib/search';
 import { Loader2, Pencil, Plus, Search, Trash2, FileCog, ListChecks } from 'lucide-react';
@@ -72,6 +73,7 @@ const PAYMENT_CHANNELS = [
 export default function TransactionTypePage() {
   const { companyId } = useCompany();
   const { toast } = useToast();
+  const { canCreate, canUpdate, canDelete } = useCrudPermissions();
 
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -241,10 +243,12 @@ export default function TransactionTypePage() {
                 <SelectItem value="100">100</SelectItem>
               </SelectContent>
             </Select>
-            <Button onClick={openAddDialog} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Transaction
-            </Button>
+            {canCreate && (
+              <Button onClick={openAddDialog} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
+                <Plus className="mr-2 h-4 w-4" />
+                Add Transaction
+              </Button>
+            )}
           </div>
         </div>
 
@@ -273,12 +277,16 @@ export default function TransactionTypePage() {
                     <TableCell className="font-medium">{record.paymentChannel || '---'}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 transition-all duration-300 hover:scale-110" onClick={() => openEditDialog(record)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive transition-all duration-300 hover:scale-110 hover:bg-destructive/10" onClick={() => handleDelete(record.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {canUpdate && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 transition-all duration-300 hover:scale-110" onClick={() => openEditDialog(record)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {canDelete && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive transition-all duration-300 hover:scale-110 hover:bg-destructive/10" onClick={() => handleDelete(record.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

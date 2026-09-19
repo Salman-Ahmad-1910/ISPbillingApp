@@ -8,6 +8,7 @@ import type { Purchase, Vendor, Product, Company } from '@/lib/types';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
+import { useCrudPermissions } from '@/hooks/usePermissions';
 
 import { z } from 'zod';
 import { purchaseSchema } from '@/lib/schemas';
@@ -43,6 +44,7 @@ export function ClientPage({ data }: ClientPageProps) {
   const { companyId, companyName, companies } = useCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { canCreate, canUpdate, canDelete } = useCrudPermissions();
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
@@ -238,7 +240,7 @@ export function ClientPage({ data }: ClientPageProps) {
     }
   };
 
-  const columns = getColumns({ onEdit: handleEdit, onPay: handlePay, onPrint: handlePrint, onDelete: handleDelete, onAddQuantity: handleAddQuantity, companyName });
+  const columns = getColumns({ onEdit: handleEdit, onPay: handlePay, onPrint: handlePrint, onDelete: handleDelete, onAddQuantity: handleAddQuantity, companyName, canUpdate, canDelete });
 
   const company = companyName ? ({ id: companyId, name: companyName } as unknown as Company) : null;
 
@@ -291,10 +293,12 @@ export function ClientPage({ data }: ClientPageProps) {
             <FileDown className="mr-2 h-4 w-4" />
             PDF
           </Button>
+          {canCreate && (
           <Button onClick={handleAddNew} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700">
             <PlusCircle className="mr-2 h-4 w-4" />
             Add Purchase
           </Button>
+          )}
         </div>
       </div>
 

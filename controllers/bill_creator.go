@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 
 	"awesomeProject/config"
 	"awesomeProject/models"
@@ -89,6 +90,7 @@ func CreateBills(c *gin.Context) {
 			// Calculate total amount from connections
 			var totalAmount float64
 			var names []string
+			conns := []models.Connection{}
 			for _, connIDStr := range group.ConnectionIDs {
 				connID, err := uuid.Parse(connIDStr)
 				if err != nil {
@@ -108,6 +110,7 @@ func CreateBills(c *gin.Context) {
 					totalAmount += conn.Amount + conn.SameAmount
 				}
 				names = append(names, conn.Name)
+				conns = append(conns, conn)
 			}
 
 			if totalAmount == 0 {
@@ -125,6 +128,20 @@ func CreateBills(c *gin.Context) {
 				typeLabel, month, year, companyID,
 			).First(&existing).Error; err == nil {
 				continue
+			}
+
+			// Add the package fee to each billed subscriber's remaining balance.
+			for _, conn := range conns {
+				fee := conn.Amount
+				switch conn.ConnectionType {
+				case "internet":
+					fee = conn.SameAmount
+				case "both":
+					fee = conn.Amount + conn.SameAmount
+				}
+				config.DB.Model(&models.Connection{}).
+					Where("id = ? AND company_id = ?", conn.ID, companyID).
+					UpdateColumn("remaining_amount", gorm.Expr("remaining_amount + ?", fee))
 			}
 
 			billRecord := models.BillRecord{
@@ -238,6 +255,11 @@ func CreateBills(c *gin.Context) {
 		).First(&existing).Error; err == nil {
 			continue // Already created
 		}
+
+		// Add the package fee to the subscriber's remaining balance.
+		config.DB.Model(&models.Connection{}).
+			Where("id = ? AND company_id = ?", connID, companyID).
+			UpdateColumn("remaining_amount", gorm.Expr("remaining_amount + ?", amount))
 
 		billRecord := models.BillRecord{
 			ConnectionID:    connID,

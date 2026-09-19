@@ -5,6 +5,7 @@ import (
 	"awesomeProject/models"
 	"awesomeProject/utils"
 	"fmt"
+	"math"
 	"strconv"
 	"time"
 
@@ -69,15 +70,6 @@ func findConnections(c *gin.Context) {
 	if err := db.Find(&connections).Error; err != nil {
 		utils.ErrorResponse(c, 500, "Failed to fetch connections", err.Error())
 		return
-	}
-
-	// Reflect the true outstanding (package fee - payments this month) on each
-	// returned row so the frontend shows/derives the correct remaining amount,
-	// even for fully-unpaid subscribers whose stored remaining_amount may be
-	// stale/zero at month boundaries.
-	monthStart := time.Now().Format("2006-01") + "-01"
-	for i := range connections {
-		connections[i].RemainingAmount = connectionOutstanding(connections[i], monthStart)
 	}
 
 	utils.SuccessResponse(c, "Connections retrieved", connections)
@@ -179,15 +171,19 @@ func createConnection(c *gin.Context) {
 		TransactionId:       input.TransactionId,
 	}
 
-	oneTime := input.InstallationAmount + input.OtherAmount
-
-	switch input.ConnectionType {
-	case "tv_cable":
-		conn.RemainingAmount = input.Amount + oneTime
-	case "internet":
-		conn.RemainingAmount = input.SameAmount + oneTime
-	default:
-		conn.RemainingAmount = input.Amount + input.SameAmount + oneTime
+	// A new subscriber starts with no balance. If the "Create balance" option
+	// is enabled, an opening balance equal to the package fee prorated for the
+	// remaining days of the month is created (fee / 30 * days).
+	conn.RemainingAmount = 0
+	if input.CreateBalance && input.BalanceDays > 0 {
+		fee := input.Amount
+		switch input.ConnectionType {
+		case "internet":
+			fee = input.SameAmount
+		case "both":
+			fee = input.Amount + input.SameAmount
+		}
+		conn.RemainingAmount = roundToTwo(fee / 30 * float64(input.BalanceDays))
 	}
 	conn.CompanyID = companyID
 
@@ -670,4 +666,9 @@ func getConnectionLogs(c *gin.Context) {
 	}
 
 	utils.SuccessResponse(c, "Connection logs retrieved", logs)
+}
+
+// roundToTwo rounds a money value to two decimal places.
+func roundToTwo(x float64) float64 {
+	return math.Round(x*100) / 100
 }

@@ -5,6 +5,7 @@ import (
 	"awesomeProject/models"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -28,136 +29,47 @@ func validateSerialNumbersWithinPurchase(items []models.PurchaseItem) string {
 	return ""
 }
 
-// consumeSNsFromVendorInvoices removes the given serial numbers from the vendor
-// invoice items they belong to (same company + product). This is the second link
-// of the SN chain: product -> vendor invoice -> purchase -> sale.
-// It returns an error if an SN is not available on any vendor invoice item or is
-// already consumed by another purchase item.
-func consumeSNsFromVendorInvoices(tx *gorm.DB, companyID, productID uuid.UUID, sns []string) error {
-	if len(sns) == 0 {
-		return nil
+// firstSNUsedByAnotherPurchase returns the first serial number in items that is
+// already recorded on another purchase item (excluding the purchase with
+// excludePurchaseID, when given). Purchase and vendor-invoice records are
+// static documents, so this is the only guard that keeps the same physical unit
+// from being recorded in two purchases: it reads existing purchase items and
+// never mutates any of them.
+func firstSNUsedByAnotherPurchase(q *gorm.DB, companyID uuid.UUID, excludePurchaseID uuid.UUID, items []models.PurchaseItem) string {
+	checked := make(map[string]bool)
+	var toCheck []string
+	for _, it := range items {
+		for _, sn := range parseVendorInvoiceSNs(it.SerialNumber) {
+			if !checked[sn] {
+				checked[sn] = true
+				toCheck = append(toCheck, sn)
+			}
+		}
+	}
+	if len(toCheck) == 0 {
+		return ""
 	}
 
-	// SNs already used by other purchase items cannot be consumed again.
-	var existingPurchases []models.PurchaseItem
-	if err := tx.Where("company_id = ? AND product_id = ? AND deleted_at IS NULL", companyID, productID).
-		Find(&existingPurchases).Error; err != nil {
-		return err
+	query := q.Model(&models.PurchaseItem{}).Where("company_id = ?", companyID)
+	if excludePurchaseID != uuid.Nil {
+		query = query.Where("purchase_id <> ?", excludePurchaseID)
 	}
-	usedInPurchase := make(map[string]bool)
-	for _, pi := range existingPurchases {
+	var others []models.PurchaseItem
+	if err := query.Find(&others).Error; err != nil {
+		return ""
+	}
+	used := make(map[string]bool)
+	for _, pi := range others {
 		for _, sn := range parseVendorInvoiceSNs(pi.SerialNumber) {
-			usedInPurchase[sn] = true
+			used[sn] = true
 		}
 	}
-
-	// Load all vendor invoice items for this product.
-	var invoiceItems []models.VendorInvoiceItem
-	if err := tx.Where("company_id = ? AND product_id = ? AND deleted_at IS NULL", companyID, productID).
-		Order("created_at asc").
-		Find(&invoiceItems).Error; err != nil {
-		return err
-	}
-
-	// Map each available SN to its invoice item.
-	snOwner := map[string]*models.VendorInvoiceItem{}
-	for i := range invoiceItems {
-		item := &invoiceItems[i]
-		for _, sn := range parseVendorInvoiceSNs(item.SerialNumber) {
-			if _, taken := snOwner[sn]; !taken {
-				snOwner[sn] = item
-			}
+	for _, sn := range toCheck {
+		if used[sn] {
+			return sn
 		}
 	}
-
-	consumedByItem := map[uuid.UUID][]string{}
-	for _, sn := range sns {
-		if usedInPurchase[sn] {
-			return fmt.Errorf("serial number %s is already used in another purchase", sn)
-		}
-		owner, ok := snOwner[sn]
-		if !ok {
-			return fmt.Errorf("serial number %s is not available on any vendor invoice for this product", sn)
-		}
-		consumedByItem[owner.ID] = append(consumedByItem[owner.ID], sn)
-	}
-
-	// Remove consumed SNs from their invoice items and sync quantity/subtotal.
-	for itemID, consumed := range consumedByItem {
-		var item models.VendorInvoiceItem
-		if err := tx.Where("id = ?", itemID).First(&item).Error; err != nil {
-			return err
-		}
-		consumedSet := make(map[string]bool, len(consumed))
-		for _, sn := range consumed {
-			consumedSet[sn] = true
-		}
-		var remaining []string
-		for _, sn := range parseVendorInvoiceSNs(item.SerialNumber) {
-			if !consumedSet[sn] {
-				remaining = append(remaining, sn)
-			}
-		}
-		newQty := len(remaining)
-		purchasePrice, _ := vendorInvoiceItemPrices(item)
-		if err := tx.Model(&models.VendorInvoiceItem{}).
-			Where("id = ?", item.ID).
-			Updates(map[string]interface{}{
-				"serial_number": strings.Join(remaining, ", "),
-				"quantity":      newQty,
-				"subtotal":      purchasePrice * float64(newQty),
-			}).Error; err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// returnSNsToVendorInvoices gives serial numbers back to the vendor invoice
-// items of a product (used when a purchase is updated or deleted). SNs are
-// appended to the oldest invoice item of that product that does not already
-// hold them. Best effort: if no invoice item exists anymore, nothing happens.
-func returnSNsToVendorInvoices(tx *gorm.DB, companyID, productID uuid.UUID, sns []string) error {
-	if len(sns) == 0 {
-		return nil
-	}
-
-	var items []models.VendorInvoiceItem
-	if err := tx.Where("company_id = ? AND product_id = ? AND deleted_at IS NULL", companyID, productID).
-		Order("created_at asc").
-		Find(&items).Error; err != nil {
-		return err
-	}
-	if len(items) == 0 {
-		return nil
-	}
-
-	target := &items[0]
-	existing := parseVendorInvoiceSNs(target.SerialNumber)
-	have := make(map[string]bool, len(existing))
-	for _, sn := range existing {
-		have[sn] = true
-	}
-	var toAdd []string
-	for _, sn := range sns {
-		if !have[sn] {
-			toAdd = append(toAdd, sn)
-		}
-	}
-	if len(toAdd) == 0 {
-		return nil
-	}
-
-	combined := append(existing, toAdd...)
-	newQty := len(combined)
-	purchasePrice, _ := vendorInvoiceItemPrices(*target)
-	return tx.Model(&models.VendorInvoiceItem{}).
-		Where("id = ?", target.ID).
-		Updates(map[string]interface{}{
-			"serial_number": strings.Join(combined, ", "),
-			"quantity":      newQty,
-			"subtotal":      purchasePrice * float64(newQty),
-		}).Error
+	return ""
 }
 
 func CreatePurchase(c *gin.Context) {
@@ -187,68 +99,30 @@ func CreatePurchase(c *gin.Context) {
 			return
 		}
 
-		tx := db.Begin()
+tx := db.Begin()
 
-		// Items flagged for merging are added to an existing purchase_item line
-		// with the same product/price/unit-type/batch instead of creating a new
-		// entry. Items with no matching line fall through to the insert path.
-		var insertItems []models.PurchaseItem
-		for _, item := range items {
-			if !item.MergeExisting {
-				insertItems = append(insertItems, item)
-				continue
-			}
-			merged, err := mergePurchaseItemInto(tx, purchase.CompanyID, &item, purchase.Batch)
-			if err != nil {
-				tx.Rollback()
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-				return
-			}
-			if !merged {
-				insertItems = append(insertItems, item)
-			}
+	// Purchase and vendor-invoice records are static (their quantity, serial
+	// numbers and models never decrease when goods move downstream). The only
+	// guard kept here is a read-only uniqueness check so the same physical SN
+	// cannot be recorded in two different purchases.
+	if dupAlready := firstSNUsedByAnotherPurchase(tx, purchase.CompanyID, uuid.Nil, items); dupAlready != "" {
+		tx.Rollback()
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Serial number %s is already used in another purchase", dupAlready)})
+		return
+	}
+
+	if createErr = tx.Create(&purchase).Error; createErr != nil {
+		tx.Rollback()
+		if strings.Contains(createErr.Error(), "duplicate key") {
+			time.Sleep(50 * time.Millisecond)
+			continue
 		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create purchase", "details": createErr.Error()})
+		return
+	}
 
-		// If every item was merged there is no new purchase to record.
-		if len(insertItems) == 0 {
-			if err := tx.Commit().Error; err != nil {
-				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit transaction"})
-				return
-			}
-			c.JSON(http.StatusOK, gin.H{
-				"success": true,
-				"message": "Purchased items merged into existing entries",
-				"data":    nil,
-			})
-			return
-		}
-
-		if createErr = tx.Create(&purchase).Error; createErr != nil {
-			tx.Rollback()
-			if strings.Contains(createErr.Error(), "duplicate key") {
-				time.Sleep(50 * time.Millisecond)
-				continue
-			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create purchase", "details": createErr.Error()})
-			return
-		}
-
-		for _, item := range insertItems {
-			itemSNs := parseVendorInvoiceSNs(item.SerialNumber)
-
-			// Consume the SNs from the vendor invoice items they belong to.
-			// Done before inserting this purchase's own item rows so the
-			// "already used by another purchase" check stays accurate.
-			if len(itemSNs) > 0 {
-				if err := consumeSNsFromVendorInvoices(tx, purchase.CompanyID, item.ProductID, itemSNs); err != nil {
-					tx.Rollback()
-					c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-					return
-				}
-			}
-
-			newItem := models.PurchaseItem{
+	for _, item := range items {
+		newItem := models.PurchaseItem{
 				TenantModel: models.TenantModel{
 					CompanyID: purchase.CompanyID,
 				},
@@ -319,81 +193,6 @@ func CreatePurchase(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create purchase after retries", "details": createErr.Error()})
-}
-
-// mergePurchaseItemInto adds the incoming item's quantity and serial numbers
-// to the most recent existing purchase_item with the same company, product,
-// purchase/selling price, unit type and purchase batch. It syncs the item's
-// quantity/quantity_entered/subtotal plus the owning purchase's totals.
-// Returns (false, nil) when no matching line exists so the caller falls back
-// to creating a new purchase item.
-func mergePurchaseItemInto(tx *gorm.DB, companyID uuid.UUID, item *models.PurchaseItem, batch string) (bool, error) {
-	var target models.PurchaseItem
-	err := tx.
-		Where("company_id = ? AND product_id = ? AND purchase_price = ? AND selling_price = ? AND unit_type = ? AND deleted_at IS NULL",
-			companyID, item.ProductID, item.PurchasePrice, item.SellingPrice, item.UnitType).
-		Where("purchase_id IN (SELECT id FROM purchases WHERE company_id = ? AND COALESCE(batch,'') = ? AND deleted_at IS NULL)",
-			companyID, batch).
-		Order("created_at DESC").
-		First(&target).Error
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return false, nil
-		}
-		return false, err
-	}
-
-	itemSNs := parseVendorInvoiceSNs(item.SerialNumber)
-	if len(itemSNs) > 0 {
-		if err := consumeSNsFromVendorInvoices(tx, companyID, item.ProductID, itemSNs); err != nil {
-			return false, err
-		}
-		// Reject serial numbers that the target line already holds so stock is
-		// not double-counted on the merged line.
-		existing := parseVendorInvoiceSNs(target.SerialNumber)
-		have := make(map[string]bool, len(existing))
-		for _, sn := range existing {
-			have[sn] = true
-		}
-		for _, sn := range itemSNs {
-			if have[sn] {
-				return false, fmt.Errorf("serial number %s already exists on the merged purchase line", sn)
-			}
-		}
-	}
-
-	quantity := target.Quantity + item.Quantity
-	subtotal := item.PurchasePrice * float64(quantity)
-	serialText := strings.Join(append(parseVendorInvoiceSNs(target.SerialNumber), itemSNs...), ", ")
-
-	modelText := target.Model
-	if strings.TrimSpace(item.Model) != "" {
-		modelText = strings.Trim(strings.Join([]string{target.Model, item.Model}, ", "), ", ")
-	}
-
-	if err := tx.Model(&models.PurchaseItem{}).
-		Where("id = ? AND deleted_at IS NULL", target.ID).
-		Updates(map[string]interface{}{
-			"quantity":         quantity,
-			"quantity_entered": target.QuantityEntered + item.Quantity,
-			"subtotal":         subtotal,
-			"serial_number":    serialText,
-			"model":            modelText,
-		}).Error; err != nil {
-		return false, err
-	}
-
-	delta := item.PurchasePrice * float64(item.Quantity)
-	if err := tx.Model(&models.Purchase{}).
-		Where("id = ? AND deleted_at IS NULL", target.PurchaseID).
-		Updates(map[string]interface{}{
-			"total_amount":     gorm.Expr("total_amount + ?", delta),
-			"remaining_amount": gorm.Expr("remaining_amount + ?", delta),
-		}).Error; err != nil {
-		return false, err
-	}
-
-	return true, nil
 }
 
 func GetPurchases(c *gin.Context) {
@@ -481,46 +280,29 @@ func UpdatePurchase(c *gin.Context) {
 	oldItems := existingPurchase.Items
 	existingPurchase.Items = nil
 
-	// Revert old items before updating: SN-bearing items give their SNs back to
-	// the vendor invoice items. No-SN items are owned by the vendor invoice (it
-	// holds the stock), so a purchase update does not touch product stock.
-	// SNs that stay in the updated purchase are left untouched: re-returning and
-	// re-consuming them would reject SNs whose originating vendor invoice item no
-	// longer exists (e.g. the vendor invoice was deleted after this purchase was
-	// recorded).
-	oldByProduct := map[uuid.UUID]map[string]bool{}
+	// Purchase records are static documents: they are not tied back into the
+	// vendor invoice and never give serial numbers back. Only SNs that are
+	// genuinely NEW to this purchase are checked for cross-purchase uniqueness.
+	oldSNSet := make(map[string]bool)
 	for _, oldItem := range oldItems {
-		if oldByProduct[oldItem.ProductID] == nil {
-			oldByProduct[oldItem.ProductID] = map[string]bool{}
-		}
 		for _, sn := range parseVendorInvoiceSNs(oldItem.SerialNumber) {
-			oldByProduct[oldItem.ProductID][sn] = true
+			oldSNSet[sn] = true
 		}
 	}
-	newByProduct := map[uuid.UUID]map[string]bool{}
+	var freshItems []models.PurchaseItem
 	for _, item := range updateData.Items {
-		if newByProduct[item.ProductID] == nil {
-			newByProduct[item.ProductID] = map[string]bool{}
-		}
+		var kept []string
 		for _, sn := range parseVendorInvoiceSNs(item.SerialNumber) {
-			newByProduct[item.ProductID][sn] = true
+			if !oldSNSet[sn] {
+				kept = append(kept, sn)
+			}
 		}
+		freshItems = append(freshItems, models.PurchaseItem{ProductID: item.ProductID, SerialNumber: strings.Join(kept, ", ")})
 	}
-
-	for productID, oldSet := range oldByProduct {
-		var removed []string
-		for sn := range oldSet {
-			if !newByProduct[productID][sn] {
-				removed = append(removed, sn)
-			}
-		}
-		if len(removed) > 0 {
-			if err := returnSNsToVendorInvoices(tx, existingPurchase.CompanyID, productID, removed); err != nil {
-				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to return serial numbers to vendor invoice"})
-				return
-			}
-		}
+	if dup := firstSNUsedByAnotherPurchase(tx, existingPurchase.CompanyID, existingPurchase.ID, freshItems); dup != "" {
+		tx.Rollback()
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Serial number %s is already used in another purchase", dup)})
+		return
 	}
 
 	if err := tx.Model(&existingPurchase).Updates(map[string]interface{}{
@@ -555,24 +337,6 @@ func UpdatePurchase(c *gin.Context) {
 	}
 
 	for _, item := range updateData.Items {
-		itemSNs := parseVendorInvoiceSNs(item.SerialNumber)
-
-		// Consume only the SNs that are genuinely new to this purchase. SNs the
-		// purchase already holds stay untouched (see the revert logic above).
-		var toConsume []string
-		for _, sn := range itemSNs {
-			if !oldByProduct[item.ProductID][sn] {
-				toConsume = append(toConsume, sn)
-			}
-		}
-		if len(toConsume) > 0 {
-			if err := consumeSNsFromVendorInvoices(tx, existingPurchase.CompanyID, item.ProductID, toConsume); err != nil {
-				tx.Rollback()
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-				return
-			}
-		}
-
 		newItem := models.PurchaseItem{
 			TenantModel: models.TenantModel{
 				CompanyID: existingPurchase.CompanyID,
@@ -898,20 +662,6 @@ func DeletePurchase(c *gin.Context) {
 		return
 	}
 
-	// Revert items: SN-bearing items give their SNs back to the vendor invoice
-	// items. No-SN items are owned by the vendor invoice, so deleting a purchase
-	// does not change product stock.
-	for _, item := range purchase.Items {
-		itemSNs := parseVendorInvoiceSNs(item.SerialNumber)
-		if len(itemSNs) > 0 {
-			if err := returnSNsToVendorInvoices(tx, purchase.CompanyID, item.ProductID, itemSNs); err != nil {
-				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to return serial numbers to vendor invoice"})
-				return
-			}
-		}
-	}
-
 	if err := tx.Where("purchase_id = ?", purchaseUUID).Delete(&models.PurchaseQuantityHistory{}).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete purchase quantity history"})
@@ -941,94 +691,69 @@ func DeletePurchase(c *gin.Context) {
 	})
 }
 
-// consumeSNsFromPurchaseItems removes sold serial numbers from the purchase
-// items holding them. This is the third link of the SN chain:
-// product -> vendor invoice -> purchase -> sale.
-// It returns true if at least one SN was found on a purchase item.
-func consumeSNsFromPurchaseItems(tx *gorm.DB, companyID, productID uuid.UUID, sns []string) (bool, error) {
-	if len(sns) == 0 {
-		return false, nil
-	}
-
-	var items []models.PurchaseItem
-	if err := tx.Where("company_id = ? AND product_id = ? AND deleted_at IS NULL", companyID, productID).
-		Order("created_at asc").
-		Find(&items).Error; err != nil {
-		return false, err
-	}
-
-	consumedSet := make(map[string]bool, len(sns))
-	for _, sn := range sns {
-		consumedSet[sn] = true
-	}
-
-	found := false
-	for i := range items {
-		item := &items[i]
-		itemSNs := parseVendorInvoiceSNs(item.SerialNumber)
-		if len(itemSNs) == 0 {
-			continue
-		}
-		var remaining []string
-		changed := false
-		for _, sn := range itemSNs {
-			if consumedSet[sn] {
-				changed = true
-				found = true
-				continue
-			}
-			remaining = append(remaining, sn)
-		}
-		if !changed {
-			continue
-		}
-		newQty := len(remaining)
-		if err := tx.Model(&models.PurchaseItem{}).
-			Where("id = ?", item.ID).
-			Updates(map[string]interface{}{
-				"serial_number": strings.Join(remaining, ", "),
-				"quantity":      newQty,
-				"subtotal":      item.PurchasePrice * float64(newQty),
-			}).Error; err != nil {
-			return found, err
+// splitCommaList splits a comma-separated string into trimmed non-empty parts.
+func splitCommaList(s string) []string {
+	var out []string
+	for _, part := range strings.Split(s, ",") {
+		if part = strings.TrimSpace(part); part != "" {
+			out = append(out, part)
 		}
 	}
-	return found, nil
+	return out
 }
 
-// GetPurchasedProducts returns each purchase item as a separate product for POS.
-// No GROUP BY on product_id — every purchased line item appears individually.
+// GetPurchasedProducts returns one row per distinct purchased product for the
+// POS page and the Stock page. Purchase records are static (quantity, serial
+// numbers and models on a purchase never decrease), so the available stock is
+// derived as SUM(purchase quantity entered) - SUM(sold quantity). Both pages
+// consume this endpoint and therefore always show the same number. Every row
+// carries the per-purchase "versions" in Lines for the Stock page and the pool
+// of serial numbers/models that have not been sold yet.
 func GetPurchasedProducts(c *gin.Context) {
 	db := config.DB
 	companyID := c.MustGet("companyID").(uuid.UUID)
 
-	var products []models.PurchasedProduct
+	type purchaseLine struct {
+		PurchaseItemID  uuid.UUID
+		ProductID       uuid.UUID
+		ProductName     string
+		Quantity        int
+		QuantityEntered int
+		PurchasePrice   float64
+		SellingPrice    float64
+		TaxPercent      float64
+		UnitType        string
+		SerialNumber    string
+		Model           string
+		BillID          string
+		PurchaseNumber  string
+		VendorName      string
+		PurchaseDate    string
+		Batch           string
+		CreatedAt       time.Time
+		Image           string
+	}
+	var lines []purchaseLine
 	if err := db.Raw(`
 		SELECT
-pi.id                                           AS purchase_item_id,
-			pi.product_id                                 AS id,
-			COALESCE(NULLIF(pi.product_name, ''), pr.name) AS name,
-			pi.selling_price                              AS price,
-			pi.quantity                                   AS stock,
-			pi.unit_type                                  AS unit_type,
-			CASE
-				WHEN pi.quantity * pi.selling_price > 0
-				THEN ROUND(pi.sale_tax / (pi.quantity * pi.selling_price) * 100, 2)
-				ELSE 0
-			END                                            AS tax_percent,
-			pi.purchase_price                             AS purchase_price,
-			pi.serial_number                              AS serial_number,
-			COALESCE(pr.serial_number, '')                 AS product_serial_number,
-			COALESCE(pr.current_serial_index, 0)           AS current_serial_index,
-			pi.model                                      AS model,
-			COALESCE(pr.model, '')                         AS product_model,
-			COALESCE(pr.current_model_index, 0)            AS current_model_index,
-			p.bill_id                                     AS bill_id,
-			p.purchase_number                             AS purchase_number,
-			p.vendor_name                                 AS vendor_name,
-			p.purchase_date                               AS purchase_date,
-			p.batch                                       AS batch,
-			pr.image                                      AS image
+			pi.id                                        AS purchase_item_id,
+			pi.product_id                                AS product_id,
+			COALESCE(NULLIF(pi.product_name, ''), pr.name) AS product_name,
+			pi.quantity                                  AS quantity,
+			COALESCE(pi.quantity_entered, pi.quantity, 0) AS quantity_entered,
+			pi.purchase_price                            AS purchase_price,
+			pi.selling_price                             AS selling_price,
+			COALESCE(pr.tax_percent, 0)                  AS tax_percent,
+			pi.unit_type                                 AS unit_type,
+			pi.serial_number                             AS serial_number,
+			pi.model                                     AS model,
+			p.bill_id                                    AS bill_id,
+			p.purchase_number                            AS purchase_number,
+			p.vendor_name                                AS vendor_name,
+			p.purchase_date                              AS purchase_date,
+			p.batch                                      AS batch,
+			pi.created_at                                AS created_at,
+			COALESCE(pr.image, '')                       AS image
 		FROM purchase_items pi
 		JOIN purchases p ON p.id = pi.purchase_id AND p.deleted_at IS NULL
 		LEFT JOIN products pr ON pr.id = pi.product_id
@@ -1036,11 +761,184 @@ pi.id                                           AS purchase_item_id,
 			AND pi.deleted_at IS NULL
 			AND pr.id IS NOT NULL
 			AND pr.deleted_at IS NULL
-		ORDER BY pi.product_name
-	`, companyID).Scan(&products).Error; err != nil {
+		ORDER BY pi.product_name, pi.created_at ASC
+	`, companyID).Scan(&lines).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch purchased products", "details": err.Error()})
 		return
 	}
+
+	type soldRow struct {
+		ProductID    uuid.UUID
+		Quantity     int
+		SerialNumber string
+	}
+	var soldRows []soldRow
+	if err := db.Raw(`
+		SELECT
+			si.product_id    AS product_id,
+			si.quantity      AS quantity,
+			si.serial_number AS serial_number
+		FROM sale_items si
+		JOIN sales s ON s.id = si.sale_id AND s.deleted_at IS NULL
+		WHERE s.company_id = ?
+			AND si.deleted_at IS NULL
+	`, companyID).Scan(&soldRows).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch sold quantities", "details": err.Error()})
+		return
+	}
+
+	soldQty := map[uuid.UUID]int{}
+	soldSNs := map[uuid.UUID]map[string]bool{}
+	for _, s := range soldRows {
+		soldQty[s.ProductID] += s.Quantity
+		if soldSNs[s.ProductID] == nil {
+			soldSNs[s.ProductID] = map[string]bool{}
+		}
+		for _, sn := range parseVendorInvoiceSNs(s.SerialNumber) {
+			soldSNs[s.ProductID][sn] = true
+		}
+	}
+
+	// Group by product NAME (case-insensitive) so purchasing the same-named
+	// product again — even as a different physical product record — shows as a
+	// single Stock page entry with expandable purchase lines (its "versions").
+	grouped := map[string]*models.PurchasedProduct{}
+	groupProducts := map[string]map[uuid.UUID]bool{}
+	var order []string
+	for _, ln := range lines {
+		key := strings.ToLower(strings.TrimSpace(ln.ProductName))
+		p := grouped[key]
+		if p == nil {
+			p = &models.PurchasedProduct{ID: ln.ProductID.String(), Lines: []models.PurchasedProductLine{}}
+			grouped[key] = p
+			groupProducts[key] = map[uuid.UUID]bool{}
+			order = append(order, key)
+		}
+		groupProducts[key][ln.ProductID] = true
+		p.TotalPurchased += ln.QuantityEntered
+		p.Name = ln.ProductName
+		p.Image = ln.Image
+		// Rows are ordered oldest -> newest, so the most recent purchase line
+		// drives the display pricing, purchase details and representative
+		// product id.
+		p.ID = ln.ProductID.String()
+		p.PurchaseItemID = ln.PurchaseItemID.String()
+		p.Price = ln.SellingPrice
+		p.PurchasePrice = ln.PurchasePrice
+		p.TaxPercent = ln.TaxPercent
+		p.UnitType = ln.UnitType
+		p.BillId = ln.BillID
+		p.PurchaseNumber = ln.PurchaseNumber
+		p.VendorName = ln.VendorName
+		p.PurchaseDate = ln.PurchaseDate
+		p.Batch = ln.Batch
+		p.Lines = append(p.Lines, models.PurchasedProductLine{
+			PurchaseItemID: ln.PurchaseItemID.String(),
+			ID:             ln.ProductID.String(),
+			Name:           ln.ProductName,
+			Quantity:       ln.Quantity,
+			PurchasePrice:  ln.PurchasePrice,
+			SellingPrice:   ln.SellingPrice,
+			UnitType:       ln.UnitType,
+			SerialNumber:   ln.SerialNumber,
+			Model:          ln.Model,
+			BillId:         ln.BillID,
+			PurchaseNumber: ln.PurchaseNumber,
+			VendorName:     ln.VendorName,
+			PurchaseDate:   ln.PurchaseDate,
+			Batch:          ln.Batch,
+			CreatedAt:      ln.CreatedAt.Format(time.RFC3339),
+		})
+	}
+
+	products := make([]models.PurchasedProduct, 0, len(order))
+	for _, key := range order {
+		p := grouped[key]
+		sold := 0
+		soldSet := map[string]bool{}
+		// Sold quantities/SNs are recorded per physical product; sum them
+		// across every product record that shares this name.
+		for pid := range groupProducts[key] {
+			sold += soldQty[pid]
+			if soldSNs[pid] != nil {
+				for sn := range soldSNs[pid] {
+					soldSet[sn] = true
+				}
+			}
+		}
+
+		// Serial/model pool: purchased minus sold, keeping purchase order.
+		seen := map[string]bool{}
+		snModel := map[string]string{}
+		modelPool := []string{}
+		seenModels := map[string]bool{}
+		for _, ln := range p.Lines {
+			sns := parseVendorInvoiceSNs(ln.SerialNumber)
+			mods := splitCommaList(ln.Model)
+			paired := len(mods) == len(sns)
+			for i, sn := range sns {
+				if seen[sn] || (soldSet != nil && soldSet[sn]) {
+					continue
+				}
+				seen[sn] = true
+				if paired {
+					snModel[sn] = mods[i]
+				}
+			}
+			if len(sns) == 0 {
+				for _, m := range mods {
+					if !seenModels[m] {
+						seenModels[m] = true
+						modelPool = append(modelPool, m)
+					}
+				}
+			}
+		}
+		var orderedSNs []string
+		for _, ln := range p.Lines {
+			for _, sn := range parseVendorInvoiceSNs(ln.SerialNumber) {
+				if !seen[sn] {
+					continue
+				}
+				seen[sn] = false
+				orderedSNs = append(orderedSNs, sn)
+			}
+		}
+		p.SerialNumber = strings.Join(orderedSNs, ", ")
+		p.ProductSerialNumber = p.SerialNumber
+		p.CurrentSerialIndex = len(orderedSNs)
+
+		var models []string
+		used := map[string]bool{}
+		for _, sn := range orderedSNs {
+			if m := snModel[sn]; m != "" && !used[m] {
+				used[m] = true
+				models = append(models, m)
+			}
+		}
+		for _, m := range modelPool {
+			if !used[m] {
+				used[m] = true
+				models = append(models, m)
+			}
+		}
+		p.Model = strings.Join(models, ", ")
+		p.ProductModel = p.Model
+		p.CurrentModelIndex = len(models)
+
+		stock := p.TotalPurchased - sold
+		if stock < 0 {
+			stock = 0
+		}
+		p.Stock = stock
+		p.TotalSold = sold
+
+		products = append(products, *p)
+	}
+
+	sort.SliceStable(products, func(i, j int) bool {
+		return strings.ToLower(products[i].Name) < strings.ToLower(products[j].Name)
+	})
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,

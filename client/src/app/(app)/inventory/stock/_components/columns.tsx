@@ -3,13 +3,38 @@
 import { type ColumnDef } from '@tanstack/react-table';
 import { Badge } from '@/components/ui/badge';
 
-interface PurchasedProduct {
+// One purchase line ("version") of a product. Purchase records are static, so
+// each line keeps the quantity, serial numbers and models exactly as recorded.
+export interface PurchasedProductLine {
+  purchaseItemId: string;
+  id: string;
+  name: string;
+  quantity: number;
+  purchasePrice: number;
+  sellingPrice: number;
+  unitType: string;
+  serialNumber: string;
+  model: string;
+  billId: string;
+  purchaseNumber: string;
+  vendorName: string;
+  purchaseDate: string;
+  batch: string;
+  createdAt: string;
+}
+
+// One row per distinct product. Stock is derived (purchased - sold) and matches
+// the number shown on the POS page.
+export interface StockProduct {
   purchaseItemId: string;
   id: string;
   name: string;
   price: number;
   stock: number;
+  totalPurchased: number;
+  totalSold: number;
   unitType: string;
+  taxPercent: number;
   purchasePrice: number;
   billId: string;
   purchaseNumber: string;
@@ -18,11 +43,16 @@ interface PurchasedProduct {
   batch: string;
   serialNumber: string;
   model?: string;
-  productModel?: string;
-  currentModelIndex?: number;
+  image?: string;
+  lines: PurchasedProductLine[];
 }
 
-export const columns: ColumnDef<PurchasedProduct>[] = [
+function countSNs(raw: string | undefined): number {
+  if (!raw) return 0;
+  return raw.split(/[\s,\-]+/).map(s => s.trim()).filter(Boolean).length;
+}
+
+export const columns: ColumnDef<StockProduct>[] = [
   {
     id: 'index',
     header: '#',
@@ -38,42 +68,41 @@ export const columns: ColumnDef<PurchasedProduct>[] = [
     cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
   },
   {
+    id: 'versions',
+    header: 'Purchases',
+    cell: ({ row }) => {
+      const count = row.original.lines?.length || 0;
+      if (count <= 1) return <span className="text-xs text-muted-foreground">—</span>;
+      return (
+        <Badge variant="secondary" className="cursor-pointer">
+          {count} entries
+        </Badge>
+      );
+    },
+  },
+  {
     accessorKey: 'vendorName',
     header: 'Vendor',
+    cell: ({ row }) => row.original.vendorName || '—',
   },
   {
     accessorKey: 'purchaseDate',
-    header: 'Purchase Date',
+    header: 'Last Purchased',
+    cell: ({ row }) => row.original.purchaseDate || '—',
   },
   {
-    accessorKey: 'batch',
-    header: 'Batch',
-    cell: ({ row }) => row.original.batch || '—',
+    accessorKey: 'totalPurchased',
+    header: 'Purchased',
+    cell: ({ row }) => (
+      <div className="text-right font-mono text-xs">{row.original.totalPurchased}</div>
+    ),
   },
   {
-    accessorKey: 'serialNumber',
-    header: 'SN / MAC',
-    cell: ({ row }) => {
-      const sn = row.original.serialNumber;
-      if (!sn) return <span className="text-xs font-mono text-muted-foreground">—</span>;
-      const sns = sn.split(/[\s,\-]+/).map(s => s.trim()).filter(Boolean);
-      if (sns.length === 0) return <span className="text-xs font-mono text-muted-foreground">—</span>;
-      const display = sns.length === 1 ? sns[0] : `${sns[0]} (1/${sns.length})`;
-      return <span className="text-xs font-mono" title={sns.join(', ')}>{display}</span>;
-    },
-  },
-  {
-    accessorKey: 'model',
-    header: 'Model',
-    cell: ({ row }) => {
-      const models = (row.original.model || row.original.productModel || '')
-        .split(/[\s,\n\r\t,]+/)
-        .map((s: string) => s.trim())
-        .filter(Boolean);
-      if (models.length === 0) return <span className="text-xs text-muted-foreground">—</span>;
-      const display = models.length === 1 ? models[0] : `${models[0]} +${models.length - 1}`;
-      return <span className="text-xs text-sky-700 dark:text-sky-300" title={models.join(', ')}>{display}</span>;
-    },
+    accessorKey: 'totalSold',
+    header: 'Sold',
+    cell: ({ row }) => (
+      <div className="text-right font-mono text-xs">{row.original.totalSold}</div>
+    ),
   },
   {
     accessorKey: 'stock',

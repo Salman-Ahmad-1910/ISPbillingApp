@@ -64,7 +64,6 @@ type PurchaseItem struct {
 	ExpiryDate    string                      `gorm:"type:varchar(50)" json:"expiryDate"`
 	SerialNumber  string                      `gorm:"type:text" json:"serialNumber"`
 	Model         string                      `gorm:"type:text" json:"model"`
-	MergeExisting bool                        `gorm:"default:false" json:"mergeExisting"`
 	History       []PurchaseQuantityHistory    `gorm:"foreignKey:PurchaseItemID;constraint:OnDelete:CASCADE" json:"history"`
 }
 
@@ -83,27 +82,53 @@ type PurchaseQuantityHistory struct {
 	UnitPrice          float64   `gorm:"type:decimal(10,2);not null;default:0" json:"unitPrice"`
 }
 
-// PurchasedProduct - Product info derived entirely from purchase_items.
-// POS page reads from this so it only shows products that were actually purchased.
+// PurchasedProduct - Product info derived from purchase_items grouped by
+// product. Purchase and vendor-invoice records are static documents, so the
+// available stock is computed as the sum of purchased quantity minus the sum
+// of sold quantity (POS page and Stock page both read this and show the same
+// number). Each entry carries the per-purchase "versions" in Lines.
 type PurchasedProduct struct {
-	PurchaseItemID       string  `json:"purchaseItemId"`
-	ID                   string  `json:"id"`
-	Name                 string  `json:"name"`
-	Price                float64 `json:"price"`
-	Stock                int     `json:"stock"`
-	UnitType             string  `json:"unitType"`
-	TaxPercent           float64 `json:"taxPercent"`
-	PurchasePrice        float64 `json:"purchasePrice"`
-	BillId               string  `json:"billId"`
-	PurchaseNumber       string  `json:"purchaseNumber"`
-	VendorName           string  `json:"vendorName"`
-	PurchaseDate         string  `json:"purchaseDate"`
-	Batch                string  `json:"batch"`
-	SerialNumber         string  `json:"serialNumber"`
-	ProductSerialNumber  string  `json:"productSerialNumber"`
-	CurrentSerialIndex   int     `json:"currentSerialIndex"`
-	Model                string  `json:"model"`
-	ProductModel         string  `json:"productModel"`
-	CurrentModelIndex    int     `json:"currentModelIndex"`
-	Image                string  `json:"image"`
+	PurchaseItemID       string                 `json:"purchaseItemId"`
+	ID                   string                 `json:"id"`
+	Name                 string                 `json:"name"`
+	Price                float64                `json:"price"`
+	Stock                int                    `json:"stock"`
+	TotalPurchased       int                    `json:"totalPurchased"`
+	TotalSold            int                    `json:"totalSold"`
+	UnitType             string                 `json:"unitType"`
+	TaxPercent           float64                `json:"taxPercent"`
+	PurchasePrice        float64                `json:"purchasePrice"`
+	BillId               string                 `json:"billId"`
+	PurchaseNumber       string                 `json:"purchaseNumber"`
+	VendorName           string                 `json:"vendorName"`
+	PurchaseDate         string                 `json:"purchaseDate"`
+	Batch                string                 `json:"batch"`
+	SerialNumber         string                 `json:"serialNumber"`
+	ProductSerialNumber  string                 `json:"productSerialNumber"`
+	CurrentSerialIndex   int                    `json:"currentSerialIndex"`
+	Model                string                 `json:"model"`
+	ProductModel         string                 `json:"productModel"`
+	CurrentModelIndex    int                    `json:"currentModelIndex"`
+	Image                string                 `json:"image"`
+	Lines                []PurchasedProductLine `json:"lines"`
+}
+
+// PurchasedProductLine - one purchase line ("version") of a product shown in
+// the Stock page when a product has been purchased more than once.
+type PurchasedProductLine struct {
+	PurchaseItemID string  `json:"purchaseItemId"`
+	ID             string  `json:"id"`
+	Name           string  `json:"name"`
+	Quantity       int     `json:"quantity"`
+	PurchasePrice  float64 `json:"purchasePrice"`
+	SellingPrice   float64 `json:"sellingPrice"`
+	UnitType       string  `json:"unitType"`
+	SerialNumber   string  `json:"serialNumber"`
+	Model          string  `json:"model"`
+	BillId         string  `json:"billId"`
+	PurchaseNumber string  `json:"purchaseNumber"`
+	VendorName     string  `json:"vendorName"`
+	PurchaseDate   string  `json:"purchaseDate"`
+	Batch          string  `json:"batch"`
+	CreatedAt      string  `json:"createdAt"`
 }

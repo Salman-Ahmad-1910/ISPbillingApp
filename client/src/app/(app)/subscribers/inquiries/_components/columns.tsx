@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button';
 interface ColumnsProps {
   onEdit: (inquiry: Inquiry) => void;
   onDelete: (inquiry: Inquiry) => void;
+  canUpdate?: boolean;
+  canDelete?: boolean;
 }
 
 const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -18,7 +20,7 @@ const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'o
   'closed': 'destructive',
 };
 
-export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<Inquiry>[] => [
+export const getColumns = ({ onEdit, onDelete, canUpdate = true, canDelete = true }: ColumnsProps): ColumnDef<Inquiry>[] => [
   {
     accessorKey: 'id',
     header: '#',
@@ -95,12 +97,16 @@ export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<Inquir
       const inquiry = row.original;
       return (
         <div className="flex items-center justify-end gap-1">
+          {canUpdate && (
           <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" onClick={() => onEdit(inquiry)}>
             <Pencil className="h-4 w-4" />
           </Button>
+          )}
+          {canDelete && (
           <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50" onClick={() => onDelete(inquiry)}>
             <Trash2 className="h-4 w-4" />
           </Button>
+          )}
         </div>
       );
     },
