@@ -29,48 +29,7 @@ func validateSerialNumbersWithinPurchase(items []models.PurchaseItem) string {
 	return ""
 }
 
-// firstSNUsedByAnotherPurchase returns the first serial number in items that is
-// already recorded on another purchase item (excluding the purchase with
-// excludePurchaseID, when given). Purchase and vendor-invoice records are
-// static documents, so this is the only guard that keeps the same physical unit
-// from being recorded in two purchases: it reads existing purchase items and
-// never mutates any of them.
-func firstSNUsedByAnotherPurchase(q *gorm.DB, companyID uuid.UUID, excludePurchaseID uuid.UUID, items []models.PurchaseItem) string {
-	checked := make(map[string]bool)
-	var toCheck []string
-	for _, it := range items {
-		for _, sn := range parseVendorInvoiceSNs(it.SerialNumber) {
-			if !checked[sn] {
-				checked[sn] = true
-				toCheck = append(toCheck, sn)
-			}
-		}
-	}
-	if len(toCheck) == 0 {
-		return ""
-	}
 
-	query := q.Model(&models.PurchaseItem{}).Where("company_id = ?", companyID)
-	if excludePurchaseID != uuid.Nil {
-		query = query.Where("purchase_id <> ?", excludePurchaseID)
-	}
-	var others []models.PurchaseItem
-	if err := query.Find(&others).Error; err != nil {
-		return ""
-	}
-	used := make(map[string]bool)
-	for _, pi := range others {
-		for _, sn := range parseVendorInvoiceSNs(pi.SerialNumber) {
-			used[sn] = true
-		}
-	}
-	for _, sn := range toCheck {
-		if used[sn] {
-			return sn
-		}
-	}
-	return ""
-}
 
 func CreatePurchase(c *gin.Context) {
 	db := config.DB
@@ -101,15 +60,10 @@ func CreatePurchase(c *gin.Context) {
 
 tx := db.Begin()
 
-	// Purchase and vendor-invoice records are static (their quantity, serial
-	// numbers and models never decrease when goods move downstream). The only
-	// guard kept here is a read-only uniqueness check so the same physical SN
-	// cannot be recorded in two different purchases.
-	if dupAlready := firstSNUsedByAnotherPurchase(tx, purchase.CompanyID, uuid.Nil, items); dupAlready != "" {
-		tx.Rollback()
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Serial number %s is already used in another purchase", dupAlready)})
-		return
-	}
+	// Purchase and vendor-invoice records are static documents: recording a
+	// purchase never mutates vendor invoices, and serial numbers may be
+	// recorded across purchases (the same product is re-bought regularly).
+	// Only duplicates within a single submitted batch are rejected above.
 
 	if createErr = tx.Create(&purchase).Error; createErr != nil {
 		tx.Rollback()
@@ -276,34 +230,12 @@ func UpdatePurchase(c *gin.Context) {
 
 	tx := db.Begin()
 
-	// Save old items before clearing to prevent GORM cascading on Updates
-	oldItems := existingPurchase.Items
+	// Clear old items before updating to prevent GORM cascading on Updates
 	existingPurchase.Items = nil
 
-	// Purchase records are static documents: they are not tied back into the
-	// vendor invoice and never give serial numbers back. Only SNs that are
-	// genuinely NEW to this purchase are checked for cross-purchase uniqueness.
-	oldSNSet := make(map[string]bool)
-	for _, oldItem := range oldItems {
-		for _, sn := range parseVendorInvoiceSNs(oldItem.SerialNumber) {
-			oldSNSet[sn] = true
-		}
-	}
-	var freshItems []models.PurchaseItem
-	for _, item := range updateData.Items {
-		var kept []string
-		for _, sn := range parseVendorInvoiceSNs(item.SerialNumber) {
-			if !oldSNSet[sn] {
-				kept = append(kept, sn)
-			}
-		}
-		freshItems = append(freshItems, models.PurchaseItem{ProductID: item.ProductID, SerialNumber: strings.Join(kept, ", ")})
-	}
-	if dup := firstSNUsedByAnotherPurchase(tx, existingPurchase.CompanyID, existingPurchase.ID, freshItems); dup != "" {
-		tx.Rollback()
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Serial number %s is already used in another purchase", dup)})
-		return
-	}
+	// Purchase records are static documents: only duplicates within a single
+	// submitted batch are rejected (below). Serial numbers may be re-recorded
+	// across purchases since the same product is re-bought regularly.
 
 	if err := tx.Model(&existingPurchase).Updates(map[string]interface{}{
 		"vendor_id":        updateData.VendorID,
@@ -540,29 +472,18 @@ func AddPurchaseQuantity(c *gin.Context) {
 		return
 	}
 
-	// Free-form SN validation: reject SNs already used by any purchase line
-	// (including already present on this line) and duplicates within the batch.
+	// Free-form SN validation: only duplicate serial numbers within this batch
+	// are rejected. Serial numbers may appear across purchases and across
+	// lines, since purchases are static records and products are re-bought.
 	if len(newSNs) > 0 {
-		var existing []models.PurchaseItem
-		if err := tx.Where("company_id = ? AND product_id = ? AND deleted_at IS NULL", companyID, body.ProductID).
-			Find(&existing).Error; err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate serial numbers", "details": err.Error()})
-			return
-		}
-		used := make(map[string]bool)
-		for _, pi := range existing {
-			for _, sn := range parseVendorInvoiceSNs(pi.SerialNumber) {
-				used[sn] = true
-			}
-		}
+		seen := make(map[string]bool)
 		for _, sn := range newSNs {
-			if used[sn] {
+			if seen[sn] {
 				tx.Rollback()
-				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Serial number %s is already used in a purchase", sn)})
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Serial number %s is duplicated in the batch", sn)})
 				return
 			}
-			used[sn] = true
+			seen[sn] = true
 		}
 	}
 

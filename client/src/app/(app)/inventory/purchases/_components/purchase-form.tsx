@@ -118,6 +118,9 @@ interface VendorProduct {
   unitType: string;
   allSNs: string[];
   allModels: string[];
+  allVendorSNs: string[];
+  allVendorModels: string[];
+  noSerial: boolean;
   vendorInvoiceId: string;
   invoiceNumber: string;
   batch: string;
@@ -225,9 +228,11 @@ export function PurchaseForm({
         const isNoSN = !!product?.noSerialNumber || itemSNs.length === 0;
 
         // The purchase page sources its products/SNs from the vendor invoice
-        // items. For SN-tracked items only unconsumed SNs remain (paired with
-        // their model). For quantity-only (no-SN) products the item is always
-        // available.
+        // items, which are static vendor documents. Every product on the
+        // invoices of the selected vendor is always selectable, even when all
+        // of its serial numbers were recorded by an earlier purchase: products
+        // are re-bought regularly and purchases are static records, so those
+        // serial numbers can be recorded again.
         const unconsumedSNs: string[] = [];
         const unconsumedModels: string[] = [];
         itemSNs.forEach((sn, i) => {
@@ -236,13 +241,14 @@ export function PurchaseForm({
             unconsumedModels.push(itemModels[i] || '');
           }
         });
-        if (!isNoSN && unconsumedSNs.length === 0) continue;
 
         const existing = productMap.get(item.productId);
         if (existing) {
           if (!isNoSN) {
             existing.allSNs.push(...unconsumedSNs);
             existing.allModels.push(...unconsumedModels);
+            existing.allVendorSNs.push(...itemSNs);
+            existing.allVendorModels.push(...itemModels);
           }
         } else {
           const unitPrice = item.purchasePrice || item.unitPrice || 0;
@@ -254,6 +260,9 @@ export function PurchaseForm({
             unitType: item.unitType || product?.unitType || 'piece',
             allSNs: isNoSN ? [] : [...unconsumedSNs],
             allModels: isNoSN ? [] : [...unconsumedModels],
+            allVendorSNs: isNoSN ? [] : [...itemSNs],
+            allVendorModels: isNoSN ? [] : [...itemModels],
+            noSerial: isNoSN,
             vendorInvoiceId: vi.id,
             invoiceNumber: vi.invoiceNumber || '',
             batch: vi.batch || '',
@@ -279,7 +288,13 @@ export function PurchaseForm({
         parseSerialNumbers(item.serialNumber).forEach(sn => usedByOthers.add(sn));
       }
     });
-    const available = vp.allSNs.filter(sn => !usedByOthers.has(sn));
+    let available = vp.allSNs.filter(sn => !usedByOthers.has(sn));
+    // When every serial number on the vendor invoice was already recorded by an
+    // earlier purchase, fall back to the full supplier serial list so the
+    // product stays re-purchasable (purchases are static records).
+    if (available.length === 0 && !vp.noSerial) {
+      available = vp.allVendorSNs.filter(sn => !usedByOthers.has(sn));
+    }
     const have = new Set(available);
     kept.forEach(sn => { if (!have.has(sn)) available.push(sn); });
     return available;
@@ -288,7 +303,7 @@ export function PurchaseForm({
   const addItem = (productId: string) => {
     const vp = vendorProducts.find(p => p.productId === productId);
     if (!vp) return;
-    const isNoSN = vp.allSNs.length === 0;
+    const isNoSN = vp.noSerial;
     const currentItems = form.getValues('items');
 
     // If the same product is already on the form, merge into that line instead
@@ -307,8 +322,14 @@ export function PurchaseForm({
         const availableSNs = getAvailableSNs(productId, existingIndex).filter(sn => !haveSNs.has(sn));
         if (availableSNs.length > 0) {
           const nextSN = availableSNs[0];
+          let nextModel = '';
           const modelIndex = vp.allSNs.indexOf(nextSN);
-          const nextModel = modelIndex >= 0 ? vp.allModels[modelIndex] || '' : '';
+          if (modelIndex >= 0) {
+            nextModel = vp.allModels[modelIndex] || '';
+          } else {
+            const fbIndex = vp.allVendorSNs.indexOf(nextSN);
+            nextModel = fbIndex >= 0 ? (vp.allVendorModels[fbIndex] || '') : '';
+          }
           currentSNs.push(nextSN);
           item.serialNumber = currentSNs.join(', ');
           item.model = [parseModels(item.model || '').join(','), nextModel]
@@ -329,8 +350,16 @@ export function PurchaseForm({
     const qty = isNoSN ? 1 : Math.min(1, availableSNs.length || 1);
     const snString = isNoSN ? '' : availableSNs.slice(0, qty).join(', ');
     const firstSN = availableSNs[0] || '';
-    const modelIndex = isNoSN ? -1 : vp.allSNs.indexOf(firstSN);
-    const modelString = isNoSN || modelIndex < 0 ? '' : vp.allModels[modelIndex] || '';
+    let modelString = '';
+    if (!isNoSN && firstSN) {
+      const modelIndex = vp.allSNs.indexOf(firstSN);
+      if (modelIndex >= 0) {
+        modelString = vp.allModels[modelIndex] || '';
+      } else {
+        const fbIndex = vp.allVendorSNs.indexOf(firstSN);
+        modelString = fbIndex >= 0 ? (vp.allVendorModels[fbIndex] || '') : '';
+      }
+    }
     const newItem = {
       productId,
       productName: vp.productName,
@@ -364,7 +393,7 @@ export function PurchaseForm({
 
     if (field === 'quantity') {
       const vp = vendorProducts.find(p => p.productId === item.productId);
-      const isNoSN = !vp || vp.allSNs.length === 0;
+      const isNoSN = !vp || vp.noSerial;
       const availableSNs = getAvailableSNs(item.productId, index);
       const maxQty = isNoSN ? 99999 : (availableSNs.length || 1);
       const qty = isNoSN
@@ -375,7 +404,9 @@ export function PurchaseForm({
       const selectedModels = selectedSNs.map(sn => {
         if (!vp) return '';
         const mIndex = vp.allSNs.indexOf(sn);
-        return mIndex >= 0 ? (vp.allModels[mIndex] || '') : '';
+        if (mIndex >= 0) return vp.allModels[mIndex] || '';
+        const fbIndex = vp.allVendorSNs.indexOf(sn);
+        return fbIndex >= 0 ? (vp.allVendorModels[fbIndex] || '') : '';
       }).filter(Boolean);
       item.quantity = qty;
       item.serialNumber = snString;
