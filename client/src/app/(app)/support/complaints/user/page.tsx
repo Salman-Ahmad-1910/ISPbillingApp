@@ -26,8 +26,8 @@ import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
-import type { Connection, Area, Complaint, Staff, RecoveryOfficer } from '@/lib/types';
-import { smartMatch } from '@/lib/search';
+import type { Connection, Area, Complaint, Staff, RecoveryOfficer, Subscriber } from '@/lib/types';
+import { smartMatch, smartSearch } from '@/lib/search';
 import {
   STATUS_COLORS,
   STATUS_LABELS,
@@ -47,6 +47,8 @@ export default function SubscriberComplaintPage() {
 
   const { data: complaints = [], isLoading, refetch } = useGenericQuery<Complaint>('support/complaints', companyId ?? undefined);
   const { data: connections = [] } = useGenericQuery<Connection>('admin/connections', companyId ?? undefined);
+  const { data: subscribersData = [] } = useGenericQuery<Subscriber>('subscribers', companyId ?? undefined);
+  const { data: subjectTypes = [] } = useGenericQuery<any>('support/complaint-subjects', companyId ?? undefined);
   const { data: areas = [] } = useGenericQuery<Area>('network/areas', companyId ?? undefined);
   const { data: staff = [] } = useGenericQuery<Staff>('hr/staff', companyId ?? undefined);
   const { data: recoveryOfficers = [] } = useGenericQuery<RecoveryOfficer>('admin/recovery-officers', companyId ?? undefined);
@@ -65,6 +67,8 @@ export default function SubscriberComplaintPage() {
   const [showForm, setShowForm] = useState(false);
   const [internetSearch, setInternetSearch] = useState('');
   const [selectedConn, setSelectedConn] = useState<Connection | null>(null);
+  const [showSubscriberList, setShowSubscriberList] = useState(false);
+  const [subscriberVisibleCount, setSubscriberVisibleCount] = useState(5);
   const [sublocalityId, setSublocalityId] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [complaintType, setComplaintType] = useState('');
@@ -112,16 +116,56 @@ export default function SubscriberComplaintPage() {
     currentPage * parseInt(pageSize)
   );
 
-  const matchedSubscribers = useMemo(() => {
-    if (!internetSearch.trim()) return [];
-    return (connections as Connection[]).filter(c =>
-      smartMatch(internetSearch, [c.internetId, c.id], [c.name])
-    ).slice(0, 10);
-  }, [connections, internetSearch]);
+  const subscriberRoster = useMemo(() => {
+    const byId = new Map<string, Connection>();
+    (connections as Connection[]).forEach((c) => byId.set(c.id, c));
+    (subscribersData as Subscriber[]).forEach((s) => {
+      if (byId.has(s.id)) return;
+      byId.set(s.id, {
+        id: s.id,
+        companyId: s.companyId || '',
+        internetId: String(s.subscriber_identity || s.id || ''),
+        name: s.name || '',
+        address: s.installationAddress || '',
+        cell: s.phone || '',
+        mobile: s.phone || '',
+        installationAmount: 0,
+        otherAmount: 0,
+        connectionType: '',
+        createBalance: false,
+        balanceDays: 0,
+        amount: 0,
+        status: s.status || '',
+        sublocalityId: s.areaId || '',
+        createdAt: (s as any).createdAt || '',
+        updatedAt: (s as any).updatedAt || '',
+      } as Connection);
+    });
+    return [...byId.values()];
+  }, [connections, subscribersData]);
+
+  const rankedSubscribers = useMemo(() => {
+    const list = [...subscriberRoster];
+    if (!internetSearch.trim()) {
+      return list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+    }
+    return smartSearch(internetSearch, list, (c) => [
+      [c.internetId, c.id],
+      [c.name, c.cnic],
+      [c.cell, c.mobile],
+    ]);
+  }, [subscriberRoster, internetSearch]);
+
+  const visibleSubscribers = useMemo(
+    () => rankedSubscribers.slice(0, subscriberVisibleCount),
+    [rankedSubscribers, subscriberVisibleCount]
+  );
 
   const resetForm = () => {
     setInternetSearch('');
     setSelectedConn(null);
+    setShowSubscriberList(false);
+    setSubscriberVisibleCount(5);
     setSublocalityId('');
     setStatusFilter('');
     setComplaintType('');
@@ -433,23 +477,66 @@ export default function SubscriberComplaintPage() {
               <Label>Internet ID / Subscriber</Label>
               <Input
                 value={internetSearch}
-                onChange={(e) => { setInternetSearch(e.target.value); setSelectedConn(null); }}
+                onChange={(e) => { setInternetSearch(e.target.value); setSelectedConn(null); setShowSubscriberList(true); setSubscriberVisibleCount(5); }}
+                onClick={() => { if (selectedConn) setInternetSearch(''); setSelectedConn(null); setShowSubscriberList(true); setSubscriberVisibleCount(5); }}
+                onKeyDown={(e) => { if (e.key === 'ArrowDown' || e.key === 'Enter') { setShowSubscriberList(true); } }}
+                onBlur={() => setTimeout(() => setShowSubscriberList(false), 150)}
                 placeholder="Search by internet ID or name..."
               />
-              {internetSearch && !selectedConn && matchedSubscribers.length > 0 && (
-                <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md max-h-48 overflow-auto">
-                  {matchedSubscribers.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent border-b last:border-b-0"
-                      onClick={() => { setSelectedConn(c); setInternetSearch(c.name || c.internetId); setSublocalityId(c.sublocalityId || ''); setStatusFilter(c.status); }}
-                    >
-                      <span className="font-medium">{c.name}</span>
-                      <span className="ml-2 text-muted-foreground">({c.internetId})</span>
-                      <span className="ml-2 text-xs text-muted-foreground">{c.cell || c.mobile}</span>
-                    </button>
-                  ))}
+              {showSubscriberList && !selectedConn && (
+                <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
+                  {visibleSubscribers.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">
+                      {internetSearch.trim()
+                        ? `No subscriber matches "${internetSearch}".`
+                        : subscriberRoster.length === 0
+                          ? 'No subscribers found for this company.'
+                          : 'Type to search, or scroll the list below for more.'}
+                    </div>
+                  ) : (
+                    <>
+                      <div
+                        className="max-h-56 overflow-auto"
+                        onScroll={(e) => {
+                          const el = e.currentTarget;
+                          if (el.scrollTop + el.clientHeight >= el.scrollHeight - 12) {
+                            setSubscriberVisibleCount((n) => Math.min(rankedSubscribers.length, n + 5));
+                          }
+                        }}
+                      >
+                        {visibleSubscribers.map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                              setSelectedConn(c);
+                              setInternetSearch(c.name || c.internetId);
+                              setShowSubscriberList(false);
+                              setSubscriberVisibleCount(5);
+                              setSublocalityId(c.sublocalityId || '');
+                              setStatusFilter(c.status);
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-accent border-b last:border-b-0"
+                          >
+                            <span className="font-medium">{c.name}</span>
+                            <span className="ml-2 text-muted-foreground">({c.internetId})</span>
+                            <span className="ml-2 text-xs text-muted-foreground">{c.cell || c.mobile}</span>
+                            {c.status && (
+                              <span className={`ml-2 rounded px-1.5 py-0.5 text-[11px] capitalize ${
+                                c.status === 'active' ? 'bg-emerald-100 text-emerald-700' :
+                                c.status === 'suspended' ? 'bg-amber-100 text-amber-700' :
+                                'bg-gray-100 text-gray-600'
+                              }`}>{c.status}</span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="border-t px-3 py-1.5 text-xs text-muted-foreground">
+                        Showing {Math.min(subscriberVisibleCount, rankedSubscribers.length)} of {rankedSubscribers.length} subscribers
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -516,7 +603,24 @@ export default function SubscriberComplaintPage() {
               </div>
               <div className="space-y-1">
                 <Label>Subject</Label>
-                <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Enter subject" />
+                <Select value={subject} onValueChange={setSubject}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select subject" />
+                  </SelectTrigger>
+                  <SelectContent portal={false}>
+                    {(subjectTypes as any[]).length === 0 ? (
+                      <div className="px-3 py-2 text-sm text-muted-foreground">
+                        No subjects available. Add them from the Subject Type page.
+                      </div>
+                    ) : (
+                      (subjectTypes as any[]).map((s) => (
+                        <SelectItem key={s.id} value={s.subject}>
+                          {s.subject}{s.type ? ` (${s.type})` : ''}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
