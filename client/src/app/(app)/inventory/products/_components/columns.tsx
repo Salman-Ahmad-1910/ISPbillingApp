@@ -86,14 +86,6 @@ export const columns = ({ onEdit, onDelete }: ProductColumnsProps): ColumnDef<Pr
     },
   },
   {
-    accessorKey: 'stock',
-    header: () => <div className="text-right">Stock</div>,
-    cell: ({ row }) => {
-      const stock = row.original.stock || 0;
-      return <div className="text-right font-medium">{stock}</div>;
-    },
-  },
-  {
     accessorKey: 'discount',
     header: () => <div className="text-right">Discount</div>,
     cell: ({ row }) => {

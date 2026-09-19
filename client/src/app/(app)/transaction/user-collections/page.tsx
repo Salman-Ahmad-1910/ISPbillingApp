@@ -360,6 +360,11 @@ export default function SubscriberCollectionsPage() {
       toast({ variant: 'destructive', title: 'Error', description: 'Please select a payment type.' });
       return;
     }
+    const trimmedTxId = receiveTransactionId.trim();
+    if (receiveMethod.toLowerCase() !== 'cash' && !trimmedTxId) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Transaction ID is required for this payment type.' });
+      return;
+    }
     setIsSaving(true);
     try {
       await api.post('/billing/payments', {
@@ -367,9 +372,9 @@ export default function SubscriberCollectionsPage() {
         subscriberName: selectedSubscriber.name,
         amount: receiveAmount,
         paymentDate: receiveDate,
-        method: receiveMethod,
-        transactionId: receiveTransactionId.trim(),
-        transactionType: receiveMethod,
+        method: receiveMethod.toLowerCase() === 'cash' ? 'cash' : receiveMethod,
+        transactionId: trimmedTxId,
+        transactionType: receiveMethod.toLowerCase() === 'cash' ? 'cash' : receiveMethod,
         collectorId: user.id,
       });
       if (selectedPromiseId) {
@@ -447,13 +452,18 @@ export default function SubscriberCollectionsPage() {
 
   const handleEditSave = async () => {
     if (!editPayment) return;
+    const trimmedTxId = editTransactionId.trim();
+    if (editTransactionType.toLowerCase() !== 'cash' && !trimmedTxId) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Transaction ID is required for this payment type.' });
+      return;
+    }
     setIsSaving(true);
     try {
       await api.put(`/billing/payments/${editPayment.id}`, {
         ...editPayment,
         amount: editAmount,
-        transactionId: editTransactionId.trim(),
-        transactionType: editTransactionType || editPayment.method,
+        transactionId: trimmedTxId,
+        transactionType: editTransactionType.toLowerCase() === 'cash' ? 'cash' : editTransactionType,
       });
       toast({ title: 'Updated', description: 'Payment entry updated.' });
       setShowEditDialog(false);
@@ -956,7 +966,7 @@ export default function SubscriberCollectionsPage() {
                 onValueChange={(v) => {
                   if (v) {
                     setReceiveMethod(v);
-                    if (v !== 'cash' && selectedSubscriber?.transactionId) {
+                    if (v.toLowerCase() !== 'cash' && selectedSubscriber?.transactionId) {
                       setReceiveTransactionId(selectedSubscriber.transactionId);
                     } else {
                       setReceiveTransactionId('');
@@ -969,9 +979,9 @@ export default function SubscriberCollectionsPage() {
                 allowClear={false}
               />
             </div>
-            {receiveMethod !== 'cash' && (
+            {receiveMethod.toLowerCase() !== 'cash' && (
               <div className="space-y-1">
-                <Label>Transaction ID</Label>
+                <Label>Transaction ID <span className="text-destructive">*</span></Label>
                 <Input
                   value={receiveTransactionId}
                   onChange={(e) => setReceiveTransactionId(e.target.value)}
@@ -1123,7 +1133,7 @@ export default function SubscriberCollectionsPage() {
               />
             </div>
             <div className="space-y-1">
-              <Label>Transaction ID</Label>
+              <Label>Transaction ID <span className="text-destructive">*</span></Label>
               <Input
                 value={editTransactionId}
                 onChange={(e) => setEditTransactionId(e.target.value)}

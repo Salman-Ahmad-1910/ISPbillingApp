@@ -3,6 +3,7 @@ package controllers
 import (
 	"math"
 	"sort"
+	"strings"
 	"time"
 
 	"awesomeProject/config"
@@ -157,6 +158,29 @@ func GetPayments(c *gin.Context) {
 	utils.SuccessResponse(c, "Payments retrieved", payments)
 }
 
+// validatePaymentTransactionID enforces that non-cash payments carry a unique
+// transaction reference within a company. Cash payments never need one.
+// excludeID is set when updating so the payment's own row does not count as a
+// duplicate. Returns a user-facing error message, or "" when valid.
+func validatePaymentTransactionID(companyID uuid.UUID, method, transactionID string, excludeID *uuid.UUID) string {
+	if strings.EqualFold(strings.TrimSpace(method), "cash") {
+		return ""
+	}
+	if strings.TrimSpace(transactionID) == "" {
+		return "Transaction ID is required for non-cash payments"
+	}
+	var count int64
+	query := config.DB.Model(&models.Payment{}).
+		Where("company_id = ? AND transaction_id = ?", companyID, strings.TrimSpace(transactionID))
+	if excludeID != nil {
+		query = query.Where("id <> ?", *excludeID)
+	}
+	if err := query.Count(&count).Error; err == nil && count > 0 {
+		return "Transaction ID is already used by another payment"
+	}
+	return ""
+}
+
 // CreatePayment handles creating a new payment
 func CreatePayment(c *gin.Context) {
 	var payment models.Payment
@@ -167,6 +191,13 @@ func CreatePayment(c *gin.Context) {
 
 	companyID, _ := c.Get("companyID")
 	payment.CompanyID = companyID.(uuid.UUID)
+
+	payment.Method = strings.TrimSpace(payment.Method)
+	payment.TransactionID = strings.TrimSpace(payment.TransactionID)
+	if msg := validatePaymentTransactionID(payment.CompanyID, payment.Method, payment.TransactionID, nil); msg != "" {
+		utils.ErrorResponse(c, 400, msg, msg)
+		return
+	}
 
 	// Get subscriber name from connections (payments use connection IDs)
 	if payment.SubscriberID != nil {
@@ -255,12 +286,22 @@ func UpdatePayment(c *gin.Context) {
 
 	oldAmount := payment.Amount
 
+	// Keep the record's tenant ownership even if the request omits it.
+	companyID := payment.CompanyID
+
 	if err := c.ShouldBindJSON(&payment); err != nil {
 		utils.ErrorResponse(c, 400, "Invalid input", err.Error())
 		return
 	}
 
 	payment.ID = uuid.MustParse(id)
+	payment.CompanyID = companyID
+	payment.Method = strings.TrimSpace(payment.Method)
+	payment.TransactionID = strings.TrimSpace(payment.TransactionID)
+	if msg := validatePaymentTransactionID(payment.CompanyID, payment.Method, payment.TransactionID, &payment.ID); msg != "" {
+		utils.ErrorResponse(c, 400, msg, msg)
+		return
+	}
 
 	// Get subscriber name if subscriber ID changed
 	if payment.SubscriberID != nil {
