@@ -31,7 +31,13 @@ func GetUserPermissions(c *gin.Context) {
 
 func UpdateUserPermissions(c *gin.Context) {
 	companyID := c.MustGet("companyID").(uuid.UUID)
-	userID := c.Param("userId")
+	userIDStr := c.Param("userId")
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		utils.ErrorResponse(c, 400, "Invalid user id", err.Error())
+		return
+	}
 
 	var req UserPermissionsUpdateInput
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -39,25 +45,41 @@ func UpdateUserPermissions(c *gin.Context) {
 		return
 	}
 
+	tx := config.DB.Begin()
+	if tx.Error != nil {
+		utils.ErrorResponse(c, 500, "Failed to start transaction", tx.Error.Error())
+		return
+	}
+
 	// Delete existing permissions for this user (hard delete to avoid soft-delete rows piling up)
-	config.DB.Unscoped().Where("user_id = ? AND company_id = ?", userID, companyID).Delete(&models.UserPermission{})
+	if err := tx.Unscoped().Where("user_id = ? AND company_id = ?", userID, companyID).Delete(&models.UserPermission{}).Error; err != nil {
+		tx.Rollback()
+		utils.ErrorResponse(c, 500, "Failed to clear permissions", err.Error())
+		return
+	}
 
 	// Insert new permissions
 	if len(req.Permissions) > 0 {
-		var newPerms []models.UserPermission
+		newPerms := make([]models.UserPermission, 0, len(req.Permissions))
 		for _, p := range req.Permissions {
 			newPerms = append(newPerms, models.UserPermission{
-				UserID:        uuid.MustParse(userID),
+				UserID:        userID,
 				PermissionID:  p.PermissionID,
 				WebEnabled:    p.WebEnabled,
 				MobileEnabled: p.MobileEnabled,
 				CompanyID:     companyID,
 			})
 		}
-		if err := config.DB.Create(&newPerms).Error; err != nil {
+		if err := tx.Create(&newPerms).Error; err != nil {
+			tx.Rollback()
 			utils.ErrorResponse(c, 500, "Failed to save permissions", err.Error())
 			return
 		}
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		utils.ErrorResponse(c, 500, "Failed to save permissions", err.Error())
+		return
 	}
 
 	utils.SuccessResponse(c, "Permissions updated successfully", nil)

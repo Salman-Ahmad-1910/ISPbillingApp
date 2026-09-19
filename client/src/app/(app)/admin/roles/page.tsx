@@ -15,11 +15,22 @@ export default function RolesPage() {
 
   const { data: roles = [], isLoading } = useGenericQuery<Role>('admin/roles', companyId ?? undefined);
 
-  const kpiData = useMemo(() => [
-    { label: 'Total Roles', value: roles.length, icon: ShieldCheck, color: 'text-blue-600', bg: 'bg-blue-100' },
-    { label: 'With Subscribers', value: roles.filter(r => (r as any)._count?.users || 0).length, icon: Users, color: 'text-emerald-600', bg: 'bg-emerald-100' },
-    { label: 'Permissions', value: new Set(roles.flatMap(r => (r as any).permissions || [])).size, icon: KeyRound, color: 'text-purple-600', bg: 'bg-purple-100' },
-  ], [roles]);
+  const kpiData = useMemo(() => {
+    const permissionIds = new Set<string>();
+    for (const role of roles) {
+      const raw = (role as any).permissions;
+      if (typeof raw === 'string') {
+        raw.split(',').map(s => s.trim()).filter(Boolean).forEach(id => permissionIds.add(id));
+      } else if (Array.isArray(raw)) {
+        raw.forEach(id => permissionIds.add(String(id)));
+      }
+    }
+    return [
+      { label: 'Total Roles', value: roles.length, icon: ShieldCheck, color: 'text-blue-600', bg: 'bg-blue-100' },
+      { label: 'With Subscribers', value: roles.filter(r => (r as any)._count?.users || 0).length, icon: Users, color: 'text-emerald-600', bg: 'bg-emerald-100' },
+      { label: 'Permissions', value: permissionIds.size, icon: KeyRound, color: 'text-purple-600', bg: 'bg-purple-100' },
+    ];
+  }, [roles]);
 
   if (companyId && isLoading) {
     return <div className="flex h-[50vh] items-center justify-center"><LoadingSpinner text="Loading roles..." /></div>;
@@ -62,7 +73,7 @@ export default function RolesPage() {
 
       <Card className="hover:shadow-md transition-all duration-300">
         <CardContent className="p-0">
-          <ClientPage data={roles} />
+          <ClientPage />
         </CardContent>
       </Card>
     </>
