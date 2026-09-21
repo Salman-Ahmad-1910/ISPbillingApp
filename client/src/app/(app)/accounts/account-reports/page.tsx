@@ -65,7 +65,7 @@ interface AccountEntry {
 export default function AccountReportsPage() {
   const { companyId } = useCompany();
 
-  const { data: apiEntries = [], isLoading } = useGenericQuery<any>('accounts/entries', companyId ?? undefined);
+  const { data: apiEntries = [], isLoading, refetch: refetchEntries } = useGenericQuery<any>('accounts/entries', companyId ?? undefined);
   const { data: apiHeads = [] } = useGenericQuery<any>('accounts/heads', companyId ?? undefined);
   const { data: apiSubHeads = [] } = useGenericQuery<any>('accounts/sub-heads', companyId ?? undefined);
   const { data: apiTxnTypes = [] } = useGenericQuery<any>('billing/transaction-types', companyId ?? undefined);
@@ -362,7 +362,13 @@ export default function AccountReportsPage() {
           </div>
 
           <div className="flex items-center gap-3 mt-6">
-            <Button onClick={() => setShowReport(true)} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700">
+            <Button
+              onClick={async () => {
+                await refetchEntries();
+                setShowReport(true);
+              }}
+              className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700"
+            >
               <Eye className="mr-2 h-4 w-4" />
               Show
             </Button>
