@@ -95,13 +95,9 @@ export default function AccountReportsPage() {
   const [filterSubHead, setFilterSubHead] = useState('All');
   const [filterUser, setFilterUser] = useState('All');
   const [filterTxnType, setFilterTxnType] = useState('All');
-  const [fromDate, setFromDate] = useState<Date | undefined>(() => {
-    const d = new Date();
-    d.setDate(1);
-    return d;
-  });
+  const [fromDate, setFromDate] = useState<Date | undefined>();
   const [fromDateOpen, setFromDateOpen] = useState(false);
-  const [toDate, setToDate] = useState<Date | undefined>(new Date());
+  const [toDate, setToDate] = useState<Date | undefined>();
   const [toDateOpen, setToDateOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [showReport, setShowReport] = useState(false);
