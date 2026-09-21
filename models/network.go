@@ -5,11 +5,19 @@ import "github.com/google/uuid"
 // Area geographic zone mapping
 type Area struct {
 	TenantModel
-	City              string     `gorm:"type:varchar(100);not null" json:"city"`
-	Zone              string     `gorm:"type:varchar(100);not null" json:"zone"`
-	Locality          string     `gorm:"type:varchar(255);not null" json:"locality"`
-	SubLocality       string     `gorm:"type:varchar(255)" json:"subLocality"`
-	RecoveryOfficerID *uuid.UUID `gorm:"type:uuid" json:"recoveryOfficerId"` // nullable
+	City        string `gorm:"type:varchar(100);not null" json:"city"`
+	Zone        string `gorm:"type:varchar(100);not null" json:"zone"`
+	Locality    string `gorm:"type:varchar(255);not null" json:"locality"`
+	SubLocality string `gorm:"type:varchar(255)" json:"subLocality"`
+}
+
+// AreaOfficer links an area to a recovery officer (many-to-many), allowing
+// one area to be assigned to multiple recovery officers.
+type AreaOfficer struct {
+	BaseModel
+	CompanyID         uuid.UUID `gorm:"type:uuid;not null;index" json:"companyId"`
+	AreaID            uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_area_officer" json:"areaId"`
+	RecoveryOfficerID uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_area_officer" json:"recoveryOfficerId"`
 }
 
 // OLT top level device

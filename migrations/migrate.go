@@ -19,6 +19,7 @@ func RunMigrations() {
 		&models.RolePermission{},
 
 		&models.Area{},
+		&models.AreaOfficer{},
 		&models.OLT{},
 		&models.Splitter{},
 		&models.POP{},

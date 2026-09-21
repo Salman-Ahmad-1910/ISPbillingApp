@@ -57,6 +57,26 @@ func findConnections(c *gin.Context) {
 	var connections []models.Connection
 	db := config.DB.Scopes(models.TenantScope(companyID))
 
+	// Recovery officers may only see subscribers in the areas assigned to them:
+	// sublocality_id stores the Area UUID as text, and each officer's areas come
+	// from the area_officers join table (plus their legacy single AreaID).
+	if idValue, ok := c.Get("userID"); ok {
+		userID, ok := idValue.(uuid.UUID)
+		if ok {
+			var officer models.RecoveryOfficer
+			if err := config.DB.Where("id = ? AND company_id = ?", userID, companyID).First(&officer).Error; err == nil {
+				areaCond := "(sublocality_id IN (SELECT area_id::text FROM area_officers WHERE recovery_officer_id = ? AND company_id = ?)"
+				args := []interface{}{userID, companyID}
+				if officer.AreaID != nil {
+					areaCond += " OR sublocality_id = ?"
+					args = append(args, officer.AreaID.String())
+				}
+				areaCond += ")"
+				db = db.Where(areaCond, args...)
+			}
+		}
+	}
+
 	queryValues := c.Request.URL.Query()
 	for key, values := range queryValues {
 		if key == "companyId" || key == "page" || key == "limit" {

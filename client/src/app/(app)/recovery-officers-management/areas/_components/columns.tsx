@@ -38,11 +38,19 @@ export const getColumns = ({ recoveryOfficers, onEdit, onDelete }: ColumnsProps)
     cell: ({ row }) => row.original.subLocality || <span className="text-muted-foreground">N/A</span>
   },
   {
-    accessorKey: 'recoveryOfficerId',
-    header: 'Assigned Officer',
+    id: 'assignedOfficers',
+    header: 'Assigned Officers',
     cell: ({ row }) => {
-      const officer = recoveryOfficers.find(o => o.id === row.original.recoveryOfficerId);
-      return officer ? officer.name : <span className="text-muted-foreground">Unassigned</span>;
+      const officerIds = row.original.recoveryOfficerIds ?? [];
+      const names = officerIds
+        .map(id => recoveryOfficers.find(o => o.id === id)?.name)
+        .filter(Boolean)
+        .join(', ');
+      return names ? (
+        <span>{names}</span>
+      ) : (
+        <span className="text-muted-foreground">Unassigned</span>
+      );
     }
   },
   {

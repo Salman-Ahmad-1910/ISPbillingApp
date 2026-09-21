@@ -184,7 +184,13 @@ func SetupRoutes(r *gin.Engine) {
 		network := protected.Group("/network")
 		network.Use(middleware.RBACMiddleware(config.DB, "network", "read"))
 		{
-			controllers.RegisterGenericCRUDScoped[models.Area](network, "/areas", true)
+			network.GET("/areas", controllers.GetAreas)
+			network.GET("/areas/:id", controllers.FindArea)
+			network.POST("/areas", controllers.CreateArea)
+			network.PUT("/areas/:id", controllers.UpdateArea)
+			network.DELETE("/areas/:id", controllers.DeleteArea)
+			network.POST("/areas/:id/assign-officer", controllers.AssignAreaOfficer)
+			network.POST("/areas/:id/unassign-officer", controllers.UnassignAreaOfficer)
 			controllers.RegisterGenericCRUDScoped[models.OLT](network, "/olts", true)
 			controllers.RegisterGenericCRUDScoped[models.OLT](network, "/olt", true) // Alias
 			controllers.RegisterGenericCRUDScoped[models.Splitter](network, "/splitters", true)

@@ -28,6 +28,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { smartMatch } from '@/lib/search';
+import type { RecoveryOfficer, Staff } from '@/lib/types';
 
 interface AccountHead {
   id: string;
@@ -68,6 +69,8 @@ export default function AccountReportsPage() {
   const { data: apiHeads = [] } = useGenericQuery<any>('accounts/heads', companyId ?? undefined);
   const { data: apiSubHeads = [] } = useGenericQuery<any>('accounts/sub-heads', companyId ?? undefined);
   const { data: apiTxnTypes = [] } = useGenericQuery<any>('billing/transaction-types', companyId ?? undefined);
+  const { data: staff = [] } = useGenericQuery<Staff>('hr/staff', companyId ?? undefined);
+  const { data: recoveryOfficers = [] } = useGenericQuery<RecoveryOfficer>('admin/recovery-officers', companyId ?? undefined);
 
   const [entriesList, setEntriesList] = useState<AccountEntry[]>([]);
   const [headsList, setHeadsList] = useState<AccountHead[]>([]);
@@ -121,9 +124,12 @@ export default function AccountReportsPage() {
   const queryClient = useQueryClient();
 
   const usersList = useMemo(() => {
-    const names = entriesList.map(e => e.addBy).filter(Boolean);
-    return [...new Set(names)];
-  }, [entriesList]);
+    const names = new Set<string>();
+    entriesList.forEach(e => { if (e.addBy) names.add(e.addBy); });
+    if (Array.isArray(staff)) staff.forEach((s: any) => { if (s?.name) names.add(s.name); });
+    if (Array.isArray(recoveryOfficers)) recoveryOfficers.forEach((o: any) => { if (o?.name) names.add(o.name); });
+    return [...names];
+  }, [entriesList, staff, recoveryOfficers]);
 
   const getHeadName = (headId: string) => headsList.find(h => h.id === headId)?.masterAccount || headId;
   const getSubHeadName = (subHeadId: string) => subHeadsList.find(s => s.id === subHeadId)?.subMasterAccount || subHeadId;
@@ -329,9 +335,9 @@ export default function AccountReportsPage() {
               <Label>From Date</Label>
               <Popover open={fromDateOpen} onOpenChange={setFromDateOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className={cn('w-full justify-start text-left font-normal', !fromDate && 'text-muted-foreground')}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {fromDate ? format(fromDate, 'PPP') : 'Pick date'}
+                  <Button variant="outline" className={cn('w-full justify-start text-left font-normal overflow-hidden whitespace-nowrap', !fromDate && 'text-muted-foreground')}>
+                    <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                    <span className="truncate">{fromDate ? format(fromDate, 'dd MMM yyyy') : 'Pick date'}</span>
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
@@ -343,9 +349,9 @@ export default function AccountReportsPage() {
               <Label>To Date</Label>
               <Popover open={toDateOpen} onOpenChange={setToDateOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className={cn('w-full justify-start text-left font-normal', !toDate && 'text-muted-foreground')}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {toDate ? format(toDate, 'PPP') : 'Pick date'}
+                  <Button variant="outline" className={cn('w-full justify-start text-left font-normal overflow-hidden whitespace-nowrap', !toDate && 'text-muted-foreground')}>
+                    <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                    <span className="truncate">{toDate ? format(toDate, 'dd MMM yyyy') : 'Pick date'}</span>
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
@@ -503,9 +509,9 @@ export default function AccountReportsPage() {
               <Label>Date</Label>
               <Popover open={formDateOpen} onOpenChange={setFormDateOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className={cn('w-full justify-start text-left font-normal', !formDate && 'text-muted-foreground')}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {formDate ? format(formDate, 'PPP') : 'Pick date'}
+                  <Button variant="outline" className={cn('w-full justify-start text-left font-normal overflow-hidden whitespace-nowrap', !formDate && 'text-muted-foreground')}>
+                    <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                    <span className="truncate">{formDate ? format(formDate, 'dd MMM yyyy') : 'Pick date'}</span>
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">

@@ -97,6 +97,7 @@ export type Area = {
   locality: string;
   subLocality?: string;
   recoveryOfficerId?: string;
+  recoveryOfficerIds?: string[];
   companyId: string;
 };
 

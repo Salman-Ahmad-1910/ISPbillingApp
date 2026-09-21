@@ -24,6 +24,14 @@ func DedupeAreas() error {
 	keep := map[areaKey]string{}
 	var deleteIDs []string
 
+	// officerAssigned reports whether an area has any recovery officer assigned
+	// via the area_officers join table.
+	officerAssigned := func(areaID string) bool {
+		var count int64
+		config.DB.Model(&models.AreaOfficer{}).Where("area_id = ?", areaID).Count(&count)
+		return count > 0
+	}
+
 	for _, a := range areas {
 		k := areaKey{
 			company:  a.CompanyID.String(),
@@ -40,14 +48,11 @@ func DedupeAreas() error {
 		}
 
 		// Duplicate found. Prefer keeping the row that is assigned to an officer
-		// (recoveryOfficerId set); otherwise keep the earlier one.
-		var existing models.Area
-		if config.DB.Where("id = ?", existingID).First(&existing).Error == nil {
-			if existing.RecoveryOfficerID == nil && a.RecoveryOfficerID != nil {
-				keep[k] = a.ID.String()
-				deleteIDs = append(deleteIDs, existingID)
-				continue
-			}
+		// (has rows in area_officers); otherwise keep the earlier one.
+		if !officerAssigned(existingID) && officerAssigned(a.ID.String()) {
+			keep[k] = a.ID.String()
+			deleteIDs = append(deleteIDs, existingID)
+			continue
 		}
 		deleteIDs = append(deleteIDs, a.ID.String())
 	}
@@ -58,6 +63,11 @@ func DedupeAreas() error {
 
 	// Hard-delete the duplicate rows so they are fully removed, not just soft-deleted.
 	if err := config.DB.Unscoped().Where("id IN ?", deleteIDs).Delete(&models.Area{}).Error; err != nil {
+		return err
+	}
+
+	// Remove any officer assignments pointing at the deleted duplicate rows.
+	if err := config.DB.Where("area_id IN ?", deleteIDs).Delete(&models.AreaOfficer{}).Error; err != nil {
 		return err
 	}
 

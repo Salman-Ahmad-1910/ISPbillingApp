@@ -19,7 +19,7 @@ export default function AreasPage() {
   const kpiData = useMemo(() => [
     { label: 'Total Areas', value: areas.length, icon: Map, color: 'text-blue-600', bg: 'bg-blue-100' },
     { label: 'Cities', value: new Set(areas.map(a => a.city)).size, icon: Building2, color: 'text-emerald-600', bg: 'bg-emerald-100' },
-    { label: 'Officers Assigned', value: areas.filter(a => a.recoveryOfficerId).length, icon: Users, color: 'text-purple-600', bg: 'bg-purple-100' },
+    { label: 'Officers Assigned', value: areas.filter(a => (a.recoveryOfficerIds?.length ?? 0) > 0).length, icon: Users, color: 'text-purple-600', bg: 'bg-purple-100' },
   ], [areas]);
 
   const isLoading = isLoadingAreas || isLoadingOfficers;

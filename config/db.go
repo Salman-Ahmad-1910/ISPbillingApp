@@ -68,6 +68,7 @@ func RunMigrations() {
 		&models.UserPermission{},
 
 		&models.Area{},
+		&models.AreaOfficer{},
 		&models.OLT{},
 		&models.Splitter{},
 		&models.POP{},
@@ -145,6 +146,39 @@ func RunMigrations() {
 		// Continue despite migration errors so cleanup statements below can run
 	} else {
 		log.Println("Migration completed successfully")
+	}
+
+	// Migrate legacy single recovery_officer_id assignments (nullable column on
+	// areas) into the new many-to-many area_officers table, then drop the old
+	// column now that the model uses the join table.
+	if DB.Migrator().HasColumn(&models.Area{}, "recovery_officer_id") {
+		log.Println("Migrating legacy area recovery_officer_id into area_officers...")
+		// Remove any duplicate area_officer rows from earlier partial runs so the
+		// unique index can be created.
+		DB.Exec(`
+			DELETE FROM area_officers a
+			USING area_officers b
+			WHERE a.id < b.id
+				AND a.area_id = b.area_id
+				AND a.recovery_officer_id = b.recovery_officer_id
+		`)
+		DB.Exec("DROP INDEX IF EXISTS idx_area_officer")
+		if err := DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_area_officer ON area_officers (area_id, recovery_officer_id)").Error; err != nil {
+			log.Printf("Warning: failed to create area_officers unique index: %v", err)
+			return
+		}
+		if err := DB.Exec(`
+			INSERT INTO area_officers (id, company_id, area_id, recovery_officer_id, created_at, updated_at)
+			SELECT gen_random_uuid(), a.company_id, a.id, a.recovery_officer_id, NOW(), NOW()
+			FROM areas a
+			WHERE a.recovery_officer_id IS NOT NULL AND a.deleted_at IS NULL
+			ON CONFLICT (area_id, recovery_officer_id) DO NOTHING
+		`).Error; err != nil {
+			log.Printf("Warning: failed to migrate legacy area assignments: %v", err)
+			return
+		}
+		DB.Exec("ALTER TABLE areas DROP COLUMN IF EXISTS recovery_officer_id")
+		log.Println("✓ Area officer assignments migrated to join table")
 	}
 
 	// Drop FK constraints that GORM AutoMigrate may recreate but that have

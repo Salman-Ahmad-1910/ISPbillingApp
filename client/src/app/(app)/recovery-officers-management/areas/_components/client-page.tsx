@@ -51,31 +51,33 @@ export function ClientPage({ data, recoveryOfficers }: ClientPageProps) {
 
   const selectedOfficer = recoveryOfficers.find(o => o.id === selectedOfficerId);
 
-  // Areas not assigned to any officer (globally available pool)
-  const availableAreas = useMemo(() =>
-    data.filter(a => !a.recoveryOfficerId),
-    [data]
-  );
+  // An area belongs to an officer if its recoveryOfficerIds contains them.
+  const isAssignedToOfficer = (area: Area, officerId: string) =>
+    (area.recoveryOfficerIds?.includes(officerId) ?? false);
+
+  const officerNamesFor = (area: Area) =>
+    (area.recoveryOfficerIds ?? [])
+      .map(id => recoveryOfficers.find(o => o.id === id)?.name)
+      .filter(Boolean)
+      .join(', ');
 
   // Areas currently assigned to the selected officer (from the server)
   const assignedAreas = useMemo(() =>
-    data.filter(a => a.recoveryOfficerId === selectedOfficerId),
+    data.filter(a => isAssignedToOfficer(a, selectedOfficerId)),
     [data, selectedOfficerId]
   );
 
-  // Left list: available pool minus staged assignments, plus assigned areas staged to unassign
-  const leftAreas = useMemo(() => {
-    const unassigned = availableAreas.filter(a => !stagedRightIds.includes(a.id));
-    const returned = assignedAreas.filter(a => stagedLeftIds.includes(a.id));
-    return [...unassigned, ...returned];
-  }, [availableAreas, assignedAreas, stagedRightIds, stagedLeftIds]);
+  // Left list: the master pool of all areas in the company.
+  // Moving an area to the right does not remove it from here, so any
+  // area can be assigned to multiple recovery officers.
+  const leftAreas = useMemo(() => data, [data]);
 
   // Right list: assigned areas (minus staged unassignments) plus staged additions
   const rightAreas = useMemo(() => {
     const kept = assignedAreas.filter(a => !stagedLeftIds.includes(a.id));
-    const added = availableAreas.filter(a => stagedRightIds.includes(a.id));
+    const added = data.filter(a => stagedRightIds.includes(a.id) && !isAssignedToOfficer(a, selectedOfficerId));
     return [...kept, ...added];
-  }, [availableAreas, assignedAreas, stagedRightIds, stagedLeftIds]);
+  }, [data, assignedAreas, stagedRightIds, stagedLeftIds, selectedOfficerId]);
 
   const stagedChangeCount = stagedRightIds.length + stagedLeftIds.length;
 
@@ -140,12 +142,16 @@ export function ClientPage({ data, recoveryOfficers }: ClientPageProps) {
     if (!selectedOfficerId || ids.length === 0) return;
     const nextRight = [...stagedRightIds];
     for (const id of ids) {
+      const area = data.find(a => a.id === id);
+      if (!area) continue;
+      // Already assigned to this officer - no change needed.
+      if (isAssignedToOfficer(area, selectedOfficerId)) continue;
       if (!nextRight.includes(id)) nextRight.push(id);
     }
     // Cancelling any staged unassignment prevents one area going to two officers.
     setStagedLeftIds(prev => prev.filter(id => !ids.includes(id)));
     setStagedRightIds(nextRight);
-    setLeftSelected(prev => prev.filter(id => !ids.includes(id)));
+    setLeftSelected([]);
     setRightSelected([]);
   };
 
@@ -198,25 +204,16 @@ export function ClientPage({ data, recoveryOfficers }: ClientPageProps) {
     setIsSaving(true);
     let count = 0;
     try {
-      const updates: { id: string; recoveryOfficerId: string | null }[] = [
-        ...stagedRightIds.map(id => ({ id, recoveryOfficerId: selectedOfficerId })),
-        ...stagedLeftIds.map(id => ({ id, recoveryOfficerId: null })),
-      ];
-      for (const u of updates) {
-        const area = data.find(a => a.id === u.id)!;
-        await api.put(`/network/areas/${u.id}`, {
-          id: u.id,
-          city: area.city,
-          zone: area.zone,
-          locality: area.locality,
-          subLocality: area.subLocality || '',
-          recoveryOfficerId: u.recoveryOfficerId,
-          companyId: companyId,
-        });
+      for (const id of stagedRightIds) {
+        await api.post(`/network/areas/${id}/assign-officer`, { recoveryOfficerId: selectedOfficerId });
+        count++;
+      }
+      for (const id of stagedLeftIds) {
+        await api.post(`/network/areas/${id}/unassign-officer`, { recoveryOfficerId: selectedOfficerId });
         count++;
       }
       queryClient.invalidateQueries({ queryKey: ['network/areas', companyId] });
-      toast({ title: 'Success', description: `${count} area(s) assigned.` });
+      toast({ title: 'Success', description: `${count} area(s) updated.` });
       resetStaging();
     } catch (error: any) {
       toast({
@@ -224,7 +221,7 @@ export function ClientPage({ data, recoveryOfficers }: ClientPageProps) {
         title: 'Error',
         description: `Failed after ${count} area(s): ${error.response?.data?.message || error.message}`,
       });
-      console.error('PUT area error', error.response?.data, error);
+      console.error('Area assignment error', error.response?.data, error);
     } finally { setIsSaving(false); }
   };
 
@@ -255,10 +252,10 @@ export function ClientPage({ data, recoveryOfficers }: ClientPageProps) {
 
           {selectedOfficerId && (
             <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 items-start">
-              {/* Left box: unassigned / other officers */}
+              {/* Left box: master pool of all areas */}
               <div className="border rounded-lg">
                 <div className="bg-muted px-3 py-2 text-sm font-medium border-b">
-                  Available Areas ({leftAreas.length})
+                  All Areas ({leftAreas.length})
                 </div>
                 <div className="max-h-80 overflow-y-auto p-1 space-y-0.5">
                   {leftAreas.length === 0 && (
@@ -276,9 +273,9 @@ export function ClientPage({ data, recoveryOfficers }: ClientPageProps) {
                       }`}
                     >
                       {area.locality}, {area.city}
-                      {area.recoveryOfficerId && (
+                      {officerNamesFor(area) && (
                         <span className="ml-2 text-xs text-muted-foreground">
-                          ({recoveryOfficers.find(o => o.id === area.recoveryOfficerId)?.name})
+                          ({officerNamesFor(area)})
                         </span>
                       )}
                     </button>

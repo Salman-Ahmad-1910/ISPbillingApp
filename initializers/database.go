@@ -86,6 +86,12 @@ func ConnectDB() {
 		return
 	}
 
+	err = DB.AutoMigrate(&models.AreaOfficer{})
+	if err != nil {
+		log.Fatal("Failed to migrate AreaOfficer DB:", err)
+		return
+	}
+
 	err = DB.AutoMigrate(&models.OLT{})
 	if err != nil {
 		log.Fatal("Failed to migrate OLT DB:", err)

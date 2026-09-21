@@ -237,6 +237,10 @@ export default function SubscriberCollectionsPage() {
   // Tries both area.recoveryOfficerId and recoveryOfficer.areaId directions.
   const recoveryOfficerName = useMemo(() => {
     if (!selectedSubscriber) return user?.name || '---';
+    // The logged-in user is a recovery officer, so they are the collector.
+    if (user?.id && (recoveryOfficers as RecoveryOfficer[]).some(o => o.id === user.id)) {
+      return user.name;
+    }
     let officer: RecoveryOfficer | undefined;
     if (selectedSubscriber.sublocalityId) {
       const area = (areas as Area[]).find(
