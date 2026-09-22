@@ -29,7 +29,7 @@ import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
-import { useUserPermissions, useCrudPermissions } from '@/hooks/usePermissions';
+import { useUserPermissions } from '@/hooks/usePermissions';
 import { hasFeaturePermission } from '@/lib/permission-pages';
 import { smartMatch } from '@/lib/search';
 import { BookOpen, PlusCircle, MoreHorizontal, Edit3, Trash2, Search, CalendarIcon, DollarSign, FileText, Loader2 } from 'lucide-react';
@@ -82,7 +82,6 @@ export default function AccountEntryPage() {
   const { toast } = useToast();
 
   const { userRole, grantedPermissions, permissionsConfigured } = useUserPermissions();
-  const { canCreate } = useCrudPermissions();
   const canViewEntries = hasFeaturePermission(
     grantedPermissions,
     permissionsConfigured,
@@ -330,12 +329,10 @@ export default function AccountEntryPage() {
             <p className="text-sm text-muted-foreground">Manage all account transactions and entries</p>
           </div>
         </div>
-        {(canViewEntries || canCreate) && (
-          <Button onClick={openAddDialog} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700">
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Add Entry
-          </Button>
-        )}
+        <Button onClick={openAddDialog} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700">
+          <PlusCircle className="mr-2 h-4 w-4" />
+          Add Entry
+        </Button>
       </div>
 
       <div className="h-0.5 bg-gradient-to-r from-blue-500/50 via-indigo-500/30 to-transparent" />
