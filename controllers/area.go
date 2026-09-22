@@ -217,6 +217,9 @@ func AssignAreaOfficer(c *gin.Context) {
 	var link models.AreaOfficer
 	err = config.DB.Where("area_id = ? AND recovery_officer_id = ? AND company_id = ?", areaID, req.RecoveryOfficerID, companyID).First(&link).Error
 	if err == gorm.ErrRecordNotFound {
+		// Purge any soft-deleted leftover row so re-assigning the same
+		// (area, officer) pair does not violate the unique index.
+		config.DB.Unscoped().Where("area_id = ? AND recovery_officer_id = ? AND company_id = ?", areaID, req.RecoveryOfficerID, companyID).Delete(&models.AreaOfficer{})
 		link = models.AreaOfficer{
 			CompanyID:         companyID,
 			AreaID:            areaID,
@@ -253,7 +256,7 @@ func UnassignAreaOfficer(c *gin.Context) {
 		return
 	}
 
-	if err := config.DB.Where("area_id = ? AND recovery_officer_id = ? AND company_id = ?", areaID, req.RecoveryOfficerID, companyID).Delete(&models.AreaOfficer{}).Error; err != nil {
+	if err := config.DB.Unscoped().Where("area_id = ? AND recovery_officer_id = ? AND company_id = ?", areaID, req.RecoveryOfficerID, companyID).Delete(&models.AreaOfficer{}).Error; err != nil {
 		utils.ErrorResponse(c, 500, "Failed to unassign officer", err.Error())
 		return
 	}

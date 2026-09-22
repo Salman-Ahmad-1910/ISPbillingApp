@@ -219,7 +219,7 @@ export function ClientPage({ data, recoveryOfficers }: ClientPageProps) {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: `Failed after ${count} area(s): ${error.response?.data?.message || error.message}`,
+        description: `Failed aft-er ${count} area(s): ${error.response?.data?.message || error.message}`,
       });
       console.error('Area assignment error', error.response?.data, error);
     } finally { setIsSaving(false); }
