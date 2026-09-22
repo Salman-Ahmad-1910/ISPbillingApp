@@ -8,26 +8,31 @@ export type PermissionDef = {
 };
 
 export const PERMISSION_DEFS: PermissionDef[] = [
-  { id: '13309', name: 'Country', module: 'Area' },
-  { id: '13310', name: 'City', module: 'Area' },
-  { id: '13311', name: 'Locality', module: 'Area' },
-  { id: '13312', name: 'Sublocality', module: 'Area' },
-  { id: '13313', name: 'Package', module: 'Subscribers Profile' },
-  { id: '13314', name: 'Box/Media', module: 'Subscribers Profile' },
-  { id: '13315', name: 'Subscribers Details', module: 'Subscribers Profile' },
-  { id: '13316', name: 'New Queries', module: 'Subscribers Profile' },
-  { id: '13351', name: 'Subscriber Location', module: 'Subscribers Profile' },
-  { id: '13318', name: 'Dealers Details', module: 'Dealers Profile' },
+  { id: '13309', name: 'Area', module: 'Network' },
+  { id: '15365', name: 'POPs', module: 'Network' },
+  { id: '15366', name: 'OLTs', module: 'Network' },
+  { id: '15367', name: 'Splitters', module: 'Network' },
+  { id: '13314', name: 'Box/Media', module: 'Network' },
+  { id: '13315', name: 'Subscribers Details', module: 'Subscriber Management' },
+  { id: '13316', name: 'New Inquiries', module: 'Subscriber Management' },
+  { id: '15368', name: 'Corporate Clients', module: 'Subscriber Management' },
+  { id: '13313', name: 'Package', module: 'Subscriber Management' },
+  { id: '13351', name: 'Subscriber Location', module: 'Subscriber Management' },
+  { id: '13318', name: 'My Dealers', module: 'Dealer Management' },
+  { id: '15385', name: 'Dealer Dashboard', module: 'Dealer Management' },
+  { id: '13331', name: 'Collections', module: 'Dealer Management' },
+  { id: '13332', name: 'Defaulters', module: 'Dealer Management' },
+  { id: '13333', name: 'New Dealers', module: 'Dealer Management' },
+  { id: '13350', name: 'Invoices', module: 'Dealer Management' },
   { id: '13317', name: 'Recovery Officer', module: 'Recovery Officer' },
-  { id: '13319', name: 'Area Allocation', module: 'Recovery Officer' },
+  { id: '13319', name: 'Area Assignment', module: 'Recovery Officer' },
   { id: '13305', name: 'Allocated Collection', module: 'Transactions' },
   { id: '13324', name: 'Transaction Type', module: 'Transactions' },
   { id: '14079', name: 'New Collection', module: 'Transactions' },
   { id: '13308', name: 'Reprint Slip', module: 'Transactions' },
   { id: '13304', name: 'Subscribers Collections', module: 'Transactions' },
-  { id: '15335', name: 'Total Collected Card', module: 'Transactions' },
-  { id: '15360', name: 'Pending Amount', module: 'Transactions' },
-  { id: '15361', name: 'Pending Subscribers', module: 'Transactions' },
+  { id: '15388', name: 'Collection Search', module: 'Transactions' },
+  { id: '15389', name: 'Collection Summary', module: 'Transactions' },
   { id: '13320', name: 'Bills Creator', module: 'Transactions' },
   { id: '13321', name: 'Dealers Collections', module: 'Transactions' },
   { id: '13357', name: 'Baddebt Collection', module: 'Transactions' },
@@ -44,26 +49,28 @@ export const PERMISSION_DEFS: PermissionDef[] = [
   { id: '13344', name: 'New Messages', module: 'Messages' },
   { id: '13322', name: 'Account Heads', module: 'Accounts' },
   { id: '13323', name: 'Account Entry', module: 'Accounts' },
+  { id: '15387', name: 'Account Entry Filters & Table', module: 'Accounts' },
   { id: '13341', name: 'One Day Accounts', module: 'Accounts' },
-  { id: '15313', name: 'Purchase', module: 'Inventory' },
-  { id: '15312', name: 'Products', module: 'Inventory' },
   { id: '15309', name: 'Brand', module: 'Inventory' },
   { id: '15311', name: 'Unit Type', module: 'Inventory' },
-  { id: '15310', name: 'Vendor', module: 'Inventory' },
   { id: '15321', name: 'Product Type', module: 'Inventory' },
+  { id: '15312', name: 'Products', module: 'Inventory' },
+  { id: '15310', name: 'Vendor', module: 'Inventory' },
+  { id: '15372', name: 'Vendor Invoice', module: 'Inventory' },
+  { id: '15313', name: 'Purchase', module: 'Inventory' },
   { id: '15314', name: 'Inventory Status', module: 'Inventory' },
+  { id: '15373', name: 'Stock', module: 'Inventory' },
   { id: '15315', name: 'Sales', module: 'Sales' },
   { id: '15336', name: 'Customers', module: 'Sales' },
   { id: '15337', name: 'Installment Plans', module: 'Sales' },
   { id: '15338', name: 'Point of Sale', module: 'Sales' },
-  { id: '15317', name: 'Advance & Loan', module: 'HRM' },
-  { id: '15318', name: 'Employee Salary', module: 'HRM' },
-  { id: '15324', name: 'Subscriber Wise Attendance', module: 'HRM' },
-  { id: '15322', name: 'Day Wise Attendance', module: 'HRM' },
-  { id: '15316', name: 'Employee Details', module: 'HRM' },
-  { id: '13334', name: 'Deleted Collection', module: 'Logs' },
-  { id: '15328', name: 'Update Connections Log', module: 'Logs' },
-  { id: '13335', name: 'Deleted Subscribers', module: 'Logs' },
+  { id: '15370', name: 'Guarantors', module: 'Sales' },
+  { id: '15316', name: 'Staff', module: 'Human Resources' },
+  { id: '15318', name: 'Staff Salary', module: 'Human Resources' },
+  { id: '15322', name: 'Staff Attendance', module: 'Human Resources' },
+  { id: '15324', name: 'Attendance Report', module: 'Human Resources' },
+  { id: '15317', name: 'Advance and Loans', module: 'Human Resources' },
+  { id: '15386', name: 'System Log', module: 'System Logs' },
   { id: '13307', name: 'Allocated Defualters', module: 'Subscribers Reports' },
   { id: '13325', name: 'Subscribers Defaulter', module: 'Subscribers Reports' },
   { id: '13326', name: 'New Subscribers List', module: 'Subscribers Reports' },
@@ -83,38 +90,40 @@ export const PERMISSION_DEFS: PermissionDef[] = [
   { id: '15330', name: 'Subscribers Defaulters', module: 'Subscribers Reports' },
   { id: '15331', name: 'Allocated Collections', module: 'Subscribers Reports' },
   { id: '15332', name: 'Month Wise Collection Monthly', module: 'Subscribers Reports' },
-  { id: '13331', name: 'Dealers Collection', module: 'Dealers Reports' },
-  { id: '13333', name: 'New Dealers List', module: 'Dealers Reports' },
-  { id: '13350', name: 'Dealer Invoice List', module: 'Dealers Reports' },
-  { id: '13332', name: 'Dealers Defaulter', module: 'Dealers Reports' },
-  { id: '13340', name: 'One Day Balance Sheet', module: 'Accounts Reports' },
-  { id: '13336', name: 'Accounts Report', module: 'Accounts Reports' },
+  { id: '13336', name: 'Accounts Report', module: 'Accounts' },
   { id: '15319', name: 'Abstract Stock', module: 'Stock Reports' },
   { id: '15320', name: 'Abstract Sales', module: 'Sales Reports' },
-  { id: '13339', name: 'Change Username/Password', module: 'Settings' },
-  { id: '13338', name: 'Subscriber Rights', module: 'Settings' },
-  { id: '13337', name: 'Configurations', module: 'Settings' },
+  { id: '15376', name: 'My Company Profile', module: 'Administration' },
+  { id: '13338', name: 'Roles & Permissions', module: 'Administration' },
+  { id: '13337', name: 'System Config', module: 'Administration' },
   { id: '15334', name: 'Dashboard Summary', module: 'Dashboard' },
+  { id: '15384', name: 'Dashboard', module: 'Dashboard' },
   { id: '15362', name: 'Add / Create', module: 'CRUD' },
   { id: '15363', name: 'Update / Edit', module: 'CRUD' },
   { id: '15364', name: 'Delete', module: 'CRUD' },
+
+  // Sidebar pages (added to cover every nav page without a permission).
+  { id: '15371', name: 'Replaced Products', module: 'Sales' },
+  { id: '15378', name: 'Drivers', module: 'Downloads' },
+  { id: '15379', name: 'Application', module: 'Downloads' },
+  { id: '15380', name: 'Pending Subscribers', module: 'Subscribers Reports' },
+  { id: '15381', name: 'Advance Subscribers', module: 'Subscribers Reports' },
+  { id: '15382', name: 'Not Generated Collections', module: 'Subscribers Reports' },
+  { id: '15383', name: 'Unpaid Collections', module: 'Subscribers Reports' },
 ];
 
 // Permission id that controls whether a user can see the dashboard summary
 // section (subscriber overview + financial metric cards).
 export const DASHBOARD_SUMMARY_PERMISSION = '15334';
 
-// Permission id that controls whether a non-admin user can see the "Total
-// Collected" amount card on the Subscriber Collections page.
-export const TOTAL_COLLECTED_PERMISSION = '15335';
+// Permission id that controls whether a user can see the search bar on the
+// Subscriber Collections page. When unchecked, the search bar is hidden.
+export const COLLECTION_SEARCH_PERMISSION = '15388';
 
-// Permission id that controls whether a user can see the "Pending Amount" card
-// on the Subscriber Collections page.
-export const PENDING_AMOUNT_PERMISSION = '15360';
-
-// Permission id that controls whether a user can see the "Pending Subscribers"
-// card on the Subscriber Collections page.
-export const PENDING_SUBSCRIBERS_PERMISSION = '15361';
+// Permission id that controls whether a user can see the four summary cards on
+// the Subscriber Collections page (Total Subscribers, Total Collected, Pending
+// Subscribers, Pending Amount). Replaces the previous per-card permissions.
+export const COLLECTION_SUMMARY_PERMISSION = '15389';
 
 // Permission id that controls whether a user can create/add records anywhere
 // in the app. When this is granted (web checkbox selected on the Roles &
@@ -156,7 +165,8 @@ export const PERMISSION_PAGES: Record<string, string[]> = {
   '13315': ['/crm/subscriber-detail'],
   '13316': ['/subscribers/inquiries'],
   '13351': ['/crm/subscriber-detail'],
-  '13318': ['/franchise/my-dealers', '/franchise/my-dealers/dashboard'],
+  '13318': ['/franchise/my-dealers'],
+  '15385': ['/franchise/my-dealers/dashboard'],
   '13317': ['/recovery-officers-management/officers'],
   '13319': ['/recovery-officers-management/areas'],
   '13305': ['/transaction/allocated-collections'],
@@ -180,6 +190,7 @@ export const PERMISSION_PAGES: Record<string, string[]> = {
   '13344': ['/messages/new'],
   '13322': ['/accounts/account-head'],
   '13323': ['/accounts/account-entry'],
+  '15387': ['/accounts/account-entry'],
   '13341': ['/accounts/one-day-balance-sheet'],
   '15313': ['/inventory/purchases'],
   '15312': ['/inventory/products'],
@@ -189,7 +200,7 @@ export const PERMISSION_PAGES: Record<string, string[]> = {
   '15321': ['/inventory/product-types'],
   '15314': ['/inventory/statuses'],
   '15315': ['/sales'],
-  '15336': ['/sales/customers'],
+  '15336': ['/sales/customers', '/crm/customers'],
   '15337': ['/sales/installment-plans'],
   '15338': ['/inventory/pos'],
   '15317': ['/hr/advances'],
@@ -197,9 +208,7 @@ export const PERMISSION_PAGES: Record<string, string[]> = {
   '15324': ['/hr/attendance-subscriber'],
   '15322': ['/hr/attendance-day'],
   '15316': ['/hr/staff'],
-  '13334': ['/admin/logs'],
-  '15328': ['/admin/logs'],
-  '13335': ['/admin/logs'],
+  '15386': ['/admin/logs'],
   '13307': ['/subscriber-reports/allocated-defaulters'],
   '13325': ['/subscriber-reports/month-defaulters'],
   '13326': ['/subscriber-reports/collections'],
@@ -223,13 +232,29 @@ export const PERMISSION_PAGES: Record<string, string[]> = {
   '13333': ['/dealer/reports/new-dealers'],
   '13350': ['/dealer/reports/invoices'],
   '13332': ['/dealer/reports/defaulters'],
-  '13340': ['/accounts/one-day-balance-sheet'],
   '13336': ['/accounts/account-reports'],
   '15319': ['/reports/abstract-stock'],
   '15320': ['/reports/abstract-sale'],
-  '13339': ['/profile'],
   '13338': ['/admin/roles'],
   '13337': ['/admin/settings'],
+  '15384': ['/dashboard'],
+
+  // Newly added sidebar page permissions (do not conflict with above).
+  '15365': ['/network/pop'],
+  '15366': ['/network/olt'],
+  '15367': ['/network/splitters'],
+  '15368': ['/subscribers/corporate'],
+  '15370': ['/crm/guarantors'],
+  '15371': ['/sales/replaced'],
+  '15372': ['/inventory/vendor-invoices'],
+  '15373': ['/inventory/stock'],
+  '15376': ['/admin/company-profile'],
+  '15378': ['/drivers'],
+  '15379': ['/applications'],
+  '15380': ['/collection/pending-subscribers'],
+  '15381': ['/collection/advance-subscribers'],
+  '15382': ['/subscriber-reports/not-generated-collections'],
+  '15383': ['/subscriber-reports/unpaid-collections'],
 };
 
 // Compute the set of hrefs the user is allowed to see based on their granted

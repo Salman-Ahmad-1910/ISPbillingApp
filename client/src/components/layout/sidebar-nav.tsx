@@ -125,7 +125,6 @@ const navItems: NavItemGroup[] = [
       { title: 'New Inquiries', href: '/subscribers/inquiries', icon: UserPlus, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
       { title: 'Corporate Clients', href: '/subscribers/corporate', icon: Building, allowedRoles: ['admin', 'manager'] },
       { title: 'Customers', href: '/crm/customers', icon: UserRound, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
-      { title: 'Guarantors', href: '/crm/guarantors', icon: UserCheck, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
       { title: 'Packages', href: '/crm/packages', icon: Receipt, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
     ],
   },
@@ -135,6 +134,7 @@ const navItems: NavItemGroup[] = [
       { title: 'Sales', href: '/sales', icon: ShoppingCart, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
       { title: 'Replaced Products', href: '/sales/replaced', icon: RefreshCw, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
       { title: 'Customers', href: '/sales/customers', icon: UserRound, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
+      { title: 'Guarantors', href: '/crm/guarantors', icon: UserCheck, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
       { title: 'Installment Plans', href: '/sales/installment-plans', icon: FileCog, allowedRoles: ['admin', 'manager'] },
       { title: 'Point of Sale', href: '/inventory/pos', icon: ShoppingCart, allowedRoles: ['admin', 'manager', 'dealer'] },
     ],
@@ -223,8 +223,8 @@ const navItems: NavItemGroup[] = [
   {
     title: 'Recovery Officers',
     items: [
-      { title: 'Areas', href: '/recovery-officers-management/areas', icon: Map, allowedRoles: ['admin', 'manager'] },
-      { title: 'Officers', href: '/recovery-officers-management/officers', icon: UserCheck, allowedRoles: ['admin', 'manager'] },
+      { title: 'Area Assignment', href: '/recovery-officers-management/areas', icon: Map, allowedRoles: ['admin', 'manager'] },
+      { title: 'Recovery Officers', href: '/recovery-officers-management/officers', icon: UserCheck, allowedRoles: ['admin', 'manager'] },
     ],
   },
   {
@@ -271,12 +271,6 @@ const navItems: NavItemGroup[] = [
       { title: 'Subscribers Defaulters', href: '/subscriber-reports/subscribers-defaulters', icon: TriangleAlert, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
       { title: 'New Subscribers List', href: '/subscriber-reports/new-subscribers', icon: UserPlus, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
       { title: 'Subscribers Creator Summary', href: '/subscriber-reports/creator-summary', icon: UserPlus, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
-    ],
-  },
-  {
-    title: 'Reports',
-    items: [
-      { title: 'Reports', href: '/admin/reports', icon: AreaChart, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
     ],
   },
   {

@@ -455,6 +455,8 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {canViewSummary && (
+      <>
       <div className="mt-8 grid gap-8 md:grid-cols-2 lg:grid-cols-7">
         <div className="lg:col-span-4 transition-all duration-300 rounded-xl">
           <DailyCollectionChart />
@@ -596,6 +598,8 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+      </>
+      )}
     </>
   );
 }

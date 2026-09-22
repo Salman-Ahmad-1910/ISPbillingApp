@@ -37,7 +37,7 @@ import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
 import { useUserPermissions, useCrudPermissions } from '@/hooks/usePermissions';
-import { hasFeaturePermission, TOTAL_COLLECTED_PERMISSION, PENDING_AMOUNT_PERMISSION, PENDING_SUBSCRIBERS_PERMISSION } from '@/lib/permission-pages';
+import { hasFeaturePermission, COLLECTION_SEARCH_PERMISSION, COLLECTION_SUMMARY_PERMISSION } from '@/lib/permission-pages';
 import { smartMatchScore } from '@/lib/search';
 import { Loader2, MoreHorizontal, Wallet, DollarSign, UserCheck, Trash2, Pencil, Copy, FileText, Users, CalendarClock, Clock } from 'lucide-react';
 
@@ -78,23 +78,17 @@ export default function SubscriberCollectionsPage() {
   const { user } = useUser();
   const { userRole, grantedPermissions, permissionsConfigured } = useUserPermissions();
   const { canCreate, canUpdate, canDelete } = useCrudPermissions();
-  const canViewTotalCollected = hasFeaturePermission(
+  const canViewCollectionSummary = hasFeaturePermission(
     grantedPermissions,
     permissionsConfigured,
     ['admin', 'owner', 'manager'].includes(userRole),
-    TOTAL_COLLECTED_PERMISSION,
+    COLLECTION_SUMMARY_PERMISSION,
   );
-  const canViewPendingAmount = hasFeaturePermission(
+  const canViewCollectionSearch = hasFeaturePermission(
     grantedPermissions,
     permissionsConfigured,
     ['admin', 'owner', 'manager'].includes(userRole),
-    PENDING_AMOUNT_PERMISSION,
-  );
-  const canViewPendingSubscribers = hasFeaturePermission(
-    grantedPermissions,
-    permissionsConfigured,
-    ['admin', 'owner', 'manager'].includes(userRole),
-    PENDING_SUBSCRIBERS_PERMISSION,
+    COLLECTION_SEARCH_PERMISSION,
   );
   const queryClient = useQueryClient();
 
@@ -505,6 +499,7 @@ export default function SubscriberCollectionsPage() {
 
       <div className="h-0.5 bg-gradient-to-r from-blue-500/50 via-cyan-500/30 to-transparent" />
 
+      {canViewCollectionSummary && (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center gap-3">
@@ -517,48 +512,44 @@ export default function SubscriberCollectionsPage() {
             </div>
           </div>
         </div>
-        {canViewTotalCollected && (
-          <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
-                <DollarSign className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-xs font-medium text-muted-foreground">Total Collected</p>
-                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">PKR {totalAmount.toLocaleString()}</p>
-              </div>
+        <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
+              <DollarSign className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Total Collected</p>
+              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">PKR {totalAmount.toLocaleString()}</p>
             </div>
           </div>
-        )}
-        {canViewPendingSubscribers && (
-          <Link href="/collection/pending-subscribers" className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:bg-accent/50 cursor-pointer block">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
-                <Clock className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-xs font-medium text-muted-foreground">Pending Subscribers</p>
-                <p className="text-2xl font-bold">{totalPendingSubscribers}</p>
-              </div>
+        </div>
+        <Link href="/collection/pending-subscribers" className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:bg-accent/50 cursor-pointer block">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
+              <Clock className="h-5 w-5" />
             </div>
-          </Link>
-        )}
-        {canViewPendingAmount && (
-          <Link href="/collection/pending-subscribers" className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:bg-accent/50 cursor-pointer block">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-gradient-to-br from-rose-500 to-pink-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
-                <Wallet className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-xs font-medium text-muted-foreground">Pending Amount</p>
-                <p className="text-2xl font-bold text-rose-600 dark:text-rose-400">PKR {totalPendingAmount.toLocaleString()}</p>
-              </div>
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Pending Subscribers</p>
+              <p className="text-2xl font-bold">{totalPendingSubscribers}</p>
             </div>
-          </Link>
-        )}
+          </div>
+        </Link>
+        <Link href="/collection/pending-subscribers" className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:bg-accent/50 cursor-pointer block">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-gradient-to-br from-rose-500 to-pink-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
+              <Wallet className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Pending Amount</p>
+              <p className="text-2xl font-bold text-rose-600 dark:text-rose-400">PKR {totalPendingAmount.toLocaleString()}</p>
+            </div>
+          </div>
+        </Link>
       </div>
+      )}
 
       <Card className="transition-all duration-300 hover:shadow-md">
+        {canViewCollectionSearch && (
         <div className="p-4 border-b">
           <div className="max-w-md space-y-2">
             <Label>Search Subscriber</Label>
@@ -611,6 +602,7 @@ export default function SubscriberCollectionsPage() {
             )}
           </div>
         </div>
+        )}
 
         {selectedSubscriber ? (
           <CardContent className="p-0">

@@ -29,11 +29,15 @@ import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
+import { useUserPermissions, useCrudPermissions } from '@/hooks/usePermissions';
+import { hasFeaturePermission } from '@/lib/permission-pages';
 import { smartMatch } from '@/lib/search';
 import { BookOpen, PlusCircle, MoreHorizontal, Edit3, Trash2, Search, CalendarIcon, DollarSign, FileText, Loader2 } from 'lucide-react';
 import type { RecoveryOfficer, Staff } from '@/lib/types';
 
 const filterByOptions = ['All', 'Add By', 'Edit By'];
+
+const ACCOUNT_ENTRY_FILTERS_PERMISSION = '15387';
 
 interface AccountHead {
   id: string;
@@ -77,6 +81,15 @@ export default function AccountEntryPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  const { userRole, grantedPermissions, permissionsConfigured } = useUserPermissions();
+  const { canCreate } = useCrudPermissions();
+  const canViewEntries = hasFeaturePermission(
+    grantedPermissions,
+    permissionsConfigured,
+    ['admin', 'owner', 'manager'].includes(userRole),
+    ACCOUNT_ENTRY_FILTERS_PERMISSION,
+  );
+
   const { data: apiEntries = [], isLoading } = useGenericQuery<any>('accounts/entries', companyId ?? undefined);
   const { data: staff = [] } = useGenericQuery<Staff>('hr/staff', companyId ?? undefined);
   const { data: recoveryOfficers = [] } = useGenericQuery<RecoveryOfficer>('admin/recovery-officers', companyId ?? undefined);
@@ -85,6 +98,7 @@ export default function AccountEntryPage() {
   const { data: apiTxnTypes = [] } = useGenericQuery<any>('billing/transaction-types', companyId ?? undefined);
 
   const [entriesList, setEntriesList] = useState<AccountEntry[]>([]);
+  const [tempEntries, setTempEntries] = useState<AccountEntry[]>([]);
   const [headsList, setHeadsList] = useState<AccountHead[]>([]);
   const [subHeadsList, setSubHeadsList] = useState<SubHead[]>([]);
   const [txnTypesList, setTxnTypesList] = useState<TransactionType[]>([]);
@@ -222,18 +236,49 @@ export default function AccountEntryPage() {
 
   const handleSave = async () => {
     if (!formHeadId || !formSubHeadId || !formAmount) return;
-    const payload = {
-      head: formHeadId,
-      subHead: formSubHeadId,
-      description: formDescription,
-      date: formDate ? format(formDate, 'yyyy-MM-dd') : new Date().toISOString().split('T')[0],
-      addBy: editingItem ? editingItem.addBy : 'Admin',
-      editBy: editingItem ? 'Admin' : '-',
-      amount: parseFloat(formAmount),
-      transactionType: formTxnTypeId,
-      companyId: companyId,
-    };
+    const entryDate = formDate ? format(formDate, 'yyyy-MM-dd') : new Date().toISOString().split('T')[0];
+    const entryAmount = parseFloat(formAmount);
     try {
+      if (!canViewEntries) {
+        if (editingItem) {
+          setTempEntries((prev) =>
+            prev.map((t) =>
+              t.id === editingItem.id
+                ? { ...t, head: formHeadId, subHead: formSubHeadId, description: formDescription, date: entryDate, amount: entryAmount, transactionType: formTxnTypeId }
+                : t
+            )
+          );
+        } else {
+          setTempEntries((prev) => [
+            ...prev,
+            {
+              id: crypto.randomUUID(),
+              head: formHeadId,
+              subHead: formSubHeadId,
+              description: formDescription,
+              date: entryDate,
+              addBy: 'Admin',
+              editBy: '-',
+              amount: entryAmount,
+              transactionType: formTxnTypeId,
+            },
+          ]);
+        }
+        toast({ title: 'Success', description: editingItem ? 'Entry updated.' : 'Entry added.' });
+        setDialogOpen(false);
+        return;
+      }
+      const payload = {
+        head: formHeadId,
+        subHead: formSubHeadId,
+        description: formDescription,
+        date: entryDate,
+        addBy: editingItem ? editingItem.addBy : 'Admin',
+        editBy: editingItem ? 'Admin' : '-',
+        amount: entryAmount,
+        transactionType: formTxnTypeId,
+        companyId: companyId,
+      };
       if (editingItem) {
         await api.put(`/accounts/entries/${editingItem.id}`, payload);
       } else {
@@ -249,6 +294,11 @@ export default function AccountEntryPage() {
 
   const handleDelete = async (id: string) => {
     try {
+      if (!canViewEntries) {
+        setTempEntries((prev) => prev.filter((t) => t.id !== id));
+        toast({ title: 'Success', description: 'Entry deleted.' });
+        return;
+      }
       await api.delete(`/accounts/entries/${id}`);
       queryClient.invalidateQueries({ queryKey: ['accounts/entries', companyId] });
       toast({ title: 'Success', description: 'Entry deleted.' });
@@ -280,14 +330,85 @@ export default function AccountEntryPage() {
             <p className="text-sm text-muted-foreground">Manage all account transactions and entries</p>
           </div>
         </div>
-        <Button onClick={openAddDialog} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700">
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Add Entry
-        </Button>
+        {(canViewEntries || canCreate) && (
+          <Button onClick={openAddDialog} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700">
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Add Entry
+          </Button>
+        )}
       </div>
 
       <div className="h-0.5 bg-gradient-to-r from-blue-500/50 via-indigo-500/30 to-transparent" />
 
+      {!canViewEntries && (
+        <div>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col gap-2 mb-4">
+                <h2 className="text-lg font-semibold">Recently Added Entries</h2>
+                <p className="text-sm text-muted-foreground">
+                  You do not have permission to view the full list. Entries added in this session are temporary and will disappear after a page refresh. You can edit or delete them before refreshing.
+                </p>
+              </div>
+              {tempEntries.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No entries added yet. Use the &quot;Add Entry&quot; button to create a temporary entry.
+                </div>
+              ) : (
+                <div className="overflow-x-hidden">
+                  <Table className="table-fixed">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[60px]">ID</TableHead>
+                        <TableHead className="w-[120px]">Head</TableHead>
+                        <TableHead className="w-[120px]">Sub Head</TableHead>
+                        <TableHead className="w-[200px]">Description</TableHead>
+                        <TableHead className="w-[100px]">Date</TableHead>
+                        <TableHead className="w-[60px]">Amount</TableHead>
+                        <TableHead className="w-[80px]">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {tempEntries.map((item, index) => (
+                        <TableRow key={item.id}>
+                          <TableCell className="text-muted-foreground truncate">{index + 1}</TableCell>
+                          <TableCell className="font-medium truncate">{getHeadName(item.head)}</TableCell>
+                          <TableCell className="truncate">{getSubHeadName(item.subHead)}</TableCell>
+                          <TableCell className="truncate">{item.description}</TableCell>
+                          <TableCell className="truncate">{item.date}</TableCell>
+                          <TableCell className="truncate">{item.amount.toLocaleString()}</TableCell>
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => openEditDialog(item)}>
+                                  <Edit3 className="mr-2 h-4 w-4" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(item.id)}>
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {canViewEntries && (
+        <div className="flex flex-col gap-6">
       {/* Summary Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
@@ -525,6 +646,8 @@ export default function AccountEntryPage() {
           )}
         </CardContent>
       </Card>
+      </div>
+      )}
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

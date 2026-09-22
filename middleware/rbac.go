@@ -41,6 +41,7 @@ var grantedPermissionModules = map[string][]string{
 
 	// Dealers Profile -> dealers
 	"13318": {"dealers"},
+	"15385": {"dealers"}, // Dealer Dashboard
 
 	// Recovery Officer -> hr / network (officers form loads network/areas)
 	"13317": {"hr", "network"},
@@ -54,9 +55,7 @@ var grantedPermissionModules = map[string][]string{
 	"13343": {"support"},
 
 	// Logs -> logs
-	"13334": {"logs"},
-	"15328": {"logs"},
-	"13335": {"logs"},
+	"15386": {"logs"}, // System Log
 
 	// User Reports. Several report pages read from billing/network APIs, so they
 	// also unlock those modules.
@@ -90,6 +89,9 @@ var grantedPermissionModules = map[string][]string{
 	"13338": {"roles"},  // User Rights
 	"13337": {"system"}, // Configurations
 
+	// Dashboard page
+	"15384": {"dashboard"},
+
 	// Inventory -> inventory
 	"15313": {"inventory"},
 	"15312": {"inventory"},
@@ -104,6 +106,23 @@ var grantedPermissionModules = map[string][]string{
 	"15336": {"crm"},                              // Sales > Customers
 	"15337": {"sales", "crm"},                     // Sales > Installment Plans
 	"15338": {"pos", "sales", "crm", "inventory"}, // Sales > Point of Sale
+
+	// Newly added sidebar page permissions.
+	"15365": {"network"},                          // POPs
+	"15366": {"network"},                          // OLTs
+	"15367": {"network"},                          // Splitters
+	"15368": {"subscribers", "crm", "billing"},    // Corporate Clients
+	"15370": {"crm"},                              // Guarantors
+	"15371": {"pos", "sales", "billing"},          // Replaced Products
+	"15372": {"inventory"},                        // Vendor Invoice
+	"15373": {"inventory"},                        // Stock
+	"15376": {"system"},                          // My Company Profile
+	"15378": {"system"},                           // Drivers
+	"15379": {"system"},                           // Application
+	"15380": {"reports", "billing", "network"},    // Pending Subscribers
+	"15381": {"reports", "billing", "network"},    // Advance Subscribers
+	"15382": {"reports", "billing", "network"},    // Not Generated Collections
+	"15383": {"reports", "billing", "network"},    // Unpaid Collections
 }
 
 // checkUserGrantedPermission verifies whether the user has been granted, via the
