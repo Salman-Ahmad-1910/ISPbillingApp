@@ -97,6 +97,7 @@ export const PERMISSION_DEFS: PermissionDef[] = [
   { id: '13338', name: 'Roles & Permissions', module: 'Administration' },
   { id: '13337', name: 'System Config', module: 'Administration' },
   { id: '15334', name: 'Dashboard Summary', module: 'Dashboard' },
+  { id: '15390', name: 'Charts & Activity', module: 'Dashboard' },
   { id: '15384', name: 'Dashboard', module: 'Dashboard' },
   { id: '15362', name: 'Add / Create', module: 'CRUD' },
   { id: '15363', name: 'Update / Edit', module: 'CRUD' },
@@ -115,6 +116,10 @@ export const PERMISSION_DEFS: PermissionDef[] = [
 // Permission id that controls whether a user can see the dashboard summary
 // section (subscriber overview + financial metric cards).
 export const DASHBOARD_SUMMARY_PERMISSION = '15334';
+
+// Permission id that controls whether a user can see the graphs, recent
+// payments and open complaints widgets on the Dashboard page.
+export const DASHBOARD_CHARTS_PERMISSION = '15390';
 
 // Permission id that controls whether a user can see the search bar on the
 // Subscriber Collections page. When unchecked, the search bar is hidden.

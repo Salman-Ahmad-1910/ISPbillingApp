@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AlertCircle, Ticket } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
 import { useUserPermissions } from '@/hooks/usePermissions';
-import { hasFeaturePermission, DASHBOARD_SUMMARY_PERMISSION } from '@/lib/permission-pages';
+import { hasFeaturePermission, DASHBOARD_SUMMARY_PERMISSION, DASHBOARD_CHARTS_PERMISSION } from '@/lib/permission-pages';
 import api from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
 import dynamic from 'next/dynamic';
@@ -49,6 +49,12 @@ export default function DashboardPage() {
     permissionsConfigured,
     isAdminRole,
     DASHBOARD_SUMMARY_PERMISSION,
+  );
+  const canViewCharts = hasFeaturePermission(
+    grantedPermissions,
+    permissionsConfigured,
+    isAdminRole,
+    DASHBOARD_CHARTS_PERMISSION,
   );
   const [timeRange, setTimeRange] = useState<'daily' | 'monthly' | 'yearly' | 'all'>('monthly');
   const [packageType, setPackageType] = useState<'both' | 'internet' | 'tv_cable'>('both');
@@ -455,7 +461,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {canViewSummary && (
+      {canViewCharts && (
       <>
       <div className="mt-8 grid gap-8 md:grid-cols-2 lg:grid-cols-7">
         <div className="lg:col-span-4 transition-all duration-300 rounded-xl">
