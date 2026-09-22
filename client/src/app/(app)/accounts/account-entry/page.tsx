@@ -30,6 +30,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import { useUserPermissions } from '@/hooks/usePermissions';
+import { useUser } from '@/hooks/use-user';
 import { hasFeaturePermission } from '@/lib/permission-pages';
 import { smartMatch } from '@/lib/search';
 import { BookOpen, PlusCircle, MoreHorizontal, Edit3, Trash2, Search, CalendarIcon, DollarSign, FileText, Loader2 } from 'lucide-react';
@@ -74,6 +75,7 @@ interface AccountEntry {
   editBy: string;
   amount: number;
   transactionType: string;
+  createdAt?: string;
 }
 
 export default function AccountEntryPage() {
@@ -82,6 +84,7 @@ export default function AccountEntryPage() {
   const { toast } = useToast();
 
   const { userRole, grantedPermissions, permissionsConfigured } = useUserPermissions();
+  const { user } = useUser();
   const canViewEntries = hasFeaturePermission(
     grantedPermissions,
     permissionsConfigured,
@@ -239,7 +242,28 @@ export default function AccountEntryPage() {
     const entryAmount = parseFloat(formAmount);
     try {
       if (!canViewEntries) {
-        if (editingItem) {
+        const author = user?.name || 'Admin';
+        const payload = {
+          head: formHeadId,
+          subHead: formSubHeadId,
+          description: formDescription,
+          date: entryDate,
+          addBy: editingItem ? editingItem.addBy : author,
+          editBy: editingItem ? author : '-',
+          amount: entryAmount,
+          transactionType: formTxnTypeId,
+          companyId: companyId,
+        };
+        if (editingItem && editingItem.createdAt) {
+          await api.put(`/accounts/entries/${editingItem.id}`, payload);
+          setTempEntries((prev) =>
+            prev.map((t) =>
+              t.id === editingItem.id
+                ? { ...t, head: formHeadId, subHead: formSubHeadId, description: formDescription, date: entryDate, amount: entryAmount, transactionType: formTxnTypeId, editBy: author }
+                : t
+            )
+          );
+        } else if (editingItem) {
           setTempEntries((prev) =>
             prev.map((t) =>
               t.id === editingItem.id
@@ -248,21 +272,11 @@ export default function AccountEntryPage() {
             )
           );
         } else {
-          setTempEntries((prev) => [
-            ...prev,
-            {
-              id: crypto.randomUUID(),
-              head: formHeadId,
-              subHead: formSubHeadId,
-              description: formDescription,
-              date: entryDate,
-              addBy: 'Admin',
-              editBy: '-',
-              amount: entryAmount,
-              transactionType: formTxnTypeId,
-            },
-          ]);
+          const res = await api.post('/accounts/entries', payload);
+          const created = res.data?.data ?? res.data ?? { ...payload, id: crypto.randomUUID(), addBy: author, editBy: '-' };
+          setTempEntries((prev) => [...prev, created as AccountEntry]);
         }
+        queryClient.invalidateQueries({ queryKey: ['accounts/entries', companyId] });
         toast({ title: 'Success', description: editingItem ? 'Entry updated.' : 'Entry added.' });
         setDialogOpen(false);
         return;
@@ -294,7 +308,12 @@ export default function AccountEntryPage() {
   const handleDelete = async (id: string) => {
     try {
       if (!canViewEntries) {
+        const item = tempEntries.find((t) => t.id === id);
+        if (item?.createdAt) {
+          await api.delete(`/accounts/entries/${id}`);
+        }
         setTempEntries((prev) => prev.filter((t) => t.id !== id));
+        queryClient.invalidateQueries({ queryKey: ['accounts/entries', companyId] });
         toast({ title: 'Success', description: 'Entry deleted.' });
         return;
       }
@@ -344,12 +363,12 @@ export default function AccountEntryPage() {
               <div className="flex flex-col gap-2 mb-4">
                 <h2 className="text-lg font-semibold">Recently Added Entries</h2>
                 <p className="text-sm text-muted-foreground">
-                  You do not have permission to view the full list. Entries added in this session are temporary and will disappear after a page refresh. You can edit or delete them before refreshing.
+                  
                 </p>
               </div>
               {tempEntries.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  No entries added yet. Use the &quot;Add Entry&quot; button to create a temporary entry.
+                  Add an Entry
                 </div>
               ) : (
                 <div className="overflow-x-hidden">
