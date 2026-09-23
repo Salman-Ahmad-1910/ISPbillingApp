@@ -29,16 +29,13 @@ import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
-import { useUserPermissions } from '@/hooks/usePermissions';
 import { useUser } from '@/hooks/use-user';
-import { hasFeaturePermission } from '@/lib/permission-pages';
+import { useUserPermissions } from '@/hooks/usePermissions';
 import { smartMatch } from '@/lib/search';
 import { BookOpen, PlusCircle, MoreHorizontal, Edit3, Trash2, Search, CalendarIcon, DollarSign, FileText, Loader2 } from 'lucide-react';
 import type { RecoveryOfficer, Staff } from '@/lib/types';
 
 const filterByOptions = ['All', 'Add By', 'Edit By'];
-
-const ACCOUNT_ENTRY_FILTERS_PERMISSION = '15387';
 
 interface AccountHead {
   id: string;
@@ -75,7 +72,6 @@ interface AccountEntry {
   editBy: string;
   amount: number;
   transactionType: string;
-  createdAt?: string;
 }
 
 export default function AccountEntryPage() {
@@ -83,14 +79,9 @@ export default function AccountEntryPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { userRole, grantedPermissions, permissionsConfigured } = useUserPermissions();
   const { user } = useUser();
-  const canViewEntries = hasFeaturePermission(
-    grantedPermissions,
-    permissionsConfigured,
-    ['admin', 'owner', 'manager'].includes(userRole),
-    ACCOUNT_ENTRY_FILTERS_PERMISSION,
-  );
+  const { userRole } = useUserPermissions();
+  const isAdmin = ['admin', 'owner', 'manager'].includes(userRole);
 
   const { data: apiEntries = [], isLoading } = useGenericQuery<any>('accounts/entries', companyId ?? undefined);
   const { data: staff = [] } = useGenericQuery<Staff>('hr/staff', companyId ?? undefined);
@@ -100,7 +91,6 @@ export default function AccountEntryPage() {
   const { data: apiTxnTypes = [] } = useGenericQuery<any>('billing/transaction-types', companyId ?? undefined);
 
   const [entriesList, setEntriesList] = useState<AccountEntry[]>([]);
-  const [tempEntries, setTempEntries] = useState<AccountEntry[]>([]);
   const [headsList, setHeadsList] = useState<AccountHead[]>([]);
   const [subHeadsList, setSubHeadsList] = useState<SubHead[]>([]);
   const [txnTypesList, setTxnTypesList] = useState<TransactionType[]>([]);
@@ -112,10 +102,19 @@ export default function AccountEntryPage() {
     return [...names];
   }, [staff, recoveryOfficers]);
 
+  const displayEntries = useMemo(() => {
+    if (isAdmin) return entriesList;
+    const myName = user?.name;
+    return entriesList.filter((e) => e.addBy === myName);
+  }, [entriesList, isAdmin, user?.name]);
+
   useEffect(() => {
-    if (Array.isArray(apiEntries) && apiEntries.length > 0) {
-      setEntriesList(apiEntries);
-    }
+    if (!Array.isArray(apiEntries)) return;
+    setEntriesList((prev) => {
+      if (prev === apiEntries) return prev;
+      if (apiEntries.length === 0 && prev.length === 0) return prev;
+      return apiEntries;
+    });
   }, [apiEntries]);
 
   useEffect(() => {
@@ -186,7 +185,7 @@ export default function AccountEntryPage() {
 
   // Filtering
   const filteredData = useMemo(() => {
-    return entriesList.filter((e) => {
+    return displayEntries.filter((e) => {
       if (filterHead !== 'All' && e.head !== filterHead) return false;
       if (filterSubHead !== 'All' && e.subHead !== filterSubHead) return false;
       if (filterUser !== 'All' && e.addBy !== filterUser && e.editBy !== filterUser) return false;
@@ -205,7 +204,7 @@ export default function AccountEntryPage() {
       }
       return true;
     });
-  }, [entriesList, filterHead, filterSubHead, filterUser, filterBy, filterFromDate, filterToDate, search, headsList, subHeadsList]);
+  }, [displayEntries, filterHead, filterSubHead, filterUser, filterBy, filterFromDate, filterToDate, search, headsList, subHeadsList]);
 
   const totalPages = Math.ceil(filteredData.length / parseInt(pageSize));
   const paginatedData = filteredData.slice(
@@ -241,53 +240,14 @@ export default function AccountEntryPage() {
     const entryDate = formDate ? format(formDate, 'yyyy-MM-dd') : new Date().toISOString().split('T')[0];
     const entryAmount = parseFloat(formAmount);
     try {
-      if (!canViewEntries) {
-        const author = user?.name || 'Admin';
-        const payload = {
-          head: formHeadId,
-          subHead: formSubHeadId,
-          description: formDescription,
-          date: entryDate,
-          addBy: editingItem ? editingItem.addBy : author,
-          editBy: editingItem ? author : '-',
-          amount: entryAmount,
-          transactionType: formTxnTypeId,
-          companyId: companyId,
-        };
-        if (editingItem && editingItem.createdAt) {
-          await api.put(`/accounts/entries/${editingItem.id}`, payload);
-          setTempEntries((prev) =>
-            prev.map((t) =>
-              t.id === editingItem.id
-                ? { ...t, head: formHeadId, subHead: formSubHeadId, description: formDescription, date: entryDate, amount: entryAmount, transactionType: formTxnTypeId, editBy: author }
-                : t
-            )
-          );
-        } else if (editingItem) {
-          setTempEntries((prev) =>
-            prev.map((t) =>
-              t.id === editingItem.id
-                ? { ...t, head: formHeadId, subHead: formSubHeadId, description: formDescription, date: entryDate, amount: entryAmount, transactionType: formTxnTypeId }
-                : t
-            )
-          );
-        } else {
-          const res = await api.post('/accounts/entries', payload);
-          const created = res.data?.data ?? res.data ?? { ...payload, id: crypto.randomUUID(), addBy: author, editBy: '-' };
-          setTempEntries((prev) => [...prev, created as AccountEntry]);
-        }
-        queryClient.invalidateQueries({ queryKey: ['accounts/entries', companyId] });
-        toast({ title: 'Success', description: editingItem ? 'Entry updated.' : 'Entry added.' });
-        setDialogOpen(false);
-        return;
-      }
+      const author = user?.name || 'Admin';
       const payload = {
         head: formHeadId,
         subHead: formSubHeadId,
         description: formDescription,
         date: entryDate,
-        addBy: editingItem ? editingItem.addBy : 'Admin',
-        editBy: editingItem ? 'Admin' : '-',
+        addBy: editingItem ? editingItem.addBy : author,
+        editBy: editingItem ? author : '-',
         amount: entryAmount,
         transactionType: formTxnTypeId,
         companyId: companyId,
@@ -307,16 +267,6 @@ export default function AccountEntryPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      if (!canViewEntries) {
-        const item = tempEntries.find((t) => t.id === id);
-        if (item?.createdAt) {
-          await api.delete(`/accounts/entries/${id}`);
-        }
-        setTempEntries((prev) => prev.filter((t) => t.id !== id));
-        queryClient.invalidateQueries({ queryKey: ['accounts/entries', companyId] });
-        toast({ title: 'Success', description: 'Entry deleted.' });
-        return;
-      }
       await api.delete(`/accounts/entries/${id}`);
       queryClient.invalidateQueries({ queryKey: ['accounts/entries', companyId] });
       toast({ title: 'Success', description: 'Entry deleted.' });
@@ -356,75 +306,7 @@ export default function AccountEntryPage() {
 
       <div className="h-0.5 bg-gradient-to-r from-blue-500/50 via-indigo-500/30 to-transparent" />
 
-      {!canViewEntries && (
-        <div>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex flex-col gap-2 mb-4">
-                <h2 className="text-lg font-semibold">Recently Added Entries</h2>
-                <p className="text-sm text-muted-foreground">
-                  
-                </p>
-              </div>
-              {tempEntries.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  Add an Entry
-                </div>
-              ) : (
-                <div className="overflow-x-hidden">
-                  <Table className="table-fixed">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[60px]">ID</TableHead>
-                        <TableHead className="w-[120px]">Head</TableHead>
-                        <TableHead className="w-[120px]">Sub Head</TableHead>
-                        <TableHead className="w-[200px]">Description</TableHead>
-                        <TableHead className="w-[100px]">Date</TableHead>
-                        <TableHead className="w-[60px]">Amount</TableHead>
-                        <TableHead className="w-[80px]">Action</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {tempEntries.map((item, index) => (
-                        <TableRow key={item.id}>
-                          <TableCell className="text-muted-foreground truncate">{index + 1}</TableCell>
-                          <TableCell className="font-medium truncate">{getHeadName(item.head)}</TableCell>
-                          <TableCell className="truncate">{getSubHeadName(item.subHead)}</TableCell>
-                          <TableCell className="truncate">{item.description}</TableCell>
-                          <TableCell className="truncate">{item.date}</TableCell>
-                          <TableCell className="truncate">{item.amount.toLocaleString()}</TableCell>
-                          <TableCell>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => openEditDialog(item)}>
-                                  <Edit3 className="mr-2 h-4 w-4" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(item.id)}>
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {canViewEntries && (
-        <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6">
       {/* Summary Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
@@ -434,7 +316,7 @@ export default function AccountEntryPage() {
             </div>
             <div>
               <p className="text-xs font-medium text-muted-foreground">Total Entries</p>
-              <p className="text-2xl font-bold">{entriesList.length}</p>
+              <p className="text-2xl font-bold">{displayEntries.length}</p>
             </div>
           </div>
         </div>
@@ -445,7 +327,7 @@ export default function AccountEntryPage() {
             </div>
             <div>
               <p className="text-xs font-medium text-muted-foreground">Total Amount</p>
-              <p className="text-2xl font-bold">PKR {entriesList.reduce((s, e) => s + e.amount, 0).toLocaleString()}</p>
+              <p className="text-2xl font-bold">PKR {displayEntries.reduce((s, e) => s + e.amount, 0).toLocaleString()}</p>
             </div>
           </div>
         </div>
@@ -456,7 +338,7 @@ export default function AccountEntryPage() {
             </div>
             <div>
               <p className="text-xs font-medium text-muted-foreground">Transaction Types</p>
-              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{new Set(entriesList.map(e => e.transactionType)).size}</p>
+              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{new Set(displayEntries.map(e => e.transactionType)).size}</p>
             </div>
           </div>
         </div>
@@ -663,7 +545,6 @@ export default function AccountEntryPage() {
         </CardContent>
       </Card>
       </div>
-      )}
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
