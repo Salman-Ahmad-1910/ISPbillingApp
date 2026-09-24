@@ -40,8 +40,90 @@ func RegisterConnectionRoutes(admin *gin.RouterGroup) {
 	connections.GET("", findConnections)
 	connections.GET("/logs", getConnectionLogs)
 	connections.POST("", createConnection)
+	connections.POST("/bulk-sublocality", bulkUpdateConnectionSublocality)
 	connections.PUT("/:id", updateConnection)
 	connections.DELETE("/:id", deleteConnection)
+}
+
+// bulkSublocalityRequest holds the ids and target sublocality for a bulk
+// area assignment performed from the subscriber list.
+type bulkSublocalityRequest struct {
+	IDs           []string `json:"ids"`
+	SublocalityID string   `json:"sublocalityId"`
+	Reason        string   `json:"reason"`
+	Comments      string   `json:"comments"`
+}
+
+// bulkUpdateConnectionSublocality assigns the given sublocality (Area UUID) to
+// all selected subscriptions of the current company. Subscribers assigned to an
+// area then show up for the recovery officers assigned to that area.
+func bulkUpdateConnectionSublocality(c *gin.Context) {
+	companyID := c.MustGet("companyID").(uuid.UUID)
+
+	var req bulkSublocalityRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, 400, "Invalid input data", err.Error())
+		return
+	}
+
+	ids := make([]string, 0, len(req.IDs))
+	for _, id := range req.IDs {
+		if id != "" {
+			ids = append(ids, id)
+		}
+	}
+	if len(ids) == 0 {
+		utils.ErrorResponse(c, 400, "At least one subscriber id is required", nil)
+		return
+	}
+
+	areaUUID, err := uuid.Parse(req.SublocalityID)
+	if err != nil {
+		utils.ErrorResponse(c, 400, "Invalid sublocality id", err.Error())
+		return
+	}
+
+	var area models.Area
+	if err := config.DB.Scopes(models.TenantScope(companyID)).First(&area, "id = ?", areaUUID).Error; err != nil {
+		utils.ErrorResponse(c, 400, "Sublocality not found", nil)
+		return
+	}
+
+	var conns []models.Connection
+	if err := config.DB.Scopes(models.TenantScope(companyID)).Where("id IN ?", ids).Find(&conns).Error; err != nil {
+		utils.ErrorResponse(c, 500, "Failed to load subscribers", err.Error())
+		return
+	}
+
+	if len(conns) == 0 {
+		utils.SuccessResponse(c, "Sublocality updated", gin.H{"updated": 0, "skipped": 0})
+		return
+	}
+
+	target := areaUUID.String()
+	updated := 0
+	skipped := 0
+	for i := range conns {
+		old := conns[i]
+		if old.SublocalityID == target {
+			skipped++
+			continue
+		}
+		if err := config.DB.Model(&models.Connection{}).Where("id = ?", old.ID).
+			Update("sublocality_id", target).Error; err != nil {
+			utils.ErrorResponse(c, 500, "Failed to update subscriber", err.Error())
+			return
+		}
+		createConnectionLogs(c, old, []connChange{{
+			FieldName:  "sublocality",
+			ActionType: "Area Changed",
+			Old:        old.SublocalityID,
+			New:        target,
+		}}, req.Reason, req.Comments)
+		updated++
+	}
+
+	utils.SuccessResponse(c, "Sublocality updated", gin.H{"updated": updated, "skipped": skipped})
 }
 
 func findConnections(c *gin.Context) {

@@ -222,6 +222,7 @@ type SystemConfig struct {
 	InvoiceTemplate string `gorm:"type:text" json:"invoiceTemplate"`
 	SMSGateway      string `gorm:"type:varchar(255)" json:"smsGateway"`
 	WhatsAppGateway string `gorm:"type:varchar(255)" json:"whatsAppGateway"`
+	WhatsAppPhoneNumberID string `gorm:"type:varchar(255)" json:"whatsAppPhoneNumberId"`
 	InvoiceSms      string `gorm:"type:text" json:"invoiceSms"`
 	Enable2FA       bool   `gorm:"default:false" json:"enable2fa"`
 	SessionTimeout  int    `gorm:"default:60" json:"sessionTimeout"`

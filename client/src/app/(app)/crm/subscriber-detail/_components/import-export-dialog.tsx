@@ -102,7 +102,7 @@ export function ImportExportDialog({ isOpen, onClose, connections, areas, compan
 
   const [importFile, setImportFile] = useState<File | null>(null);
   const [isImporting, setIsImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ success: number; failed: number; errors: string[] } | null>(null);
+  const [importResult, setImportResult] = useState<{ success: number; failed: number; errors: string[]; warnings: string[] } | null>(null);
   const [activeTab, setActiveTab] = useState('export');
 
   const handleExport = useCallback(() => {
@@ -212,6 +212,7 @@ export function ImportExportDialog({ isOpen, onClose, connections, areas, compan
       let success = 0;
       let failed = 0;
       const errors: string[] = [];
+      const warnings: string[] = [];
 
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
@@ -234,6 +235,7 @@ export function ImportExportDialog({ isOpen, onClose, connections, areas, compan
             (a.locality || '').toLowerCase() === sublocalityName.toLowerCase()
           );
           if (match) sublocalityId = match.id;
+          else warnings.push(`Row ${rowNum} (${internetId}): Sublocality "${sublocalityName}" not found in Areas - subscriber imported without an area.`);
         }
 
         const connectionType = String(row[headers.find(h => h === 'Connection Type') || ''] || 'both').trim() || 'both';
@@ -273,7 +275,7 @@ export function ImportExportDialog({ isOpen, onClose, connections, areas, compan
         }
       }
 
-      setImportResult({ success, failed, errors });
+      setImportResult({ success, failed, errors, warnings });
       queryClient.invalidateQueries({ queryKey: ['admin/connections', companyId] });
 
       if (success > 0) {
@@ -387,9 +389,9 @@ export function ImportExportDialog({ isOpen, onClose, connections, areas, compan
             )}
 
             {importResult && (
-              <div className={`rounded-lg p-4 space-y-2 ${importResult.failed > 0 ? 'bg-amber-50 border border-amber-200' : 'bg-emerald-50 border border-emerald-200'}`}>
+              <div className={`rounded-lg p-4 space-y-2 ${importResult.failed > 0 || importResult.warnings.length > 0 ? 'bg-amber-50 border border-amber-200' : 'bg-emerald-50 border border-emerald-200'}`}>
                 <div className="flex items-center gap-2">
-                  {importResult.failed > 0 ? (
+                  {importResult.failed > 0 || importResult.warnings.length > 0 ? (
                     <AlertCircle className="h-5 w-5 text-amber-600" />
                   ) : (
                     <CheckCircle2 className="h-5 w-5 text-emerald-600" />
@@ -398,6 +400,13 @@ export function ImportExportDialog({ isOpen, onClose, connections, areas, compan
                     {importResult.success} imported, {importResult.failed} failed
                   </span>
                 </div>
+                {importResult.warnings.length > 0 && (
+                  <div className="mt-2 max-h-32 overflow-y-auto text-xs text-amber-700 space-y-1">
+                    {importResult.warnings.map((w, i) => (
+                      <p key={`w-${i}`}>{w}</p>
+                    ))}
+                  </div>
+                )}
                 {importResult.errors.length > 0 && (
                   <div className="mt-2 max-h-32 overflow-y-auto text-xs text-muted-foreground space-y-1">
                     {importResult.errors.map((err, i) => (

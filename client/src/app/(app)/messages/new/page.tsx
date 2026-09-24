@@ -66,7 +66,7 @@ function buildValues(entity: any, category: string): Record<string, string> {
 
   if (category === 'subscribers') {
     map['cableAmount'] = formatVal(entity.amount);
-    map['internetAmount'] = formatVal(entity.packageInternet);
+    map['internetAmount'] = formatVal(entity.sameAmount);
     map['received'] = formatVal(entity.amount);
     map['balance'] = formatVal(entity.remainingAmount ?? entity.amount);
     map['bill'] = formatVal(entity.amount);
@@ -115,7 +115,7 @@ export default function NewMessagesPage() {
   const [sendCategory, setSendCategory] = useState('');
   const [sendSearch, setSendSearch] = useState('');
   const [sendSelectedIds, setSendSelectedIds] = useState<Set<string>>(new Set());
-  const [sendViaWhatsApp, setSendViaWhatsApp] = useState(false);
+  const [sendViaWhatsApp, setSendViaWhatsApp] = useState(true);
   const [isSendingNow, setIsSendingNow] = useState(false);
 
   const { data: templates = [], isLoading, refetch: refetchTemplates } = useGenericQuery<MessageTemplate>('messages/templates', companyId ?? undefined);
@@ -268,7 +268,7 @@ export default function NewMessagesPage() {
     setSendCategory('');
     setSendSearch('');
     setSendSelectedIds(new Set());
-    setSendViaWhatsApp(false);
+    setSendViaWhatsApp(true);
   };
 
   const closeSendDialog = () => {
@@ -276,7 +276,7 @@ export default function NewMessagesPage() {
     setSendCategory('');
     setSendSearch('');
     setSendSelectedIds(new Set());
-    setSendViaWhatsApp(false);
+    setSendViaWhatsApp(true);
   };
 
   const handleSendTemplate = async (template: MessageTemplate) => {
@@ -433,67 +433,69 @@ export default function NewMessagesPage() {
           <DialogHeader>
             <DialogTitle>{editingTemplate ? 'Edit Message Template' : 'Add Message Template'}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <Label>Title</Label>
-              <Input
-                value={templateTitle}
-                onChange={(e) => setTemplateTitle(e.target.value)}
-                placeholder="e.g. COLLECTION, UsersCredentail"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Message</Label>
-              <Textarea
-                value={templateMessage}
-                onChange={(e) => setTemplateMessage(e.target.value)}
-                placeholder="e.g. Dear {name}, Thanks for payment, Cable:{cableAmount} Internet:{internetAmount}..."
-                rows={6}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Parameters</Label>
-              <div className="flex gap-2">
-                <Select value="" onValueChange={handleSelectParam}>
-                  <SelectTrigger className="w-full border-muted-foreground/20">
-                    <SelectValue placeholder="Select parameters..." />
-                  </SelectTrigger>
-                  <SelectContent portal={false}>
-                    {availableParams.filter(p => !selectedParams.includes(p)).map((p) => (
-                      <SelectItem key={p} value={p}>{"{" + p + "}"}</SelectItem>
-                    ))}
-                    {availableParams.filter(p => !selectedParams.includes(p)).length === 0 && (
-                      <SelectItem value="__none__" disabled>No parameters available</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-                <Button type="button" variant="outline" onClick={() => setParamsDialogOpen(true)}>
-                  <Plus className="mr-1 h-4 w-4" /> Add Parameters
-                </Button>
+          <ScrollArea className="max-h-[70vh] pr-4">
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <Label>Title</Label>
+                <Input
+                  value={templateTitle}
+                  onChange={(e) => setTemplateTitle(e.target.value)}
+                  placeholder="e.g. COLLECTION, UsersCredentail"
+                />
               </div>
-              {selectedParams.length > 0 && (
-                <div className="flex flex-wrap gap-1 pt-1">
-                  {selectedParams.map((p) => (
-                    <span key={p} className="inline-flex items-center gap-1 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-mono text-blue-700 dark:bg-blue-950/30 dark:text-blue-400">
-                      {"{" + p + "}"}
-                      <button type="button" onClick={() => removeSelectedParam(p)} className="hover:text-red-600">
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
+              <div className="space-y-1">
+                <Label>Message</Label>
+                <Textarea
+                  value={templateMessage}
+                  onChange={(e) => setTemplateMessage(e.target.value)}
+                  placeholder="e.g. Dear {name}, Thanks for payment, Cable:{cableAmount} Internet:{internetAmount}..."
+                  rows={6}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Parameters</Label>
+                <div className="flex gap-2">
+                  <Select value="" onValueChange={handleSelectParam}>
+                    <SelectTrigger className="w-full border-muted-foreground/20">
+                      <SelectValue placeholder="Select parameters..." />
+                    </SelectTrigger>
+                    <SelectContent portal={false}>
+                      {availableParams.filter(p => !selectedParams.includes(p)).map((p) => (
+                        <SelectItem key={p} value={p}>{"{" + p + "}"}</SelectItem>
+                      ))}
+                      {availableParams.filter(p => !selectedParams.includes(p)).length === 0 && (
+                        <SelectItem value="__none__" disabled>No parameters available</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <Button type="button" variant="outline" onClick={() => setParamsDialogOpen(true)}>
+                    <Plus className="mr-1 h-4 w-4" /> Add Parameters
+                  </Button>
                 </div>
-              )}
-              <p className="text-xs text-muted-foreground">Select parameters from the dropdown or manage the list via Add Parameters.</p>
+                {selectedParams.length > 0 && (
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {selectedParams.map((p) => (
+                      <span key={p} className="inline-flex items-center gap-1 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-mono text-blue-700 dark:bg-blue-950/30 dark:text-blue-400">
+                        {"{" + p + "}"}
+                        <button type="button" onClick={() => removeSelectedParam(p)} className="hover:text-red-600">
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">Select parameters from the dropdown or manage the list via Add Parameters.</p>
+              </div>
+              <Button
+                onClick={handleTemplateSave}
+                disabled={isSavingTemplate}
+                className="w-full bg-gradient-to-r from-blue-500 to-cyan-600 text-white hover:from-blue-600 hover:to-cyan-700 shadow-sm transition-all duration-300 hover:shadow-md"
+              >
+                {isSavingTemplate && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {editingTemplate ? 'Save Changes' : 'Add'}
+              </Button>
             </div>
-            <Button
-              onClick={handleTemplateSave}
-              disabled={isSavingTemplate}
-              className="w-full bg-gradient-to-r from-blue-500 to-cyan-600 text-white hover:from-blue-600 hover:to-cyan-700 shadow-sm transition-all duration-300 hover:shadow-md"
-            >
-              {isSavingTemplate && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {editingTemplate ? 'Save Changes' : 'Add'}
-            </Button>
-          </div>
+          </ScrollArea>
         </DialogContent>
       </Dialog>
 
@@ -544,6 +546,7 @@ export default function NewMessagesPage() {
             <DialogTitle>Send Message</DialogTitle>
           </DialogHeader>
           {sendTarget && (
+            <ScrollArea className="max-h-[70vh] pr-2">
             <div className="space-y-4">
               <div>
                 <p className="text-sm"><span className="text-muted-foreground">Template:</span> <span className="font-medium">{sendTarget.title}</span></p>
@@ -617,6 +620,7 @@ export default function NewMessagesPage() {
                 </Button>
               </div>
             </div>
+            </ScrollArea>
           )}
         </DialogContent>
       </Dialog>

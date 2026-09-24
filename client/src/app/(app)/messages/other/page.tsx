@@ -27,13 +27,6 @@ const messageTitles = [
 
 const EXPIRY_TITLE = 'Defaulter';
 
-function waNumber(phone?: string): string {
-  if (!phone) return '';
-  let digits = phone.replace(/\D/g, '');
-  if (digits.startsWith('0')) digits = '92' + digits.slice(1);
-  return digits;
-}
-
 function messageBody(m: Message): string {
   return m.messageText || `Dear ${m.name}, your monthly subscription fee is due. Please pay your dues to continue uninterrupted services. Thank you.`;
 }
@@ -194,16 +187,27 @@ export default function OtherMessagesPage() {
     return result;
   }, [totalPages, currentPage]);
 
-  const waPhone = (m: Message): string => {
-    const conn = m.entityId ? connectionMap.get(m.entityId) : undefined;
-    return m.mobileNo || m.phone || conn?.cell || conn?.mobile || '';
-  };
-
-  const handleWhatsApp = (m: Message) => {
-    const num = waNumber(waPhone(m));
-    if (!num) return;
-    const text = encodeURIComponent(messageBody(m));
-    window.open(`https://wa.me/${num}?text=${text}`, '_blank');
+  const handleWhatsApp = async (m: Message) => {
+    if (!confirm(`Send this message to ${m.name} via WhatsApp?`)) return;
+    try {
+      const res = await api.post(`/messages/send?companyId=${companyId}`, {
+        ids: [m.id],
+        sentBy: 'Admin',
+        channel: 'whatsapp',
+      });
+      const failed = res.data?.data?.failed ?? [];
+      if (failed.length > 0) {
+        toast({
+          variant: 'destructive',
+          title: 'Send Failed',
+          description: `${failed[0]?.name}: ${failed[0]?.error}`,
+        });
+      } else {
+        toast({ title: 'Success', description: `WhatsApp message sent to ${m.name}.` });
+      }
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.response?.data?.message || 'Failed to send message.' });
+    }
   };
 
   const handleDelete = async (m: Message) => {

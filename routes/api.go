@@ -293,6 +293,7 @@ billing.PUT("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "ed
 		messages := protected.Group("/messages")
 		{
 			controllers.RegisterGenericCRUDScoped[models.Message](messages, "", true)
+			messages.POST("/send", controllers.SendMessages)
 			controllers.RegisterGenericCRUDScoped[models.MessageTemplate](messages, "/templates", true)
 		}
 

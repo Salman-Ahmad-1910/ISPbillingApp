@@ -42,13 +42,6 @@ function displayDate(key: string): string {
   return isNaN(d.getTime()) ? key : format(d, 'dd MMM yyyy');
 }
 
-function waNumber(phone?: string): string {
-  if (!phone) return '';
-  let digits = phone.replace(/\D/g, '');
-  if (digits.startsWith('0')) digits = '92' + digits.slice(1);
-  return digits;
-}
-
 export default function WhatsAppDraftPage() {
   const { companyId } = useCompany();
   const { user } = useUser();
@@ -170,27 +163,26 @@ export default function WhatsAppDraftPage() {
 
   const sendSelected = async (ids: string[]) => {
     if (ids.length === 0) return;
-    if (!confirm(`Send ${ids.length} WhatsApp message(s)? WhatsApp will open for each recipient.`)) return;
+    if (!confirm(`Send ${ids.length} WhatsApp message(s) via the WhatsApp API?`)) return;
     setIsSending(true);
     try {
-      for (const id of ids) {
-        const msg = messages.find((m) => m.id === id);
-        if (!msg) continue;
-        const phone = waNumber(msg.mobileNo || msg.phone);
-        const text = encodeURIComponent(msg.messageText || '');
-        if (phone) {
-          window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
-        }
-        await api.put(`/messages/${id}?companyId=${companyId}`, {
-          ...msg,
-          status: 'sent',
-          sentBy: user?.name || 'Admin',
-          sendedAt: new Date().toISOString(),
-        });
-      }
+      const res = await api.post(`/messages/send?companyId=${companyId}`, {
+        ids,
+        sentBy: user?.name || 'Admin',
+      });
       queryClient.invalidateQueries({ queryKey: ['messages', companyId] });
       setSelected(new Set());
-      toast({ title: 'Success', description: `${ids.length} WhatsApp message(s) sent.` });
+      const sentCount = res.data?.data?.sent ?? ids.length;
+      const failed = res.data?.data?.failed ?? [];
+      if (failed.length > 0) {
+        toast({
+          variant: 'destructive',
+          title: 'Partial Success',
+          description: `${sentCount} sent, ${failed.length} failed. ${failed[0]?.name}: ${failed[0]?.error}`,
+        });
+      } else {
+        toast({ title: 'Success', description: `${sentCount} WhatsApp message(s) sent.` });
+      }
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.response?.data?.message || 'Failed to send messages.' });
     } finally {

@@ -755,6 +755,7 @@ export type SystemConfig = {
   invoiceTemplate: string;
   smsGateway: string;
   whatsAppGateway: string;
+  whatsAppPhoneNumberId: string;
   invoiceSms: string;
   enable2fa: boolean;
   sessionTimeout: number;

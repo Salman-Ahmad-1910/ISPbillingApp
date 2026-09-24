@@ -198,16 +198,10 @@ export default function DraftMessagesPage() {
     if (!confirm(`Send ${ids.length} message(s)? Sent expiry reminders go to Expiry Messages, others to Other Messages.`)) return;
     setIsSending(true);
     try {
-      for (const id of ids) {
-        const msg = messages.find((m) => m.id === id);
-        if (!msg) continue;
-        await api.put(`/messages/${id}?companyId=${companyId}`, {
-          ...msg,
-          status: 'sent',
-          sentBy: user?.name || 'Admin',
-          sendedAt: new Date().toISOString(),
-        });
-      }
+      await api.post(`/messages/send?companyId=${companyId}`, {
+        ids,
+        sentBy: user?.name || 'Admin',
+      });
       queryClient.invalidateQueries({ queryKey: ['messages', companyId] });
       setSelected(new Set());
       toast({ title: 'Success', description: `${ids.length} message(s) sent.` });

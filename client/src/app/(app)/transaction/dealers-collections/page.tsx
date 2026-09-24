@@ -63,7 +63,7 @@ export default function DealersCollectionsPage() {
   const currentCompany = companies.find(c => c.id === companyId);
   const { toast } = useToast();
   const { user } = useUser();
-  const { canCreate, canUpdate, canDelete } = useCrudPermissions();
+  const { canUpdate, canDelete } = useCrudPermissions();
 
   const [selectedDealerId, setSelectedDealerId] = useState<string | null>(null);
   const [showReceiveDialog, setShowReceiveDialog] = useState(false);
@@ -385,12 +385,10 @@ export default function DealersCollectionsPage() {
                 <span>Receiving as: <span className="font-medium text-foreground">{recoveryOfficerName}</span></span>
               </div>
               <div className="flex-1" />
-              {canCreate && (
               <Button onClick={() => setShowReceiveDialog(true)} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
                 <DollarSign className="mr-2 h-4 w-4" />
                 Receive Payment
               </Button>
-            )}
             </div>
 
             <div className="p-4">

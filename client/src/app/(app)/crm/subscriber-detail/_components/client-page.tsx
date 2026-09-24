@@ -3,8 +3,10 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PlusCircle, Users, FileSpreadsheet } from 'lucide-react';
+import { PlusCircle, Users, FileSpreadsheet, Pencil } from 'lucide-react';
+import type { ColumnDef } from '@tanstack/react-table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useCompany } from '@/context/company-context';
 import { z } from 'zod';
@@ -58,6 +60,10 @@ export function ClientPage({ connections, initialConnectionId, initialPackageNam
   const [filterSortBy, setFilterSortBy] = useState('all');
   const [filterProvider, setFilterProvider] = useState('all');
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
+  const [isBulkEditMode, setIsBulkEditMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkSublocality, setBulkSublocality] = useState('');
+  const [isBulkSaving, setIsBulkSaving] = useState(false);
 
   useEffect(() => {
     if (initialConnectionId && connections.length > 0) {
@@ -99,7 +105,9 @@ export function ClientPage({ connections, initialConnectionId, initialPackageNam
       );
     }
 
-    if (filterSublocality !== 'all') {
+    if (filterSublocality === 'unassigned') {
+      result = result.filter(c => !c.sublocalityId);
+    } else if (filterSublocality !== 'all') {
       result = result.filter(c => c.sublocalityId === filterSublocality);
     }
     if (filterStatus !== 'all') {
@@ -257,13 +265,86 @@ export function ClientPage({ connections, initialConnectionId, initialPackageNam
     }
   };
 
-  const columns = getColumns({
+  const allFilteredSelected = filteredData.length > 0 && filteredData.every((c) => selectedIds.has(c.id));
+  const someFilteredSelected = filteredData.some((c) => selectedIds.has(c.id));
+
+  const toggleOne = (id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = (checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      filteredData.forEach((c) => (checked ? next.add(c.id) : next.delete(c.id)));
+      return next;
+    });
+  };
+
+  const exitBulkEditMode = () => {
+    setIsBulkEditMode(false);
+    setSelectedIds(new Set());
+    setBulkSublocality('');
+  };
+
+  const handleAddSublocality = async () => {
+    if (!bulkSublocality || selectedIds.size === 0) return;
+    setIsBulkSaving(true);
+    try {
+      const res = await api.post(`/admin/connections/bulk-sublocality?companyId=${companyId}`, {
+        ids: Array.from(selectedIds),
+        sublocalityId: bulkSublocality,
+        comments: `Bulk sublocality assignment (${selectedIds.size} subscriber(s))`,
+      });
+      const updated = res.data?.data?.updated ?? selectedIds.size;
+      queryClient.invalidateQueries({ queryKey: ['admin/connections', companyId] });
+      exitBulkEditMode();
+      setFeedback({ type: 'success', title: 'Success', message: `Sublocality assigned to ${updated} subscriber(s).` });
+    } catch (error: any) {
+      setFeedback({
+        type: 'error',
+        title: 'Error',
+        message: errorMessage(error, 'Failed to update sublocality')
+      });
+    } finally {
+      setIsBulkSaving(false);
+    }
+  };
+
+  const baseColumns = getColumns({
     onEdit: handleEdit,
     onDelete: openDeleteDialog,
     onDeactivate: openDeactivateDialog,
     canUpdate,
     canDelete,
   });
+
+  const selectColumn: ColumnDef<Connection, unknown> = {
+    id: 'select',
+    header: () => (
+      <Checkbox
+        checked={allFilteredSelected}
+        aria-checked={someFilteredSelected && !allFilteredSelected ? 'mixed' : allFilteredSelected}
+        onCheckedChange={(value) => toggleSelectAll(value === true)}
+        aria-label="Select all subscribers"
+      />
+    ),
+    cell: ({ row }) => (
+      <Checkbox
+        checked={selectedIds.has(row.original.id)}
+        onCheckedChange={(value) => toggleOne(row.original.id, value === true)}
+        aria-label={`Select ${row.original.name}`}
+      />
+    ),
+    enableSorting: false,
+    enableHiding: false,
+  };
+
+  const columns = isBulkEditMode ? [selectColumn, ...baseColumns] : baseColumns;
 
   return (
     <>
@@ -275,6 +356,7 @@ export function ClientPage({ connections, initialConnectionId, initialPackageNam
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Sublocality</SelectItem>
+              <SelectItem value="unassigned">Unassigned</SelectItem>
               {areas.map((area) => (
                 <SelectItem key={area.id} value={area.id}>{area.subLocality || area.locality || area.id.slice(0, 8)}</SelectItem>
               ))}
@@ -378,6 +460,14 @@ export function ClientPage({ connections, initialConnectionId, initialPackageNam
           />
           <div className="flex items-center gap-2 ml-auto">
             <Button
+              variant={isBulkEditMode ? 'default' : 'outline'}
+              onClick={() => (isBulkEditMode ? exitBulkEditMode() : setIsBulkEditMode(true))}
+              className={isBulkEditMode ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700' : 'border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-800'}
+            >
+              <Pencil className="mr-2 h-4 w-4" />
+              {isBulkEditMode ? 'Done' : 'Bulk Edit'}
+            </Button>
+            <Button
               variant="outline"
               onClick={() => setIsImportExportOpen(true)}
               className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
@@ -418,6 +508,33 @@ export function ClientPage({ connections, initialConnectionId, initialPackageNam
             )}
           </div>
         </div>
+
+        {isBulkEditMode && (
+          <div className="flex flex-wrap items-center gap-3 rounded-md border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-900 dark:bg-blue-950/30">
+            <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
+              {selectedIds.size} subscriber(s) selected
+            </span>
+            <Select value={bulkSublocality} onValueChange={setBulkSublocality}>
+              <SelectTrigger className="w-56 border-muted-foreground/20">
+                <SelectValue placeholder="Select sublocality" />
+              </SelectTrigger>
+              <SelectContent portal={false}>
+                {areas.map((area) => (
+                  <SelectItem key={area.id} value={area.id}>{area.subLocality || area.locality || area.id.slice(0, 8)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              onClick={handleAddSublocality}
+              disabled={!bulkSublocality || selectedIds.size === 0 || isBulkSaving}
+              className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700"
+            >
+              {isBulkSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Add Sublocality
+            </Button>
+            <Button variant="outline" onClick={exitBulkEditMode}>Cancel</Button>
+          </div>
+        )}
 
         <DataTable columns={columns} data={paginatedData} />
 

@@ -26,6 +26,7 @@ const initialConfig = {
   invoiceTemplate: "Invoice footer text, terms and conditions...",
   smsGateway: "",
   whatsAppGateway: "",
+  whatsAppPhoneNumberId: "",
   invoiceSms: "Dear {customer_name}, your bill of PKR {amount} for {billing_period} is due on {due_date}. Thank you.",
   enable2fa: false,
   sessionTimeout: 60,
@@ -234,6 +235,18 @@ export default function SystemConfigPage() {
                     {showWhatsAppToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="whatsAppPhoneNumberId">WhatsApp Phone Number ID</Label>
+                <Input
+                  id="whatsAppPhoneNumberId"
+                  placeholder="e.g. 123456789012345"
+                  value={config.whatsAppPhoneNumberId}
+                  onChange={handleInputChange}
+                />
+                <p className="text-sm text-muted-foreground">
+                  The phone number ID of your WhatsApp Business API sender. Find it in the Meta developer/app dashboard.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="invoiceSms">Invoice Generation SMS Template</Label>

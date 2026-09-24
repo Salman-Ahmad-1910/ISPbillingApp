@@ -353,7 +353,7 @@ export function ClientPage({ data, recoveryOfficers }: ClientPageProps) {
                 <p className="text-xs text-muted-foreground mr-auto">
                   {stagedChangeCount > 0
                     ? `${stagedChangeCount} pending change(s) - click Save to apply them to ${selectedOfficer?.name || 'this officer'}.`
-                    : 'No pending changes. Use the arrow buttons to move areas, then press Save.'}
+                    : ''}
                 </p>
                 <Button
                   variant="outline"
