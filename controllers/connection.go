@@ -232,6 +232,43 @@ func createConnection(c *gin.Context) {
 		return
 	}
 
+	// The partial unique index on (company_id, internet_id) covers soft-deleted
+	// rows too, so re-uploading a file (e.g. the export with an updated
+	// Sublocality column) used to surface a raw unique-constraint error. Check
+	// for an existing row and either restore a soft-deleted one or return a
+	// clean 409 so the import never leaks the database error.
+	var dup models.Connection
+	if err := tx.Unscoped().Where("company_id = ? AND internet_id = ?", companyID, input.InternetID).First(&dup).Error; err == nil {
+		if !dup.DeletedAt.Valid {
+			tx.Rollback()
+			utils.ErrorResponse(c, 409, "Duplicate subscriber", fmt.Sprintf("A subscriber with Internet ID %s already exists", input.InternetID))
+			return
+		}
+
+		// Only a soft-deleted row holds this ID: restore it instead of
+		// re-creating (which would violate the unique index).
+		restore := map[string]interface{}{
+			"deleted_at":     nil,
+			"name":           input.Name,
+			"address":        input.Address,
+			"cell":           input.Cell,
+			"mobile":         input.Mobile,
+			"status":         input.Status,
+			"sublocality_id": input.SublocalityID,
+		}
+		if err := tx.Model(&models.Connection{}).Unscoped().Where("id = ? AND company_id = ?", dup.ID, companyID).Updates(restore).Error; err != nil {
+			tx.Rollback()
+			utils.ErrorResponse(c, 500, "Failed to restore subscriber", err.Error())
+			return
+		}
+		if err := tx.Commit().Error; err != nil {
+			utils.ErrorResponse(c, 500, "Failed to commit", err.Error())
+			return
+		}
+		utils.CreatedResponse(c, "Connection restored", dup)
+		return
+	}
+
 	if input.SplitterID != "" {
 		if _, err := uuid.Parse(input.SplitterID); err != nil {
 			tx.Rollback()

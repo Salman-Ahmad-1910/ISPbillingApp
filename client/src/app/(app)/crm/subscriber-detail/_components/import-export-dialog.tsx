@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -102,8 +103,17 @@ export function ImportExportDialog({ isOpen, onClose, connections, areas, compan
 
   const [importFile, setImportFile] = useState<File | null>(null);
   const [isImporting, setIsImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ success: number; failed: number; errors: string[]; warnings: string[] } | null>(null);
+  const [importResult, setImportResult] = useState<{ created: number; updated: number; unchanged: number; failed: number; errors: string[]; warnings: string[] } | null>(null);
   const [activeTab, setActiveTab] = useState('export');
+  const [updateExisting, setUpdateExisting] = useState(true);
+
+  const existingByInternetId = useMemo(() => {
+    const map: Record<string, Connection> = {};
+    for (const c of connections) {
+      if (c.internetId) map[c.internetId.toLowerCase()] = c;
+    }
+    return map;
+  }, [connections]);
 
   const handleExport = useCallback(() => {
     const exportData = connections.map((c, idx) => {
@@ -209,7 +219,9 @@ export function ImportExportDialog({ isOpen, onClose, connections, areas, compan
         return;
       }
 
-      let success = 0;
+      let created = 0;
+      let updated = 0;
+      let unchanged = 0;
       let failed = 0;
       const errors: string[] = [];
       const warnings: string[] = [];
@@ -266,8 +278,32 @@ export function ImportExportDialog({ isOpen, onClose, connections, areas, compan
         };
 
         try {
-          await api.post(`/admin/connections?companyId=${companyId}`, payload);
-          success++;
+          let existing = updateExisting ? existingByInternetId[internetId.toLowerCase()] : undefined;
+
+          // Fallback: the local list may be stale or miss soft-deleted rows.
+          // Confirm against the server so an existing Internet ID is never
+          // POSTed (which hits the unique-constraint error).
+          if (updateExisting && !existing) {
+            try {
+              const res = await api.get('/admin/connections', { params: { companyId, internetId } });
+              const found = (res.data?.data ?? []) as Connection[];
+              if (found.length > 0) existing = found[0];
+            } catch {
+              // Ignore lookup failures; the POST below will surface real errors.
+            }
+          }
+
+          if (existing) {
+            if (!existing.sublocalityId && sublocalityId) {
+              await api.put(`/admin/connections/${existing.id}?companyId=${companyId}`, { sublocalityId });
+              updated++;
+            } else {
+              unchanged++;
+            }
+          } else {
+            await api.post(`/admin/connections?companyId=${companyId}`, payload);
+            created++;
+          }
         } catch (err: unknown) {
           failed++;
           const msg = err instanceof Error ? err.message : 'Unknown error';
@@ -275,11 +311,11 @@ export function ImportExportDialog({ isOpen, onClose, connections, areas, compan
         }
       }
 
-      setImportResult({ success, failed, errors, warnings });
+      setImportResult({ created, updated, unchanged, failed, errors, warnings });
       queryClient.invalidateQueries({ queryKey: ['admin/connections', companyId] });
 
-      if (success > 0) {
-        toast({ title: 'Import complete', description: `${success} subscribers imported successfully.` });
+      if (created > 0 || updated > 0) {
+        toast({ title: 'Import complete', description: `${created} created, ${updated} updated, ${unchanged} unchanged, ${failed} failed.` });
       }
       if (failed > 0) {
         toast({ variant: 'destructive', title: 'Import issues', description: `${failed} rows failed. See details in the dialog.` });
@@ -289,7 +325,7 @@ export function ImportExportDialog({ isOpen, onClose, connections, areas, compan
     } finally {
       setIsImporting(false);
     }
-  }, [importFile, companyId, areas, queryClient, toast]);
+  }, [importFile, companyId, areas, queryClient, toast, updateExisting, existingByInternetId]);
 
   const handleOpenChange = (open: boolean) => {
     if (!open) {
@@ -373,6 +409,19 @@ export function ImportExportDialog({ isOpen, onClose, connections, areas, compan
             </div>
 
             {importFile && !importResult && (
+              <label className="flex items-start gap-2 rounded-lg border border-muted p-3 text-sm text-muted-foreground cursor-pointer">
+                <Checkbox checked={updateExisting} onCheckedChange={(v) => setUpdateExisting(v === true)} className="mt-0.5" />
+                <span>
+                  Update existing subscribers by Internet ID
+                  <span className="block text-xs text-muted-foreground/80 mt-0.5">
+                    Existing subscribers are kept as-is. Only empty Sublocality cells are filled from this
+                    file - existing areas are never overwritten and subscribers are never duplicated.
+                  </span>
+                </span>
+              </label>
+            )}
+
+            {importFile && !importResult && (
               <Button onClick={handleImport} disabled={isImporting} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 w-full">
                 {isImporting ? (
                   <>
@@ -397,7 +446,7 @@ export function ImportExportDialog({ isOpen, onClose, connections, areas, compan
                     <CheckCircle2 className="h-5 w-5 text-emerald-600" />
                   )}
                   <span className="font-semibold">
-                    {importResult.success} imported, {importResult.failed} failed
+                    {importResult.created} created, {importResult.updated} updated, {importResult.unchanged} unchanged, {importResult.failed} failed
                   </span>
                 </div>
                 {importResult.warnings.length > 0 && (
