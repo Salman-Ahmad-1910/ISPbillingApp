@@ -247,7 +247,7 @@ export function ImportExportDialog({ isOpen, onClose, connections, areas, compan
             (a.locality || '').toLowerCase() === sublocalityName.toLowerCase()
           );
           if (match) sublocalityId = match.id;
-          else warnings.push(`Row ${rowNum} (${internetId}): Sublocality "${sublocalityName}" not found in Areas - subscriber imported without an area.`);
+          else warnings.push(`Row ${rowNum} (${internetId}): Sublocality "${sublocalityName}" not found in Areas - existing area was kept.`);
         }
 
         const connectionType = String(row[headers.find(h => h === 'Connection Type') || ''] || 'both').trim() || 'both';
@@ -294,7 +294,7 @@ export function ImportExportDialog({ isOpen, onClose, connections, areas, compan
           }
 
           if (existing) {
-            if (!existing.sublocalityId && sublocalityId) {
+            if (sublocalityId && existing.sublocalityId !== sublocalityId) {
               await api.put(`/admin/connections/${existing.id}?companyId=${companyId}`, { sublocalityId });
               updated++;
             } else {
@@ -414,8 +414,9 @@ export function ImportExportDialog({ isOpen, onClose, connections, areas, compan
                 <span>
                   Update existing subscribers by Internet ID
                   <span className="block text-xs text-muted-foreground/80 mt-0.5">
-                    Existing subscribers are kept as-is. Only empty Sublocality cells are filled from this
-                    file - existing areas are never overwritten and subscribers are never duplicated.
+                    Existing subscribers are matched by Internet ID and their Sublocality is updated from this
+                    file when a value is provided. Empty cells leave existing values untouched, and no
+                    subscriber is ever duplicated.
                   </span>
                 </span>
               </label>
