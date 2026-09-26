@@ -1,7 +1,7 @@
 import { useUser } from '@/hooks/use-user';
 import type { User } from '@/lib/types';
 import { hasPermission, hasAnyPermission, hasAllPermissions, getUserPermissions, hasMinimumRole, ROLES } from '@/lib/permissions';
-import { hasFeaturePermission, CAN_CREATE_PERMISSION, CAN_UPDATE_PERMISSION, CAN_DELETE_PERMISSION } from '@/lib/permission-pages';
+import { hasFeaturePermission, hasCrudPermission, hasPagePermission } from '@/lib/permission-pages';
 
 export function usePermissions(user: User | null) {
   const userRole = user?.role || ROLES.STAFF;
@@ -43,18 +43,41 @@ export function useUserPermissions() {
   return usePermissions(actualUser);
 }
 
-// CRUD (Add/Create, Update, Delete) operation permissions. These are controlled
-// by the "CRUD" checkboxes on the Roles & Permissions page. Admin and Owner
-// roles always bypass, exactly like hasFeaturePermission.
-export function useCrudPermissions() {
+// CRUD (Add/Create, Update, Delete) operation permissions.
+//
+// Pass the page's own permission id (e.g. AREA_PERMISSION) to gate the buttons
+// with that page's own Create / Update / Delete children; the global "CRUD"
+// checkboxes on the Roles & Permissions page act as an app-wide fallback.
+// Admin and Owner roles always bypass, exactly like hasFeaturePermission.
+export function useCrudPermissions(pagePermissionId?: string) {
+  const perms = useUserPermissions();
+  const isAdmin = perms.isAdmin() || perms.userRole === ROLES.OWNER;
+  const granted = perms.grantedPermissions || [];
+  const configured = perms.permissionsConfigured;
+
+  const check = (action: 'create' | 'update' | 'delete') =>
+    hasCrudPermission(granted, configured, isAdmin, pagePermissionId, action);
+
+  return {
+    canCreate: check('create'),
+    canUpdate: check('update'),
+    canDelete: check('delete'),
+  };
+}
+
+// Per-page feature permissions (cards, bulk edit, import/export, status, ...).
+//
+// Unlike the CRUD actions above, these exist on a single page only, so they are
+// governed purely by that page's own child permission - there is no global
+// fallback. Pass the page permission id (e.g. SUBSCRIBER_DETAIL_PERMISSION) and
+// call `can` with the child key declared in PAGE_PERMISSIONS.
+export function usePagePermissions(pagePermissionId: string) {
   const perms = useUserPermissions();
   const isAdmin = perms.isAdmin() || perms.userRole === ROLES.OWNER;
   const granted = perms.grantedPermissions || [];
   const configured = perms.permissionsConfigured;
 
   return {
-    canCreate: hasFeaturePermission(granted, configured, isAdmin, CAN_CREATE_PERMISSION),
-    canUpdate: hasFeaturePermission(granted, configured, isAdmin, CAN_UPDATE_PERMISSION),
-    canDelete: hasFeaturePermission(granted, configured, isAdmin, CAN_DELETE_PERMISSION),
+    can: (key: string) => hasPagePermission(granted, configured, isAdmin, pagePermissionId, key),
   };
 }

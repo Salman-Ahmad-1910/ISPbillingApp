@@ -24,8 +24,9 @@ import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 import { ActionFeedbackDialog } from '@/components/shared/action-feedback-dialog';
 import { ImportExportDialog } from './import-export-dialog';
 import { smartMatch } from '@/lib/search';
-import { DeactivateDialog } from './deactivate-dialog';
-import { useCrudPermissions } from '@/hooks/usePermissions';
+import { StatusDialog } from './status-dialog';
+import { useCrudPermissions, usePagePermissions } from '@/hooks/usePermissions';
+import { SUBSCRIBER_DETAIL_PERMISSION } from '@/lib/permission-pages';
 
 type ConnectionFormValues = z.infer<typeof connectionSchema>;
 
@@ -38,14 +39,18 @@ interface ClientPageProps {
 export function ClientPage({ connections, initialConnectionId, initialPackageName }: ClientPageProps) {
   const { companyId } = useCompany();
   const queryClient = useQueryClient();
-  const { canCreate, canUpdate, canDelete } = useCrudPermissions();
+  const { canCreate, canUpdate, canDelete } = useCrudPermissions(SUBSCRIBER_DETAIL_PERMISSION);
+  const { can } = usePagePermissions(SUBSCRIBER_DETAIL_PERMISSION);
+  const canBulkEdit = can('bulk-edit');
+  const canImportExport = can('import-export');
+  const canChangeStatus = can('status');
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedConnection, setSelectedConnection] = useState<Connection | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isDeactivateDialogOpen, setIsDeactivateDialogOpen] = useState(false);
+  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isDeactivating, setIsDeactivating] = useState(false);
+  const [isStatusSaving, setIsStatusSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; title: string; message: string } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -236,32 +241,40 @@ export function ClientPage({ connections, initialConnectionId, initialPackageNam
     setIsDeleteDialogOpen(true);
   };
 
-  const openDeactivateDialog = (connection: Connection) => {
+  const openStatusDialog = (connection: Connection) => {
     setSelectedConnection(connection);
-    setIsDeactivateDialogOpen(true);
+    setIsStatusDialogOpen(true);
   };
 
-  const handleDeactivate = async (connection: Connection, reason: string, comments: string) => {
-    setIsDeactivating(true);
+  const handleChangeStatus = async (connection: Connection, status: string, reason: string, comments: string) => {
+    setIsStatusSaving(true);
     try {
-      await api.put(`/admin/connections/${connection.id}?companyId=${companyId}`, {
-        status: 'deactivated',
-        deactivationReason: reason,
-        comments: comments,
-        leavingDate: new Date().toISOString(),
+      // The backend applies only the fields present in the payload, so the
+      // deactivation bookkeeping is sent when moving to "deactivated" and
+      // omitted for the other statuses.
+      const payload: Record<string, string> = { status };
+      if (status === 'deactivated') {
+        payload.deactivationReason = reason;
+        payload.comments = comments;
+        payload.leavingDate = new Date().toISOString();
+      }
+      await api.put(`/admin/connections/${connection.id}?companyId=${companyId}`, payload);
+      setFeedback({
+        type: 'success',
+        title: 'Success',
+        message: `Subscriber status updated to ${status}.`,
       });
-      setFeedback({ type: 'success', title: 'Success', message: 'Subscriber deactivated successfully.' });
       queryClient.invalidateQueries({ queryKey: ['admin/connections', companyId] });
-      setIsDeactivateDialogOpen(false);
+      setIsStatusDialogOpen(false);
       setSelectedConnection(null);
     } catch (error: any) {
       setFeedback({
         type: 'error',
         title: 'Error',
-        message: errorMessage(error, 'Failed to deactivate subscriber')
+        message: errorMessage(error, 'Failed to update subscriber status')
       });
     } finally {
-      setIsDeactivating(false);
+      setIsStatusSaving(false);
     }
   };
 
@@ -318,9 +331,10 @@ export function ClientPage({ connections, initialConnectionId, initialPackageNam
   const baseColumns = getColumns({
     onEdit: handleEdit,
     onDelete: openDeleteDialog,
-    onDeactivate: openDeactivateDialog,
+    onChangeStatus: openStatusDialog,
     canUpdate,
     canDelete,
+    canChangeStatus,
   });
 
   const selectColumn: ColumnDef<Connection, unknown> = {
@@ -459,6 +473,7 @@ export function ClientPage({ connections, initialConnectionId, initialPackageNam
             className="max-w-sm"
           />
           <div className="flex items-center gap-2 ml-auto">
+            {canBulkEdit && (
             <Button
               variant={isBulkEditMode ? 'default' : 'outline'}
               onClick={() => (isBulkEditMode ? exitBulkEditMode() : setIsBulkEditMode(true))}
@@ -467,6 +482,8 @@ export function ClientPage({ connections, initialConnectionId, initialPackageNam
               <Pencil className="mr-2 h-4 w-4" />
               {isBulkEditMode ? 'Done' : 'Bulk Edit'}
             </Button>
+            )}
+            {canImportExport && (
             <Button
               variant="outline"
               onClick={() => setIsImportExportOpen(true)}
@@ -475,6 +492,7 @@ export function ClientPage({ connections, initialConnectionId, initialPackageNam
               <FileSpreadsheet className="mr-2 h-4 w-4" />
               Import/Export
             </Button>
+            )}
             {canCreate && (
             <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
             <DialogTrigger asChild>
@@ -624,21 +642,23 @@ export function ClientPage({ connections, initialConnectionId, initialPackageNam
         itemName={selectedConnection?.name || ''}
       />
 
-      <DeactivateDialog
-        isOpen={isDeactivateDialogOpen}
-        onClose={() => setIsDeactivateDialogOpen(false)}
-        onDeactivate={handleDeactivate}
+      <StatusDialog
+        isOpen={isStatusDialogOpen}
+        onClose={() => setIsStatusDialogOpen(false)}
+        onChangeStatus={handleChangeStatus}
         connection={selectedConnection}
-        isSaving={isDeactivating}
+        isSaving={isStatusSaving}
       />
 
-      <ImportExportDialog
-        isOpen={isImportExportOpen}
-        onClose={() => setIsImportExportOpen(false)}
-        connections={connections}
-        areas={areas}
-        companies={companies}
-      />
+      {canImportExport && (
+        <ImportExportDialog
+          isOpen={isImportExportOpen}
+          onClose={() => setIsImportExportOpen(false)}
+          connections={connections}
+          areas={areas}
+          companies={companies}
+        />
+      )}
 
       <ActionFeedbackDialog
         open={feedback !== null}

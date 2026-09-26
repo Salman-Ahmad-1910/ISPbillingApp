@@ -117,6 +117,41 @@ export const PERMISSION_DEFS: PermissionDef[] = [
 // section (subscriber overview + financial metric cards).
 export const DASHBOARD_SUMMARY_PERMISSION = '15334';
 
+// Sidebar folders, in the exact order they appear in the navigation, mapped to
+// the permission modules they own. The Roles & Permissions page uses this to
+// filter the permission table down to a single folder. `modules` is empty for
+// the "all" entry, which means every module.
+export type PermissionFolder = {
+  id: string;
+  name: string;
+  modules: string[];
+};
+
+export const ALL_FOLDERS_ID = 'all';
+
+export const PERMISSION_FOLDERS: PermissionFolder[] = [
+  { id: ALL_FOLDERS_ID, name: 'All Folders', modules: [] },
+  { id: 'dashboard', name: 'Dashboard', modules: ['Dashboard'] },
+  { id: 'network', name: 'Network', modules: ['Network'] },
+  { id: 'messages', name: 'Messages', modules: ['Messages'] },
+  { id: 'subscribers-management', name: 'Subscribers Management', modules: ['Subscriber Management'] },
+  { id: 'sales', name: 'Sales', modules: ['Sales'] },
+  { id: 'transaction', name: 'Transaction', modules: ['Transactions'] },
+  { id: 'dealer-management', name: 'Dealer Management', modules: ['Dealer Management'] },
+  { id: 'inventory', name: 'Inventory', modules: ['Inventory'] },
+  { id: 'accounts', name: 'Accounts', modules: ['Accounts'] },
+  { id: 'stock-report', name: 'Stock Report', modules: ['Stock Reports'] },
+  { id: 'sale-report', name: 'Sale Report', modules: ['Sales Reports'] },
+  { id: 'complaints', name: 'Complaints', modules: ['Complain'] },
+  { id: 'recovery-officers', name: 'Recovery Officers', modules: ['Recovery Officer'] },
+  { id: 'human-resources', name: 'Human Resources', modules: ['Human Resources'] },
+  { id: 'administration', name: 'Administration', modules: ['Administration'] },
+  { id: 'system-log', name: 'System Log', modules: ['System Logs'] },
+  { id: 'subscriber-reports', name: 'Subscriber Reports', modules: ['Subscribers Reports'] },
+  { id: 'downloads', name: 'Downloads', modules: ['Downloads'] },
+  { id: 'general-actions', name: 'General Actions', modules: ['CRUD'] },
+];
+
 // Permission id that controls whether a user can see the graphs, recent
 // payments and open complaints widgets on the Dashboard page.
 export const DASHBOARD_CHARTS_PERMISSION = '15390';
@@ -272,4 +307,140 @@ export function getAllowedHrefs(permissionIds: string[]): Set<string> {
     (PERMISSION_PAGES[id] || []).forEach((href) => hrefs.add(href));
   });
   return hrefs;
+}
+
+// --- Per-page child permissions ---------------------------------------------
+// A page-level permission (e.g. "Area") can own finer-grained children that
+// control the individual features and buttons on that page. Child ids are
+// derived from the parent id ("13309:create") so they can never collide with
+// the legacy numeric permission ids and stay self-describing in the database.
+
+// Page permission ids that own children.
+export const AREA_PERMISSION = '13309';
+export const POP_PERMISSION = '15365';
+export const OLT_PERMISSION = '15366';
+export const SPLITTER_PERMISSION = '15367';
+export const BOX_MEDIA_PERMISSION = '13314';
+export const SUBSCRIBER_DETAIL_PERMISSION = '13315';
+export const INQUIRIES_PERMISSION = '13316';
+
+export type CrudAction = 'create' | 'update' | 'delete';
+
+export type PageChildPermission = {
+  key: string;
+  label: string;
+};
+
+// The three CRUD children shared by most pages.
+export const CRUD_CHILDREN: PageChildPermission[] = [
+  { key: 'create', label: 'Create' },
+  { key: 'update', label: 'Update' },
+  { key: 'delete', label: 'Delete' },
+];
+
+// Subscriber Detail exposes more than CRUD, so it declares its own set.
+export const SUBSCRIBER_DETAIL_CHILDREN: PageChildPermission[] = [
+  { key: 'cards', label: 'Cards' },
+  { key: 'bulk-edit', label: 'Bulk Edit' },
+  { key: 'import-export', label: 'Import / Export' },
+  { key: 'create', label: 'Create' },
+  { key: 'update', label: 'Edit' },
+  { key: 'delete', label: 'Delete' },
+  { key: 'status', label: 'Status' },
+];
+
+// New Inquiries adds a gate for the summary cards at the top of the page.
+export const INQUIRIES_CHILDREN: PageChildPermission[] = [
+  { key: 'summary', label: 'Summary' },
+  { key: 'create', label: 'Create' },
+  { key: 'update', label: 'Edit' },
+  { key: 'delete', label: 'Delete' },
+];
+
+export function childPermissionId(parentId: string, key: string): string {
+  return `${parentId}:${key}`;
+}
+
+// The master (coarse) CRUD switches, used as an app-wide fallback when a page
+// has no per-page child permission granted.
+const GLOBAL_CRUD_PERMISSION: Record<CrudAction, string> = {
+  create: CAN_CREATE_PERMISSION,
+  update: CAN_UPDATE_PERMISSION,
+  delete: CAN_DELETE_PERMISSION,
+};
+
+// Pages that expose their own children instead of relying solely on the global
+// CRUD switches. Keyed by the parent page permission id. Adding a page here is
+// all that is required to give it per-page control.
+export const PAGE_PERMISSIONS: Record<string, { name: string; children: PageChildPermission[] }> = {
+  [AREA_PERMISSION]: { name: 'Area', children: CRUD_CHILDREN },
+  [POP_PERMISSION]: { name: 'POPs', children: CRUD_CHILDREN },
+  [OLT_PERMISSION]: { name: 'OLTs', children: CRUD_CHILDREN },
+  [SPLITTER_PERMISSION]: { name: 'Splitters', children: CRUD_CHILDREN },
+  [BOX_MEDIA_PERMISSION]: { name: 'Box/Media', children: CRUD_CHILDREN },
+  [SUBSCRIBER_DETAIL_PERMISSION]: { name: 'Subscribers Details', children: SUBSCRIBER_DETAIL_CHILDREN },
+  [INQUIRIES_PERMISSION]: { name: 'New Inquiries', children: INQUIRIES_CHILDREN },
+};
+
+// Child permission definitions, derived from PAGE_PERMISSIONS. These are
+// stored in `user_permissions` exactly like the top-level ones, but they are
+// never listed in PERMISSION_PAGES - reaching the page still requires the
+// parent permission.
+export const PERMISSION_CHILD_DEFS: (PermissionDef & { parentId: string; key: string; label: string })[] =
+  Object.entries(PAGE_PERMISSIONS).flatMap(([parentId, { name, children }]) =>
+    children.map(({ key, label }) => ({
+      id: childPermissionId(parentId, key),
+      name: `${name} - ${label}`,
+      module: PERMISSION_DEFS.find(p => p.id === parentId)?.module ?? 'General',
+      parentId,
+      key,
+      label,
+    }))
+  );
+
+// Every permission id that can be stored for a user: the top-level definitions
+// plus their per-page children.
+export const ALL_PERMISSION_IDS: string[] = [
+  ...PERMISSION_DEFS.map(p => p.id),
+  ...PERMISSION_CHILD_DEFS.map(p => p.id),
+];
+
+// Children grouped by their parent page permission id.
+export const CHILDREN_BY_PARENT: Record<string, typeof PERMISSION_CHILD_DEFS> =
+  PERMISSION_CHILD_DEFS.reduce((acc, child) => {
+    (acc[child.parentId] ||= []).push(child);
+    return acc;
+  }, {} as Record<string, typeof PERMISSION_CHILD_DEFS>);
+
+// Resolve whether a page's own child permission is granted. Unlike the CRUD
+// helpers there is no global fallback: a feature that only exists on a single
+// page (cards, bulk edit, status, ...) is governed purely by that page's child
+// permission. Admin/owner roles and users with no per-user configuration always
+// pass, matching hasFeaturePermission.
+export function hasPagePermission(
+  grantedPermissions: string[],
+  permissionsConfigured: boolean,
+  isAdmin: boolean,
+  pagePermissionId: string,
+  key: string,
+): boolean {
+  return hasFeaturePermission(grantedPermissions, permissionsConfigured, isAdmin, childPermissionId(pagePermissionId, key));
+}
+
+// Resolve whether a CRUD action is allowed on a page, honouring the page's own
+// child permission and falling back to the global CRUD switch. Admin/owner
+// roles and users with no per-user configuration always pass, matching
+// hasFeaturePermission.
+export function hasCrudPermission(
+  grantedPermissions: string[],
+  permissionsConfigured: boolean,
+  isAdmin: boolean,
+  pagePermissionId: string | undefined,
+  action: CrudAction,
+): boolean {
+  if (pagePermissionId
+    && hasFeaturePermission(grantedPermissions, permissionsConfigured, isAdmin, childPermissionId(pagePermissionId, action))) {
+    return true;
+  }
+  return hasFeaturePermission(grantedPermissions, permissionsConfigured, isAdmin, GLOBAL_CRUD_PERMISSION[action]);
 }

@@ -9,9 +9,11 @@ import { Pencil, Trash2, RadioTower, Wifi, WifiOff, MapPin } from 'lucide-react'
 interface ColumnsProps {
   onEdit: (pop: POP) => void;
   onDelete: (pop: POP) => void;
+  canUpdate?: boolean;
+  canDelete?: boolean;
 }
 
-export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<POP>[] => [
+export const getColumns = ({ onEdit, onDelete, canUpdate = true, canDelete = true }: ColumnsProps): ColumnDef<POP>[] => [
   {
     accessorKey: 'id',
     header: 'ID',
@@ -73,24 +75,28 @@ export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<POP>[]
       const pop = row.original;
       return (
         <div className="flex items-center justify-end gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 p-0 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-950/30 transition-all duration-300 hover:scale-110"
-            onClick={() => onEdit(pop)}
-          >
-            <Pencil className="h-4 w-4" />
-            <span className="sr-only">Edit</span>
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 p-0 text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/30 transition-all duration-300 hover:scale-110"
-            onClick={() => onDelete(pop)}
-          >
-            <Trash2 className="h-4 w-4" />
-            <span className="sr-only">Delete</span>
-          </Button>
+          {canUpdate && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-950/30 transition-all duration-300 hover:scale-110"
+              onClick={() => onEdit(pop)}
+            >
+              <Pencil className="h-4 w-4" />
+              <span className="sr-only">Edit</span>
+            </Button>
+          )}
+          {canDelete && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/30 transition-all duration-300 hover:scale-110"
+              onClick={() => onDelete(pop)}
+            >
+              <Trash2 className="h-4 w-4" />
+              <span className="sr-only">Delete</span>
+            </Button>
+          )}
         </div>
       );
     },

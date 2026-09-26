@@ -7,18 +7,34 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Search, Eye, Save, Users, UserRound, Handshake } from 'lucide-react';
+import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
+import { Loader2, Search, Eye, Save, Users, UserRound, Handshake, ChevronRight, ChevronDown } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import { smartMatch } from '@/lib/search';
 import { useQueryClient } from '@tanstack/react-query';
-import { PERMISSION_DEFS } from '@/lib/permission-pages';
+import {
+  PERMISSION_DEFS,
+  PERMISSION_FOLDERS,
+  PERMISSION_CHILD_DEFS,
+  CHILDREN_BY_PARENT,
+  ALL_PERMISSION_IDS,
+  ALL_FOLDERS_ID,
+} from '@/lib/permission-pages';
 
 const PERMISSIONS = PERMISSION_DEFS;
 
 const MODULES = [...new Set(PERMISSIONS.map(p => p.module))];
+
+const FOLDER_OPTIONS = PERMISSION_FOLDERS.map(folder => ({
+  id: folder.id,
+  name: folder.name,
+  secondary: `${folder.modules.length === 0
+    ? PERMISSIONS.length
+    : PERMISSIONS.filter(p => folder.modules.includes(p.module)).length} permissions`,
+}));
 
 const USER_CATEGORIES = [
   { key: 'staff', label: 'Staff', icon: Users, endpoint: 'hr/staff' },
@@ -40,6 +56,20 @@ export default function ClientPage() {
   const [isLoadingPerms, setIsLoadingPerms] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [permissionsLoaded, setPermissionsLoaded] = useState(false);
+  const [selectedFolder, setSelectedFolder] = useState<string>(ALL_FOLDERS_ID);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  const toggleExpanded = (permId: string) => {
+    setExpanded(prev => ({ ...prev, [permId]: !prev[permId] }));
+  };
+
+  // Only the modules owned by the selected sidebar folder are listed.
+  const visibleModules = useMemo(() => {
+    if (selectedFolder === ALL_FOLDERS_ID) return MODULES;
+    const folder = PERMISSION_FOLDERS.find(f => f.id === selectedFolder);
+    if (!folder) return MODULES;
+    return MODULES.filter(module => folder.modules.includes(module));
+  }, [selectedFolder]);
 
   const { data: staff = [] } = useGenericQuery<any>(userCategory === 'staff' ? 'hr/staff' : null, companyId ?? undefined);
   const { data: recoveryOfficers = [] } = useGenericQuery<any>(userCategory === 'recovery' ? 'admin/recovery-officers' : null, companyId ?? undefined);
@@ -76,9 +106,17 @@ export default function ClientPage() {
       const res = await api.get(`/admin/roles/users/${selectedUserId}/permissions`, { params: { companyId } });
       const data = res.data?.data || [];
       const permMap: Record<string, { web: boolean; mobile: boolean }> = {};
-      PERMISSIONS.forEach(p => { permMap[p.id] = { web: false, mobile: false }; });
+      ALL_PERMISSION_IDS.forEach(id => { permMap[id] = { web: false, mobile: false }; });
+      const saved = new Set<string>();
       (Array.isArray(data) ? data : []).forEach((p: any) => {
         permMap[p.permissionId] = { web: p.webEnabled ?? true, mobile: p.mobileEnabled ?? true };
+        saved.add(p.permissionId);
+      });
+      // Per-page CRUD children inherit their parent's state when the parent was
+      // saved before these children existed, so existing users keep their
+      // buttons instead of silently losing them.
+      PERMISSION_CHILD_DEFS.forEach(child => {
+        if (!saved.has(child.id)) permMap[child.id] = { ...(permMap[child.parentId] ?? { web: false, mobile: false }) };
       });
       setPermissions(permMap);
       setPermissionsLoaded(true);
@@ -90,21 +128,75 @@ export default function ClientPage() {
   };
 
   const handleToggleWeb = (permId: string) => {
-    setPermissions(prev => ({
-      ...prev,
-      [permId]: { ...prev[permId], web: !prev[permId]?.web },
-    }));
+    setPermissions(prev => {
+      const web = !prev[permId]?.web;
+      return setWithChildren(prev, permId, 'web', web);
+    });
   };
 
   const handleToggleMobile = (permId: string) => {
-    setPermissions(prev => ({
-      ...prev,
-      [permId]: { ...prev[permId], mobile: !prev[permId]?.mobile },
-    }));
+    setPermissions(prev => {
+      const mobile = !prev[permId]?.mobile;
+      return setWithChildren(prev, permId, 'mobile', mobile);
+    });
   };
 
+  // Toggling a parent page permission cascades down to its Create / Update /
+  // Delete children, so granting a page grants its actions by default and an
+  // admin can then switch individual actions back off.
+  const setWithChildren = (
+    prev: Record<string, { web: boolean; mobile: boolean }>,
+    permId: string,
+    platform: 'web' | 'mobile',
+    value: boolean,
+  ) => {
+    const next = { ...prev };
+    next[permId] = { ...next[permId], [platform]: value };
+    (CHILDREN_BY_PARENT[permId] || []).forEach(child => {
+      next[child.id] = { ...next[child.id], [platform]: value };
+    });
+    return next;
+  };
+
+  // Toggling a child switches the parent on when any child is enabled, so the
+  // page itself is never hidden while one of its actions is granted.
+  const setParentFromChild = (
+    prev: Record<string, { web: boolean; mobile: boolean }>,
+    parentId: string,
+    platform: 'web' | 'mobile',
+    anyChildOn: boolean,
+  ) => {
+    if (!prev[parentId]?.[platform] && !anyChildOn) return prev;
+    const next = { ...prev };
+    next[parentId] = { ...next[parentId], [platform]: true };
+    return next;
+  };
+
+  const handleToggleChildWeb = (parentId: string, childId: string) => {
+    setPermissions(prev => {
+      const web = !prev[childId]?.web;
+      const next = { ...prev, [childId]: { ...prev[childId], web } };
+      return setParentFromChild(next, parentId, 'web', web);
+    });
+  };
+
+  const handleToggleChildMobile = (parentId: string, childId: string) => {
+    setPermissions(prev => {
+      const mobile = !prev[childId]?.mobile;
+      const next = { ...prev, [childId]: { ...prev[childId], mobile } };
+      return setParentFromChild(next, parentId, 'mobile', mobile);
+    });
+  };
+
+  // Bulk "select all" for a module also covers the module's per-page CRUD
+  // children, otherwise the header checkbox could never read as fully checked.
+  const modulePermissionIds = (module: string) => [
+    ...PERMISSIONS.filter(p => p.module === module).map(p => p.id),
+    ...PERMISSION_CHILD_DEFS.filter(p => p.module === module).map(p => p.id),
+  ];
+
   const handleToggleModuleWeb = (module: string, checked: boolean) => {
-    const ids = PERMISSIONS.filter(p => p.module === module).map(p => p.id);
+    const ids = modulePermissionIds(module);
     setPermissions(prev => {
       const next = { ...prev };
       ids.forEach(id => { if (next[id]) next[id] = { ...next[id], web: checked }; });
@@ -113,7 +205,7 @@ export default function ClientPage() {
   };
 
   const handleToggleModuleMobile = (module: string, checked: boolean) => {
-    const ids = PERMISSIONS.filter(p => p.module === module).map(p => p.id);
+    const ids = modulePermissionIds(module);
     setPermissions(prev => {
       const next = { ...prev };
       ids.forEach(id => { if (next[id]) next[id] = { ...next[id], mobile: checked }; });
@@ -122,12 +214,12 @@ export default function ClientPage() {
   };
 
   const moduleWebAllSelected = (module: string) => {
-    const ids = PERMISSIONS.filter(p => p.module === module).map(p => p.id);
+    const ids = modulePermissionIds(module);
     return ids.every(id => permissions[id]?.web);
   };
 
   const moduleMobileAllSelected = (module: string) => {
-    const ids = PERMISSIONS.filter(p => p.module === module).map(p => p.id);
+    const ids = modulePermissionIds(module);
     return ids.every(id => permissions[id]?.mobile);
   };
 
@@ -232,16 +324,27 @@ export default function ClientPage() {
       {/* Permissions Table */}
       {permissionsLoaded && (
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <CardTitle className="text-base">Permissions</CardTitle>
               <p className="text-sm text-muted-foreground mt-1">{selectedCount} permissions enabled</p>
             </div>
-            <Button onClick={handleSave} disabled={isSaving} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white">
-              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              <Save className="mr-2 h-4 w-4" />
-              Save
-            </Button>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <SearchableDropdown
+                items={FOLDER_OPTIONS}
+                value={selectedFolder}
+                onValueChange={setSelectedFolder}
+                placeholder="Search folder..."
+                allowClear={false}
+                matchContainsOnly
+                className="sm:w-72"
+              />
+              <Button onClick={handleSave} disabled={isSaving} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white">
+                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <Save className="mr-2 h-4 w-4" />
+                Save
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -256,55 +359,107 @@ export default function ClientPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {MODULES.map(module => {
-                    const modulePerms = PERMISSIONS.filter(p => p.module === module);
-                    const webAll = moduleWebAllSelected(module);
-                    const mobileAll = moduleMobileAllSelected(module);
-                    return (
-                      <Fragment key={module}>
-                        <tr className="border-b bg-accent/30">
-                          <td colSpan={5} className="py-2 px-3">
-                            <div className="flex items-center gap-4">
-                              <span className="font-semibold text-sm">{module}</span>
-                              <label className="flex items-center gap-1.5 text-xs cursor-pointer">
-                                <Checkbox
-                                  checked={webAll}
-                                  onCheckedChange={c => handleToggleModuleWeb(module, !!c)}
-                                />
-                                Web
-                              </label>
-                              <label className="flex items-center gap-1.5 text-xs cursor-pointer">
-                                <Checkbox
-                                  checked={mobileAll}
-                                  onCheckedChange={c => handleToggleModuleMobile(module, !!c)}
-                                />
-                                Mobile
-                              </label>
-                            </div>
-                          </td>
-                        </tr>
-                        {modulePerms.map(p => (
-                          <tr key={p.id} className="border-b hover:bg-muted/30">
-                            <td className="py-2 px-3 font-mono text-xs text-muted-foreground">{p.id}</td>
-                            <td className="py-2 px-3">{p.name}</td>
-                            <td className="py-2 px-3 text-muted-foreground">{p.module}</td>
-                            <td className="py-2 px-3 text-center">
-                              <Checkbox
-                                checked={permissions[p.id]?.web ?? false}
-                                onCheckedChange={() => handleToggleWeb(p.id)}
-                              />
-                            </td>
-                            <td className="py-2 px-3 text-center">
-                              <Checkbox
-                                checked={permissions[p.id]?.mobile ?? false}
-                                onCheckedChange={() => handleToggleMobile(p.id)}
-                              />
+                  {visibleModules.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 px-3 text-center text-sm text-muted-foreground">
+                        No permissions found for this folder.
+                      </td>
+                    </tr>
+                  ) : (
+                    visibleModules.map(module => {
+                      const modulePerms = PERMISSIONS.filter(p => p.module === module);
+                      const webAll = moduleWebAllSelected(module);
+                      const mobileAll = moduleMobileAllSelected(module);
+                      return (
+                        <Fragment key={module}>
+                          <tr className="border-b bg-accent/30">
+                            <td colSpan={5} className="py-2 px-3">
+                              <div className="flex items-center gap-4">
+                                <span className="font-semibold text-sm">{module}</span>
+                                <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                                  <Checkbox
+                                    checked={webAll}
+                                    onCheckedChange={c => handleToggleModuleWeb(module, !!c)}
+                                  />
+                                  Web
+                                </label>
+                                <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                                  <Checkbox
+                                    checked={mobileAll}
+                                    onCheckedChange={c => handleToggleModuleMobile(module, !!c)}
+                                  />
+                                  Mobile
+                                </label>
+                              </div>
                             </td>
                           </tr>
-                        ))}
-                      </Fragment>
-                    );
-                  })}
+                          {modulePerms.map(p => {
+                            const children = CHILDREN_BY_PARENT[p.id] || [];
+                            const isOpen = !!expanded[p.id];
+                            return (
+                              <Fragment key={p.id}>
+                                <tr
+                                  className={`border-b hover:bg-muted/30 ${children.length ? 'cursor-pointer' : ''}`}
+                                  onClick={() => children.length && toggleExpanded(p.id)}
+                                >
+                                  <td className="py-2 px-3 font-mono text-xs text-muted-foreground">{p.id}</td>
+                                  <td className="py-2 px-3">
+                                    <div className="flex items-center gap-1.5">
+                                      {children.length > 0 && (
+                                        <span className="text-muted-foreground shrink-0">
+                                          {isOpen
+                                            ? <ChevronDown className="h-4 w-4" />
+                                            : <ChevronRight className="h-4 w-4" />}
+                                        </span>
+                                      )}
+                                      <span className={children.length ? 'font-medium' : undefined}>{p.name}</span>
+                                    </div>
+                                  </td>
+                                  <td className="py-2 px-3 text-muted-foreground">{p.module}</td>
+                                  <td className="py-2 px-3 text-center" onClick={e => e.stopPropagation()}>
+                                    <Checkbox
+                                      checked={permissions[p.id]?.web ?? false}
+                                      onCheckedChange={() => handleToggleWeb(p.id)}
+                                    />
+                                  </td>
+                                  <td className="py-2 px-3 text-center" onClick={e => e.stopPropagation()}>
+                                    <Checkbox
+                                      checked={permissions[p.id]?.mobile ?? false}
+                                      onCheckedChange={() => handleToggleMobile(p.id)}
+                                    />
+                                  </td>
+                                </tr>
+                                {isOpen && children.map(child => (
+                                  <tr key={child.id} className="border-b bg-muted/20 hover:bg-muted/30">
+                                    <td className="py-1.5 pl-10 pr-3 font-mono text-xs text-muted-foreground/70">{child.id}</td>
+                                    <td className="py-1.5 pr-3 text-sm">
+                                      <div className="flex items-center gap-1.5 pl-10">
+                                        <span className="text-muted-foreground select-none">↳</span>
+                                        <span>{child.label}</span>
+                                      </div>
+                                    </td>
+                                    <td className="py-1.5 pl-10 pr-3 text-xs text-muted-foreground">{p.name}</td>
+                                    <td className="py-1.5 px-3 text-center">
+                                      <Checkbox
+                                        checked={permissions[child.id]?.web ?? false}
+                                        onCheckedChange={() => handleToggleChildWeb(p.id, child.id)}
+                                      />
+                                    </td>
+                                    <td className="py-1.5 px-3 text-center">
+                                      <Checkbox
+                                        checked={permissions[child.id]?.mobile ?? false}
+                                        onCheckedChange={() => handleToggleChildMobile(p.id, child.id)}
+                                      />
+                                    </td>
+                                  </tr>
+                                ))}
+                              </Fragment>
+                            );
+                          })}
+                        </Fragment>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>

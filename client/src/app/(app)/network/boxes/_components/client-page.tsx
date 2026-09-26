@@ -22,6 +22,8 @@ import {
 } from '@/components/ui/dialog';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useCrudPermissions } from '@/hooks/usePermissions';
+import { BOX_MEDIA_PERMISSION } from '@/lib/permission-pages';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { prefixMatch } from '@/lib/search';
@@ -33,8 +35,9 @@ interface ClientPageProps {
 }
 
 export function ClientPage({ data }: ClientPageProps) {
-  const { companyId } = useCompany();
-  const { toast } = useToast();
+const { companyId } = useCompany();
+const { toast } = useToast();
+const { canCreate, canUpdate, canDelete } = useCrudPermissions(BOX_MEDIA_PERMISSION);
   const queryClient = useQueryClient();
   const [boxes, setBoxes] = useState<DistributionBox[]>(data);
   const [filter, setFilter] = useState('');
@@ -115,6 +118,8 @@ export function ClientPage({ data }: ClientPageProps) {
   const columns = getColumns({
     onEdit: handleEdit,
     onDelete: openDeleteDialog,
+    canUpdate,
+    canDelete,
   });
 
   return (
@@ -145,27 +150,29 @@ export function ClientPage({ data }: ClientPageProps) {
               className="max-w-sm pl-8"
             />
           </div>
-          <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-            <DialogTrigger asChild>
-              <Button
-                onClick={() => setSelectedBox(null)}
-                className="bg-gradient-to-r from-green-800 to-green-500 text-white hover:from-green-700 hover:to-green-400 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105"
-              >
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Add Box Number
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{selectedBox ? 'Edit' : 'Add'} Box / Media Number</DialogTitle>
-              </DialogHeader>
-              <BoxForm
-                box={selectedBox}
-                onSave={handleSave}
-                onCancel={() => setIsFormOpen(false)}
-              />
-            </DialogContent>
-          </Dialog>
+          {canCreate && (
+            <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  onClick={() => setSelectedBox(null)}
+                  className="bg-gradient-to-r from-green-800 to-green-500 text-white hover:from-green-700 hover:to-green-400 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105"
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Add Box Number
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{selectedBox ? 'Edit' : 'Add'} Box / Media Number</DialogTitle>
+                </DialogHeader>
+                <BoxForm
+                  box={selectedBox}
+                  onSave={handleSave}
+                  onCancel={() => setIsFormOpen(false)}
+                />
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
         <DataTable columns={columns} data={paginatedData} />
         <div className="flex items-center justify-between mt-4">

@@ -37,7 +37,6 @@ import {
   Receipt,
   CircleDollarSign,
   Ticket,
-  BellRing,
   Briefcase,
   Fingerprint,
   HelpingHand,
@@ -48,7 +47,6 @@ import {
   FileClock,
   FileText,
   ReceiptText,
-  Headphones,
   Settings,
   LogOut,
   LifeBuoy,
@@ -211,13 +209,6 @@ const navItems: NavItemGroup[] = [
       { title: 'Subscriber Complaint', href: '/support/complaints/user', icon: UserPlus, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
       { title: 'Allocated Complaint', href: '/support/complaints/allocated', icon: ClipboardPen, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
       { title: 'Complaint Report', href: '/support/complaints/report', icon: FileText, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
-    ],
-  },
-  {
-    title: 'Service Desk',
-    items: [
-      { title: 'Alerts', href: '/support/alerts', icon: BellRing, allowedRoles: ['admin', 'manager', 'staff'] },
-      { title: 'Support Tickets', href: '/admin/support-tickets', icon: Headphones, allowedRoles: ['admin', 'manager'] },
     ],
   },
   {

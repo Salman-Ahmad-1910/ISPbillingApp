@@ -22,6 +22,8 @@ import {
 } from '@/components/ui/dialog';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useCrudPermissions } from '@/hooks/usePermissions';
+import { POP_PERMISSION } from '@/lib/permission-pages';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { smartMatch } from '@/lib/search';
@@ -33,8 +35,9 @@ interface ClientPageProps {
 }
 
 export function ClientPage({ data }: ClientPageProps) {
-    const { companyId } = useCompany();
-    const { toast } = useToast();
+const { companyId } = useCompany();
+const { toast } = useToast();
+const { canCreate, canUpdate, canDelete } = useCrudPermissions(POP_PERMISSION);
     const queryClient = useQueryClient();
     const [pops, setPops] = useState<POP[]>(data);
     const [filter, setFilter] = useState('');
@@ -154,6 +157,8 @@ export function ClientPage({ data }: ClientPageProps) {
     const columns = getColumns({
         onEdit: handleEdit,
         onDelete: openDeleteDialog,
+        canUpdate,
+        canDelete,
     });
 
     // Stats
@@ -210,27 +215,29 @@ export function ClientPage({ data }: ClientPageProps) {
                             className="max-w-sm pl-8"
                         />
                     </div>
-                    <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-                        <DialogTrigger asChild>
-                            <Button
-                                onClick={() => setSelectedPop(null)}
-                                className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105"
-                            >
-                                <PlusCircle className="mr-2 h-4 w-4" />
-                                Add POP
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>{selectedPop ? 'Edit' : 'Add'} POP</DialogTitle>
-                            </DialogHeader>
-                            <POPForm
-                                pop={selectedPop}
-                                onSave={handleSave}
-                                onCancel={() => setIsFormOpen(false)}
-                            />
-                        </DialogContent>
-                    </Dialog>
+                    {canCreate && (
+                        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+                            <DialogTrigger asChild>
+                                <Button
+                                    onClick={() => setSelectedPop(null)}
+                                    className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105"
+                                >
+                                    <PlusCircle className="mr-2 h-4 w-4" />
+                                    Add POP
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>{selectedPop ? 'Edit' : 'Add'} POP</DialogTitle>
+                                </DialogHeader>
+                                <POPForm
+                                    pop={selectedPop}
+                                    onSave={handleSave}
+                                    onCancel={() => setIsFormOpen(false)}
+                                />
+                            </DialogContent>
+                        </Dialog>
+                    )}
                 </div>
                 <DataTable columns={columns} data={getPaginatedData()} />
                 

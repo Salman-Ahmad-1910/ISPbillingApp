@@ -16,12 +16,13 @@ import {
 interface ConnectionColumnsProps {
   onEdit: (connection: Connection) => void;
   onDelete: (connection: Connection) => void;
-  onDeactivate: (connection: Connection) => void;
+  onChangeStatus: (connection: Connection) => void;
   canUpdate?: boolean;
   canDelete?: boolean;
+  canChangeStatus?: boolean;
 }
 
-export const getColumns = ({ onEdit, onDelete, onDeactivate, canUpdate = true, canDelete = true }: ConnectionColumnsProps): ColumnDef<Connection>[] => [
+export const getColumns = ({ onEdit, onDelete, onChangeStatus, canUpdate = true, canDelete = true, canChangeStatus = true }: ConnectionColumnsProps): ColumnDef<Connection>[] => [
   {
     accessorKey: 'internetId',
     header: 'Internet ID',
@@ -106,8 +107,8 @@ export const getColumns = ({ onEdit, onDelete, onDeactivate, canUpdate = true, c
               {canUpdate && (
               <DropdownMenuItem onClick={() => onEdit(connection)} className="data-[highlighted]:text-emerald-600">Edit subscriber</DropdownMenuItem>
               )}
-              {connection.status !== 'deactivated' && (
-                <DropdownMenuItem onClick={() => onDeactivate(connection)} className="data-[highlighted]:text-amber-600">Deactivate subscriber</DropdownMenuItem>
+              {canChangeStatus && (
+                <DropdownMenuItem onClick={() => onChangeStatus(connection)} className="data-[highlighted]:text-amber-600">Status</DropdownMenuItem>
               )}
               {canDelete && (
                 <>

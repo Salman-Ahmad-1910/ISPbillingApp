@@ -7,6 +7,8 @@ import { Users, Wifi, WifiOff, UserX, Pause, Loader2 } from 'lucide-react';
 import { ClientPage } from './_components/client-page';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { usePagePermissions } from '@/hooks/usePermissions';
+import { SUBSCRIBER_DETAIL_PERMISSION } from '@/lib/permission-pages';
 import type { Connection } from '@/lib/types';
 
 export default function SubscriberDetailPage() {
@@ -15,6 +17,8 @@ export default function SubscriberDetailPage() {
   const connectionId = searchParams.get('connectionId') || undefined;
   const packageName = searchParams.get('package') || undefined;
   const { data: connectionsData, isLoading } = useGenericQuery<Connection[]>('admin/connections', companyId ?? undefined);
+  const { can } = usePagePermissions(SUBSCRIBER_DETAIL_PERMISSION);
+  const canViewCards = can('cards');
 
   const connections = (connectionsData || []) as Connection[];
 
@@ -73,6 +77,7 @@ export default function SubscriberDetailPage() {
 
       <div className="h-0.5 bg-gradient-to-r from-blue-500/50 via-blue-400/30 to-transparent" />
 
+      {canViewCards && (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-5">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center gap-3">
@@ -130,6 +135,7 @@ export default function SubscriberDetailPage() {
           </div>
         </div>
       </div>
+      )}
 
       <Card className="transition-all duration-300 hover:shadow-md">
         <CardContent className="p-0">

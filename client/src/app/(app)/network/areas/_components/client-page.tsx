@@ -26,6 +26,8 @@ import {
 } from '@/components/ui/dialog';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useCrudPermissions } from '@/hooks/usePermissions';
+import { AREA_PERMISSION } from '@/lib/permission-pages';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { smartMatch } from '@/lib/search';
@@ -39,6 +41,7 @@ interface ClientPageProps {
 export function ClientPage({ data }: ClientPageProps) {
   const { companyId } = useCompany();
   const { toast } = useToast();
+  const { canCreate, canUpdate, canDelete } = useCrudPermissions(AREA_PERMISSION);
   const queryClient = useQueryClient();
   const [areas, setAreas] = useState<Area[]>(data);
   const [filter, setFilter] = useState('');
@@ -162,6 +165,8 @@ export function ClientPage({ data }: ClientPageProps) {
   const columns = getColumns({
     onEdit: handleEdit,
     onDelete: openDeleteDialog,
+    canUpdate,
+    canDelete,
   });
 
   return (
@@ -217,32 +222,34 @@ export function ClientPage({ data }: ClientPageProps) {
               className="pl-9"
             />
           </div>
-          <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-            <DialogTrigger asChild>
-              <Button
-                onClick={() => setSelectedArea(null)}
-                className="bg-gradient-to-r from-green-800 to-green-500 hover:from-green-700 hover:to-green-400 shadow-sm transition-all duration-200 hover:shadow-md"
-              >
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Add New Area
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <div className="rounded-md bg-gradient-to-br from-green-800 to-green-500 p-1 text-white">
-                    <MapPin className="h-4 w-4" />
-                  </div>
-                  {selectedArea ? 'Edit' : 'Add'} Area
-                </DialogTitle>
-              </DialogHeader>
-              <AreaForm
-                area={selectedArea}
-                onSave={handleSave}
-                onCancel={() => setIsFormOpen(false)}
-              />
-            </DialogContent>
-          </Dialog>
+          {canCreate && (
+            <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  onClick={() => setSelectedArea(null)}
+                  className="bg-gradient-to-r from-green-800 to-green-500 hover:from-green-700 hover:to-green-400 shadow-sm transition-all duration-200 hover:shadow-md"
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Add New Area
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <div className="rounded-md bg-gradient-to-br from-green-800 to-green-500 p-1 text-white">
+                      <MapPin className="h-4 w-4" />
+                    </div>
+                    {selectedArea ? 'Edit' : 'Add'} Area
+                  </DialogTitle>
+                </DialogHeader>
+                <AreaForm
+                  area={selectedArea}
+                  onSave={handleSave}
+                  onCancel={() => setIsFormOpen(false)}
+                />
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
 
         <div className="transition-all duration-300 hover:shadow-md rounded-lg overflow-hidden">

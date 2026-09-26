@@ -19,7 +19,8 @@ import { DataTable } from './data-table';
 import { getColumns } from './columns';
 import { InquiryForm } from './inquiry-form';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
-import { useCrudPermissions } from '@/hooks/usePermissions';
+import { useCrudPermissions, usePagePermissions } from '@/hooks/usePermissions';
+import { INQUIRIES_PERMISSION } from '@/lib/permission-pages';
 
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
@@ -37,7 +38,9 @@ export function ClientPage({ data, areas, boxes, packages }: ClientPageProps) {
     const { companyId } = useCompany();
     const { toast } = useToast();
     const queryClient = useQueryClient();
-    const { canCreate, canUpdate, canDelete } = useCrudPermissions();
+    const { canCreate, canUpdate, canDelete } = useCrudPermissions(INQUIRIES_PERMISSION);
+    const { can } = usePagePermissions(INQUIRIES_PERMISSION);
+    const canViewSummary = can('summary');
     const [inquiries, setInquiries] = useState<Inquiry[]>(data);
     const [searchQuery, setSearchQuery] = useState('');
     const [filterSublocality, setFilterSublocality] = useState('all');
@@ -219,6 +222,7 @@ export function ClientPage({ data, areas, boxes, packages }: ClientPageProps) {
     return (
         <>
             <div className="p-6 space-y-6">
+                {canViewSummary && (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
                     <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
                         <div className="flex items-center gap-3">
@@ -276,6 +280,7 @@ export function ClientPage({ data, areas, boxes, packages }: ClientPageProps) {
                         </div>
                     </div>
                 </div>
+                )}
 
                 <div className="flex flex-wrap items-end gap-4">
                     <div className="space-y-1.5">
