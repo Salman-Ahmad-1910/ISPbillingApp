@@ -18,7 +18,8 @@ import { DataTable } from './data-table';
 import { getColumns } from './columns';
 import { CorporateCustomerForm } from './corporate-customer-form';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
-import { useCrudPermissions } from '@/hooks/usePermissions';
+import { useCrudPermissions, usePagePermissions } from '@/hooks/usePermissions';
+import { CORPORATE_CLIENTS_PERMISSION } from '@/lib/permission-pages';
 
 
 import { useQueryClient } from '@tanstack/react-query';
@@ -35,7 +36,9 @@ export function ClientPage({ data }: ClientPageProps) {
     const { companyId } = useCompany();
     const { toast } = useToast();
     const queryClient = useQueryClient();
-    const { canCreate, canUpdate, canDelete } = useCrudPermissions();
+    const { canCreate, canUpdate, canDelete } = useCrudPermissions(CORPORATE_CLIENTS_PERMISSION);
+    const { can } = usePagePermissions(CORPORATE_CLIENTS_PERMISSION);
+    const canViewSummary = can('summary');
     const [customers, setCustomers] = useState<CorporateCustomer[]>(data);
     const [filter, setFilter] = useState('');
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -165,6 +168,7 @@ export function ClientPage({ data }: ClientPageProps) {
     return (
         <>
             <div className="p-6 space-y-6">
+                {canViewSummary && (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
                         <div className="flex items-center gap-3">
@@ -200,6 +204,7 @@ export function ClientPage({ data }: ClientPageProps) {
                         </div>
                     </div>
                 </div>
+                )}
 
                 <div className="flex items-center justify-between">
                     <div className="relative">

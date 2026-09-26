@@ -323,6 +323,7 @@ export const SPLITTER_PERMISSION = '15367';
 export const BOX_MEDIA_PERMISSION = '13314';
 export const SUBSCRIBER_DETAIL_PERMISSION = '13315';
 export const INQUIRIES_PERMISSION = '13316';
+export const CORPORATE_CLIENTS_PERMISSION = '15368';
 
 export type CrudAction = 'create' | 'update' | 'delete';
 
@@ -357,6 +358,14 @@ export const INQUIRIES_CHILDREN: PageChildPermission[] = [
   { key: 'delete', label: 'Delete' },
 ];
 
+// Corporate Clients follows the same shape as New Inquiries.
+export const CORPORATE_CLIENTS_CHILDREN: PageChildPermission[] = [
+  { key: 'summary', label: 'Summary' },
+  { key: 'create', label: 'Create' },
+  { key: 'update', label: 'Edit' },
+  { key: 'delete', label: 'Delete' },
+];
+
 export function childPermissionId(parentId: string, key: string): string {
   return `${parentId}:${key}`;
 }
@@ -380,6 +389,7 @@ export const PAGE_PERMISSIONS: Record<string, { name: string; children: PageChil
   [BOX_MEDIA_PERMISSION]: { name: 'Box/Media', children: CRUD_CHILDREN },
   [SUBSCRIBER_DETAIL_PERMISSION]: { name: 'Subscribers Details', children: SUBSCRIBER_DETAIL_CHILDREN },
   [INQUIRIES_PERMISSION]: { name: 'New Inquiries', children: INQUIRIES_CHILDREN },
+  [CORPORATE_CLIENTS_PERMISSION]: { name: 'Corporate Clients', children: CORPORATE_CLIENTS_CHILDREN },
 };
 
 // Child permission definitions, derived from PAGE_PERMISSIONS. These are
