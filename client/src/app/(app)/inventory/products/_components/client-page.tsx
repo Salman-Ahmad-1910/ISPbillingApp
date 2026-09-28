@@ -17,6 +17,8 @@ import { exportToExcel, printTableReport, fmtPKR } from '@/components/shared/tab
 
 import { DataTable } from './data-table';
 import { columns as getColumns } from './columns';
+import { useCrudPermissions } from '@/hooks/usePermissions';
+import { PRODUCT_PERMISSION } from '@/lib/permission-pages';
 import { ProductForm } from './product-form';
 import { SerialEntriesTable, parseSerialNumbers } from '@/components/shared/serial-entries';
 import {
@@ -44,6 +46,7 @@ export function ClientPage({ data }: ClientPageProps) {
   const company = companies.find((c) => c.id === companyId) || null;
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { canCreate, canUpdate, canDelete } = useCrudPermissions(PRODUCT_PERMISSION);
   const [products, setProducts] = useState<Product[]>(data);
   const [filter, setFilter] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -233,7 +236,7 @@ export function ClientPage({ data }: ClientPageProps) {
     setIsDeleteDialogOpen(true);
   };
 
-  const columns = getColumns({ onEdit: handleEdit, onDelete: openDeleteDialog });
+  const columns = getColumns({ onEdit: handleEdit, onDelete: openDeleteDialog, canUpdate, canDelete });
 
   return (
     <>
@@ -266,6 +269,7 @@ export function ClientPage({ data }: ClientPageProps) {
             <Button variant="outline" size="default" onClick={handleExportPdf} className="text-xs">
               <FileDown className="mr-1.5 h-3.5 w-3.5" /> PDF
             </Button>
+            {canCreate && (
             <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
             <DialogTrigger asChild>
               <Button onClick={() => setSelectedProduct(null)} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700">
@@ -290,6 +294,7 @@ export function ClientPage({ data }: ClientPageProps) {
   />
 </DialogContent>
           </Dialog>
+            )}
           </div>
         </div>
         <DataTable

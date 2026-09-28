@@ -21,6 +21,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
+import { useCrudPermissions } from '@/hooks/usePermissions';
+import { BRAND_PERMISSION } from '@/lib/permission-pages';
 
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import api from '@/lib/api';
@@ -36,6 +38,7 @@ export function ClientPage({ data }: ClientPageProps) {
   const { companyId } = useCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { canCreate, canUpdate, canDelete } = useCrudPermissions(BRAND_PERMISSION);
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null);
@@ -129,7 +132,7 @@ export function ClientPage({ data }: ClientPageProps) {
     setIsFormOpen(true);
   };
 
-  const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete });
+  const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, canUpdate, canDelete });
 
   return (
     <div className="space-y-4">
@@ -143,10 +146,12 @@ export function ClientPage({ data }: ClientPageProps) {
             className="pl-8"
           />
         </div>
+        {canCreate && (
         <Button onClick={handleAddNew} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700">
           <PlusCircle className="mr-2 h-4 w-4" />
           Add Brand
         </Button>
+        )}
       </div>
 
       <DataTable columns={columns} data={filteredBrands} />

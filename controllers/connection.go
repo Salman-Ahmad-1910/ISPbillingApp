@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"awesomeProject/config"
+	"awesomeProject/middleware"
 	"awesomeProject/models"
 	"awesomeProject/utils"
 	"fmt"
@@ -35,14 +36,21 @@ func incrementSplitterPorts(tx *gorm.DB, splitterID string) error {
 		UpdateColumn("available_ports", gorm.Expr("LEAST(available_ports + 1, total_ports)")).Error
 }
 
-func RegisterConnectionRoutes(admin *gin.RouterGroup) {
+// RegisterConnectionRoutesGuarded registers the subscriber routes with the
+// per-page child permissions of the Subscribers Details page enforced. The
+// status change shares PUT /:id with the ordinary edit form, so that route
+// requires the "status" child permission when the body carries a status field and
+// the "update" permission otherwise.
+func RegisterConnectionRoutesGuarded(admin *gin.RouterGroup, db *gorm.DB) {
+	pageID := middleware.SubscriberDetailPermission
+
 	connections := admin.Group("/connections")
 	connections.GET("", findConnections)
 	connections.GET("/logs", getConnectionLogs)
-	connections.POST("", createConnection)
-	connections.POST("/bulk-sublocality", bulkUpdateConnectionSublocality)
-	connections.PUT("/:id", updateConnection)
-	connections.DELETE("/:id", deleteConnection)
+	connections.POST("", middleware.RequirePageCrud(db, pageID), createConnection)
+	connections.POST("/bulk-sublocality", middleware.RequirePageFeature(db, pageID, middleware.FeatureBulkEdit), bulkUpdateConnectionSublocality)
+	connections.PUT("/:id", middleware.RequirePageCrudUnlessFeature(db, pageID, middleware.ActionUpdate, "status", middleware.FeatureStatus), updateConnection)
+	connections.DELETE("/:id", middleware.RequirePageCrud(db, pageID), deleteConnection)
 }
 
 // bulkSublocalityRequest holds the ids and target sublocality for a bulk

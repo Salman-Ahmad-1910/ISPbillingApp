@@ -324,6 +324,18 @@ export const BOX_MEDIA_PERMISSION = '13314';
 export const SUBSCRIBER_DETAIL_PERMISSION = '13315';
 export const INQUIRIES_PERMISSION = '13316';
 export const CORPORATE_CLIENTS_PERMISSION = '15368';
+export const PACKAGE_PERMISSION = '13313';
+export const RECOVERY_OFFICER_PERMISSION = '13317';
+export const AREA_ASSIGNMENT_PERMISSION = '13319';
+export const SALES_CUSTOMERS_PERMISSION = '15336';
+export const GUARANTORS_PERMISSION = '15370';
+export const INSTALLMENT_PLANS_PERMISSION = '15337';
+export const POINT_OF_SALE_PERMISSION = '15338';
+export const BRAND_PERMISSION = '15309';
+export const VENDOR_PERMISSION = '15310';
+export const UNIT_TYPE_PERMISSION = '15311';
+export const PRODUCT_PERMISSION = '15312';
+export const PRODUCT_TYPE_PERMISSION = '15321';
 
 export type CrudAction = 'create' | 'update' | 'delete';
 
@@ -366,6 +378,66 @@ export const CORPORATE_CLIENTS_CHILDREN: PageChildPermission[] = [
   { key: 'delete', label: 'Delete' },
 ];
 
+// Packages gates its summary cards and CRUD buttons the same way.
+export const PACKAGE_CHILDREN: PageChildPermission[] = [
+  { key: 'summary', label: 'Summary' },
+  { key: 'create', label: 'Create' },
+  { key: 'update', label: 'Edit' },
+  { key: 'delete', label: 'Delete' },
+];
+
+// Recovery Officers gates its KPI cards and CRUD actions the same way.
+export const RECOVERY_OFFICER_CHILDREN: PageChildPermission[] = [
+  { key: 'summary', label: 'Summary' },
+  { key: 'create', label: 'Create' },
+  { key: 'update', label: 'Edit' },
+  { key: 'delete', label: 'Delete' },
+];
+
+// Area Assignment exposes a single feature: the "Select Recovery Officer"
+// dropdown. Without it the whole transfer panel below is unreachable, so the
+// dropdown is the permission boundary for this page.
+export const AREA_ASSIGNMENT_CHILDREN: PageChildPermission[] = [
+  { key: 'officer-select', label: 'Select Officer' },
+];
+
+// Sales > Customers gates its KPI cards and CRUD actions the same way.
+export const SALES_CUSTOMERS_CHILDREN: PageChildPermission[] = [
+  { key: 'summary', label: 'Summary' },
+  { key: 'create', label: 'Create' },
+  { key: 'update', label: 'Edit' },
+  { key: 'delete', label: 'Delete' },
+];
+
+// Guarantors and Installment Plans are CRUD-only: their stat cards are not
+// exposed as a permission, so only these three children exist.
+export const GUARANTORS_CHILDREN: PageChildPermission[] = [
+  { key: 'create', label: 'Create' },
+  { key: 'update', label: 'Edit' },
+  { key: 'delete', label: 'Delete' },
+];
+
+export const INSTALLMENT_PLANS_CHILDREN: PageChildPermission[] = [
+  { key: 'create', label: 'Create' },
+  { key: 'update', label: 'Edit' },
+  { key: 'delete', label: 'Delete' },
+];
+
+// Point of Sale is split into two independent panels: the product grid on the
+// left and the Order Details panel on the right. Each is gated on its own.
+export const POINT_OF_SALE_CHILDREN: PageChildPermission[] = [
+  { key: 'products', label: 'Products' },
+  { key: 'order-detail', label: 'Order Detail' },
+];
+
+// The inventory lookup pages (Brand, Unit Type, Product Type, Product, Vendor)
+// all share the same plain CRUD surface, so they reuse one child definition.
+export const INVENTORY_CATALOG_CHILDREN: PageChildPermission[] = [
+  { key: 'create', label: 'Create' },
+  { key: 'update', label: 'Edit' },
+  { key: 'delete', label: 'Delete' },
+];
+
 export function childPermissionId(parentId: string, key: string): string {
   return `${parentId}:${key}`;
 }
@@ -390,6 +462,18 @@ export const PAGE_PERMISSIONS: Record<string, { name: string; children: PageChil
   [SUBSCRIBER_DETAIL_PERMISSION]: { name: 'Subscribers Details', children: SUBSCRIBER_DETAIL_CHILDREN },
   [INQUIRIES_PERMISSION]: { name: 'New Inquiries', children: INQUIRIES_CHILDREN },
   [CORPORATE_CLIENTS_PERMISSION]: { name: 'Corporate Clients', children: CORPORATE_CLIENTS_CHILDREN },
+  [PACKAGE_PERMISSION]: { name: 'Package', children: PACKAGE_CHILDREN },
+  [RECOVERY_OFFICER_PERMISSION]: { name: 'Recovery Officer', children: RECOVERY_OFFICER_CHILDREN },
+  [AREA_ASSIGNMENT_PERMISSION]: { name: 'Area Assignment', children: AREA_ASSIGNMENT_CHILDREN },
+  [SALES_CUSTOMERS_PERMISSION]: { name: 'Customers', children: SALES_CUSTOMERS_CHILDREN },
+  [GUARANTORS_PERMISSION]: { name: 'Guarantors', children: GUARANTORS_CHILDREN },
+  [INSTALLMENT_PLANS_PERMISSION]: { name: 'Installment Plans', children: INSTALLMENT_PLANS_CHILDREN },
+  [POINT_OF_SALE_PERMISSION]: { name: 'Point of Sale', children: POINT_OF_SALE_CHILDREN },
+  [BRAND_PERMISSION]: { name: 'Brand', children: INVENTORY_CATALOG_CHILDREN },
+  [VENDOR_PERMISSION]: { name: 'Vendor', children: INVENTORY_CATALOG_CHILDREN },
+  [UNIT_TYPE_PERMISSION]: { name: 'Unit Type', children: INVENTORY_CATALOG_CHILDREN },
+  [PRODUCT_PERMISSION]: { name: 'Products', children: INVENTORY_CATALOG_CHILDREN },
+  [PRODUCT_TYPE_PERMISSION]: { name: 'Product Type', children: INVENTORY_CATALOG_CHILDREN },
 };
 
 // Child permission definitions, derived from PAGE_PERMISSIONS. These are

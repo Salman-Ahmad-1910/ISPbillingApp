@@ -9,9 +9,13 @@ import { LoadingSpinner } from '@/components/shared/loading-spinner';
 import { ClientPage } from './_components/client-page';
 import { useCompany } from '@/context/company-context';
 import type { RecoveryOfficer } from '@/lib/types';
+import { usePagePermissions } from '@/hooks/usePermissions';
+import { RECOVERY_OFFICER_PERMISSION } from '@/lib/permission-pages';
 
 export default function OfficersPage() {
   const { companyId } = useCompany();
+  const { can: canPage } = usePagePermissions(RECOVERY_OFFICER_PERMISSION);
+  const canViewSummary = canPage('summary');
 
   const { data: recoveryOfficers = [], isLoading } = useGenericQuery<RecoveryOfficer>(
     'admin/recovery-officers',
@@ -43,6 +47,7 @@ export default function OfficersPage() {
         <div className="h-0.5 mt-4 bg-gradient-to-r from-blue-500 via-emerald-500 to-transparent" />
       </div>
 
+      {canViewSummary && (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {kpiData.map((metric) => (
           <div key={metric.label} className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
@@ -62,6 +67,7 @@ export default function OfficersPage() {
           </div>
         ))}
       </div>
+      )}
 
       <Card className="hover:shadow-md transition-all duration-300">
         <CardContent className="p-0">

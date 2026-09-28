@@ -8,9 +8,11 @@ import { Button } from '@/components/ui/button';
 interface UnitTypeColumnsProps {
   onEdit: (unitType: UnitType) => void;
   onDelete: (unitType: UnitType) => void;
+  canUpdate?: boolean;
+  canDelete?: boolean;
 }
 
-export const columns = ({ onEdit, onDelete }: UnitTypeColumnsProps): ColumnDef<UnitType>[] => [
+export const columns = ({ onEdit, onDelete, canUpdate = true, canDelete = true }: UnitTypeColumnsProps): ColumnDef<UnitType>[] => [
   {
     accessorKey: 'id',
     header: 'ID',
@@ -28,21 +30,29 @@ export const columns = ({ onEdit, onDelete }: UnitTypeColumnsProps): ColumnDef<U
       return <div className="font-medium">{name}</div>;
     },
   },
-  {
-    id: 'actions',
-    header: 'Actions',
-    cell: ({ row }) => {
-      const unitType = row.original;
-      return (
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => onEdit(unitType)}>
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => onDelete(unitType)}>
-            <Trash2 className="h-4 w-4 text-destructive" />
-          </Button>
-        </div>
-      );
-    },
-  },
+  ...(canUpdate || canDelete
+    ? [
+        {
+          id: 'actions',
+          header: 'Actions',
+          cell: ({ row }: { row: { original: UnitType } }) => {
+            const unitType = row.original;
+            return (
+              <div className="flex items-center gap-2">
+                {canUpdate && (
+                  <Button variant="ghost" size="sm" onClick={() => onEdit(unitType)}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
+                {canDelete && (
+                  <Button variant="ghost" size="sm" onClick={() => onDelete(unitType)}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                )}
+              </div>
+            );
+          },
+        } as ColumnDef<UnitType>,
+      ]
+    : []),
 ];

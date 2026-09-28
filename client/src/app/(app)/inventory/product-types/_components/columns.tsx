@@ -8,9 +8,11 @@ import { Button } from '@/components/ui/button';
 interface ProductTypeColumnsProps {
   onEdit: (productType: ProductType) => void;
   onDelete: (productType: ProductType) => void;
+  canUpdate?: boolean;
+  canDelete?: boolean;
 }
 
-export const columns = ({ onEdit, onDelete }: ProductTypeColumnsProps): ColumnDef<ProductType>[] => [
+export const columns = ({ onEdit, onDelete, canUpdate = true, canDelete = true }: ProductTypeColumnsProps): ColumnDef<ProductType>[] => [
   {
     accessorKey: 'id',
     header: 'ID',
@@ -28,21 +30,29 @@ export const columns = ({ onEdit, onDelete }: ProductTypeColumnsProps): ColumnDe
       return <div className="font-medium">{name}</div>;
     },
   },
-  {
-    id: 'actions',
-    header: 'Actions',
-    cell: ({ row }) => {
-      const productType = row.original;
-      return (
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => onEdit(productType)}>
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => onDelete(productType)}>
-            <Trash2 className="h-4 w-4 text-destructive" />
-          </Button>
-        </div>
-      );
-    },
-  },
+  ...(canUpdate || canDelete
+    ? [
+        {
+          id: 'actions',
+          header: 'Actions',
+          cell: ({ row }: { row: { original: ProductType } }) => {
+            const productType = row.original;
+            return (
+              <div className="flex items-center gap-2">
+                {canUpdate && (
+                  <Button variant="ghost" size="sm" onClick={() => onEdit(productType)}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
+                {canDelete && (
+                  <Button variant="ghost" size="sm" onClick={() => onDelete(productType)}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                )}
+              </div>
+            );
+          },
+        } as ColumnDef<ProductType>,
+      ]
+    : []),
 ];

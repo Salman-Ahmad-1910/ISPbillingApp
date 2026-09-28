@@ -99,7 +99,7 @@ func SetupRoutes(r *gin.Engine) {
 		admin.Use(middleware.AuthMiddleware())
 		{
 			controllers.RegisterGenericCRUDScoped[models.Company](admin, "/companies", false)
-			controllers.RegisterConnectionRoutes(admin)
+			controllers.RegisterConnectionRoutesGuarded(admin, config.DB)
 
 		// Custom users endpoint to handle password and role properly
 		adminUsers := admin.Group("/users")
@@ -122,10 +122,11 @@ func SetupRoutes(r *gin.Engine) {
 		recoveryOfficers.Use(middleware.AuthMiddleware())
 		recoveryOfficers.Use(middleware.CompanyMiddleware(config.DB))
 		{
+			recoveryOfficersWrite := middleware.RequirePageCrud(config.DB, middleware.RecoveryOfficerPermission)
 			recoveryOfficers.GET("", controllers.GetRecoveryOfficers)
-			recoveryOfficers.POST("", controllers.CreateSubUser)
-			recoveryOfficers.PUT("/:id", controllers.UpdateSubUser)
-			recoveryOfficers.DELETE("/:id", controllers.DeleteSubUser)
+			recoveryOfficers.POST("", recoveryOfficersWrite, controllers.CreateSubUser)
+			recoveryOfficers.PUT("/:id", recoveryOfficersWrite, controllers.UpdateSubUser)
+			recoveryOfficers.DELETE("/:id", recoveryOfficersWrite, controllers.DeleteSubUser)
 		}
 	}
 
@@ -184,26 +185,29 @@ func SetupRoutes(r *gin.Engine) {
 		network := protected.Group("/network")
 		network.Use(middleware.RBACMiddleware(config.DB, "network", "read"))
 		{
+			// Each network page owns Create/Update/Delete child permissions, so the
+			// write handlers are guarded by the page's own permission id.
+			areasWrite := middleware.RequirePageCrud(config.DB, middleware.AreaPermission)
 			network.GET("/areas", controllers.GetAreas)
 			network.GET("/areas/:id", controllers.FindArea)
-			network.POST("/areas", controllers.CreateArea)
-			network.PUT("/areas/:id", controllers.UpdateArea)
-			network.DELETE("/areas/:id", controllers.DeleteArea)
-			network.POST("/areas/:id/assign-officer", controllers.AssignAreaOfficer)
-			network.POST("/areas/:id/unassign-officer", controllers.UnassignAreaOfficer)
-			controllers.RegisterGenericCRUDScoped[models.OLT](network, "/olts", true)
-			controllers.RegisterGenericCRUDScoped[models.OLT](network, "/olt", true) // Alias
-			controllers.RegisterGenericCRUDScoped[models.Splitter](network, "/splitters", true)
-			controllers.RegisterGenericCRUDScoped[models.POP](network, "/pops", true)
-			controllers.RegisterGenericCRUDScoped[models.POP](network, "/pop", true) // Alias
-			controllers.RegisterGenericCRUDScoped[models.DistributionBox](network, "/boxes", true)
+			network.POST("/areas", areasWrite, controllers.CreateArea)
+			network.PUT("/areas/:id", areasWrite, controllers.UpdateArea)
+			network.DELETE("/areas/:id", areasWrite, controllers.DeleteArea)
+			network.POST("/areas/:id/assign-officer", middleware.RequirePageCrudAction(config.DB, middleware.AreaPermission, middleware.ActionUpdate), controllers.AssignAreaOfficer)
+			network.POST("/areas/:id/unassign-officer", middleware.RequirePageCrudAction(config.DB, middleware.AreaPermission, middleware.ActionUpdate), controllers.UnassignAreaOfficer)
+			controllers.RegisterGenericCRUDGuarded[models.OLT](network, "/olts", true, middleware.RequirePageCrud(config.DB, middleware.OltPermission))
+			controllers.RegisterGenericCRUDGuarded[models.OLT](network, "/olt", true, middleware.RequirePageCrud(config.DB, middleware.OltPermission)) // Alias
+			controllers.RegisterGenericCRUDGuarded[models.Splitter](network, "/splitters", true, middleware.RequirePageCrud(config.DB, middleware.SplitterPermission))
+			controllers.RegisterGenericCRUDGuarded[models.POP](network, "/pops", true, middleware.RequirePageCrud(config.DB, middleware.PopPermission))
+			controllers.RegisterGenericCRUDGuarded[models.POP](network, "/pop", true, middleware.RequirePageCrud(config.DB, middleware.PopPermission)) // Alias
+			controllers.RegisterGenericCRUDGuarded[models.DistributionBox](network, "/boxes", true, middleware.RequirePageCrud(config.DB, middleware.BoxMediaPermission))
 		}
 
 		// Billing routes (with RBAC)
 		billing := protected.Group("/billing")
 		billing.Use(middleware.RBACMiddleware(config.DB, "billing", "read"))
 		{
-			controllers.RegisterGenericCRUD[models.Package](billing, "/packages")
+			controllers.RegisterGenericCRUDGuarded[models.Package](billing, "/packages", true, middleware.RequirePageCrud(config.DB, middleware.PackagePermission))
 			controllers.RegisterGenericCRUD[models.Subscriber](billing, "/subscribers")
 			controllers.RegisterGenericCRUD[models.Invoice](billing, "/invoices")
 			billing.POST("/payments/process", middleware.RBACMiddleware(config.DB, "billing", "add"), controllers.ProcessPayment)
@@ -247,9 +251,19 @@ billing.PUT("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "ed
 			c.Next()
 		})
 		{
-			controllers.RegisterGenericCRUD[models.Customer](crm, "/customers")
-			controllers.RegisterGenericCRUD[models.Guarantor](crm, "/guarantors")
-			controllers.RegisterGenericCRUD[models.Vendor](crm, "/vendors")
+			// Customers are shared by the Sales Customers page, POS, Guarantors and
+			// Customer Ledger, so the writes are guarded by the single Sales >
+			// Customers permission. This subgroup adds the auth + company context the
+			// /crm group lacks, which the permission resolver requires.
+		crmProtected := crm.Group("")
+		crmProtected.Use(middleware.AuthMiddleware())
+		crmProtected.Use(middleware.CompanyMiddleware(config.DB))
+		controllers.RegisterGenericCRUDGuarded[models.Customer](crmProtected, "/customers", true, middleware.RequirePageCrud(config.DB, middleware.SalesCustomersPermission))
+		controllers.RegisterGenericCRUDGuarded[models.Guarantor](crmProtected, "/guarantors", true, middleware.RequirePageCrud(config.DB, middleware.GuarantorsPermission))
+		// Shares the /inventory/vendors resource, so it must share the same
+		// permission; leaving it on the unauthenticated group was a bypass.
+		controllers.RegisterGenericCRUDGuarded[models.Vendor](crmProtected, "/vendors", true, middleware.RequirePageCrud(config.DB, middleware.VendorPermission))
+
 
 			// Vendor Invoice specific routes
 			crm.GET("/vendor-invoices", controllers.GetVendorInvoices)
@@ -453,7 +467,12 @@ billing.PUT("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "ed
 			c.Next()
 		})
 		{
-			controllers.RegisterGenericCRUD[models.InstallmentPlan](sales, "/installment-plans")
+			// Same reasoning as /crm: the /sales group has no auth, so the guarded
+			// writes need an authenticated subgroup to resolve permissions.
+			salesPlans := sales.Group("")
+			salesPlans.Use(middleware.AuthMiddleware())
+			salesPlans.Use(middleware.CompanyMiddleware(config.DB))
+			controllers.RegisterGenericCRUDGuarded[models.InstallmentPlan](salesPlans, "/installment-plans", true, middleware.RequirePageCrud(config.DB, middleware.InstallmentPlansPermission))
 		}
 
 		// Corporate clients routes
@@ -622,13 +641,27 @@ billing.PUT("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "ed
 		{
 			controllers.RegisterGenericCRUD[models.InventoryItem](inventory, "/stock")
 			controllers.RegisterGenericCRUD[models.InventoryItem](inventory, "/items")
-			controllers.RegisterProductRoutes(inventory.Group("/products"))
 			controllers.RegisterGenericCRUD[models.PricingPlan](inventory, "/plans")
-			controllers.RegisterGenericCRUD[models.Brand](inventory, "/brands")
-			controllers.RegisterGenericCRUD[models.UnitType](inventory, "/unit-types")
-			controllers.RegisterGenericCRUD[models.ProductType](inventory, "/product-types")
 			controllers.RegisterGenericCRUD[models.InventoryStatus](inventory, "/statuses")
-			controllers.RegisterGenericCRUD[models.Vendor](inventory, "/vendors")
+
+			// The /inventory group has no auth, so the guarded catalog writes need
+			// an authenticated subgroup to resolve the caller's permissions.
+			// Reads (stock, purchases, vendor invoices, POS) keep using the group
+			// above and are unaffected.
+			inventoryCatalog := inventory.Group("")
+			inventoryCatalog.Use(middleware.AuthMiddleware())
+			inventoryCatalog.Use(middleware.CompanyMiddleware(config.DB))
+
+			// RegisterProductRoutes has no guarded variant, but RequirePageCrud lets
+			// GET/HEAD/OPTIONS through untouched, so it is safe at group level.
+			inventoryProducts := inventoryCatalog.Group("/products")
+			inventoryProducts.Use(middleware.RequirePageCrud(config.DB, middleware.ProductPermission))
+			controllers.RegisterProductRoutes(inventoryProducts)
+
+			controllers.RegisterGenericCRUDGuarded[models.Brand](inventoryCatalog.Group("/brands"), "", true, middleware.RequirePageCrud(config.DB, middleware.BrandPermission))
+			controllers.RegisterGenericCRUDGuarded[models.UnitType](inventoryCatalog.Group("/unit-types"), "", true, middleware.RequirePageCrud(config.DB, middleware.UnitTypePermission))
+			controllers.RegisterGenericCRUDGuarded[models.ProductType](inventoryCatalog.Group("/product-types"), "", true, middleware.RequirePageCrud(config.DB, middleware.ProductTypePermission))
+			controllers.RegisterGenericCRUDGuarded[models.Vendor](inventoryCatalog.Group("/vendors"), "", true, middleware.RequirePageCrud(config.DB, middleware.VendorPermission))
 			{
 				snPool := controllers.SerialNumberPoolCRUD{GenericCRUD: controllers.GenericCRUD[models.SerialNumberPool]{IsScoped: true}}
 				inventory.GET("/serial-number-pool", snPool.FindAll)
@@ -777,8 +810,8 @@ billing.PUT("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "ed
 		subscribers.POST("/import/preview", subscriberImportExport.PreviewImportSubscribers)
 		subscribers.POST("/import/confirm", subscriberImportExport.ConfirmImportSubscribers)
 
-			controllers.RegisterGenericCRUD[models.Inquiry](subscribers, "/inquiries")
-			controllers.RegisterGenericCRUD[models.CorporateCustomer](subscribers, "/corporate")
+		controllers.RegisterGenericCRUDGuarded[models.Inquiry](subscribers, "/inquiries", true, middleware.RequirePageCrud(config.DB, middleware.InquiriesPermission))
+		controllers.RegisterGenericCRUDGuarded[models.CorporateCustomer](subscribers, "/corporate", true, middleware.RequirePageCrud(config.DB, middleware.CorporateClientsPermission))
 		}
 
 	}

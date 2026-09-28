@@ -28,6 +28,8 @@ import { DataTable } from './data-table';
 import { getColumns } from './columns';
 import { SalesCustomerForm } from './customer-form';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
+import { useCrudPermissions } from '@/hooks/usePermissions';
+import { SALES_CUSTOMERS_PERMISSION } from '@/lib/permission-pages';
 
   import { useQueryClient } from '@tanstack/react-query';
   import api from '@/lib/api';
@@ -43,6 +45,7 @@ export function SalesCustomerClientPage({ data }: SalesCustomerClientPageProps) 
   const { companyId } = useCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { canCreate, canUpdate, canDelete } = useCrudPermissions(SALES_CUSTOMERS_PERMISSION);
   const [customers, setCustomers] = useState<Customer[]>(data);
   const [filter, setFilter] = useState('');
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
@@ -170,6 +173,8 @@ export function SalesCustomerClientPage({ data }: SalesCustomerClientPageProps) 
   const columns = getColumns({
     onEdit: handleEdit,
     onDelete: openDeleteDialog,
+    canUpdate,
+    canDelete,
   });
 
   return (
@@ -213,10 +218,12 @@ export function SalesCustomerClientPage({ data }: SalesCustomerClientPageProps) 
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+          {canCreate && (
           <Button onClick={() => { setSelectedCustomer(null); setIsFormOpen(true); }} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700">
             <PlusCircle className="mr-2 h-4 w-4" />
             Add Customer
           </Button>
+          )}
         </div>
 
         <DataTable columns={columns} data={getPaginatedData()} />
