@@ -100,6 +100,8 @@ export function ClientPage({ data }: ClientPageProps) {
 
     const exportColumns: ExportColumn[] = [
         { key: 'name', header: 'Product' },
+        { key: 'productTypeName', header: 'Product Type' },
+        { key: 'serialNumber', header: 'SN Numbers' },
         { key: 'vendorName', header: 'Vendor' },
         { key: 'purchaseDate', header: 'Last Purchased' },
         { key: 'totalPurchased', header: 'Purchased' },

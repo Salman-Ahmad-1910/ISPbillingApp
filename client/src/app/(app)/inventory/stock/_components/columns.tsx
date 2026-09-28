@@ -29,6 +29,7 @@ export interface StockProduct {
   purchaseItemId: string;
   id: string;
   name: string;
+  productTypeName?: string;
   price: number;
   stock: number;
   totalPurchased: number;

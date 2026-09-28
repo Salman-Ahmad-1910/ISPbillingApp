@@ -638,6 +638,7 @@ func GetPurchasedProducts(c *gin.Context) {
 		PurchaseItemID  uuid.UUID
 		ProductID       uuid.UUID
 		ProductName     string
+		ProductTypeName string
 		Quantity        int
 		QuantityEntered int
 		PurchasePrice   float64
@@ -660,6 +661,28 @@ func GetPurchasedProducts(c *gin.Context) {
 			pi.id                                        AS purchase_item_id,
 			pi.product_id                                AS product_id,
 			COALESCE(NULLIF(pi.product_name, ''), pr.name) AS product_name,
+			-- Product type mirrors the Products page, which falls back to the
+			-- category column when product_type_name is empty. If the product
+			-- record this line points at carries no type, fall back to any
+			-- product with the same name that does (the same product can exist
+			-- as several physical records grouped into one Stock page row).
+			COALESCE(
+				NULLIF(pr.product_type_name, ''),
+				NULLIF(pr.category, ''),
+				(
+					SELECT COALESCE(NULLIF(p2.product_type_name, ''), NULLIF(p2.category, ''), '')
+					FROM products p2
+					WHERE LOWER(p2.name) = LOWER(COALESCE(NULLIF(pi.product_name, ''), pr.name))
+						AND p2.company_id = pi.company_id
+						AND p2.deleted_at IS NULL
+					ORDER BY CASE
+							WHEN COALESCE(NULLIF(p2.product_type_name, ''), NULLIF(p2.category, ''), '') <> '' THEN 0
+							ELSE 1
+						END,
+						p2.created_at DESC
+					LIMIT 1
+				)
+			)                                            AS product_type_name,
 			pi.quantity                                  AS quantity,
 			COALESCE(pi.quantity_entered, pi.quantity, 0) AS quantity_entered,
 			pi.purchase_price                            AS purchase_price,
@@ -738,6 +761,12 @@ func GetPurchasedProducts(c *gin.Context) {
 		groupProducts[key][ln.ProductID] = true
 		p.TotalPurchased += ln.QuantityEntered
 		p.Name = ln.ProductName
+		// Keep the first non-empty type found: rows are ordered oldest -> newest
+		// and the newest line's product record may carry no type at all, which
+		// would otherwise blank out a value an earlier line supplied.
+		if p.ProductTypeName == "" {
+			p.ProductTypeName = ln.ProductTypeName
+		}
 		p.Image = ln.Image
 		// Rows are ordered oldest -> newest, so the most recent purchase line
 		// drives the display pricing, purchase details and representative

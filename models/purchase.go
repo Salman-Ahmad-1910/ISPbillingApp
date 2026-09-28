@@ -91,6 +91,7 @@ type PurchasedProduct struct {
 	PurchaseItemID       string                 `json:"purchaseItemId"`
 	ID                   string                 `json:"id"`
 	Name                 string                 `json:"name"`
+	ProductTypeName      string                 `json:"productTypeName"`
 	Price                float64                `json:"price"`
 	Stock                int                    `json:"stock"`
 	TotalPurchased       int                    `json:"totalPurchased"`
