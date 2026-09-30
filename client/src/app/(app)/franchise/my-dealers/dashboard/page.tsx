@@ -7,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Users, Wallet, Percent, Clock, XCircle, CheckCircle2, MapPin, Phone, CalendarDays, Handshake, ArrowRightLeft } from 'lucide-react';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useUser } from '@/hooks/use-user';
+import { usePagePermissions } from '@/hooks/usePermissions';
+import { DEALER_DASHBOARD_PERMISSION } from '@/lib/permission-pages';
 import { LoadingSpinner } from '@/components/shared/loading-spinner';
 import { useCompany } from '@/context/company-context';
 import type { Dealer, Subscriber } from '@/lib/types';
@@ -18,6 +20,13 @@ export default function DealerDashboardPage() {
   const { user } = useUser();
   const isAdminUser = ADMIN_ROLES.includes(user?.role || '');
   const [selectedDealerId, setSelectedDealerId] = useState<string>('');
+  const { can: canPage } = usePagePermissions(DEALER_DASHBOARD_PERMISSION);
+  // The selector and the dealer identity/commission card are one permission:
+  // the cards below describe whichever dealer is selected, so letting one show
+  // without the other would either leak the dealer's identity or leave the
+  // summary cards unattributed.
+  const canSelectDealer = canPage('dealer-select');
+  const canViewSummary = canPage('summary');
 
   const { data: dealers = [], isLoading } = useGenericQuery<Dealer>(
     'dealers',
@@ -112,7 +121,7 @@ export default function DealerDashboardPage() {
         <div className="h-0.5 mt-4 bg-gradient-to-r from-emerald-500 via-green-500 to-transparent" />
       </div>
 
-      {isAdminUser && (
+      {isAdminUser && canSelectDealer && (
         <div className="mb-6 max-w-sm">
           <Select value={dealer.id} onValueChange={(v) => setSelectedDealerId(v)}>
             <SelectTrigger>
@@ -129,6 +138,7 @@ export default function DealerDashboardPage() {
         </div>
       )}
 
+      {canSelectDealer && (
       <Card className="mb-6 overflow-hidden transition-all duration-300 hover:shadow-lg">
         <CardContent className="p-0">
           <div className="flex items-center justify-between border-b bg-gradient-to-r from-slate-50 to-transparent p-4 dark:from-slate-900">
@@ -158,7 +168,10 @@ export default function DealerDashboardPage() {
           </div>
         </CardContent>
       </Card>
+      )}
 
+      {canViewSummary && (
+      <>
       <div className="mb-2 flex items-center gap-2">
         <h2 className="text-base font-semibold">Subscriber Overview</h2>
         <span className="text-xs text-muted-foreground">summary of {mySubscribers.length} subscribers</span>
@@ -203,6 +216,8 @@ export default function DealerDashboardPage() {
           </Card>
         ))}
       </div>
+      </>
+      )}
     </>
   );
 }

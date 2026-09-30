@@ -31,8 +31,6 @@ export const PERMISSION_DEFS: PermissionDef[] = [
   { id: '14079', name: 'New Collection', module: 'Transactions' },
   { id: '13308', name: 'Reprint Slip', module: 'Transactions' },
   { id: '13304', name: 'Subscribers Collections', module: 'Transactions' },
-  { id: '15388', name: 'Collection Search', module: 'Transactions' },
-  { id: '15389', name: 'Collection Summary', module: 'Transactions' },
   { id: '13320', name: 'Bills Creator', module: 'Transactions' },
   { id: '13321', name: 'Dealers Collections', module: 'Transactions' },
   { id: '13357', name: 'Baddebt Collection', module: 'Transactions' },
@@ -155,15 +153,6 @@ export const PERMISSION_FOLDERS: PermissionFolder[] = [
 // Permission id that controls whether a user can see the graphs, recent
 // payments and open complaints widgets on the Dashboard page.
 export const DASHBOARD_CHARTS_PERMISSION = '15390';
-
-// Permission id that controls whether a user can see the search bar on the
-// Subscriber Collections page. When unchecked, the search bar is hidden.
-export const COLLECTION_SEARCH_PERMISSION = '15388';
-
-// Permission id that controls whether a user can see the four summary cards on
-// the Subscriber Collections page (Total Subscribers, Total Collected, Pending
-// Subscribers, Pending Amount). Replaces the previous per-card permissions.
-export const COLLECTION_SUMMARY_PERMISSION = '15389';
 
 // Permission id that controls whether a user can create/add records anywhere
 // in the app. When this is granted (web checkbox selected on the Roles &
@@ -305,6 +294,16 @@ export function getAllowedHrefs(permissionIds: string[]): Set<string> {
   const hrefs = new Set<string>(ALWAYS_ALLOWED);
   (permissionIds || []).forEach((id) => {
     (PERMISSION_PAGES[id] || []).forEach((href) => hrefs.add(href));
+    // A child id ("13331:filters") is not itself a key in PERMISSION_PAGES, so
+    // the lookup above finds nothing and its page would stay hidden from the
+    // sidebar. Resolve the parent instead: granting any child of a page is
+    // enough to reveal that page in the nav. Without this the folder only ever
+    // appears via the separate parent checkbox, and reports whose features are
+    // granted individually never show up at all.
+    const parentId = id.split(':')[0];
+    if (parentId !== id) {
+      (PERMISSION_PAGES[parentId] || []).forEach((href) => hrefs.add(href));
+    }
   });
   return hrefs;
 }
@@ -336,6 +335,24 @@ export const VENDOR_PERMISSION = '15310';
 export const UNIT_TYPE_PERMISSION = '15311';
 export const PRODUCT_PERMISSION = '15312';
 export const PRODUCT_TYPE_PERMISSION = '15321';
+export const VENDOR_INVOICE_PERMISSION = '15372';
+// Collection pages. Each owns a Summary and a Search child.
+export const SUBSCRIBER_COLLECTION_PERMISSION = '13304';
+export const DEALER_COLLECTION_PERMISSION = '13321';
+export const ALLOCATED_COLLECTION_PERMISSION = '13305';
+export const BADDEBT_COLLECTION_PERMISSION = '13357';
+export const TRANSACTION_TYPE_PERMISSION = '13324';
+export const BILL_CREATOR_PERMISSION = '13320';
+// My Dealer list (franchise) and its dashboard. Both parents already exist and
+// already map to their routes, so existing grants keep working unchanged.
+export const MY_DEALER_PERMISSION = '13318';
+export const DEALER_DASHBOARD_PERMISSION = '15385';
+// Dealer > Reports: Collections, Defaulters, New Dealers, Invoices. All four
+// share one filters / summary / export child set.
+export const REPORT_COLLECTION_PERMISSION = '13331';
+export const REPORT_DEFAULTER_PERMISSION = '13332';
+export const REPORT_NEW_DEALER_PERMISSION = '13333';
+export const REPORT_INVOICE_PERMISSION = '13350';
 
 export type CrudAction = 'create' | 'update' | 'delete';
 
@@ -438,6 +455,65 @@ export const INVENTORY_CATALOG_CHILDREN: PageChildPermission[] = [
   { key: 'delete', label: 'Delete' },
 ];
 
+// Vendor Invoice mixes the three CRUD actions with two page-only features: the
+// print view (reached from the row action menu) and the summary cards at the
+// top. "Buy a Product" is the page's create action, so it reuses the CRUD keys.
+export const VENDOR_INVOICE_CHILDREN: PageChildPermission[] = [
+  { key: 'create', label: 'Buy a Product' },
+  { key: 'update', label: 'Edit' },
+  { key: 'delete', label: 'Delete' },
+  { key: 'print', label: 'Print' },
+  { key: 'summary', label: 'Summary' },
+];
+
+// The four collection pages all show the same pair of regions: a row of summary
+// cards and a search bar. Both are gated independently so the numbers can be
+// hidden while the search stays usable (and vice versa).
+const COLLECTION_CHILDREN: PageChildPermission[] = [
+  { key: 'summary', label: 'Summary' },
+  { key: 'search', label: 'Search' },
+];
+
+// Transaction Type is a plain CRUD lookup table.
+export const TRANSACTION_TYPE_CHILDREN: PageChildPermission[] = [
+  { key: 'create', label: 'Create' },
+  { key: 'update', label: 'Edit' },
+  { key: 'delete', label: 'Delete' },
+];
+
+// Bills Creator only creates and deletes generated bills; there is no per-bill
+// edit because the sheet is regenerated rather than patched.
+export const BILL_CREATOR_CHILDREN: PageChildPermission[] = [
+  { key: 'create', label: 'Create' },
+  { key: 'delete', label: 'Delete' },
+];
+
+// My Dealer list. "Change Status" is its own child rather than being folded into
+// Edit, because it is a separate confirmation dialog that only writes `status`
+// and admins often want to freeze a dealer without allowing field edits.
+export const MY_DEALER_CHILDREN: PageChildPermission[] = [
+  { key: 'create', label: 'Add' },
+  { key: 'update', label: 'Edit' },
+  { key: 'change-status', label: 'Change Status' },
+  { key: 'delete', label: 'Delete' },
+];
+
+// Dealer Dashboard. The selector is a child in its own right because it also
+// gates the dealer identity/commission card: hiding one without the other would
+// either leak the dealer or strand the summary cards with nothing to describe.
+export const DEALER_DASHBOARD_CHILDREN: PageChildPermission[] = [
+  { key: 'dealer-select', label: 'Dealer Select' },
+  { key: 'summary', label: 'Summary' },
+];
+
+// The four Dealer > Reports pages share one surface: a filter panel, a set of
+// summary cards, and the combined Print / Excel export pair.
+const REPORT_CHILDREN: PageChildPermission[] = [
+  { key: 'filters', label: 'Filters' },
+  { key: 'summary', label: 'Summary' },
+  { key: 'export', label: 'Print / Excel' },
+];
+
 export function childPermissionId(parentId: string, key: string): string {
   return `${parentId}:${key}`;
 }
@@ -474,6 +550,19 @@ export const PAGE_PERMISSIONS: Record<string, { name: string; children: PageChil
   [UNIT_TYPE_PERMISSION]: { name: 'Unit Type', children: INVENTORY_CATALOG_CHILDREN },
   [PRODUCT_PERMISSION]: { name: 'Products', children: INVENTORY_CATALOG_CHILDREN },
   [PRODUCT_TYPE_PERMISSION]: { name: 'Product Type', children: INVENTORY_CATALOG_CHILDREN },
+  [VENDOR_INVOICE_PERMISSION]: { name: 'Vendor Invoice', children: VENDOR_INVOICE_CHILDREN },
+  [SUBSCRIBER_COLLECTION_PERMISSION]: { name: 'Subscribers Collections', children: COLLECTION_CHILDREN },
+  [DEALER_COLLECTION_PERMISSION]: { name: 'Dealers Collections', children: COLLECTION_CHILDREN },
+  [ALLOCATED_COLLECTION_PERMISSION]: { name: 'Allocated Collection', children: COLLECTION_CHILDREN },
+  [BADDEBT_COLLECTION_PERMISSION]: { name: 'Baddebt Collection', children: COLLECTION_CHILDREN },
+  [TRANSACTION_TYPE_PERMISSION]: { name: 'Transaction Type', children: TRANSACTION_TYPE_CHILDREN },
+  [BILL_CREATOR_PERMISSION]: { name: 'Bills Creator', children: BILL_CREATOR_CHILDREN },
+  [MY_DEALER_PERMISSION]: { name: 'My Dealer', children: MY_DEALER_CHILDREN },
+  [DEALER_DASHBOARD_PERMISSION]: { name: 'Dealer Dashboard', children: DEALER_DASHBOARD_CHILDREN },
+  [REPORT_COLLECTION_PERMISSION]: { name: 'Collection Report', children: REPORT_CHILDREN },
+  [REPORT_DEFAULTER_PERMISSION]: { name: 'Defaulter Report', children: REPORT_CHILDREN },
+  [REPORT_NEW_DEALER_PERMISSION]: { name: 'New Dealer Report', children: REPORT_CHILDREN },
+  [REPORT_INVOICE_PERMISSION]: { name: 'Invoice Report', children: REPORT_CHILDREN },
 };
 
 // Child permission definitions, derived from PAGE_PERMISSIONS. These are

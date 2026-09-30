@@ -39,7 +39,8 @@ import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
-import { useCrudPermissions } from '@/hooks/usePermissions';
+import { useCrudPermissions, usePagePermissions } from '@/hooks/usePermissions';
+import { ALLOCATED_COLLECTION_PERMISSION } from '@/lib/permission-pages';
 import { CalendarIcon, Loader2, MoreHorizontal, PlusCircle, ClipboardPen, Users, DollarSign } from 'lucide-react';
 
 import type { Subscriber, Payment } from '@/lib/types';
@@ -63,6 +64,7 @@ export default function AllocatedCollectionsPage() {
   const { toast } = useToast();
   const { user } = useUser();
   const { canCreate, canUpdate, canDelete } = useCrudPermissions();
+  const collectionPage = usePagePermissions(ALLOCATED_COLLECTION_PERMISSION);
 
   const [selectedSubscriberId, setSelectedSubscriberId] = useState<string | null>(null);
   const [showNewAmountDialog, setShowNewAmountDialog] = useState(false);
@@ -220,6 +222,7 @@ export default function AllocatedCollectionsPage() {
 
       <div className="h-0.5 bg-gradient-to-r from-violet-500/50 via-purple-500/30 to-transparent" />
 
+      {collectionPage.can('summary') && (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center gap-3">
@@ -255,8 +258,10 @@ export default function AllocatedCollectionsPage() {
           </div>
         </div>
       </div>
+      )}
 
       <Card className="transition-all duration-300 hover:shadow-md">
+        {collectionPage.can('search') && (
         <div className="p-4 border-b">
           <div className="max-w-md">
             <SearchableSelect
@@ -269,6 +274,7 @@ export default function AllocatedCollectionsPage() {
             />
           </div>
         </div>
+        )}
 
         {selectedSubscriber ? (
           <CardContent className="p-0">

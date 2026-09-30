@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strconv"
 
 	"awesomeProject/models"
 
@@ -52,11 +53,15 @@ const (
 	SalesCustomersPermission   = "15336"
 	GuarantorsPermission       = "15370"
 	InstallmentPlansPermission = "15337"
+	TransactionTypePermission  = "13324"
+	BillCreatorPermission      = "13320"
+	MyDealerPermission         = "13318"
 	BrandPermission            = "15309"
 	VendorPermission           = "15310"
 	UnitTypePermission         = "15311"
 	ProductPermission          = "15312"
 	ProductTypePermission      = "15321"
+	VendorInvoicePermission    = "15372"
 )
 
 // CRUD child action keys shared by every page that exposes CRUD children.
@@ -324,6 +329,65 @@ func RequirePageFeature(db *gorm.DB, pageID, key string) gin.HandlerFunc {
 
 // bodyHasField reports whether a JSON request body contains the given key. The
 // body is buffered and restored so the downstream handler still reads it.
+// StripPageFieldUnlessFeature removes a field from a JSON body unless the page's
+// feature permission for it is granted, then lets the request through. It exists
+// for forms that mix a separately-governed field in with ordinary edits: the
+// dealer edit form carries `status`, so without this a user granted only "Edit"
+// could change a status that "Change Status" governs. Denying the request would
+// be wrong here (the rest of the edit is legitimate), so the field is dropped
+// instead and the handler simply leaves that column untouched.
+func StripPageFieldUnlessFeature(db *gorm.DB, pageID, action, field, featureKey string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.Body == nil {
+			c.Next()
+			return
+		}
+
+		raw, err := io.ReadAll(c.Request.Body)
+		if err != nil {
+			c.Next()
+			return
+		}
+		c.Request.Body = io.NopCloser(bytes.NewReader(raw))
+		c.Request.ContentLength = int64(len(raw))
+
+		if len(bytes.TrimSpace(raw)) == 0 {
+			c.Next()
+			return
+		}
+		var payload map[string]any
+		if err := json.Unmarshal(raw, &payload); err != nil {
+			c.Next()
+			return
+		}
+		if _, present := payload[field]; !present {
+			c.Next()
+			return
+		}
+
+		set, ok := resolvePermissionSet(c, db)
+		if !ok {
+			c.Abort()
+			return
+		}
+		if set.hasPageFeature(pageID, featureKey) {
+			c.Next()
+			return
+		}
+
+		delete(payload, field)
+		stripped, err := json.Marshal(payload)
+		if err != nil {
+			c.Next()
+			return
+		}
+		c.Request.Body = io.NopCloser(bytes.NewReader(stripped))
+		c.Request.ContentLength = int64(len(stripped))
+		c.Request.Header.Set("Content-Length", strconv.Itoa(len(stripped)))
+		c.Next()
+	}
+}
+
 func bodyHasField(c *gin.Context, field string) bool {
 	if c.Request.Body == nil {
 		return false

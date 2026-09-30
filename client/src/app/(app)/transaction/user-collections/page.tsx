@@ -36,8 +36,8 @@ import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
-import { useUserPermissions, useCrudPermissions } from '@/hooks/usePermissions';
-import { hasFeaturePermission, COLLECTION_SEARCH_PERMISSION, COLLECTION_SUMMARY_PERMISSION } from '@/lib/permission-pages';
+import { useUserPermissions, useCrudPermissions, usePagePermissions } from '@/hooks/usePermissions';
+import { SUBSCRIBER_COLLECTION_PERMISSION } from '@/lib/permission-pages';
 import { smartMatchScore } from '@/lib/search';
 import { Loader2, MoreHorizontal, Wallet, DollarSign, UserCheck, Trash2, Pencil, Copy, FileText, Users, CalendarClock, Clock } from 'lucide-react';
 
@@ -76,20 +76,10 @@ export default function SubscriberCollectionsPage() {
   const currentCompany = companies.find(c => c.id === companyId);
   const { toast } = useToast();
   const { user } = useUser();
-  const { userRole, grantedPermissions, permissionsConfigured } = useUserPermissions();
   const { canCreate, canUpdate, canDelete } = useCrudPermissions();
-  const canViewCollectionSummary = hasFeaturePermission(
-    grantedPermissions,
-    permissionsConfigured,
-    ['admin', 'owner', 'manager'].includes(userRole),
-    COLLECTION_SUMMARY_PERMISSION,
-  );
-  const canViewCollectionSearch = hasFeaturePermission(
-    grantedPermissions,
-    permissionsConfigured,
-    ['admin', 'owner', 'manager'].includes(userRole),
-    COLLECTION_SEARCH_PERMISSION,
-  );
+  const collectionPage = usePagePermissions(SUBSCRIBER_COLLECTION_PERMISSION);
+  const canViewCollectionSummary = collectionPage.can('summary');
+  const canViewCollectionSearch = collectionPage.can('search');
   const queryClient = useQueryClient();
 
   const [selectedSubscriberId, setSelectedSubscriberId] = useState<string | null>(null);

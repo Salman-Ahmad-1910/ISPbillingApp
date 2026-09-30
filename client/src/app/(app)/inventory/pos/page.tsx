@@ -435,10 +435,16 @@ export default function POSPage() {
     const { user } = useUser();
     const { toast } = useToast();
     const queryClient = useQueryClient();
-    const { canCreate, canDelete } = useCrudPermissions();
+    const { canDelete } = useCrudPermissions();
     const { can: canPage } = usePagePermissions(POINT_OF_SALE_PERMISSION);
     const canViewProducts = canPage('products');
     const canViewOrderDetail = canPage('order-detail');
+    // Complete Payment and Hold Bill finalize a sale, so they follow the Order
+    // Detail panel the cashier is already working in. They previously read
+    // useCrudPermissions() with no page id, which silently fell back to the
+    // global "Can Create" switch (15362) and left them hidden for anyone
+    // granted Point of Sale without that unrelated global grant.
+    const canCreate = canViewOrderDetail;
 
     const { data: purchasedProducts = [] } = useGenericQuery<any>('inventory/purchased-products', companyId ?? undefined);
     const { data: customersData = [] } = useGenericQuery<any>('crm/customers', companyId ?? undefined);

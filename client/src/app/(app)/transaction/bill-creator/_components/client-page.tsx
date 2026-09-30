@@ -12,6 +12,7 @@ import { Loader2, PlusCircle, Trash2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useCrudPermissions } from '@/hooks/usePermissions';
+import { BILL_CREATOR_PERMISSION } from '@/lib/permission-pages';
 
 import { DataTable } from './data-table';
 import { getColumns } from './columns';
@@ -51,7 +52,9 @@ export function ClientPage() {
   const { companyId } = useCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { canCreate, canUpdate, canDelete } = useCrudPermissions();
+  // This page only creates and deletes whole batches of bills, so it declares
+  // Create/Delete children and deliberately has no Update child.
+  const { canCreate, canDelete } = useCrudPermissions(BILL_CREATOR_PERMISSION);
 
   const { data: connectionsData, isLoading } = useGenericQuery<Connection>('admin/connections', companyId ?? undefined);
   const { data: areasData } = useGenericQuery<Area>('network/areas', companyId ?? undefined);

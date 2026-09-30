@@ -9,6 +9,8 @@ import { PlusCircle, Search, ChevronLeft, ChevronRight, ArrowRight, Handshake, S
 import type { Dealer, Company, Area } from '@/lib/types';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { useCrudPermissions, usePagePermissions } from '@/hooks/usePermissions';
+import { MY_DEALER_PERMISSION } from '@/lib/permission-pages';
 import { DataTable } from './data-table';
 import { getColumns } from './columns';
 import {
@@ -47,6 +49,11 @@ interface ClientPageProps {
 
 export function ClientPage({ data }: ClientPageProps) {
   const { companyId } = useCompany();
+  const { canCreate, canUpdate, canDelete } = useCrudPermissions(MY_DEALER_PERMISSION);
+  // "Change Status" is a fourth action that is not part of the CRUD trio, so it
+  // is resolved directly against this page's child permission.
+  const { can: canPage } = usePagePermissions(MY_DEALER_PERMISSION);
+  const canChangeStatus = canPage('change-status');
   const queryClient = useQueryClient();
   const [dealers, setDealers] = useState<Dealer[]>(data);
   const [filter, setFilter] = useState('');
@@ -207,6 +214,11 @@ export function ClientPage({ data }: ClientPageProps) {
         commissionRate: parseFloat(formData.commissionRate) || 0,
         walletBalance: parseFloat(formData.walletBalance) || 0,
       };
+      // Status is governed by its own child permission, so an edit that is not
+      // allowed to change it must not send it at all.
+      if (!canChangeStatus) {
+        delete payload.status;
+      }
       if (formData.password) {
         payload.password = formData.password;
       } else {
@@ -292,7 +304,7 @@ export function ClientPage({ data }: ClientPageProps) {
     if (!statusDealer || !statusValue) return;
     setIsStatusUpdating(true);
     try {
-      await api.put(`/dealers/${statusDealer.id}?companyId=${companyId}`, { status: statusValue });
+        await api.put(`/dealers/${statusDealer.id}/status?companyId=${companyId}`, { status: statusValue });
       queryClient.invalidateQueries({ queryKey: ['dealers', companyId] });
       setStatusDealer(null);
       setFeedback({ type: 'success', title: 'Success', message: `Dealer status updated to "${statusValue}".` });
@@ -311,6 +323,9 @@ export function ClientPage({ data }: ClientPageProps) {
     onEdit: handleEdit,
     onDelete: openDeleteDialog,
     onStatus: openStatusDialog,
+    canUpdate,
+    canChangeStatus,
+    canDelete,
   });
 
   return (
@@ -326,6 +341,7 @@ export function ClientPage({ data }: ClientPageProps) {
               className="max-w-sm pl-8"
             />
           </div>
+          {canCreate && (
           <Dialog open={isFormOpen} onOpenChange={(open) => {
             setIsFormOpen(open);
             if (!open) {
@@ -413,6 +429,7 @@ export function ClientPage({ data }: ClientPageProps) {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {canChangeStatus && (
                   <div className="space-y-2">
                     <Label>Status</Label>
                     <Select
@@ -430,6 +447,7 @@ export function ClientPage({ data }: ClientPageProps) {
                       </SelectContent>
                     </Select>
                   </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -541,6 +559,7 @@ export function ClientPage({ data }: ClientPageProps) {
               </div>
             </DialogContent>
           </Dialog>
+          )}
         </div>
 
         <DataTable columns={columns} data={getPaginatedData()} />
@@ -637,13 +656,16 @@ export function ClientPage({ data }: ClientPageProps) {
         </div>
       </div>
 
+      {canDelete && (
       <DeleteAlertDialog
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         onDelete={handleDelete}
         itemName={selectedDealer?.name}
       />
+      )}
 
+      {canChangeStatus && (
       <Dialog open={!!statusDealer} onOpenChange={(open) => { if (!open) setStatusDealer(null); }}>
         <DialogContent className="max-w-sm rounded-xl shadow-lg">
           <DialogHeader>
@@ -693,6 +715,7 @@ export function ClientPage({ data }: ClientPageProps) {
           </div>
         </DialogContent>
       </Dialog>
+      )}
 
       <ActionFeedbackDialog
         open={!!feedback}

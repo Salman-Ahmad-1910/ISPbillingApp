@@ -155,12 +155,14 @@ const navItems: NavItemGroup[] = [
       {
         title: 'Reports',
         icon: FolderClosed,
-        allowedRoles: ['admin', 'manager', 'dealer'],
+        // Kept in sync with the pages below: a role absent from this list can
+        // still reach the folder when an admin grants one of these pages to it.
+        allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'],
         items: [
-          { title: 'Collections', href: '/dealer/reports/collections', icon: Wallet, allowedRoles: ['admin', 'manager', 'dealer'] },
-          { title: 'Defaulters', href: '/dealer/reports/defaulters', icon: TriangleAlert, allowedRoles: ['admin', 'manager', 'dealer'] },
-          { title: 'New Dealers', href: '/dealer/reports/new-dealers', icon: UserPlus, allowedRoles: ['admin', 'manager', 'dealer'] },
-          { title: 'Invoices', href: '/dealer/reports/invoices', icon: FileText, allowedRoles: ['admin', 'manager', 'dealer'] },
+          { title: 'Collections', href: '/dealer/reports/collections', icon: Wallet, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
+          { title: 'Defaulters', href: '/dealer/reports/defaulters', icon: TriangleAlert, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
+          { title: 'New Dealers', href: '/dealer/reports/new-dealers', icon: UserPlus, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
+          { title: 'Invoices', href: '/dealer/reports/invoices', icon: FileText, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
         ],
       },
     ],
@@ -281,7 +283,15 @@ function filterNavItems(items: NavItem[], hasPermission: (perm: string) => boole
       if (item.allowedRoles && !item.allowedRoles.includes(userRole)) {
         // Admin-granted per-user permission for this page overrides the
         // hardcoded allowedRoles list (admin assignment wins over role defaults).
-        if (!(allowedHrefs && item.href && allowedHrefs.has(item.href))) {
+        // A group/folder has no href of its own, so consult its children: a
+        // folder must survive when any page beneath it was granted, otherwise
+        // the granted pages are unreachable because their parent was dropped.
+        const granted =
+          allowedHrefs &&
+          (item.href
+            ? allowedHrefs.has(item.href)
+            : (item.items || []).some(child => child.href && allowedHrefs.has(child.href)));
+        if (!granted) {
           return false;
         }
       }

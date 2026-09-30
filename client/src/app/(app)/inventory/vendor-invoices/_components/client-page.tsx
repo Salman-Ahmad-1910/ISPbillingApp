@@ -7,7 +7,8 @@ import type { VendorInvoice, Vendor, Product } from '@/lib/types';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
-import { useCrudPermissions } from '@/hooks/usePermissions';
+import { useCrudPermissions, usePagePermissions } from '@/hooks/usePermissions';
+import { VENDOR_INVOICE_PERMISSION } from '@/lib/permission-pages';
 
 import { z } from 'zod';
 import { vendorInvoiceSchema } from '@/lib/schemas';
@@ -40,7 +41,9 @@ export function ClientPage({ data }: ClientPageProps) {
   const { companyId } = useCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { canCreate, canUpdate, canDelete } = useCrudPermissions();
+  const { canCreate, canUpdate, canDelete } = useCrudPermissions(VENDOR_INVOICE_PERMISSION);
+  const { can } = usePagePermissions(VENDOR_INVOICE_PERMISSION);
+  const canPrint = can('print');
   const [invoices, setInvoices] = useState<VendorInvoice[]>(data);
 
   useEffect(() => {
@@ -184,7 +187,7 @@ export function ClientPage({ data }: ClientPageProps) {
     setIsFormOpen(true);
   };
 
-  const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, onPrint: handlePrint, canUpdate, canDelete });
+  const columns = getColumns({ onEdit: handleEdit, onDelete: handleDelete, onPrint: handlePrint, canUpdate, canDelete, canPrint });
 
   return (
     <div className="space-y-4">
@@ -275,7 +278,9 @@ export function ClientPage({ data }: ClientPageProps) {
         setCurrentPage={setCurrentPage}
       />
 
-      {/* Form Dialog */}
+      {/* Form Dialog - serves both "Buy a Product" and "Edit", so it stays
+          mounted for either action rather than being gated on create alone. */}
+      {(canCreate || canUpdate) && (
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto rounded-xl shadow-lg">
           <DialogHeader>
@@ -303,14 +308,17 @@ export function ClientPage({ data }: ClientPageProps) {
           />
         </DialogContent>
       </Dialog>
+      )}
 
       {/* Delete Confirmation Dialog */}
+      {canDelete && (
       <DeleteAlertDialog
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         onDelete={confirmDelete}
         itemName={selectedInvoice?.invoiceNumber}
       />
+      )}
     </div>
   );
 }

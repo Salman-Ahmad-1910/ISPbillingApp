@@ -215,9 +215,9 @@ func SetupRoutes(r *gin.Engine) {
 			billing.POST("/payments", middleware.RBACMiddleware(config.DB, "billing", "add"), controllers.CreatePayment)
 billing.PUT("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "edit"), controllers.UpdatePayment)
 		billing.DELETE("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "delete"), controllers.DeletePayment)
-			controllers.RegisterGenericCRUD[models.TransactionType](billing, "/transaction-types")
-			billing.POST("/bills/create", middleware.RBACMiddleware(config.DB, "billing", "add"), controllers.CreateBills)
-			billing.POST("/bills/delete", middleware.RBACMiddleware(config.DB, "billing", "add"), controllers.DeleteBills)
+		controllers.RegisterGenericCRUDGuarded[models.TransactionType](billing, "/transaction-types", true, middleware.RequirePageCrud(config.DB, middleware.TransactionTypePermission))
+		billing.POST("/bills/create", middleware.RBACMiddleware(config.DB, "billing", "add"), middleware.RequirePageCrud(config.DB, middleware.BillCreatorPermission), controllers.CreateBills)
+		billing.POST("/bills/delete", middleware.RBACMiddleware(config.DB, "billing", "add"), middleware.RequirePageCrud(config.DB, middleware.BillCreatorPermission), controllers.DeleteBills)
 			billing.GET("/bills", controllers.GetBillRecords)
 
 			billing.GET("/promises", controllers.GetPromises)
@@ -265,12 +265,15 @@ billing.PUT("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "ed
 		controllers.RegisterGenericCRUDGuarded[models.Vendor](crmProtected, "/vendors", true, middleware.RequirePageCrud(config.DB, middleware.VendorPermission))
 
 
-			// Vendor Invoice specific routes
+			// Vendor Invoice specific routes. Same resource as
+			// /inventory/vendor-invoices, so they share its permission guards; on
+			// the bare crm group they were an unguarded duplicate write path.
+			crmVendorInvoiceWrite := middleware.RequirePageCrud(config.DB, middleware.VendorInvoicePermission)
 			crm.GET("/vendor-invoices", controllers.GetVendorInvoices)
 			crm.GET("/vendor-invoices/:id", controllers.GetVendorInvoiceByID)
-			crm.POST("/vendor-invoices", controllers.CreateVendorInvoice)
-			crm.PUT("/vendor-invoices/:id", controllers.UpdateVendorInvoice)
-			crm.DELETE("/vendor-invoices/:id", controllers.DeleteVendorInvoice)
+			crm.POST("/vendor-invoices", crmVendorInvoiceWrite, controllers.CreateVendorInvoice)
+			crm.PUT("/vendor-invoices/:id", crmVendorInvoiceWrite, controllers.UpdateVendorInvoice)
+			crm.DELETE("/vendor-invoices/:id", crmVendorInvoiceWrite, controllers.DeleteVendorInvoice)
 		}
 
 		// Roles and permissions
@@ -369,13 +372,20 @@ billing.PUT("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "ed
 		})
 		dealers.Use(middleware.AuthMiddleware())
 		{
-			dealers.POST("", controllers.CreateDealer)
+			dealerWrite := middleware.RequirePageCrud(config.DB, middleware.MyDealerPermission)
+			dealers.POST("", dealerWrite, controllers.CreateDealer)
 			// Register only GET, PUT for generic CRUD, DELETE uses custom logic
 			crud := controllers.GenericCRUD[models.Dealer]{IsScoped: true}
 			dealers.GET("", crud.FindAll)
 			dealers.GET("/:id", crud.FindOne)
-			dealers.PUT("/:id", controllers.UpdateDealer)
-			dealers.DELETE("/:id", controllers.DeleteDealer)
+			// The edit form also carries `status`, so drop that field unless the
+			// change-status child is granted; otherwise "Edit" would be a back
+			// door around "Change Status".
+			dealerEdit := middleware.StripPageFieldUnlessFeature(
+				config.DB, middleware.MyDealerPermission, "update", "status", "change-status")
+			dealers.PUT("/:id", dealerWrite, dealerEdit, controllers.UpdateDealer)
+			dealers.PUT("/:id/status", middleware.RequirePageCrudAction(config.DB, middleware.MyDealerPermission, "change-status"), controllers.UpdateDealerStatus)
+			dealers.DELETE("/:id", dealerWrite, controllers.DeleteDealer)
 			controllers.RegisterGenericCRUD[models.DealerFranchise](dealers, "/franchises")
 			dcCRUD := controllers.GenericCRUD[models.DealerCollection]{IsScoped: true}
 			dealers.POST("/collections", controllers.CreateDealerCollection)
@@ -671,11 +681,14 @@ billing.PUT("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "ed
 				inventory.PUT("/serial-number-pool/:id", snPool.Update)
 				inventory.DELETE("/serial-number-pool/:id", snPool.Delete)
 			}
+			// Buy a Product / Edit / Delete map onto the page's create, update and
+			// delete children, so a single RequirePageCrud guard covers all three.
+			vendorInvoiceWrite := middleware.RequirePageCrud(config.DB, middleware.VendorInvoicePermission)
 			inventory.GET("/vendor-invoices", controllers.GetVendorInvoices)
 			inventory.GET("/vendor-invoices/:id", controllers.GetVendorInvoiceByID)
-			inventory.POST("/vendor-invoices", controllers.CreateVendorInvoice)
-			inventory.PUT("/vendor-invoices/:id", controllers.UpdateVendorInvoice)
-			inventory.DELETE("/vendor-invoices/:id", controllers.DeleteVendorInvoice)
+			inventory.POST("/vendor-invoices", vendorInvoiceWrite, controllers.CreateVendorInvoice)
+			inventory.PUT("/vendor-invoices/:id", vendorInvoiceWrite, controllers.UpdateVendorInvoice)
+			inventory.DELETE("/vendor-invoices/:id", vendorInvoiceWrite, controllers.DeleteVendorInvoice)
 			inventory.GET("/purchases", controllers.GetPurchases)
 			inventory.GET("/purchases/:id", controllers.GetPurchaseByID)
 			inventory.POST("/purchases", controllers.CreatePurchase)

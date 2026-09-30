@@ -13,6 +13,8 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import api from '@/lib/api';
 import { useCompany } from '@/context/company-context';
+import { usePagePermissions } from '@/hooks/usePermissions';
+import { REPORT_INVOICE_PERMISSION } from '@/lib/permission-pages';
 import { useToast } from '@/hooks/use-toast';
 
 interface SubscriberData {
@@ -54,6 +56,7 @@ interface CombinedRow {
 
 export default function DealersInvoiceListPage() {
   const { companyId } = useCompany();
+  const { can } = usePagePermissions(REPORT_INVOICE_PERMISSION);
   const { toast } = useToast();
   const reportRef = useRef<HTMLDivElement>(null);
 
@@ -219,6 +222,7 @@ export default function DealersInvoiceListPage() {
       <div className="h-0.5 bg-gradient-to-r from-amber-500/50 via-orange-500/30 to-transparent no-print" />
 
       {/* Filter Row */}
+      {can('filters') && (
       <Card className="no-print transition-all duration-300 hover:shadow-md">
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -311,8 +315,10 @@ export default function DealersInvoiceListPage() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Summary Cards */}
+      {can('summary') && (
       <div className="grid gap-4 md:grid-cols-2 no-print">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center justify-between">
@@ -337,6 +343,7 @@ export default function DealersInvoiceListPage() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Printable Report Section */}
       <div ref={reportRef} className="print-report">
@@ -350,6 +357,7 @@ export default function DealersInvoiceListPage() {
                   {toDate ? format(toDate, 'dd MMM yyyy') : '...'}
                 </p>
               </div>
+              {can('export') && (
               <div className="flex gap-2 no-print">
                 <Button variant="outline" onClick={handlePrint}>
                   <Printer className="mr-2 h-4 w-4" />
@@ -360,6 +368,7 @@ export default function DealersInvoiceListPage() {
                   Excel
                 </Button>
               </div>
+              )}
             </div>
 
             {loading ? (
