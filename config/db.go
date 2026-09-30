@@ -49,9 +49,7 @@ func RunMigrations() {
 
 	// Drop FK constraints that were removed from models
 	log.Println("Dropping removed FK constraints...")
-	DB.Exec(`ALTER TABLE invoices DROP CONSTRAINT IF EXISTS fk_invoices_subscriber`)
-	DB.Exec(`ALTER TABLE payments DROP CONSTRAINT IF EXISTS fk_payments_subscriber`)
-	DB.Exec(`ALTER TABLE payments DROP CONSTRAINT IF EXISTS fk_payments_invoice`)
+	dropRemovedSubscriberForeignKeys()
 	DB.Exec(`ALTER TABLE invoices ALTER COLUMN subscriber_id DROP NOT NULL`)
 	DB.Exec(`ALTER TABLE payments ALTER COLUMN subscriber_id DROP NOT NULL`)
 	DB.Exec(`ALTER TABLE payments ALTER COLUMN invoice_id DROP NOT NULL`)
@@ -183,9 +181,7 @@ func RunMigrations() {
 
 	// Drop FK constraints that GORM AutoMigrate may recreate but that have
 	// orphaned data preventing creation.
-	DB.Exec(`ALTER TABLE invoices DROP CONSTRAINT IF EXISTS fk_invoices_subscriber`)
-	DB.Exec(`ALTER TABLE payments DROP CONSTRAINT IF EXISTS fk_payments_subscriber`)
-	DB.Exec(`ALTER TABLE payments DROP CONSTRAINT IF EXISTS fk_payments_invoice`)
+	dropRemovedSubscriberForeignKeys()
 	log.Println("FK constraints cleaned up after migration")
 
 	// Product ID (product_code) must be unique per company, not globally, so each
@@ -354,6 +350,54 @@ func RunMigrations() {
 
 	// Seed initial data
 	seedInitialData()
+}
+
+// dropRemovedSubscriberForeignKeys removes the legacy foreign keys that used to
+// link invoices and payments to subscribers/invoices. Those relations no longer
+// exist in the models: subscriber data moved from the `subscribers` table to
+// `connections`, and Invoice has no Subscriber relation (see models/billing.go).
+//
+// The constraints are matched from pg_constraint rather than dropped by a
+// hardcoded name. The old statements named `fk_invoices_subscriber` (singular)
+// while the constraint actually created on the server is
+// `fk_invoices_subscribers` (plural), so `DROP CONSTRAINT IF EXISTS` silently
+// did nothing and the constraint survived every boot. That left Postgres
+// validating existing rows against an empty `subscribers` table, which is what
+// produced the foreign key error during migration.
+//
+// Selecting by OID from the catalogs (instead of casting 'invoices'::regclass)
+// keeps this a no-op on a brand-new database where the tables do not exist yet
+// and AutoMigrate has not created them.
+func dropRemovedSubscriberForeignKeys() {
+	const q = `
+DO $$
+DECLARE
+	r record;
+BEGIN
+	FOR r IN
+		SELECT con.conrelid::regclass::text AS table_name, con.conname
+		FROM pg_constraint con
+		JOIN pg_class rel ON rel.oid = con.conrelid
+		JOIN pg_namespace ns ON ns.oid = rel.relnamespace
+		WHERE con.contype = 'f'
+			AND ns.nspname = 'public'
+			AND rel.relname IN ('invoices', 'payments')
+			AND con.confrelid IN (
+				SELECT c.oid
+				FROM pg_class c
+				JOIN pg_namespace n2 ON n2.oid = c.relnamespace
+				WHERE c.relname IN ('subscribers', 'invoices')
+					AND n2.nspname = 'public'
+			)
+	LOOP
+		EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', r.table_name, r.conname);
+		RAISE NOTICE 'dropped leftover FK % -> %', r.table_name, r.conname;
+	END LOOP;
+END $$;`
+
+	if err := DB.Exec(q).Error; err != nil {
+		log.Printf("Warning: failed to drop leftover subscriber foreign keys: %v", err)
+	}
 }
 
 func seedInitialData() {
