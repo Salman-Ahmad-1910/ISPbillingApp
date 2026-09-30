@@ -35,8 +35,7 @@ import { useToast } from '@/hooks/use-toast';
 import { smartMatchScore } from '@/lib/search';
 import api from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
-import { useCrudPermissions, usePagePermissions } from '@/hooks/usePermissions';
-import { BADDEBT_COLLECTION_PERMISSION } from '@/lib/permission-pages';
+import { useCrudPermissions } from '@/hooks/usePermissions';
 import { Loader2, MoreHorizontal, PlusCircle, TriangleAlert, Users, DollarSign, AlertTriangle, UserCheck } from 'lucide-react';
 
 import type { Connection, Dealer, Payment, Area, RecoveryOfficer } from '@/lib/types';
@@ -54,7 +53,6 @@ export default function BadDebtCollectionsPage() {
   const { user } = useUser();
   const queryClient = useQueryClient();
   const { canUpdate, canDelete } = useCrudPermissions();
-  const collectionPage = usePagePermissions(BADDEBT_COLLECTION_PERMISSION);
 
   const [activeTab, setActiveTab] = useState('subscribers');
 
@@ -279,7 +277,6 @@ export default function BadDebtCollectionsPage() {
 
       <div className="h-0.5 bg-gradient-to-r from-rose-500/50 via-red-500/30 to-transparent" />
 
-      {collectionPage.can('summary') && (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center gap-3">
@@ -326,7 +323,6 @@ export default function BadDebtCollectionsPage() {
           </div>
         </div>
       </div>
-      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full max-w-md grid-cols-2">
@@ -336,7 +332,6 @@ export default function BadDebtCollectionsPage() {
 
         <TabsContent value="subscribers" className="mt-4">
           <Card>
-            {collectionPage.can('search') && (
             <div className="p-4 border-b">
               <div className="max-w-md space-y-2">
                 <Label>Search Subscriber</Label>
@@ -389,7 +384,6 @@ export default function BadDebtCollectionsPage() {
                 )}
               </div>
             </div>
-            )}
 
             {selectedSubscriber ? (
               <CardContent className="p-0">
@@ -501,7 +495,6 @@ export default function BadDebtCollectionsPage() {
 
         <TabsContent value="dealers" className="mt-4">
           <Card>
-            {collectionPage.can('search') && (
             <div className="p-4 border-b">
               <div className="max-w-md">
                 <SearchableSelect
@@ -514,7 +507,6 @@ export default function BadDebtCollectionsPage() {
                 />
               </div>
             </div>
-            )}
 
             {selectedDealer ? (
               <CardContent className="p-0">

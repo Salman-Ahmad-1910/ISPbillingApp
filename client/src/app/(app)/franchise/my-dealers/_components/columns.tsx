@@ -19,9 +19,6 @@ interface ColumnsProps {
   onEdit: (dealer: Dealer) => void;
   onDelete: (dealer: Dealer) => void;
   onStatus: (dealer: Dealer) => void;
-  canUpdate?: boolean;
-  canChangeStatus?: boolean;
-  canDelete?: boolean;
 }
 
 const statusBadgeClass: Record<string, string> = {
@@ -31,14 +28,7 @@ const statusBadgeClass: Record<string, string> = {
   deactivated: 'bg-red-100 text-red-700',
 };
 
-export const getColumns = ({
-  onEdit,
-  onDelete,
-  onStatus,
-  canUpdate = true,
-  canChangeStatus = true,
-  canDelete = true,
-}: ColumnsProps): ColumnDef<Dealer>[] => [
+export const getColumns = ({ onEdit, onDelete, onStatus }: ColumnsProps): ColumnDef<Dealer>[] => [
   {
     accessorKey: 'id',
     header: 'ID',
@@ -88,46 +78,36 @@ export const getColumns = ({
       );
     },
   },
-  ...(canUpdate || canChangeStatus || canDelete
-    ? [
-        {
-          id: 'actions',
-          cell: ({ row }: { row: { original: Dealer } }) => {
-            const dealer = row.original;
-            return (
-              <div className="text-right">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="h-8 w-8 p-0">
-                      <span className="sr-only">Open menu</span>
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                    {canUpdate && (
-                      <DropdownMenuItem onClick={() => onEdit(dealer)} className="data-[highlighted]:text-emerald-600">
-                        Edit Dealer
-                      </DropdownMenuItem>
-                    )}
-                    {canChangeStatus && (
-                      <DropdownMenuItem onClick={() => onStatus(dealer)} className="data-[highlighted]:text-blue-600">
-                        <ShieldCheck className="h-4 w-4" />
-                        Change Status
-                      </DropdownMenuItem>
-                    )}
-                    {(canUpdate || canChangeStatus) && canDelete && <DropdownMenuSeparator />}
-                    {canDelete && (
-                      <DropdownMenuItem className="text-destructive data-[highlighted]:text-red-600" onClick={() => onDelete(dealer)}>
-                        Delete Dealer
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            );
-          },
-        } as ColumnDef<Dealer>,
-      ]
-    : []),
+  {
+    id: 'actions',
+    cell: ({ row }) => {
+      const dealer = row.original;
+      return (
+        <div className="text-right">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => onEdit(dealer)} className="data-[highlighted]:text-emerald-600">
+                Edit Dealer
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onStatus(dealer)} className="data-[highlighted]:text-blue-600">
+                <ShieldCheck className="h-4 w-4" />
+                Change Status
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive data-[highlighted]:text-red-600" onClick={() => onDelete(dealer)}>
+                Delete Dealer
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      );
+    },
+  },
 ];

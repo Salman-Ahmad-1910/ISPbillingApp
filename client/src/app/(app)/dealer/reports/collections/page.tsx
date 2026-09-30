@@ -16,8 +16,6 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import api from '@/lib/api';
 import { useCompany } from '@/context/company-context';
-import { usePagePermissions } from '@/hooks/usePermissions';
-import { REPORT_COLLECTION_PERMISSION } from '@/lib/permission-pages';
 import { useToast } from '@/hooks/use-toast';
 import type { Company } from '@/lib/types';
 import {
@@ -68,7 +66,6 @@ const PAGE_SIZE_OPTIONS = [10, 50, 100] as const;
 
 export default function DealersCollectionsPage() {
   const { companyId, companies } = useCompany();
-  const { can } = usePagePermissions(REPORT_COLLECTION_PERMISSION);
   const { toast } = useToast();
 
   const [loading, setLoading] = useState(false);
@@ -315,7 +312,6 @@ export default function DealersCollectionsPage() {
       <div className="h-0.5 bg-gradient-to-r from-teal-500/50 via-emerald-500/30 to-transparent no-print" />
 
       {/* Filter Row */}
-      {can('filters') && (
       <Card className="no-print transition-all duration-300 hover:shadow-md">
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
@@ -459,10 +455,8 @@ export default function DealersCollectionsPage() {
           </div>
         </CardContent>
       </Card>
-      )}
 
       {/* Summary Cards */}
-      {can('summary') && (
       <div className="grid gap-4 md:grid-cols-2 no-print">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center justify-between">
@@ -487,7 +481,6 @@ export default function DealersCollectionsPage() {
           </div>
         </div>
       </div>
-      )}
 
       {/* Printable Report Section */}
       <div className="print-report">
@@ -501,7 +494,6 @@ export default function DealersCollectionsPage() {
                   {toDate ? format(toDate, 'dd MMM yyyy') : '...'}
                 </p>
               </div>
-              {can('export') && (
               <div className="flex gap-2 no-print">
                 <Button variant="outline" size="sm" onClick={handlePrintReport}>
                   <Printer className="mr-2 h-4 w-4" />
@@ -512,7 +504,6 @@ export default function DealersCollectionsPage() {
                   Excel
                 </Button>
               </div>
-              )}
             </div>
 
             {loading ? (
@@ -582,8 +573,6 @@ export default function DealersCollectionsPage() {
                                 {item.settlementStatus === 'settled' ? 'Mark Unpaid' : 'Mark Paid'}
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              {can('export') && (
-                              <>
                               <DropdownMenuItem onClick={() => handlePrint(item, 'a4')}>
                                 <FileText className="mr-2 h-4 w-4" />
                                 Print Bill
@@ -592,8 +581,6 @@ export default function DealersCollectionsPage() {
                                 <Copy className="mr-2 h-4 w-4" />
                                 Duplicate Print
                               </DropdownMenuItem>
-                              </>
-                              )}
                               <DropdownMenuSeparator />
                               <DropdownMenuItem onClick={() => handleDelete(item.id)} className="text-red-600">
                                 <Trash2 className="mr-2 h-4 w-4" />

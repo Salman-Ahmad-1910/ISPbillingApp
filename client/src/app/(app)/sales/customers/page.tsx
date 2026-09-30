@@ -7,13 +7,9 @@ import { useMemo } from 'react';
 
 import { SalesCustomerClientPage } from './_components/client-page';
 import { useCompany } from '@/context/company-context';
-import { usePagePermissions } from '@/hooks/usePermissions';
-import { SALES_CUSTOMERS_PERMISSION } from '@/lib/permission-pages';
 
 export default function SalesCustomersPage() {
   const { companyId } = useCompany();
-  const { can: canPage } = usePagePermissions(SALES_CUSTOMERS_PERMISSION);
-  const canViewSummary = canPage('summary');
 
   const { data: customers = [], isLoading } = useGenericQuery<any>('crm/customers', companyId ?? undefined);
 
@@ -57,7 +53,6 @@ export default function SalesCustomersPage() {
 
       <div className="h-0.5 bg-gradient-to-r from-violet-500/50 via-purple-500/30 to-transparent" />
 
-      {canViewSummary && (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center gap-3">
@@ -95,7 +90,6 @@ export default function SalesCustomersPage() {
           </div>
         </div>
       </div>
-      )}
 
       <Card className="transition-all duration-300 hover:shadow-md">
         <CardContent className="p-0">

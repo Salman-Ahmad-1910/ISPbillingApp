@@ -16,11 +16,9 @@ import {
 interface ProductColumnsProps {
   onEdit: (product: Product) => void;
   onDelete: (product: Product) => void;
-  canUpdate?: boolean;
-  canDelete?: boolean;
 }
 
-export const columns = ({ onEdit, onDelete, canUpdate = true, canDelete = true }: ProductColumnsProps): ColumnDef<Product>[] => [
+export const columns = ({ onEdit, onDelete }: ProductColumnsProps): ColumnDef<Product>[] => [
   {
     accessorKey: 'productId',
     header: 'Product ID',
@@ -96,36 +94,30 @@ export const columns = ({ onEdit, onDelete, canUpdate = true, canDelete = true }
       return <div className="text-right font-medium">{formatted}</div>;
     },
   },
-  ...(canUpdate || canDelete
-    ? [
-        {
-          id: 'actions',
-          cell: ({ row }: { row: { original: Product } }) => {
-            const product = row.original;
-            return (
-              <div className="text-right">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="h-8 w-8 p-0">
-                      <span className="sr-only">Open menu</span>
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                    {canUpdate && <DropdownMenuItem onClick={() => onEdit(product)}>Edit product</DropdownMenuItem>}
-                    {canUpdate && canDelete && <DropdownMenuSeparator />}
-                    {canDelete && (
-                      <DropdownMenuItem className="text-destructive" onClick={() => onDelete(product)}>
-                        Delete product
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            );
-          },
-        } as ColumnDef<Product>,
-      ]
-    : []),
+  {
+    id: 'actions',
+    cell: ({ row }) => {
+        const product = row.original;
+      return (
+        <div className="text-right">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => onEdit(product)}>Edit product</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive" onClick={() => onDelete(product)}>
+                Delete product
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      );
+    },
+  },
 ];

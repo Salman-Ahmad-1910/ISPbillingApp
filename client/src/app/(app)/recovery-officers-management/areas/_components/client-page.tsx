@@ -20,8 +20,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
-import { usePagePermissions } from '@/hooks/usePermissions';
-import { AREA_ASSIGNMENT_PERMISSION } from '@/lib/permission-pages';
   import api from '@/lib/api';
   import { smartMatch } from '@/lib/search';
 import { useQueryClient } from '@tanstack/react-query';
@@ -35,8 +33,6 @@ export function ClientPage({ data, recoveryOfficers }: ClientPageProps) {
   const { companyId } = useCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { can: canPage } = usePagePermissions(AREA_ASSIGNMENT_PERMISSION);
-  const canSelectOfficer = canPage('officer-select');
   const [filter, setFilter] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedArea, setSelectedArea] = useState<Area | null>(null);
@@ -240,7 +236,6 @@ export function ClientPage({ data, recoveryOfficers }: ClientPageProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {canSelectOfficer && (
           <div className="mb-4 max-w-xs">
             <Label className="text-xs text-muted-foreground">Select Recovery Officer</Label>
             <Select value={selectedOfficerId} onValueChange={handleOfficerChange}>
@@ -254,7 +249,6 @@ export function ClientPage({ data, recoveryOfficers }: ClientPageProps) {
               </SelectContent>
             </Select>
           </div>
-          )}
 
           {selectedOfficerId && (
             <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 items-start">
@@ -385,9 +379,7 @@ export function ClientPage({ data, recoveryOfficers }: ClientPageProps) {
 
           {!selectedOfficerId && (
             <p className="text-sm text-muted-foreground py-6 text-center">
-              {canSelectOfficer
-                ? 'Select a recovery officer above to manage their area assignments.'
-                : 'You do not have permission to select a recovery officer.'}
+              Select a recovery officer above to manage their area assignments.
             </p>
           )}
         </CardContent>

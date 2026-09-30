@@ -17,11 +17,9 @@ import { Badge } from '@/components/ui/badge';
 interface ColumnsProps {
   onEdit: (officer: RecoveryOfficer) => void;
   onDelete: (officer: RecoveryOfficer) => void;
-  canUpdate?: boolean;
-  canDelete?: boolean;
 }
 
-export const getColumns = ({ onEdit, onDelete, canUpdate = true, canDelete = true }: ColumnsProps): ColumnDef<RecoveryOfficer>[] => [
+export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<RecoveryOfficer>[] => [
   {
     accessorKey: 'id',
     header: 'ID',
@@ -70,19 +68,13 @@ export const getColumns = ({ onEdit, onDelete, canUpdate = true, canDelete = tru
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              {canUpdate && (
               <DropdownMenuItem onClick={() => onEdit(officer)} className="data-[highlighted]:text-emerald-600">
                 Edit
               </DropdownMenuItem>
-              )}
-              {canDelete && (
-                <>
-                  {canUpdate && <DropdownMenuSeparator />}
-                  <DropdownMenuItem className="text-destructive data-[highlighted]:text-red-600" onClick={() => onDelete(officer)}>
-                    Delete
-                  </DropdownMenuItem>
-                </>
-              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive data-[highlighted]:text-red-600" onClick={() => onDelete(officer)}>
+                Delete
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

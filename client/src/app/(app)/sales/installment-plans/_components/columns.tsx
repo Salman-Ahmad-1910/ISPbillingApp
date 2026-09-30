@@ -16,11 +16,9 @@ import {
 interface InstallmentPlanColumnsProps {
   onEdit: (plan: InstallmentPlan) => void;
   onDelete: (plan: InstallmentPlan) => void;
-  canUpdate?: boolean;
-  canDelete?: boolean;
 }
 
-export const getColumns = ({ onEdit, onDelete, canUpdate = true, canDelete = true }: InstallmentPlanColumnsProps): ColumnDef<InstallmentPlan>[] => [
+export const getColumns = ({ onEdit, onDelete }: InstallmentPlanColumnsProps): ColumnDef<InstallmentPlan>[] => [
   {
     accessorKey: 'name',
     header: 'Plan Name',
@@ -38,36 +36,30 @@ export const getColumns = ({ onEdit, onDelete, canUpdate = true, canDelete = tru
       return <div className="text-center">{val}%</div>;
     }
   },
-  ...(canUpdate || canDelete
-    ? [
-        {
-          id: 'actions',
-          cell: ({ row }: { row: { original: InstallmentPlan } }) => {
-            const plan = row.original;
-            return (
-              <div className="text-right">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="h-8 w-8 p-0">
-                      <span className="sr-only">Open menu</span>
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                    {canUpdate && <DropdownMenuItem onClick={() => onEdit(plan)}>Edit plan</DropdownMenuItem>}
-                    {canUpdate && canDelete && <DropdownMenuSeparator />}
-                    {canDelete && (
-                      <DropdownMenuItem className="text-destructive" onClick={() => onDelete(plan)}>
-                        Delete plan
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            );
-          },
-        } as ColumnDef<InstallmentPlan>,
-      ]
-    : []),
+  {
+    id: 'actions',
+    cell: ({ row }) => {
+      const plan = row.original;
+      return (
+        <div className="text-right">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => onEdit(plan)}>Edit plan</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive" onClick={() => onDelete(plan)}>
+                Delete plan
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      );
+    },
+  },
 ];

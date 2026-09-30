@@ -10,7 +10,7 @@ import { useCompany } from '@/context/company-context';
 import { useUser } from '@/hooks/use-user';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useCrudPermissions, usePagePermissions } from '@/hooks/usePermissions';
-import { POINT_OF_SALE_PERMISSION } from '@/lib/permission-pages';
+import { POS_PERMISSION } from '@/lib/permission-pages';
 
 import { PlusCircle, Trash2, CreditCard, Landmark, CircleDollarSign, Loader2, ShoppingCart, Search, Users, UserRound, Handshake, CalendarDays, Receipt, MoreVertical, Hash, ChevronDown, Tag, CheckCircle2, XCircle } from 'lucide-react';
 import Image from 'next/image';
@@ -436,15 +436,11 @@ export default function POSPage() {
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const { canDelete } = useCrudPermissions();
-    const { can: canPage } = usePagePermissions(POINT_OF_SALE_PERMISSION);
-    const canViewProducts = canPage('products');
-    const canViewOrderDetail = canPage('order-detail');
-    // Complete Payment and Hold Bill finalize a sale, so they follow the Order
-    // Detail panel the cashier is already working in. They previously read
-    // useCrudPermissions() with no page id, which silently fell back to the
-    // global "Can Create" switch (15362) and left them hidden for anyone
-    // granted Point of Sale without that unrelated global grant.
-    const canCreate = canViewOrderDetail;
+    // The payment actions belong to the Order Detail panel, not to the app-wide
+    // Create switch: an admin who unticks CRUD > Create must not silently stop a
+    // cashier from completing a sale.
+    const { can: canPage } = usePagePermissions(POS_PERMISSION);
+    const canCollectPayment = canPage('order-detail');
 
     const { data: purchasedProducts = [] } = useGenericQuery<any>('inventory/purchased-products', companyId ?? undefined);
     const { data: customersData = [] } = useGenericQuery<any>('crm/customers', companyId ?? undefined);
@@ -1092,8 +1088,7 @@ export default function POSPage() {
             <div className="h-0.5 bg-gradient-to-r from-amber-500/50 via-orange-500/30 to-transparent" />
 
             <div className="grid gap-8 lg:grid-cols-3">
-            {canViewProducts && (
-                <div className={canViewOrderDetail ? 'lg:col-span-2' : 'lg:col-span-3'}>
+                <div className="lg:col-span-2">
                     <Card className="transition-all duration-300 hover:shadow-md">
                         <CardHeader>
                             <Input placeholder="Search products..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
@@ -1181,7 +1176,6 @@ export default function POSPage() {
                         </CardContent>
                     </Card>
                 </div>
-                )}
 
                 <AlertDialog open={!!productToDelete} onOpenChange={(o) => { if (!o) setProductToDelete(null); }}>
                     <AlertDialogContent>
@@ -1263,7 +1257,6 @@ export default function POSPage() {
                     </DialogContent>
                 </Dialog>
 
-                {canViewOrderDetail && (
                 <div className="lg:col-span-1 flex flex-col gap-4">
                     <Card className="sticky top-20 transition-all duration-300 hover:shadow-md">
                         <CardHeader>
@@ -1589,7 +1582,7 @@ export default function POSPage() {
                                             <Button variant={paymentMethod === 'bank' ? 'default' : 'outline'} onClick={() => setPaymentMethod('bank')} className="transition-all duration-300 hover:scale-105"><Landmark className="mr-2 h-4 w-4" /> Bank</Button>
                                             <Button variant={paymentMethod === 'cash' ? 'default' : 'outline'} onClick={() => setPaymentMethod('cash')} className="transition-all duration-300 hover:scale-105"><CircleDollarSign className="mr-2 h-4 w-4" /> Cash</Button>
                                         </div>
-                                        {canCreate && (
+                                        {canCollectPayment && (
                                         <Button
                                             size="lg"
                                             disabled={isProcessing || (!existingInstallment && (cart.length === 0 || !selectedPlanId)) || (!!existingInstallment && (!installmentDetails || installmentDetails.remainingInstallments <= 0))}
@@ -1617,7 +1610,7 @@ export default function POSPage() {
                                             <Button variant={paymentMethod === 'cash' ? 'default' : 'outline'} onClick={() => setPaymentMethod('cash')} className="transition-all duration-300 hover:scale-105"><CircleDollarSign className="mr-2 h-4 w-4" /> Cash</Button>
                                         </div>
                                         <div className="grid grid-cols-2 gap-2">
-                                            {canCreate && (
+                                            {canCollectPayment && (
                                             <Button
                                                 variant="outline"
                                                 size="lg"
@@ -1628,7 +1621,7 @@ export default function POSPage() {
                                                 Hold Bill
                                             </Button>
                                             )}
-                                            {canCreate && (
+                                            {canCollectPayment && (
                                             <Button
                                                 size="lg"
                                                 disabled={cart.length === 0 || isProcessing}
@@ -1646,52 +1639,7 @@ export default function POSPage() {
                         )}
                     </Card>
                 </div>
-                )}
             </div>
-
-            {canViewProducts && !canViewOrderDetail && (
-            <div>
-                <Card className="transition-all duration-300 hover:shadow-md">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <ShoppingCart className="h-5 w-5 text-amber-500" />
-                            Order Details
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-sm text-muted-foreground">
-                            You do not have permission to view the Order Details panel, so orders cannot be created from this page.
-                        </p>
-                    </CardContent>
-                </Card>
-            </div>
-            )}
-
-            {!canViewProducts && canViewOrderDetail && (
-            <div>
-                <Card className="transition-all duration-300 hover:shadow-md">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <ShoppingCart className="h-5 w-5 text-amber-500" />
-                            Products
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-sm text-muted-foreground">
-                            You do not have permission to view products, so no items can be added to the order.
-                        </p>
-                    </CardContent>
-                </Card>
-            </div>
-            )}
-
-            {!canViewProducts && !canViewOrderDetail && (
-            <Card className="transition-all duration-300 hover:shadow-md">
-                <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                    You do not have permission to view the Point of Sale sections.
-                </CardContent>
-            </Card>
-            )}
         </div>
     );
 }

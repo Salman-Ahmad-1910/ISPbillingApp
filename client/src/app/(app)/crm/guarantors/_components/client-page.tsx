@@ -22,8 +22,6 @@ import { DataTable } from './data-table';
 import { getColumns } from './columns';
 import { GuarantorForm } from './guarantor-form';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
-import { useCrudPermissions } from '@/hooks/usePermissions';
-import { GUARANTORS_PERMISSION } from '@/lib/permission-pages';
 
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
@@ -39,7 +37,6 @@ export function ClientPage({ data }: ClientPageProps) {
     const { companyId } = useCompany();
     const { toast } = useToast();
     const queryClient = useQueryClient();
-    const { canCreate, canUpdate, canDelete } = useCrudPermissions(GUARANTORS_PERMISSION);
     const [guarantors, setGuarantors] = useState<Guarantor[]>(data);
     const [filter, setFilter] = useState('');
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -174,8 +171,6 @@ export function ClientPage({ data }: ClientPageProps) {
     const columns = getColumns({
         onEdit: handleEdit,
         onDelete: openDeleteDialog,
-        canUpdate,
-        canDelete,
     });
 
     return (
@@ -228,7 +223,6 @@ export function ClientPage({ data }: ClientPageProps) {
                         />
                     </div>
                     <div className="flex items-center gap-2">
-                        {canCreate && (
                         <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
                             <DialogTrigger asChild>
                                 <Button onClick={() => setSelectedGuarantor(null)} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
@@ -254,7 +248,6 @@ export function ClientPage({ data }: ClientPageProps) {
                                 />
                             </DialogContent>
                         </Dialog>
-                        )}
                     </div>
                 </div>
                 <DataTable columns={columns} data={getPaginatedData()} />

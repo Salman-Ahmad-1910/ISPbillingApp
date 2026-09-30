@@ -27,10 +27,9 @@ interface VendorInvoiceColumnsProps {
   onPrint: (invoice: VendorInvoice) => void;
   canUpdate?: boolean;
   canDelete?: boolean;
-  canPrint?: boolean;
 }
 
-export const columns = ({ onEdit, onDelete, onPrint, canUpdate = true, canDelete = true, canPrint = true }: VendorInvoiceColumnsProps): ColumnDef<FlatRow>[] => [
+export const columns = ({ onEdit, onDelete, onPrint, canUpdate = true, canDelete = true }: VendorInvoiceColumnsProps): ColumnDef<FlatRow>[] => [
   {
     id: 'index',
     header: '#',
@@ -157,9 +156,6 @@ export const columns = ({ onEdit, onDelete, onPrint, canUpdate = true, canDelete
     cell: ({ row }) => {
       if (!row.original.isFirst) return <span />;
       const invoice = row.original.invoice;
-      // With every action denied the column is pointless, so the whole trigger
-      // goes away rather than opening onto an empty menu.
-      if (!canPrint && !canUpdate && !canDelete) return <span />;
       return (
         <div className="text-right">
           <DropdownMenu>
@@ -171,12 +167,10 @@ export const columns = ({ onEdit, onDelete, onPrint, canUpdate = true, canDelete
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              {canPrint && (
               <DropdownMenuItem onClick={() => onPrint(invoice)}>
                 <Printer className="mr-2 h-4 w-4" />
                 Print
               </DropdownMenuItem>
-              )}
               {canUpdate && (
               <DropdownMenuItem onClick={() => onEdit(invoice)}>
                 <Pencil className="mr-2 h-4 w-4" />
@@ -185,7 +179,7 @@ export const columns = ({ onEdit, onDelete, onPrint, canUpdate = true, canDelete
               )}
               {canDelete && (
               <>
-              {(canPrint || canUpdate) && <DropdownMenuSeparator />}
+              <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive" onClick={() => onDelete(invoice)}>
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete
