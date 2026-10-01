@@ -31,6 +31,8 @@ export const PERMISSION_DEFS: PermissionDef[] = [
   { id: '14079', name: 'New Collection', module: 'Transactions' },
   { id: '13308', name: 'Reprint Slip', module: 'Transactions' },
   { id: '13304', name: 'Subscribers Collections', module: 'Transactions' },
+  { id: '15388', name: 'Collection Search', module: 'Transactions' },
+  { id: '15389', name: 'Collection Summary', module: 'Transactions' },
   { id: '13320', name: 'Bills Creator', module: 'Transactions' },
   { id: '13321', name: 'Dealers Collections', module: 'Transactions' },
   { id: '13357', name: 'Baddebt Collection', module: 'Transactions' },
@@ -153,6 +155,15 @@ export const PERMISSION_FOLDERS: PermissionFolder[] = [
 // Permission id that controls whether a user can see the graphs, recent
 // payments and open complaints widgets on the Dashboard page.
 export const DASHBOARD_CHARTS_PERMISSION = '15390';
+
+// Permission id that controls whether a user can see the search bar on the
+// Subscriber Collections page. When unchecked, the search bar is hidden.
+export const COLLECTION_SEARCH_PERMISSION = '15388';
+
+// Permission id that controls whether a user can see the four summary cards on
+// the Subscriber Collections page (Total Subscribers, Total Collected, Pending
+// Subscribers, Pending Amount). Replaces the previous per-card permissions.
+export const COLLECTION_SUMMARY_PERMISSION = '15389';
 
 // Permission id that controls whether a user can create/add records anywhere
 // in the app. When this is granted (web checkbox selected on the Roles &
@@ -294,16 +305,6 @@ export function getAllowedHrefs(permissionIds: string[]): Set<string> {
   const hrefs = new Set<string>(ALWAYS_ALLOWED);
   (permissionIds || []).forEach((id) => {
     (PERMISSION_PAGES[id] || []).forEach((href) => hrefs.add(href));
-    // A child id ("13331:filters") is not itself a key in PERMISSION_PAGES, so
-    // the lookup above finds nothing and its page would stay hidden from the
-    // sidebar. Resolve the parent instead: granting any child of a page is
-    // enough to reveal that page in the nav. Without this the folder only ever
-    // appears via the separate parent checkbox, and reports whose features are
-    // granted individually never show up at all.
-    const parentId = id.split(':')[0];
-    if (parentId !== id) {
-      (PERMISSION_PAGES[parentId] || []).forEach((href) => hrefs.add(href));
-    }
   });
   return hrefs;
 }
@@ -329,7 +330,9 @@ export const AREA_ASSIGNMENT_PERMISSION = '13319';
 export const SALES_CUSTOMERS_PERMISSION = '15336';
 export const GUARANTORS_PERMISSION = '15370';
 export const INSTALLMENT_PLANS_PERMISSION = '15337';
-export const POINT_OF_SALE_PERMISSION = '15338';
+// Point of Sale. The id is the same as the POS page entry added on the remote
+// branch; one constant only, so the PAGE_PERMISSIONS key is unambiguous.
+export const POS_PERMISSION = '15338';
 export const BRAND_PERMISSION = '15309';
 export const VENDOR_PERMISSION = '15310';
 export const UNIT_TYPE_PERMISSION = '15311';
@@ -495,7 +498,7 @@ export const INQUIRIES_CHILDREN: PageChildPermission[] = [
 export const CORPORATE_CLIENTS_CHILDREN: PageChildPermission[] = [
   { key: 'summary', label: 'Summary' },
   { key: 'create', label: 'Create' },
-  { key: 'update', label: 'Edit' },
+  { key: 'update', label: 'Update' },
   { key: 'delete', label: 'Delete' },
 ];
 
@@ -544,9 +547,11 @@ export const INSTALLMENT_PLANS_CHILDREN: PageChildPermission[] = [
   { key: 'delete', label: 'Delete' },
 ];
 
-// Point of Sale is split into two independent panels: the product grid on the
-// left and the Order Details panel on the right. Each is gated on its own.
-export const POINT_OF_SALE_CHILDREN: PageChildPermission[] = [
+// Point of Sale splits the page into two independent panels. "Order Detail" owns
+// the cart and the payment actions, so the payment buttons hang off it instead of
+// the app-wide Create switch - taking the global switch away must not stop someone
+// from taking money at the till.
+export const POS_CHILDREN: PageChildPermission[] = [
   { key: 'products', label: 'Products' },
   { key: 'order-detail', label: 'Order Detail' },
 ];
@@ -667,7 +672,7 @@ export const PAGE_PERMISSIONS: Record<string, { name: string; children: PageChil
   [SALES_CUSTOMERS_PERMISSION]: { name: 'Customers', children: SALES_CUSTOMERS_CHILDREN },
   [GUARANTORS_PERMISSION]: { name: 'Guarantors', children: GUARANTORS_CHILDREN },
   [INSTALLMENT_PLANS_PERMISSION]: { name: 'Installment Plans', children: INSTALLMENT_PLANS_CHILDREN },
-  [POINT_OF_SALE_PERMISSION]: { name: 'Point of Sale', children: POINT_OF_SALE_CHILDREN },
+  [POS_PERMISSION]: { name: 'Point of Sale', children: POS_CHILDREN },
   [BRAND_PERMISSION]: { name: 'Brand', children: INVENTORY_CATALOG_CHILDREN },
   [VENDOR_PERMISSION]: { name: 'Vendor', children: INVENTORY_CATALOG_CHILDREN },
   [UNIT_TYPE_PERMISSION]: { name: 'Unit Type', children: INVENTORY_CATALOG_CHILDREN },

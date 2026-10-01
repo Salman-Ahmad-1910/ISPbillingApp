@@ -36,7 +36,7 @@ import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
-import { useUserPermissions, useCrudPermissions, usePagePermissions } from '@/hooks/usePermissions';
+import { useCrudPermissions, usePagePermissions } from '@/hooks/usePermissions';
 import { SUBSCRIBER_COLLECTION_PERMISSION } from '@/lib/permission-pages';
 import { smartMatchScore } from '@/lib/search';
 import { Loader2, MoreHorizontal, Wallet, DollarSign, UserCheck, Trash2, Pencil, Copy, FileText, Users, CalendarClock, Clock } from 'lucide-react';
@@ -76,6 +76,12 @@ export default function SubscriberCollectionsPage() {
   const currentCompany = companies.find(c => c.id === companyId);
   const { toast } = useToast();
   const { user } = useUser();
+// Receiving a payment is the recovery officer's core job, not an app-wide
+  // "create record" action. Gating is therefore page-scoped: it resolves against
+  // this page's own children (SUBSCRIBER_COLLECTION_PERMISSION:create for
+  // "Receive Payment" / "Make Promise", :update / :delete for per-row actions)
+  // rather than the global CRUD switch, so an admin removing CRUD > Create must
+  // not stop a recovery officer from collecting.
   const { canCreate, canUpdate, canDelete } = useCrudPermissions(SUBSCRIBER_COLLECTION_PERMISSION);
   const collectionPage = usePagePermissions(SUBSCRIBER_COLLECTION_PERMISSION);
   const canViewCollectionSummary = collectionPage.can('summary');
@@ -673,15 +679,13 @@ export default function SubscriberCollectionsPage() {
                 <span>Receiving as: <span className="font-medium text-foreground">{recoveryOfficerName}</span></span>
               </div>
               <div className="flex-1" />
-              {canCreate && (
-                <Button variant="outline" onClick={() => setShowPromiseDialog(true)}>
-                  <CalendarClock className="mr-2 h-4 w-4" />
-                  Make Promise
-                </Button>
-              )}
               <Button onClick={() => { setSelectedPromiseId(null); setReceiveAmount(displayRemaining); setReceiveMethod('cash'); setReceiveTransactionId(''); setShowReceiveDialog(true); }} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
                 <DollarSign className="mr-2 h-4 w-4" />
                 Receive Payment
+              </Button>
+              <Button variant="outline" onClick={() => setShowPromiseDialog(true)}>
+                <CalendarClock className="mr-2 h-4 w-4" />
+                Make Promise
               </Button>
             </div>
 
@@ -740,12 +744,10 @@ export default function SubscriberCollectionsPage() {
                           <TableCell className="py-1.5 px-1.5 whitespace-nowrap">{promise.collectorName || recoveryOfficerName}</TableCell>
                           <TableCell className="py-1.5 px-1.5">
                             <div className="flex items-center gap-1">
-                              {canCreate && (
                               <Button variant="outline" size="sm" className="h-6 px-2 text-[10px] text-emerald-600 hover:text-emerald-700" onClick={() => handleReceivePromise(promise)}>
                                 <DollarSign className="mr-1 h-3 w-3" />
                                 Receive
                               </Button>
-                            )}
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                   <Button variant="ghost" size="icon" className="h-6 w-6">

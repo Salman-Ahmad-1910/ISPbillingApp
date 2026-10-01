@@ -63,6 +63,11 @@ export default function AllocatedCollectionsPage() {
   const { companyId } = useCompany();
   const { toast } = useToast();
   const { user } = useUser();
+// Recording a collection is the recovery officer's core job, not an app-wide
+  // "create record" action. Gating is therefore page-scoped: it resolves against
+  // this page's own `create` child (ALLOCATED_COLLECTION_PERMISSION:create) rather
+  // than the global CRUD > Create switch, so an admin removing CRUD > Create must
+  // not stop a recovery officer from collecting.
   const { canCreate } = useCrudPermissions(ALLOCATED_COLLECTION_PERMISSION);
   const collectionPage = usePagePermissions(ALLOCATED_COLLECTION_PERMISSION);
 
@@ -222,7 +227,6 @@ export default function AllocatedCollectionsPage() {
 
       <div className="h-0.5 bg-gradient-to-r from-violet-500/50 via-purple-500/30 to-transparent" />
 
-      {collectionPage.can('summary') && (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center gap-3">
@@ -258,10 +262,8 @@ export default function AllocatedCollectionsPage() {
           </div>
         </div>
       </div>
-      )}
 
       <Card className="transition-all duration-300 hover:shadow-md">
-        {collectionPage.can('search') && (
         <div className="p-4 border-b">
           <div className="max-w-md">
             <SearchableSelect
@@ -274,7 +276,6 @@ export default function AllocatedCollectionsPage() {
             />
           </div>
         </div>
-        )}
 
         {selectedSubscriber ? (
           <CardContent className="p-0">
@@ -340,18 +341,14 @@ export default function AllocatedCollectionsPage() {
                 />
               </div>
               <div className="flex items-end gap-2">
-                {canCreate && (
-                  <Button onClick={() => setShowPromiseDateDialog(true)} className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white hover:from-blue-600 hover:to-cyan-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    Promise Date
-                  </Button>
-                )}
-                {canCreate && (
-                  <Button onClick={() => setShowNewAmountDialog(true)} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    New Amount
-                  </Button>
-                )}
+                <Button onClick={() => setShowPromiseDateDialog(true)} className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white hover:from-blue-600 hover:to-cyan-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  Promise Date
+                </Button>
+                <Button onClick={() => setShowNewAmountDialog(true)} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  New Amount
+                </Button>
               </div>
             </div>
 

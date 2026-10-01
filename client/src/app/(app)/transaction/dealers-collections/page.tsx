@@ -64,7 +64,7 @@ export default function DealersCollectionsPage() {
   const currentCompany = companies.find(c => c.id === companyId);
   const { toast } = useToast();
   const { user } = useUser();
-  const { canCreate, canUpdate, canDelete } = useCrudPermissions(DEALER_COLLECTION_PERMISSION);
+const { canCreate, canUpdate, canDelete } = useCrudPermissions(DEALER_COLLECTION_PERMISSION);
   const collectionPage = usePagePermissions(DEALER_COLLECTION_PERMISSION);
 
   const [selectedDealerId, setSelectedDealerId] = useState<string | null>(null);
@@ -283,7 +283,6 @@ export default function DealersCollectionsPage() {
 
       <div className="h-0.5 bg-gradient-to-r from-amber-500/50 via-orange-500/30 to-transparent" />
 
-      {collectionPage.can('summary') && (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center gap-3">
@@ -330,10 +329,8 @@ export default function DealersCollectionsPage() {
           </div>
         </div>
       </div>
-      )}
 
       <Card className="transition-all duration-300 hover:shadow-md">
-        {collectionPage.can('search') && (
         <div className="p-4 border-b">
           <div className="max-w-md">
             <SearchableSelect
@@ -346,7 +343,6 @@ export default function DealersCollectionsPage() {
             />
           </div>
         </div>
-        )}
 
         {selectedDealer ? (
           <CardContent className="p-0">

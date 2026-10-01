@@ -30,7 +30,6 @@ import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
 import { useCrudPermissions } from '@/hooks/usePermissions';
-import { TRANSACTION_TYPE_PERMISSION } from '@/lib/permission-pages';
 import api from '@/lib/api';
 import { smartMatch } from '@/lib/search';
 import { Loader2, Pencil, Plus, Search, Trash2, FileCog, ListChecks } from 'lucide-react';
@@ -74,7 +73,7 @@ const PAYMENT_CHANNELS = [
 export default function TransactionTypePage() {
   const { companyId } = useCompany();
   const { toast } = useToast();
-  const { canCreate, canUpdate, canDelete } = useCrudPermissions(TRANSACTION_TYPE_PERMISSION);
+  const { canCreate, canUpdate, canDelete } = useCrudPermissions();
 
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);

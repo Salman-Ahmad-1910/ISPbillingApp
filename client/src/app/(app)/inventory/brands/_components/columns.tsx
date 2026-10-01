@@ -8,11 +8,9 @@ import { Button } from '@/components/ui/button';
 interface BrandColumnsProps {
   onEdit: (brand: Brand) => void;
   onDelete: (brand: Brand) => void;
-  canUpdate?: boolean;
-  canDelete?: boolean;
 }
 
-export const columns = ({ onEdit, onDelete, canUpdate = true, canDelete = true }: BrandColumnsProps): ColumnDef<Brand>[] => [
+export const columns = ({ onEdit, onDelete }: BrandColumnsProps): ColumnDef<Brand>[] => [
   {
     accessorKey: 'id',
     header: 'Brand ID',
@@ -30,29 +28,21 @@ export const columns = ({ onEdit, onDelete, canUpdate = true, canDelete = true }
       return <div className="font-medium">{name}</div>;
     },
   },
-  ...(canUpdate || canDelete
-    ? [
-        {
-          id: 'actions',
-          header: 'Actions',
-          cell: ({ row }: { row: { original: Brand } }) => {
-            const brand = row.original;
-            return (
-              <div className="flex items-center gap-2">
-                {canUpdate && (
-                  <Button variant="ghost" size="sm" onClick={() => onEdit(brand)}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                )}
-                {canDelete && (
-                  <Button variant="ghost" size="sm" onClick={() => onDelete(brand)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                )}
-              </div>
-            );
-          },
-        } as ColumnDef<Brand>,
-      ]
-    : []),
+  {
+    id: 'actions',
+    header: 'Actions',
+    cell: ({ row }) => {
+      const brand = row.original;
+      return (
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => onEdit(brand)}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => onDelete(brand)}>
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
+      );
+    },
+  },
 ];

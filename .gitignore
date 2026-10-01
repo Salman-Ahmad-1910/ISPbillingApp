@@ -17,3 +17,26 @@ fintrack-erp.exe~
 frontend/
 client/.next-export
 client/build
+
+# Next.js reads env only from client/, so keep its local env files untracked.
+client/.env.local
+client/.env*.local
+.env*.local
+
+# Compiled Go binaries and build output. Note: the existing "awesomeProject" and
+# "server" binaries are already tracked in history; these rules stop new ones
+# being added.
+*.exe
+*.exe~
+*.out
+server
+awesomeProject
+fintrack-erp
+*.lnk
+
+*.log
+npm-debug.log*
+yarn-error.log*
+
+.DS_Store
+Thumbs.db

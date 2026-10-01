@@ -224,10 +224,10 @@ func RegisterGenericCRUDScoped[T any](router *gin.RouterGroup, path string, isSc
 	router.DELETE(path+"/:id", crud.Delete)
 }
 
-// RegisterGenericCRUDGuarded registers the standard CRUD routes for T, running
-// writeMW before every mutating handler. It is used to enforce per-page child
-// permissions on the generated endpoints; read routes stay unguarded because
-// they are covered by the enclosing group RBAC.
+// RegisterGenericCRUDGuarded is RegisterGenericCRUDScoped with a write guard.
+// Only the mutating verbs (POST / PUT / DELETE) run writeMW; the read verbs stay
+// unguarded so that hiding a page's Add/Edit/Delete buttons does not also block
+// the list and detail endpoints that render the rest of the page.
 func RegisterGenericCRUDGuarded[T any](router *gin.RouterGroup, path string, isScoped bool, writeMW gin.HandlerFunc) {
 	crud := GenericCRUD[T]{IsScoped: isScoped}
 	router.POST(path, writeMW, crud.Create)

@@ -373,6 +373,7 @@ export default function PendingSubscribersPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>#</TableHead>
+                    <TableHead>Internet ID</TableHead>
                     <TableHead>Subscriber</TableHead>
                     <TableHead>ID</TableHead>
                     <TableHead>Contact</TableHead>
@@ -389,6 +390,7 @@ export default function PendingSubscribersPage() {
                     return (
                       <TableRow key={c.id}>
                         <TableCell className="text-muted-foreground">{startIdx + i + 1}</TableCell>
+                        <TableCell className="font-mono text-xs">{c.internetId || '---'}</TableCell>
                         <TableCell className="font-medium">
                           <Link
                             href={`/crm/subscriber-detail?connectionId=${c.id}`}

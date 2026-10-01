@@ -23,8 +23,6 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
-import { useCrudPermissions } from '@/hooks/usePermissions';
-import { RECOVERY_OFFICER_PERMISSION } from '@/lib/permission-pages';
 
   import api from '@/lib/api';
   import { smartMatch } from '@/lib/search';
@@ -40,7 +38,6 @@ export function ClientPage({ data }: ClientPageProps) {
     const { companyId } = useCompany();
     const { toast } = useToast();
     const queryClient = useQueryClient();
-    const { canCreate, canUpdate, canDelete } = useCrudPermissions(RECOVERY_OFFICER_PERMISSION);
     const [filter, setFilter] = useState('');
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedOfficer, setSelectedOfficer] = useState<RecoveryOfficer | null>(null);
@@ -157,7 +154,7 @@ export function ClientPage({ data }: ClientPageProps) {
         setIsDeleteDialogOpen(true);
     };
 
-    const columns = getColumns({ onEdit: handleEdit, onDelete: openDeleteDialog, canUpdate, canDelete });
+    const columns = getColumns({ onEdit: handleEdit, onDelete: openDeleteDialog });
 
     return (
         <>
@@ -170,14 +167,12 @@ export function ClientPage({ data }: ClientPageProps) {
                         className="max-w-sm"
                     />
                     <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-                        {canCreate && (
                         <DialogTrigger asChild>
                             <Button onClick={() => setSelectedOfficer(null)} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700">
                                 <PlusCircle className="mr-2 h-4 w-4" />
                                 Add Recovery Officer
                             </Button>
                         </DialogTrigger>
-                        )}
                         <DialogContent className="max-h-[85vh] overflow-y-auto rounded-xl shadow-lg">
                             <DialogHeader>
                                 <DialogTitle className="flex items-center gap-2">

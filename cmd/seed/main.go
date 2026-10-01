@@ -1,5 +1,5 @@
 package seed
-
+//    this is for exporting the env.
 import (
 	"log"
 	"os"

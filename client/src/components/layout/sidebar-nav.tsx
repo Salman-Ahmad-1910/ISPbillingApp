@@ -122,6 +122,7 @@ const navItems: NavItemGroup[] = [
       { title: 'Subscriber Detail', href: '/crm/subscriber-detail', icon: Users, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
       { title: 'New Inquiries', href: '/subscribers/inquiries', icon: UserPlus, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
       { title: 'Corporate Clients', href: '/subscribers/corporate', icon: Building, allowedRoles: ['admin', 'manager'] },
+      { title: 'Customers', href: '/crm/customers', icon: UserRound, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
       { title: 'Packages', href: '/crm/packages', icon: Receipt, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
     ],
   },
@@ -155,14 +156,12 @@ const navItems: NavItemGroup[] = [
       {
         title: 'Reports',
         icon: FolderClosed,
-        // Kept in sync with the pages below: a role absent from this list can
-        // still reach the folder when an admin grants one of these pages to it.
-        allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'],
+        allowedRoles: ['admin', 'manager', 'dealer'],
         items: [
-          { title: 'Collections', href: '/dealer/reports/collections', icon: Wallet, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
-          { title: 'Defaulters', href: '/dealer/reports/defaulters', icon: TriangleAlert, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
-          { title: 'New Dealers', href: '/dealer/reports/new-dealers', icon: UserPlus, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
-          { title: 'Invoices', href: '/dealer/reports/invoices', icon: FileText, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
+          { title: 'Collections', href: '/dealer/reports/collections', icon: Wallet, allowedRoles: ['admin', 'manager', 'dealer'] },
+          { title: 'Defaulters', href: '/dealer/reports/defaulters', icon: TriangleAlert, allowedRoles: ['admin', 'manager', 'dealer'] },
+          { title: 'New Dealers', href: '/dealer/reports/new-dealers', icon: UserPlus, allowedRoles: ['admin', 'manager', 'dealer'] },
+          { title: 'Invoices', href: '/dealer/reports/invoices', icon: FileText, allowedRoles: ['admin', 'manager', 'dealer'] },
         ],
       },
     ],
@@ -283,15 +282,7 @@ function filterNavItems(items: NavItem[], hasPermission: (perm: string) => boole
       if (item.allowedRoles && !item.allowedRoles.includes(userRole)) {
         // Admin-granted per-user permission for this page overrides the
         // hardcoded allowedRoles list (admin assignment wins over role defaults).
-        // A group/folder has no href of its own, so consult its children: a
-        // folder must survive when any page beneath it was granted, otherwise
-        // the granted pages are unreachable because their parent was dropped.
-        const granted =
-          allowedHrefs &&
-          (item.href
-            ? allowedHrefs.has(item.href)
-            : (item.items || []).some(child => child.href && allowedHrefs.has(child.href)));
-        if (!granted) {
+        if (!(allowedHrefs && item.href && allowedHrefs.has(item.href))) {
           return false;
         }
       }

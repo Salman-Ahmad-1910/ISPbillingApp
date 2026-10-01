@@ -25,16 +25,11 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { PackageForm } from './_components/package-form';
-import { useCrudPermissions, usePagePermissions } from '@/hooks/usePermissions';
-import { PACKAGE_PERMISSION } from '@/lib/permission-pages';
 
 export default function PackagesPage() {
   const { companyId } = useCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { canCreate, canUpdate, canDelete } = useCrudPermissions(PACKAGE_PERMISSION);
-  const { can: canPage } = usePagePermissions(PACKAGE_PERMISSION);
-  const canViewSummary = canPage('summary');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -233,9 +228,8 @@ export default function PackagesPage() {
 
       <div className="h-0.5 bg-gradient-to-r from-rose-500/50 via-pink-500/30 to-transparent" />
 
-      {canViewSummary && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-          <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+        <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-gradient-to-br from-rose-500 to-pink-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
               <PackageIcon className="h-5 w-5" />
@@ -279,8 +273,7 @@ export default function PackagesPage() {
             </div>
           </div>
         </div>
-        </div>
-      )}
+      </div>
 
       <div className="flex justify-end gap-2">
         <Input
@@ -290,14 +283,12 @@ export default function PackagesPage() {
           className="max-w-sm"
         />
         <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-          {canCreate && (
           <DialogTrigger asChild>
             <Button onClick={() => setSelectedPackage(null)} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
               <PlusCircle className="mr-2 h-4 w-4" />
               Add Package
             </Button>
           </DialogTrigger>
-          )}
           <DialogContent>
             <DialogHeader>
               <DialogTitle>{selectedPackage ? 'Edit' : 'Add'} Package</DialogTitle>
@@ -353,16 +344,12 @@ export default function PackagesPage() {
                     <TableCell className="text-right">{(pkg.purchasePrice || 0).toLocaleString()}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        {canUpdate && (
                         <Button variant="outline" size="sm" onClick={() => { setSelectedPackage(pkg); setIsFormOpen(true); }} className="transition-all duration-300 hover:scale-105">
                           <Edit2 className="h-4 w-4" />
                         </Button>
-                        )}
-                        {canDelete && (
                         <Button variant="destructive" size="sm" onClick={() => { setSelectedPackage(pkg); setIsDeleteDialogOpen(true); }} className="transition-all duration-300 hover:scale-105">
                           <Trash2 className="h-4 w-4" />
                         </Button>
-                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -415,16 +402,12 @@ export default function PackagesPage() {
                     <TableCell className="text-right">{(pkg.purchasePrice || 0).toLocaleString()}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        {canUpdate && (
                         <Button variant="outline" size="sm" onClick={() => { setSelectedPackage(pkg); setIsFormOpen(true); }} className="transition-all duration-300 hover:scale-105">
                           <Edit2 className="h-4 w-4" />
                         </Button>
-                        )}
-                        {canDelete && (
                         <Button variant="destructive" size="sm" onClick={() => { setSelectedPackage(pkg); setIsDeleteDialogOpen(true); }} className="transition-all duration-300 hover:scale-105">
                           <Trash2 className="h-4 w-4" />
                         </Button>
-                        )}
                       </div>
                     </TableCell>
                   </TableRow>

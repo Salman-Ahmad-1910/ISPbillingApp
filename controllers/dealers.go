@@ -306,64 +306,6 @@ func UpdateDealer(c *gin.Context) {
 	utils.SuccessResponse(c, "Dealer updated successfully", dealer)
 }
 
-var dealerStatuses = map[string]bool{
-	"active":      true,
-	"inactive":    true,
-	"suspended":   true,
-	"deactivated": true,
-}
-
-// UpdateDealerStatus changes only a dealer's status, and only on the status
-// permission. The full edit form shares PUT /dealers/:id and also carries a
-// status field, so "Edit" and "Change Status" cannot be told apart on that
-// route; this dedicated endpoint keeps the two permissions independent. It
-// mirrors UpdateDealer by keeping the linked user account in sync, because a
-// dealer's login is only enabled while their status is active.
-func UpdateDealerStatus(c *gin.Context) {
-	companyID := c.MustGet("companyID").(uuid.UUID)
-	id := c.Param("id")
-
-	var req struct {
-		Status string `json:"status" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.ErrorResponse(c, 400, "Invalid input", err.Error())
-		return
-	}
-
-	status := strings.ToLower(strings.TrimSpace(req.Status))
-	if !dealerStatuses[status] {
-		utils.ErrorResponse(c, 400, "Invalid status", "Status must be one of: active, inactive, suspended, deactivated")
-		return
-	}
-
-	var dealer models.Dealer
-	if err := config.DB.Where("id = ? AND company_id = ?", id, companyID).First(&dealer).Error; err != nil {
-		utils.ErrorResponse(c, 404, "Dealer not found", err.Error())
-		return
-	}
-
-	dealer.Status = status
-
-	err := config.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Save(&dealer).Error; err != nil {
-			return err
-		}
-		// Update the linked user if there is one, otherwise there is no login
-		// state to keep in sync.
-		return tx.Model(&models.User{}).
-			Where("LOWER(email) = LOWER(?)", dealer.Email).
-			Update("status", status).Error
-	})
-	if err != nil {
-		utils.ErrorResponse(c, 500, "Failed to update dealer status", err.Error())
-		return
-	}
-
-	dealer.Password = ""
-	utils.SuccessResponse(c, "Dealer status updated successfully", dealer)
-}
-
 // CreateDealerCollection handles creating a dealer collection and updating the dealer's lastPaymentDate, walletBalance, and remainingAmount
 func CreateDealerCollection(c *gin.Context) {
 	companyID, _ := c.Get("companyID")

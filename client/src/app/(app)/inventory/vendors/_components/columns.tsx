@@ -17,11 +17,9 @@ import {
 interface VendorColumnsProps {
   onEdit: (vendor: Vendor) => void;
   onDelete: (vendor: Vendor) => void;
-  canUpdate?: boolean;
-  canDelete?: boolean;
 }
 
-export const columns = ({ onEdit, onDelete, canUpdate = true, canDelete = true }: VendorColumnsProps): ColumnDef<Vendor>[] => [
+export const columns = ({ onEdit, onDelete }: VendorColumnsProps): ColumnDef<Vendor>[] => [
   {
     accessorKey: 'id',
     header: 'ID',
@@ -86,36 +84,30 @@ export const columns = ({ onEdit, onDelete, canUpdate = true, canDelete = true }
       ) : <span className="text-muted-foreground">-</span>;
     },
   },
-  ...(canUpdate || canDelete
-    ? [
-        {
-          id: 'actions',
-          cell: ({ row }: { row: { original: Vendor } }) => {
-            const vendor = row.original;
-            return (
-              <div className="text-right">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="h-8 w-8 p-0">
-                      <span className="sr-only">Open menu</span>
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                    {canUpdate && <DropdownMenuItem onClick={() => onEdit(vendor)}>Edit vendor</DropdownMenuItem>}
-                    {canUpdate && canDelete && <DropdownMenuSeparator />}
-                    {canDelete && (
-                      <DropdownMenuItem className="text-destructive" onClick={() => onDelete(vendor)}>
-                        Delete vendor
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            );
-          },
-        } as ColumnDef<Vendor>,
-      ]
-    : []),
+  {
+    id: 'actions',
+    cell: ({ row }) => {
+      const vendor = row.original;
+      return (
+        <div className="text-right">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => onEdit(vendor)}>Edit vendor</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive" onClick={() => onDelete(vendor)}>
+                Delete vendor
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      );
+    },
+  },
 ];

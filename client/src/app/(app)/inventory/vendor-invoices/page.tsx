@@ -4,15 +4,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { Loader2, ShoppingCart, DollarSign, Receipt } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
-import { usePagePermissions } from '@/hooks/usePermissions';
-import { VENDOR_INVOICE_PERMISSION } from '@/lib/permission-pages';
 
 import { ClientPage } from './_components/client-page';
 
 export default function VendorInvoicesPage() {
   const { companyId } = useCompany();
-  const { can } = usePagePermissions(VENDOR_INVOICE_PERMISSION);
-  const canSummary = can('summary');
 
   const { data: vendorInvoices = [], isLoading, error } = useGenericQuery<any>('inventory/vendor-invoices', companyId ?? undefined);
 
@@ -45,7 +41,6 @@ export default function VendorInvoicesPage() {
 
       <div className="h-0.5 bg-gradient-to-r from-amber-500/50 via-orange-500/30 to-transparent" />
 
-      {canSummary && (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center gap-3">
@@ -89,7 +84,6 @@ export default function VendorInvoicesPage() {
           </div>
         </div>
       </div>
-      )}
 
       <Card className="transition-all duration-300 hover:shadow-md">
         <CardContent className="p-0">
