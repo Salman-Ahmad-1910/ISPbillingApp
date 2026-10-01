@@ -796,9 +796,14 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {proration.delta > 0
-                    ? 'This is added to the outstanding balance now. The full new fee is charged again when the next bill is created.'
-                    : 'This is subtracted from the outstanding balance now. If the balance goes below zero the subscriber shows under advances.'}
+                    ? 'This difference becomes the outstanding balance, so the subscriber moves to the pending list. The full new fee is charged again when the next bill is created.'
+                    : 'This difference becomes the subscriber balance, so they move to the advance list.'}
                 </p>
+                {connection && Number(connection.remainingAmount) !== 0 && (
+                  <p className="text-xs text-amber-600">
+                    Their current balance of PKR {Number(connection.remainingAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} will be replaced by this amount.
+                  </p>
+                )}
               </>
             ) : (
               <p className="text-xs text-muted-foreground">

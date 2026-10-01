@@ -240,6 +240,67 @@ func TestRenamingPackageWithoutPriceChangeIsFree(t *testing.T) {
 	}
 }
 
+// TestUpgradeBecomesPendingEvenWithExistingAdvance pins the direction rule: an
+// upgrade always leaves dues for the subscriber, so a pre-existing advance is
+// replaced by the prorated difference rather than silently absorbing it. Without
+// this the subscriber stayed on the advance page and the upgrade vanished into
+// the old credit.
+func TestUpgradeBecomesPendingEvenWithExistingAdvance(t *testing.T) {
+	storedAdvance := -4000.0
+	delta, applied := packageProration(date(2026, time.October, 1), 1000, 3000)
+	if !applied {
+		t.Fatal("expected an adjustment to apply")
+	}
+	if delta != 2000 {
+		t.Fatalf("delta = %v, want 2000", delta)
+	}
+
+	// The difference becomes the balance outright.
+	newBalance := roundToTwo(delta)
+	if newBalance != 2000 {
+		t.Errorf("balance = %v, want 2000", newBalance)
+	}
+	if got := paymentStatusForBalance(newBalance); got != "pending" {
+		t.Errorf("status = %q, want pending", got)
+	}
+	if storedAdvance == newBalance {
+		t.Error("test is not exercising the replacement path")
+	}
+}
+
+// TestDowngradeBecomesAdvanceEvenWithExistingDues is the mirror case: a
+// downgrade always leaves an advance.
+func TestDowngradeBecomesAdvanceEvenWithExistingDues(t *testing.T) {
+	delta, applied := packageProration(date(2026, time.October, 1), 3000, 1000)
+	if !applied {
+		t.Fatal("expected an adjustment to apply")
+	}
+	if delta != -2000 {
+		t.Fatalf("delta = %v, want -2000", delta)
+	}
+
+	newBalance := roundToTwo(delta)
+	if got := paymentStatusForBalance(newBalance); got != "advance" {
+		t.Errorf("status = %q, want advance", got)
+	}
+}
+
+// TestProrationResyncsStatusFromBalance guards against a stale payment_status
+// keeping the subscriber on the advance page after an upgrade.
+func TestProrationResyncsStatusFromBalance(t *testing.T) {
+	for _, remaining := range []float64{2000, -2000, 0, 354.84, -354.84} {
+		got := paymentStatusForBalance(remaining)
+		switch {
+		case remaining > 0 && got != "pending":
+			t.Errorf("balance %v: status = %q, want pending", remaining, got)
+		case remaining < 0 && got != "advance":
+			t.Errorf("balance %v: status = %q, want advance", remaining, got)
+		case remaining == 0 && got != "":
+			t.Errorf("balance %v: status = %q, want empty", remaining, got)
+		}
+	}
+}
+
 func TestPaymentStatusForBalance(t *testing.T) {
 	cases := []struct {
 		remaining float64

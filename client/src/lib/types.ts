@@ -159,6 +159,7 @@ export type Connection = {
   packagePreviousFee?: number;
   packageNewFee?: number;
   packageAdjustmentAmount?: number;
+  packagePreviousBalance?: number;
   packageAdjustedOn?: string;
   cnic?: string;
   leavingDate?: string;

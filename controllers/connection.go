@@ -477,29 +477,32 @@ func updateConnection(c *gin.Context) {
 
 	// A package fee change is prorated across the billing month it takes effect
 	// in. The month is billed in advance at the old rate, so only the days
-	// still ahead of the subscriber carry the new rate. The delta is folded into
-	// remaining_amount straight away, which means a downgrade can push the
-	// balance negative and surface as an advance.
+	// still ahead of the subscriber carry the new rate.
 	oldFee := monthlyPackageFee(old.ConnectionType, old.Amount, old.SameAmount)
 	newFee := packageFeeAfterUpdate(old, input)
 
 	now := time.Now()
 	if delta, applyDelta := packageProration(now, oldFee, newFee); applyDelta {
-		// An explicit balance from the caller wins as the starting point, so an
-		// admin resetting an advance and changing the package gets both effects.
-		baseBalance := old.RemainingAmount
+		// The prorated difference becomes the subscriber's balance for the month,
+		// so its sign decides the outcome: a higher fee leaves dues (pending), a
+		// lower fee leaves an advance. The balance being replaced is kept so the
+		// change stays auditable.
+		previousBalance := old.RemainingAmount
+		newBalance := delta
 		if input.RemainingAmount != nil {
-			baseBalance = *input.RemainingAmount
+			// An explicit balance from the caller acts as the starting point, so
+			// an admin resetting an advance and changing the package gets both.
+			newBalance = roundToTwo(*input.RemainingAmount + delta)
 		}
-		newBalance := roundToTwo(baseBalance + delta)
 
 		updates["remaining_amount"] = newBalance
-		if input.PaymentStatus == nil {
-			updates["payment_status"] = paymentStatusForBalance(newBalance)
-		}
+		// Always resync the status with the balance just written, otherwise a
+		// stale "advance" would keep the subscriber listed on the advance page.
+		updates["payment_status"] = paymentStatusForBalance(newBalance)
 		updates["package_previous_fee"] = oldFee
 		updates["package_new_fee"] = newFee
 		updates["package_adjustment_amount"] = delta
+		updates["package_previous_balance"] = previousBalance
 		updates["package_adjusted_on"] = now.Format("2006-01-02")
 
 		daysUsed, daysRemaining, _ := packageProrationBreakdown(now)
@@ -510,8 +513,8 @@ func updateConnection(c *gin.Context) {
 		prorationChange = &connChange{
 			FieldName:  "Package Fee (prorated)",
 			ActionType: action + " " + fmtNum(delta),
-			Old:        fmtNum(oldFee) + " for " + fmtInt(daysUsed) + " days",
-			New:        fmtNum(newFee) + " for " + fmtInt(daysRemaining) + " days",
+			Old:        fmtNum(oldFee) + " for " + fmtInt(daysUsed) + " days (balance was " + fmtNum(previousBalance) + ")",
+			New:        fmtNum(newFee) + " for " + fmtInt(daysRemaining) + " days (balance now " + fmtNum(newBalance) + ")",
 		}
 	}
 

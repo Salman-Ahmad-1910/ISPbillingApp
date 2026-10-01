@@ -51,6 +51,7 @@ type Connection struct {
 	PackagePreviousFee      float64 `gorm:"type:decimal(10,2);default:0" json:"packagePreviousFee"`
 	PackageNewFee           float64 `gorm:"type:decimal(10,2);default:0" json:"packageNewFee"`
 	PackageAdjustmentAmount float64 `gorm:"type:decimal(10,2);default:0" json:"packageAdjustmentAmount"`
+	PackagePreviousBalance  float64 `gorm:"type:decimal(10,2);default:0" json:"packagePreviousBalance"`
 	PackageAdjustedOn       string  `gorm:"type:varchar(50)" json:"packageAdjustedOn"`
 }
 

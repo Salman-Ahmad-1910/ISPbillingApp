@@ -667,6 +667,11 @@ export default function SubscriberCollectionsPage() {
                       {packageAdjustment.date ? ` on ${packageAdjustment.date}` : ''}
                     </p>
                   )}
+                  {packageAdjustment && Number(selectedSubscriber?.packagePreviousBalance) !== 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Replaced previous balance of PKR {Number(selectedSubscriber?.packagePreviousBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Received This Month</Label>
