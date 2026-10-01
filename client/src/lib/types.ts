@@ -156,6 +156,10 @@ export type Connection = {
   splitterPort?: number;
   lastPaymentDate?: string;
   remainingAmount?: number;
+  packagePreviousFee?: number;
+  packageNewFee?: number;
+  packageAdjustmentAmount?: number;
+  packageAdjustedOn?: string;
   cnic?: string;
   leavingDate?: string;
   deactivationReason?: string;

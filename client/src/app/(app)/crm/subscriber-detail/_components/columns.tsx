@@ -2,6 +2,7 @@
 
 import { type ColumnDef } from '@tanstack/react-table';
 import type { Connection } from '@/lib/types';
+import { formatPkr } from '@/lib/package-proration';
 import { MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -64,12 +65,24 @@ export const getColumns = ({ onEdit, onDelete, onChangeStatus, canUpdate = true,
   {
     id: 'cableInternet',
     header: 'Cable / Internet',
-    cell: ({ row }) => (
-      <div className="text-sm">
-        {row.original.packageCable && <div>C: {row.original.packageCable}</div>}
-        {row.original.packageInternet && <div>I: {row.original.packageInternet}</div>}
-      </div>
-    ),
+    cell: ({ row }) => {
+      const { packageAdjustmentAmount, packageAdjustedOn } = row.original;
+      const showAdjustment = packageAdjustmentAmount !== undefined && packageAdjustmentAmount !== 0;
+
+      return (
+        <div className="text-sm">
+          {row.original.packageCable && <div>C: {row.original.packageCable}</div>}
+          {row.original.packageInternet && <div>I: {row.original.packageInternet}</div>}
+          {showAdjustment && (
+            <div className="text-xs text-muted-foreground">
+              Prorated {packageAdjustmentAmount! > 0 ? '+' : ''}
+              {formatPkr(packageAdjustmentAmount!)}
+              {packageAdjustedOn ? ` on ${packageAdjustedOn}` : ''}
+            </div>
+          )}
+        </div>
+      );
+    },
   },
   {
     accessorKey: 'status',

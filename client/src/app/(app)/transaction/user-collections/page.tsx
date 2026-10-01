@@ -59,6 +59,13 @@ function getPackagePrice(c: Connection): number {
   return cable + internet;
 }
 
+function getPackageLabel(c: Connection): string {
+  const parts: string[] = [];
+  if (c.packageCable) parts.push(c.packageCable);
+  if (c.packageInternet) parts.push(c.packageInternet);
+  return parts.length ? parts.join(' + ') : '---';
+}
+
 function getTotalOwed(c: Connection): number {
   const remaining = Number(c.remainingAmount) || 0;
   const activeDate = c.lastPaymentDate || c.rechargeDate || c.createdAt;
@@ -269,6 +276,19 @@ export default function SubscriberCollectionsPage() {
     () => (selectedSubscriber ? getPackagePrice(selectedSubscriber) : 0),
     [selectedSubscriber],
   );
+
+  // Reads straight off the connection, so it always shows the package the
+  // subscriber is currently on after an upgrade or downgrade.
+  const packageLabel = useMemo(
+    () => (selectedSubscriber ? getPackageLabel(selectedSubscriber) : '---'),
+    [selectedSubscriber],
+  );
+
+  const packageAdjustment = useMemo(() => {
+    const amount = Number(selectedSubscriber?.packageAdjustmentAmount) || 0;
+    if (!amount) return null;
+    return { amount, date: selectedSubscriber?.packageAdjustedOn || '' };
+  }, [selectedSubscriber]);
 
   const totalReceivedThisMonth = useMemo(() => {
     if (!selectedSubscriber) return 0;
@@ -575,6 +595,14 @@ export default function SubscriberCollectionsPage() {
                       {(c.cell || c.mobile) && (
                         <span className="ml-2 text-xs text-muted-foreground">• {c.cell || c.mobile}</span>
                       )}
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        • {getPackageLabel(c)} • PKR {getPackagePrice(c).toLocaleString()}
+                        {Number(c.remainingAmount) < 0
+                          ? ` • Advance PKR ${Math.abs(Number(c.remainingAmount)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : Number(c.remainingAmount) > 0
+                            ? ` • Pending PKR ${Number(c.remainingAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                            : ''}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -627,10 +655,18 @@ export default function SubscriberCollectionsPage() {
               </div>
             </div>
             <div className="p-4 border-b">
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 <div>
-                  <Label className="text-xs text-muted-foreground">Package Fee</Label>
-                  <p className="font-semibold">PKR {packageFee.toLocaleString()}</p>
+                  <Label className="text-xs text-muted-foreground">Package</Label>
+                  <p className="font-medium text-sm" title={packageLabel}>{packageLabel}</p>
+                  <p className="text-xs text-muted-foreground">PKR {packageFee.toLocaleString()} / month</p>
+                  {packageAdjustment && (
+                    <p className="text-xs text-muted-foreground">
+                      Prorated {packageAdjustment.amount > 0 ? '+' : ''}
+                      {packageAdjustment.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {packageAdjustment.date ? ` on ${packageAdjustment.date}` : ''}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Received This Month</Label>

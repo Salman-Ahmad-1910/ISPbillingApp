@@ -192,12 +192,12 @@ type connectionInput struct {
 	BoxNumber           string  `json:"boxNumber"`
 	PackageCable        string  `json:"packageCable"`
 	Discount            string  `json:"discount"`
-	Amount              float64 `json:"amount"`
-	PackageInternet     string  `json:"packageInternet"`
-	CreateBalance       bool    `json:"createBalance"`
-	BalanceDays         int     `json:"balanceDays"`
-	SameDiscount        string  `json:"sameDiscount"`
-	SameAmount          float64 `json:"sameAmount"`
+	Amount              *float64 `json:"amount"`
+	PackageInternet     string   `json:"packageInternet"`
+	CreateBalance       bool     `json:"createBalance"`
+	BalanceDays         int      `json:"balanceDays"`
+	SameDiscount        string   `json:"sameDiscount"`
+	SameAmount          *float64 `json:"sameAmount"`
 	Status              string  `json:"status"`
 	SublocalityID       string  `json:"sublocalityId"`
 	SplitterID          string  `json:"splitterId"`
@@ -297,12 +297,12 @@ func createConnection(c *gin.Context) {
 		BoxNumber:           input.BoxNumber,
 		PackageCable:        input.PackageCable,
 		Discount:            input.Discount,
-		Amount:              input.Amount,
+		Amount:              valueOrZero(input.Amount),
 		PackageInternet:     input.PackageInternet,
 		CreateBalance:       input.CreateBalance,
 		BalanceDays:         input.BalanceDays,
 		SameDiscount:        input.SameDiscount,
-		SameAmount:          input.SameAmount,
+		SameAmount:          valueOrZero(input.SameAmount),
 		Status:              input.Status,
 		SublocalityID:       input.SublocalityID,
 		SplitterID:          input.SplitterID,
@@ -315,12 +315,14 @@ func createConnection(c *gin.Context) {
 	// remaining days of the month is created (fee / 30 * days).
 	conn.RemainingAmount = 0
 	if input.CreateBalance && input.BalanceDays > 0 {
-		fee := input.Amount
+		cableFee := valueOrZero(input.Amount)
+		internetFee := valueOrZero(input.SameAmount)
+		fee := cableFee
 		switch input.ConnectionType {
 		case "internet":
-			fee = input.SameAmount
+			fee = internetFee
 		case "both":
-			fee = input.Amount + input.SameAmount
+			fee = cableFee + internetFee
 		}
 		conn.RemainingAmount = roundToTwo(fee / 30 * float64(input.BalanceDays))
 	}
@@ -362,6 +364,10 @@ func updateConnection(c *gin.Context) {
 		utils.ErrorResponse(c, 400, "Invalid input data", err.Error())
 		return
 	}
+
+	// Set when the update carries a prorated package fee change, so the
+	// adjustment is recorded in the connection history alongside field edits.
+	var prorationChange *connChange
 
 	tx := config.DB.Begin()
 	if tx.Error != nil {
@@ -421,8 +427,8 @@ func updateConnection(c *gin.Context) {
 	if input.Discount != "" {
 		updates["discount"] = input.Discount
 	}
-	if input.Amount != 0 {
-		updates["amount"] = input.Amount
+	if input.Amount != nil {
+		updates["amount"] = *input.Amount
 	}
 	if input.PackageInternet != "" {
 		updates["package_internet"] = input.PackageInternet
@@ -434,8 +440,8 @@ func updateConnection(c *gin.Context) {
 	if input.SameDiscount != "" {
 		updates["same_discount"] = input.SameDiscount
 	}
-	if input.SameAmount != 0 {
-		updates["same_amount"] = input.SameAmount
+	if input.SameAmount != nil {
+		updates["same_amount"] = *input.SameAmount
 	}
 	if input.Status != "" {
 		updates["status"] = input.Status
@@ -467,6 +473,46 @@ func updateConnection(c *gin.Context) {
 	}
 	if input.RemainingAmount != nil {
 		updates["remaining_amount"] = *input.RemainingAmount
+	}
+
+	// A package fee change is prorated across the billing month it takes effect
+	// in. The month is billed in advance at the old rate, so only the days
+	// still ahead of the subscriber carry the new rate. The delta is folded into
+	// remaining_amount straight away, which means a downgrade can push the
+	// balance negative and surface as an advance.
+	oldFee := monthlyPackageFee(old.ConnectionType, old.Amount, old.SameAmount)
+	newFee := packageFeeAfterUpdate(old, input)
+
+	now := time.Now()
+	if delta, applyDelta := packageProration(now, oldFee, newFee); applyDelta {
+		// An explicit balance from the caller wins as the starting point, so an
+		// admin resetting an advance and changing the package gets both effects.
+		baseBalance := old.RemainingAmount
+		if input.RemainingAmount != nil {
+			baseBalance = *input.RemainingAmount
+		}
+		newBalance := roundToTwo(baseBalance + delta)
+
+		updates["remaining_amount"] = newBalance
+		if input.PaymentStatus == nil {
+			updates["payment_status"] = paymentStatusForBalance(newBalance)
+		}
+		updates["package_previous_fee"] = oldFee
+		updates["package_new_fee"] = newFee
+		updates["package_adjustment_amount"] = delta
+		updates["package_adjusted_on"] = now.Format("2006-01-02")
+
+		daysUsed, daysRemaining, _ := packageProrationBreakdown(now)
+		action := "Package Upgraded"
+		if delta < 0 {
+			action = "Package Downgraded"
+		}
+		prorationChange = &connChange{
+			FieldName:  "Package Fee (prorated)",
+			ActionType: action + " " + fmtNum(delta),
+			Old:        fmtNum(oldFee) + " for " + fmtInt(daysUsed) + " days",
+			New:        fmtNum(newFee) + " for " + fmtInt(daysRemaining) + " days",
+		}
 	}
 
 	// Handle splitter changes
@@ -519,7 +565,11 @@ func updateConnection(c *gin.Context) {
 	if reason == "" {
 		reason = input.DeactivationReason
 	}
-	createConnectionLogs(c, updated, connectionFieldChanges(old, input), reason, input.Comments)
+	changes := connectionFieldChanges(old, input)
+	if prorationChange != nil {
+		changes = append(changes, *prorationChange)
+	}
+	createConnectionLogs(c, updated, changes, reason, input.Comments)
 
 	utils.SuccessResponse(c, "Connection updated", updated)
 }
@@ -628,11 +678,11 @@ func connectionFieldChanges(old models.Connection, input connectionInput) []conn
 	if input.OtherAmount != 0 {
 		add("otherAmount", "Other Charges Updated", fmtNum(old.OtherAmount), fmtNum(input.OtherAmount))
 	}
-	if input.Amount != 0 {
-		add("amount", "Cable Price Changed", fmtNum(old.Amount), fmtNum(input.Amount))
+	if input.Amount != nil {
+		add("amount", "Cable Price Changed", fmtNum(old.Amount), fmtNum(*input.Amount))
 	}
-	if input.SameAmount != 0 {
-		add("sameAmount", "Internet Price Changed", fmtNum(old.SameAmount), fmtNum(input.SameAmount))
+	if input.SameAmount != nil {
+		add("sameAmount", "Internet Price Changed", fmtNum(old.SameAmount), fmtNum(*input.SameAmount))
 	}
 	if input.BalanceDays != 0 {
 		add("balanceDays", "Balance Days Updated", fmtInt(old.BalanceDays), fmtInt(input.BalanceDays))
@@ -810,4 +860,95 @@ func getConnectionLogs(c *gin.Context) {
 // roundToTwo rounds a money value to two decimal places.
 func roundToTwo(x float64) float64 {
 	return math.Round(x*100) / 100
+}
+
+// monthlyPackageFee mirrors the billing rule used by Bill Creator so proration
+// is always based on the exact fee the subscriber would otherwise be charged.
+func monthlyPackageFee(connectionType string, amount, sameAmount float64) float64 {
+	switch connectionType {
+	case "internet":
+		return sameAmount
+	case "both":
+		return amount + sameAmount
+	default:
+		return amount
+	}
+}
+
+// packageFeeAfterUpdate resolves the monthly fee that will be in force once the
+// update is applied, mirroring the handler's zero-value guards so proration is
+// never based on a value the database would not actually store.
+func packageFeeAfterUpdate(old models.Connection, input connectionInput) float64 {
+	amount, sameAmount := old.Amount, old.SameAmount
+	if input.Amount != nil {
+		amount = *input.Amount
+	}
+	if input.SameAmount != nil {
+		sameAmount = *input.SameAmount
+	}
+
+	connectionType := old.ConnectionType
+	if input.ConnectionType != "" {
+		connectionType = input.ConnectionType
+	}
+
+	return monthlyPackageFee(connectionType, amount, sameAmount)
+}
+
+// valueOrZero reads an optional money field, treating an omitted value as zero.
+func valueOrZero(v *float64) float64 {
+	if v == nil {
+		return 0
+	}
+	return *v
+}
+
+// packageProrationBreakdown splits the billing month into the part already
+// consumed at the old rate and the part still to come at the new rate.
+func packageProrationBreakdown(effective time.Time) (daysUsed, daysRemaining, daysInMonth int) {
+	daysInMonth = time.Date(effective.Year(), effective.Month()+1, 0, 0, 0, 0, 0, effective.Location()).Day()
+	daysUsed = effective.Day() - 1
+	daysRemaining = daysInMonth - effective.Day() + 1
+	return
+}
+
+// packageProration returns the balance adjustment owed (positive) or refunded
+// (negative) when a subscriber's package fee changes part-way through a month
+// that was already billed in full at the old rate.
+//
+//	delta = (newFee - oldFee) * remainingDays / daysInMonth
+//
+// Only the days still ahead of the subscriber carry the new rate, which is
+// equivalent to charging (oldFee * daysUsed + newFee * daysRemaining) and
+// subtracting the old fee that was already billed.
+//
+// A change effective on the 1st is the full difference, because the whole
+// month still carries the new rate. That is what happens when the month has
+// already been billed and paid at the old rate: an upgrade collects the whole
+// difference and the subscriber returns to the pending list, while a
+// downgrade refunds it and the subscriber moves to the advance list.
+//
+// The bool reports whether an adjustment applies at all.
+func packageProration(effective time.Time, oldFee, newFee float64) (float64, bool) {
+	if oldFee == newFee {
+		return 0, false
+	}
+
+	_, daysRemaining, daysInMonth := packageProrationBreakdown(effective)
+
+	delta := (newFee - oldFee) * float64(daysRemaining) / float64(daysInMonth)
+	return roundToTwo(delta), true
+}
+
+// paymentStatusForBalance mirrors the status rules used when a payment is
+// applied: a positive balance is pending, a negative one is an advance.
+func paymentStatusForBalance(remaining float64) string {
+	switch {
+	case remaining > 0:
+		return "pending"
+	case remaining < 0:
+		return "advance"
+	default:
+		return ""
+	}
 }

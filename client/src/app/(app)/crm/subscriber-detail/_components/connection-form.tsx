@@ -25,6 +25,7 @@ import {
 import { Loader2 } from 'lucide-react';
 import type { Connection, Area, DistributionBox, Package, Company, Splitter } from '@/lib/types';
 import { connectionSchema } from '@/lib/schemas';
+import { formatPkr, monthlyPackageFee, packageProration } from '@/lib/package-proration';
 
 type ConnectionFormValues = z.infer<typeof connectionSchema>;
 
@@ -185,12 +186,16 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
 
   // Monthly package fee for the selected connection type (matches getPackagePrice).
   const packageFeeTotal = React.useMemo(() => {
-    const cable = Number(amount) || 0;
-    const internet = Number(sameAmount) || 0;
-    if (connectionType === 'tv_cable') return cable;
-    if (connectionType === 'internet') return internet;
-    return cable + internet;
+    return monthlyPackageFee(connectionType, amount, sameAmount);
   }, [connectionType, amount, sameAmount]);
+
+  // A fee change on an existing subscriber is prorated across the billing month
+  // and applied to remaining_amount the moment the form is saved.
+  const proration = React.useMemo(() => {
+    if (!connection) return null;
+    const oldFee = monthlyPackageFee(connection.connectionType, connection.amount, connection.sameAmount);
+    return packageProration(new Date(), oldFee, packageFeeTotal);
+  }, [connection, packageFeeTotal]);
 
   // Opening balance = package fee prorated for the remaining days of the month (fee / 30 * days).
   const openingBalance = React.useMemo(() => {
@@ -771,6 +776,39 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
             />
           </div>
         </div>
+
+        {proration && (
+          <div className="rounded-lg border border-border bg-muted/40 p-4 space-y-2">
+            <p className="text-sm font-medium">This Month&rsquo;s Package Adjustment</p>
+
+            {proration.applies ? (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  {formatPkr(proration.oldFee)} billed for {proration.daysUsed} days, then{' '}
+                  {formatPkr(proration.newFee)} for the remaining {proration.daysRemaining} of {proration.daysInMonth} days.
+                </p>
+                <p className="text-sm font-medium">
+                  {proration.delta > 0 ? 'Extra amount to collect' : 'Advance credit'}: PKR{' '}
+                  <span className={proration.delta > 0 ? 'text-amber-600' : 'text-emerald-600'}>
+                    {proration.delta > 0 ? '+' : ''}
+                    {formatPkr(proration.delta)}
+                  </span>
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {proration.delta > 0
+                    ? 'This is added to the outstanding balance now. The full new fee is charged again when the next bill is created.'
+                    : 'This is subtracted from the outstanding balance now. If the balance goes below zero the subscriber shows under advances.'}
+                </p>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                {proration.daysUsed === 0
+                  ? `The whole month moves to the new fee of ${formatPkr(proration.newFee)}, so the full difference is applied.`
+                  : 'The package fee is unchanged, so the balance stays as it is.'}
+              </p>
+            )}
+          </div>
+        )}
 
         {selectedCablePkg && selectedInternetPkg && (
           <div className="rounded-lg border border-border bg-muted/40 p-4">
