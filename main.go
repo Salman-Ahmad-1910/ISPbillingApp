@@ -23,6 +23,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// this is for the pushing, not related
 // BuildMode is set at build time via -ldflags -X main.BuildMode=prod|dev.
 // In production mode the binary serves HTTPS; in development mode it serves HTTP.
 var BuildMode string
