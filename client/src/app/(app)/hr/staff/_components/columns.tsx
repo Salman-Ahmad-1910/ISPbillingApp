@@ -17,9 +17,11 @@ import {
 interface ColumnsProps {
   onEdit: (staff: Staff) => void;
   onDelete: (staff: Staff) => void;
+  canUpdate?: boolean;
+  canDelete?: boolean;
 }
 
-export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<Staff>[] => [
+export const getColumns = ({ onEdit, onDelete, canUpdate = true, canDelete = true }: ColumnsProps): ColumnDef<Staff>[] => [
   {
     accessorKey: 'id',
     header: 'ID',
@@ -106,11 +108,17 @@ export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<Staff>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              {canUpdate && (
               <DropdownMenuItem className="data-[highlighted]:text-emerald-600" onClick={() => onEdit(staffMember)}>Edit Staff</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive data-[highlighted]:text-red-600" onClick={() => onDelete(staffMember)}>
-                Delete Staff
-              </DropdownMenuItem>
+              )}
+              {canDelete && (
+                <>
+                  {canUpdate && <DropdownMenuSeparator />}
+                  <DropdownMenuItem className="text-destructive data-[highlighted]:text-red-600" onClick={() => onDelete(staffMember)}>
+                    Delete Staff
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

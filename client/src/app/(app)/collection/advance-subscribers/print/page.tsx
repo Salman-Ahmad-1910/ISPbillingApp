@@ -3,10 +3,12 @@
 import { useMemo, useEffect } from 'react';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { usePagePermissions } from '@/hooks/usePermissions';
 import { Loader2, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Connection, Company } from '@/lib/types';
 import api from '@/lib/api';
+import { SUBSCRIBER_REPORT_ADVANCE_SUBSCRIBERS_PERMISSIONS } from '@/lib/permission-pages';
 
 function getPackagePrice(c: Connection): number {
   const cable = Number(c.amount) || 0;
@@ -18,6 +20,7 @@ function getPackagePrice(c: Connection): number {
 
 export default function PrintAdvancePage() {
   const { companyId, companies } = useCompany();
+  const { can } = usePagePermissions(SUBSCRIBER_REPORT_ADVANCE_SUBSCRIBERS_PERMISSIONS);
 
   const { data: connectionsData, isLoading } = useGenericQuery<Connection>('admin/connections', companyId ?? undefined);
 
@@ -94,10 +97,12 @@ export default function PrintAdvancePage() {
     <div className="print-root">
       <div className="no-print p-4 bg-white border-b border-gray-200 flex items-center justify-between">
         <h1 className="text-lg font-bold text-gray-900">Advance Subscribers - Print Preview</h1>
+        {can('export') && (
         <Button onClick={() => window.print()} className="bg-emerald-600 text-white hover:bg-emerald-700 font-semibold shadow-sm">
           <Printer className="mr-2 h-4 w-4" />
           Print Invoice
         </Button>
+        )}
       </div>
 
       <div className="print-area bg-white text-gray-900 p-8 font-sans max-w-4xl mx-auto">

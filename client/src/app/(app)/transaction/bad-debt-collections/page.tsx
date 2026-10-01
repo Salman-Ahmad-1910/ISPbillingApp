@@ -53,7 +53,7 @@ export default function BadDebtCollectionsPage() {
   const { toast } = useToast();
   const { user } = useUser();
   const queryClient = useQueryClient();
-  const { canUpdate, canDelete } = useCrudPermissions();
+  const { canCreate } = useCrudPermissions(BADDEBT_COLLECTION_PERMISSION);
   const collectionPage = usePagePermissions(BADDEBT_COLLECTION_PERMISSION);
 
   const [activeTab, setActiveTab] = useState('subscribers');
@@ -434,10 +434,12 @@ export default function BadDebtCollectionsPage() {
                     <span>Receiving as: <span className="font-medium text-foreground">{subscriberRecoveryOfficerName}</span></span>
                   </div>
                   <div className="flex-1" />
+                  {canCreate && (
                   <Button onClick={() => setShowReceiveDialog(true)} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm">
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Receive Payment
                   </Button>
+                  )}
                 </div>
 
                 <div className="p-4">
@@ -555,10 +557,12 @@ export default function BadDebtCollectionsPage() {
                     <span>Receiving as: <span className="font-medium text-foreground">{dealerRecoveryOfficerName}</span></span>
                   </div>
                   <div className="flex-1" />
+                  {canCreate && (
                   <Button onClick={() => setShowDealerReceiveDialog(true)} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm">
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Receive Payment
                   </Button>
+                  )}
                 </div>
 
                 <div className="p-4">

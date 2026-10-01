@@ -15,6 +15,8 @@ import { cn } from '@/lib/utils';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
+import { usePagePermissions } from '@/hooks/usePermissions';
+import { SUBSCRIBER_REPORT_COLLECTIONS_PERMISSIONS } from '@/lib/permission-pages';
 import api from '@/lib/api';
 import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
 import SubscriberSystemDatesTable, { systemDatesExcel, systemDatesInvoiceColumns, type SystemDateRow } from '@/components/shared/subscriber-system-dates';
@@ -137,6 +139,7 @@ function toInternetPackageRow(item: CollectionRecord): InternetPackageRow {
 
 export default function SubscriberReportPage() {
   const { companyId } = useCompany();
+  const { can } = usePagePermissions(SUBSCRIBER_REPORT_COLLECTIONS_PERMISSIONS);
   const { toast } = useToast();
 
   const { data: payments = [], isLoading: loading, refetch: refetchPayments } = useGenericQuery<any>('billing/payments', companyId ?? undefined);
@@ -593,6 +596,7 @@ export default function SubscriberReportPage() {
       <div className="h-0.5 bg-gradient-to-r from-blue-500/50 via-cyan-500/30 to-transparent no-print" />
 
       {/* Summary Cards */}
+      {can('summary') && (
       <div className="grid gap-4 md:grid-cols-3 no-print">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center justify-between">
@@ -630,8 +634,10 @@ export default function SubscriberReportPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* Filter Card */}
+      {can('filters') && (
       <Card className="no-print transition-all duration-300 hover:shadow-md">
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
@@ -735,6 +741,7 @@ export default function SubscriberReportPage() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Printable Report Section */}
       <div className="print-report">
@@ -747,6 +754,7 @@ export default function SubscriberReportPage() {
                   From: {format(filterFromDate, 'dd MMM yyyy')} — To: {format(filterToDate, 'dd MMM yyyy')}
                 </p>
               </div>
+              {can('export') && (
               <div className="flex gap-2 no-print">
                 <Button variant="outline" size="sm" onClick={handlePrint} disabled={!showReport}>
                   <Printer className="mr-2 h-4 w-4" />
@@ -757,6 +765,7 @@ export default function SubscriberReportPage() {
                   Excel
                 </Button>
               </div>
+              )}
             </div>
 
             {!showReport ? (

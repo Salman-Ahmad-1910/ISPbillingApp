@@ -11,6 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Box, Loader2, Download, Printer } from 'lucide-react';
 import { format } from 'date-fns';
 import { useCompany } from '@/context/company-context';
+import { usePagePermissions } from '@/hooks/usePermissions';
+import { SUBSCRIBER_REPORT_PACKAGE_WISE_PERMISSIONS } from '@/lib/permission-pages';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { smartMatch } from '@/lib/search';
 import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
@@ -23,6 +25,7 @@ interface PackageData {
 
 export default function PackageWiseReportsPage() {
   const { companyId } = useCompany();
+  const { can } = usePagePermissions(SUBSCRIBER_REPORT_PACKAGE_WISE_PERMISSIONS);
 
   const { data: packages = [], isLoading: loadingPackages } = useGenericQuery<any>('billing/packages', companyId ?? undefined);
   const { data: connections = [], isLoading: loadingConnections } = useGenericQuery<any>('admin/connections', companyId ?? undefined);
@@ -135,6 +138,7 @@ export default function PackageWiseReportsPage() {
       <div className="h-0.5 bg-gradient-to-r from-sky-500/50 via-blue-500/30 to-transparent no-print" />
 
       {/* Summary */}
+      {can('summary') && (
       <div className="grid gap-4 md:grid-cols-2 no-print">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center justify-between">
@@ -159,8 +163,10 @@ export default function PackageWiseReportsPage() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Filter Card */}
+      {can('filters') && (
       <Card className="no-print transition-all duration-300 hover:shadow-md">
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -200,6 +206,7 @@ export default function PackageWiseReportsPage() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Printable Report Section */}
       <div className="print-report">
@@ -210,6 +217,7 @@ export default function PackageWiseReportsPage() {
                 <h2 className="text-xl font-bold">Package Wise Reports</h2>
                 <p className="text-sm text-muted-foreground mt-1">Package-wise subscriber distribution</p>
               </div>
+              {can('export') && (
               <div className="flex gap-2 no-print">
                 <Button variant="outline" size="sm" onClick={handlePrint}>
                   <Printer className="mr-2 h-4 w-4" />
@@ -220,6 +228,7 @@ export default function PackageWiseReportsPage() {
                   Excel
                 </Button>
               </div>
+              )}
             </div>
 
             {loading ? (

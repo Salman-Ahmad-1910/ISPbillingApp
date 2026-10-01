@@ -17,6 +17,8 @@ import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
 import type { Invoice, Connection, Area } from '@/lib/types';
+import { usePagePermissions } from '@/hooks/usePermissions';
+import { SUBSCRIBER_REPORT_SUBSCRIBERS_DEFAULTERS_PERMISSIONS } from '@/lib/permission-pages';
 
 interface DefaulterRecord {
   id: string;
@@ -49,6 +51,7 @@ function billingPeriodDueDate(period: string): Date | null {
 
 export default function SubscribersDefaultersPage() {
   const { companyId } = useCompany();
+  const { can } = usePagePermissions(SUBSCRIBER_REPORT_SUBSCRIBERS_DEFAULTERS_PERMISSIONS);
 
   const { data: invoices = [], isLoading: loading } = useGenericQuery<Invoice>('billing/invoices', companyId ?? undefined);
   const { data: connections = [] } = useGenericQuery<Connection>('admin/connections', companyId ?? undefined);
@@ -228,6 +231,7 @@ export default function SubscribersDefaultersPage() {
       </div>
       <div className="h-0.5 bg-gradient-to-r from-rose-500/50 via-red-500/30 to-transparent no-print" />
 
+      {can('summary') && (
       <div className="grid gap-4 md:grid-cols-2 no-print">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center justify-between">
@@ -252,7 +256,9 @@ export default function SubscribersDefaultersPage() {
           </div>
         </div>
       </div>
+      )}
 
+      {can('filters') && (
       <Card className="no-print transition-all duration-300 hover:shadow-md">
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -312,6 +318,7 @@ export default function SubscribersDefaultersPage() {
             </div>
           </div>
 
+          {can('export') && (
           <div className="mt-4 flex flex-col sm:flex-row items-end sm:items-center gap-3">
             <Button onClick={handlePrint} className="bg-rose-600 hover:bg-rose-700 text-white font-semibold">
               <Printer className="mr-2 h-4 w-4" />
@@ -322,8 +329,10 @@ export default function SubscribersDefaultersPage() {
               Excel
             </Button>
           </div>
+          )}
         </CardContent>
       </Card>
+      )}
 
       <div className="print-report">
         <Card>
@@ -335,6 +344,7 @@ export default function SubscribersDefaultersPage() {
                   From: {format(filterFromDate, 'dd MMM yyyy')} — To: {format(filterToDate, 'dd MMM yyyy')}
                 </p>
               </div>
+              {can('export') && (
               <div className="flex gap-2 no-print">
                 <Button variant="outline" size="sm" onClick={handlePrint}>
                   <Printer className="mr-2 h-4 w-4" />
@@ -345,6 +355,7 @@ export default function SubscribersDefaultersPage() {
                   Excel
                 </Button>
               </div>
+              )}
             </div>
 
             {loading ? (

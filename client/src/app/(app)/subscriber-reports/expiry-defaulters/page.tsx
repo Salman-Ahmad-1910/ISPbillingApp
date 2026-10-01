@@ -14,6 +14,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCompany } from '@/context/company-context';
+import { usePagePermissions } from '@/hooks/usePermissions';
+import { SUBSCRIBER_REPORT_EXPIRY_DEFAULTERS_PERMISSIONS } from '@/lib/permission-pages';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
 
@@ -38,6 +40,7 @@ function resolveAreaName(areas: any[], sublocalityId?: string): string {
 
 export default function ExpiryDefaultersPage() {
   const { companyId } = useCompany();
+  const { can } = usePagePermissions(SUBSCRIBER_REPORT_EXPIRY_DEFAULTERS_PERMISSIONS);
 
   const { data: connections = [], isLoading: loading } = useGenericQuery<any>('admin/connections', companyId ?? undefined);
   const { data: areas = [] } = useGenericQuery<any>('network/areas', companyId ?? undefined);
@@ -173,6 +176,7 @@ export default function ExpiryDefaultersPage() {
       <div className="h-0.5 bg-gradient-to-r from-violet-500/50 via-purple-500/30 to-transparent no-print" />
 
       {/* Summary */}
+      {can('summary') && (
       <div className="grid gap-4 md:grid-cols-2 no-print">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center justify-between">
@@ -197,8 +201,10 @@ export default function ExpiryDefaultersPage() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Filter Card */}
+      {can('filters') && (
       <Card className="no-print transition-all duration-300 hover:shadow-md">
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -247,6 +253,7 @@ export default function ExpiryDefaultersPage() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Printable Report Section */}
       <div className="print-report">
@@ -259,6 +266,7 @@ export default function ExpiryDefaultersPage() {
                   From: {format(filterFromDate, 'dd MMM yyyy')} — To: {format(filterToDate, 'dd MMM yyyy')}
                 </p>
               </div>
+              {can('export') && (
               <div className="flex gap-2 no-print">
                 <Button variant="outline" size="sm" onClick={handlePrint}>
                   <Printer className="mr-2 h-4 w-4" />
@@ -269,6 +277,7 @@ export default function ExpiryDefaultersPage() {
                   Excel
                 </Button>
               </div>
+              )}
             </div>
 
             {loading ? (

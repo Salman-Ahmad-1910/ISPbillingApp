@@ -21,6 +21,8 @@ import SubscriberInternetPackageTable, { internetPackageExcel, internetPackageIn
 import SubscriberPackageWiseTable, { packageWiseExcel, packageWiseInvoiceColumns, withPackageExcel, withPackageInvoiceColumns, SubscriberWithPackageTable, buildPackageWiseReport, packageSubscriberCounts, connectionPackageName, type PackageWiseRow } from '@/components/shared/subscriber-package-wise';
 import { SUBSCRIBER_REPORT_TYPE_OPTIONS, matchesReportType, type ReportTypeConn } from '@/lib/subscriber-report-types';
 import type { PromiseEntry } from '@/lib/types';
+import { usePagePermissions } from '@/hooks/usePermissions';
+import { SUBSCRIBER_REPORT_PROMISE_DATES_PERMISSIONS } from '@/lib/permission-pages';
 
 interface PromiseRecord {
   key: string;
@@ -66,6 +68,7 @@ function toInternetPackageRow(item: PromiseRecord): InternetPackageRow {
 
 export default function PromiseDateReportsPage() {
   const { companyId } = useCompany();
+  const { can } = usePagePermissions(SUBSCRIBER_REPORT_PROMISE_DATES_PERMISSIONS);
 
   const { data: promises = [], isLoading: loading } = useGenericQuery<PromiseEntry>(
     'billing/promises',
@@ -363,6 +366,7 @@ export default function PromiseDateReportsPage() {
       <div className="h-0.5 bg-gradient-to-r from-cyan-500/50 via-teal-500/30 to-transparent no-print" />
 
       {/* Summary */}
+      {can('summary') && (
       <div className="grid gap-4 md:grid-cols-2 no-print">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center justify-between">
@@ -387,8 +391,10 @@ export default function PromiseDateReportsPage() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Filter Card */}
+      {can('filters') && (
       <Card className="no-print transition-all duration-300 hover:shadow-md">
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
@@ -474,6 +480,7 @@ export default function PromiseDateReportsPage() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Printable Report Section */}
       <div className="print-report">
@@ -486,6 +493,7 @@ export default function PromiseDateReportsPage() {
                   From: {format(filterFromDate, 'dd MMM yyyy')} — To: {format(filterToDate, 'dd MMM yyyy')}
                 </p>
               </div>
+              {can('export') && (
               <div className="flex gap-2 no-print">
                 <Button variant="outline" size="sm" onClick={handlePrint}>
                   <Printer className="mr-2 h-4 w-4" />
@@ -496,6 +504,7 @@ export default function PromiseDateReportsPage() {
                   Excel
                 </Button>
               </div>
+              )}
             </div>
 
             {loading ? (

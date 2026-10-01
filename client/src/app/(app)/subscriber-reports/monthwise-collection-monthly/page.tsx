@@ -12,6 +12,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCompany } from '@/context/company-context';
+import { usePagePermissions } from '@/hooks/usePermissions';
+import { SUBSCRIBER_REPORT_MONTHWISE_COLLECTION_MONTHLY_PERMISSIONS } from '@/lib/permission-pages';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
 import type { Payment, Connection } from '@/lib/types';
@@ -31,6 +33,7 @@ interface MonthCollectionRecord {
 
 export default function MonthWiseCollectionMonthlyPage() {
   const { companyId } = useCompany();
+  const { can } = usePagePermissions(SUBSCRIBER_REPORT_MONTHWISE_COLLECTION_MONTHLY_PERMISSIONS);
 
   const { data: payments = [], isLoading: loading } = useGenericQuery<Payment>('billing/payments', companyId ?? undefined);
   const { data: connections = [] } = useGenericQuery<Connection>('admin/connections', companyId ?? undefined);
@@ -181,6 +184,7 @@ export default function MonthWiseCollectionMonthlyPage() {
       </div>
       <div className="h-0.5 bg-gradient-to-r from-indigo-500/50 via-blue-500/30 to-transparent no-print" />
 
+      {can('summary') && (
       <div className="grid gap-4 md:grid-cols-2 no-print">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center justify-between">
@@ -205,7 +209,9 @@ export default function MonthWiseCollectionMonthlyPage() {
           </div>
         </div>
       </div>
+      )}
 
+      {can('filters') && (
       <Card className="no-print transition-all duration-300 hover:shadow-md">
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -252,6 +258,7 @@ export default function MonthWiseCollectionMonthlyPage() {
             </div>
           </div>
 
+          {can('export') && (
           <div className="mt-4 flex flex-col sm:flex-row items-end sm:items-center gap-3">
             <Button onClick={handlePrint} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">
               <Printer className="mr-2 h-4 w-4" />
@@ -262,8 +269,10 @@ export default function MonthWiseCollectionMonthlyPage() {
               Excel
             </Button>
           </div>
+          )}
         </CardContent>
       </Card>
+      )}
 
       <div className="print-report">
         <Card>
@@ -275,6 +284,7 @@ export default function MonthWiseCollectionMonthlyPage() {
                   From: {format(filterFromDate, 'dd MMM yyyy')} — To: {format(filterToDate, 'dd MMM yyyy')}
                 </p>
               </div>
+              {can('export') && (
               <div className="flex gap-2 no-print">
                 <Button variant="outline" size="sm" onClick={handlePrint}>
                   <Printer className="mr-2 h-4 w-4" />
@@ -285,6 +295,7 @@ export default function MonthWiseCollectionMonthlyPage() {
                   Excel
                 </Button>
               </div>
+              )}
             </div>
 
             {loading ? (

@@ -71,8 +71,14 @@ func SetupRoutes(r *gin.Engine) {
 		accounts.PUT("/ledger/:id", controllers.UpdateLedgerEntry)
 		accounts.DELETE("/ledger/:id", controllers.DeleteLedgerEntry)
 		controllers.RegisterGenericCRUD[models.Expense](accounts, "/expenses")
-		controllers.RegisterGenericCRUD[models.AccountHead](accounts, "/heads")
-		controllers.RegisterGenericCRUD[models.AccountSubHead](accounts, "/sub-heads")
+		// Heads and sub-heads are both owned by the Account Heads page, which
+		// gates Add / Edit / Delete for each of the two tables. /entries is
+		// deliberately left unguarded: it is written by Account Entry (13323)
+		// AND by One Day Balance Sheet (13341), so a single page guard here
+		// would let one page's grant unlock the other's data.
+		accountHeadWrite := middleware.RequirePageCrud(config.DB, middleware.AccountHeadPermission)
+		controllers.RegisterGenericCRUDGuarded[models.AccountHead](accounts, "/heads", true, accountHeadWrite)
+		controllers.RegisterGenericCRUDGuarded[models.AccountSubHead](accounts, "/sub-heads", true, accountHeadWrite)
 		controllers.RegisterGenericCRUD[models.AccountEntry](accounts, "/entries")
 	}
 
@@ -311,7 +317,12 @@ billing.PUT("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "ed
 		{
 			controllers.RegisterGenericCRUDScoped[models.Message](messages, "", true)
 			messages.POST("/send", controllers.SendMessages)
-			controllers.RegisterGenericCRUDScoped[models.MessageTemplate](messages, "/templates", true)
+			// Message templates are created, edited and deleted only from the New
+			// Messages page, which gates all three. The queued messages themselves
+			// stay unguarded because Draft / WhatsApp Draft / Other / Expiry all
+			// share the same collection and delete endpoints.
+			controllers.RegisterGenericCRUDGuarded[models.MessageTemplate](messages, "/templates", true,
+				middleware.RequirePageCrud(config.DB, middleware.MessageNewPermission))
 		}
 
 		// Support tickets routes (with RBAC)
@@ -388,11 +399,16 @@ billing.PUT("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "ed
 			dealers.DELETE("/:id", dealerWrite, controllers.DeleteDealer)
 			controllers.RegisterGenericCRUD[models.DealerFranchise](dealers, "/franchises")
 			dcCRUD := controllers.GenericCRUD[models.DealerCollection]{IsScoped: true}
-			dealers.POST("/collections", controllers.CreateDealerCollection)
+			// Dealer Collections (13321) is the only page that records, edits or
+			// deletes a dealer collection, so all three are gated on its own
+			// Create / Update / Delete children. The recovery and payments groups
+			// register their own /collections below and are left alone.
+			dcWrite := middleware.RequirePageCrud(config.DB, middleware.DealerCollectionPage)
+			dealers.POST("/collections", dcWrite, controllers.CreateDealerCollection)
 			dealers.GET("/collections", dcCRUD.FindAll)
 			dealers.GET("/collections/:id", dcCRUD.FindOne)
-			dealers.PUT("/collections/:id", dcCRUD.Update)
-			dealers.DELETE("/collections/:id", dcCRUD.Delete)
+			dealers.PUT("/collections/:id", dcWrite, dcCRUD.Update)
+			dealers.DELETE("/collections/:id", dcWrite, dcCRUD.Delete)
 			dealers.POST("/sub-dealer", controllers.CreateSubDealer)
 
 		}
@@ -689,13 +705,18 @@ billing.PUT("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "ed
 			inventory.POST("/vendor-invoices", vendorInvoiceWrite, controllers.CreateVendorInvoice)
 			inventory.PUT("/vendor-invoices/:id", vendorInvoiceWrite, controllers.UpdateVendorInvoice)
 			inventory.DELETE("/vendor-invoices/:id", vendorInvoiceWrite, controllers.DeleteVendorInvoice)
+			// Purchase (15313) owns Add / Edit / Delete, which the page gates. The
+			// status toggle and add-quantity sub-actions are deliberately not
+			// guarded: the page does not gate those buttons, so guarding them
+			// would 403 a control the user can legitimately see and use.
+			purchaseWrite := middleware.RequirePageCrud(config.DB, middleware.PurchasePermission)
 			inventory.GET("/purchases", controllers.GetPurchases)
 			inventory.GET("/purchases/:id", controllers.GetPurchaseByID)
-			inventory.POST("/purchases", controllers.CreatePurchase)
-			inventory.PUT("/purchases/:id", controllers.UpdatePurchase)
+			inventory.POST("/purchases", purchaseWrite, controllers.CreatePurchase)
+			inventory.PUT("/purchases/:id", purchaseWrite, controllers.UpdatePurchase)
 			inventory.POST("/purchases/:id/add-quantity", controllers.AddPurchaseQuantity)
 			inventory.PATCH("/purchases/:id/status", controllers.UpdatePurchaseStatus)
-			inventory.DELETE("/purchases/:id", controllers.DeletePurchase)
+			inventory.DELETE("/purchases/:id", purchaseWrite, controllers.DeletePurchase)
 			inventory.GET("/purchased-products", controllers.GetPurchasedProducts)
 		}
 
@@ -764,9 +785,16 @@ billing.PUT("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "ed
 			c.Next()
 		})
 		{
+			// /complaints is shared by the main complaint list, Subscribers Complain
+			// (13342) and Allocated Complains (13343), so it stays unguarded: a
+			// single page guard would let one of those grants unlock the others.
+			// The two lookup tables below are each owned by exactly one page, which
+			// gates all three of Add / Edit / Delete for them.
 			controllers.RegisterGenericCRUD[models.Complaint](customerSupport, "/complaints")
-			controllers.RegisterGenericCRUD[models.ComplaintSubject](customerSupport, "/complaint-subjects")
-			controllers.RegisterGenericCRUD[models.ComplaintType](customerSupport, "/complaint-types")
+			controllers.RegisterGenericCRUDGuarded[models.ComplaintSubject](customerSupport, "/complaint-subjects", true,
+				middleware.RequirePageCrud(config.DB, middleware.ComplaintSubjectPermission))
+			controllers.RegisterGenericCRUDGuarded[models.ComplaintType](customerSupport, "/complaint-types", true,
+				middleware.RequirePageCrud(config.DB, middleware.ComplaintTypePermission))
 			controllers.RegisterGenericCRUD[models.AlertTemplate](customerSupport, "/alerts")
 		}
 
@@ -795,18 +823,32 @@ billing.PUT("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "ed
 			c.Next()
 		})
 		{
-			// Staff routes with custom user creation
-			hr.POST("/staff", controllers.CreateSubUser)
+			// Staff routes with custom user creation. The Staff page gates
+			// Add / Edit / Delete, so the three writes are guarded. /departments is
+			// left unguarded on purpose: it has no page permission of its own and
+			// the staff form creates a department inline, so guarding it would
+			// break staff creation for a user who legitimately holds Staff Create.
+			staffWrite := middleware.RequirePageCrud(config.DB, middleware.StaffPermission)
+			hr.POST("/staff", staffWrite, controllers.CreateSubUser)
 			hr.GET("/staff", controllers.GetStaff)
-			hr.PUT("/staff/:id", controllers.UpdateSubUser)
-			hr.DELETE("/staff/:id", controllers.DeleteSubUser)
+			hr.PUT("/staff/:id", staffWrite, controllers.UpdateSubUser)
+			hr.DELETE("/staff/:id", staffWrite, controllers.DeleteSubUser)
 
 			controllers.RegisterGenericCRUD[models.StaffDepartment](hr, "/departments")
 
-			controllers.RegisterGenericCRUD[models.Attendance](hr, "/attendance")
-			controllers.RegisterGenericCRUD[models.SalaryPayment](hr, "/salary")
-			controllers.RegisterGenericCRUD[models.AdvanceLoan](hr, "/advance-loans")
-			controllers.RegisterGenericCRUD[models.AdvanceLoan](hr, "/advances")
+			// Attendance (15322) creates and updates a whole day in one Save, so
+			// both of its children are covered by the method-derived guard.
+			controllers.RegisterGenericCRUDGuarded[models.Attendance](hr, "/attendance", true,
+				middleware.RequirePageCrud(config.DB, middleware.StaffAttendancePermission))
+			// Salary (15318) is create-only: paying a salary is a financial record,
+			// so the page exposes no Edit or Delete and the global fallback still
+			// applies to PUT/DELETE.
+			controllers.RegisterGenericCRUDGuarded[models.SalaryPayment](hr, "/salary", true,
+				middleware.RequirePageCrud(config.DB, middleware.StaffSalaryPermission))
+			// Advance and Loans (15317) is one page served by two paths.
+			advanceWrite := middleware.RequirePageCrud(config.DB, middleware.AdvanceLoanPermission)
+			controllers.RegisterGenericCRUDGuarded[models.AdvanceLoan](hr, "/advance-loans", true, advanceWrite)
+			controllers.RegisterGenericCRUDGuarded[models.AdvanceLoan](hr, "/advances", true, advanceWrite)
 			controllers.RegisterGenericCRUD[models.AlertTemplate](hr, "/alerts")
 		}
 

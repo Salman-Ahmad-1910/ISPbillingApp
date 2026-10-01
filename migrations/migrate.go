@@ -104,5 +104,14 @@ func RunMigrations() {
 		log.Println("Warning: failed to create partial unique index on serial_number:", err)
 	}
 
+	// Materialise inherited child permissions so a newly added per-page
+	// Create/Update/Delete child does not strip an existing user's buttons. Purely
+	// additive and idempotent, so a failure here must not stop the app from
+	// starting: the guards stay correct either way, an affected user would just
+	// need the Roles page re-saved.
+	if err := BackfillUserPermissionChildren(config.DB); err != nil {
+		log.Println("Warning: failed to backfill inherited child permissions:", err)
+	}
+
 	log.Println("Migration completed successfully")
 }

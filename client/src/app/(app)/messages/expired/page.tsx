@@ -15,6 +15,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useCrudPermissions } from '@/hooks/usePermissions';
+import { MESSAGE_EXPIRED_PERMISSION } from '@/lib/permission-pages';
 
 const messageTitles = [
   'Select the Message',
@@ -36,6 +38,7 @@ export default function ExpiryMessagesPage() {
   const { companyId, companies } = useCompany();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { canDelete } = useCrudPermissions(MESSAGE_EXPIRED_PERMISSION);
 
   const { data: messages = [], isLoading } = useGenericQuery<Message>('messages', companyId ?? undefined);
   const { data: connections = [] } = useGenericQuery<Connection>('admin/connections', companyId ?? undefined);
@@ -442,9 +445,11 @@ export default function ExpiryMessagesPage() {
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-950/30 transition-all duration-300 hover:scale-110" title="Preview" onClick={() => setPreview(item)}>
                               <Eye className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30 transition-all duration-300 hover:scale-110" title="Delete" onClick={() => handleDelete(item)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            {canDelete && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30 transition-all duration-300 hover:scale-110" title="Delete" onClick={() => handleDelete(item)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>

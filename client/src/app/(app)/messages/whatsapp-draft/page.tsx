@@ -18,6 +18,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useCrudPermissions } from '@/hooks/usePermissions';
+import { MESSAGE_WHATSAPP_DRAFT_PERMISSION } from '@/lib/permission-pages';
 
 const messageTitles = [
   'All',
@@ -47,6 +49,7 @@ export default function WhatsAppDraftPage() {
   const { user } = useUser();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { canDelete } = useCrudPermissions(MESSAGE_WHATSAPP_DRAFT_PERMISSION);
 
   const { data: messages = [], isLoading } = useGenericQuery<Message>('messages', companyId ?? undefined);
   const { data: connections = [] } = useGenericQuery<Connection>('admin/connections', companyId ?? undefined);
@@ -389,9 +392,11 @@ export default function WhatsAppDraftPage() {
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-950/30 transition-all duration-300 hover:scale-110" title="Preview" onClick={() => setPreview(item)}>
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/30 transition-all duration-300 hover:scale-110" title="Delete" onClick={() => handleDeleteDraft(item.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {canDelete && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/30 transition-all duration-300 hover:scale-110" title="Delete" onClick={() => handleDeleteDraft(item.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

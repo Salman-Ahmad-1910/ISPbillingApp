@@ -30,7 +30,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
-import { useUserPermissions } from '@/hooks/usePermissions';
+import { useUserPermissions, useCrudPermissions } from '@/hooks/usePermissions';
+import { ACCOUNT_ENTRY_PERMISSION } from '@/lib/permission-pages';
 import { smartMatch } from '@/lib/search';
 import { BookOpen, PlusCircle, MoreHorizontal, Edit3, Trash2, Search, CalendarIcon, DollarSign, FileText, Loader2 } from 'lucide-react';
 import type { RecoveryOfficer, Staff } from '@/lib/types';
@@ -82,6 +83,7 @@ export default function AccountEntryPage() {
   const { user } = useUser();
   const { userRole } = useUserPermissions();
   const isAdmin = ['admin', 'owner', 'manager'].includes(userRole);
+  const { canCreate, canUpdate, canDelete } = useCrudPermissions(ACCOUNT_ENTRY_PERMISSION);
 
   const { data: apiEntries = [], isLoading } = useGenericQuery<any>('accounts/entries', companyId ?? undefined);
   const { data: staff = [] } = useGenericQuery<Staff>('hr/staff', companyId ?? undefined);
@@ -298,10 +300,12 @@ export default function AccountEntryPage() {
             <p className="text-sm text-muted-foreground">Manage all account transactions and entries</p>
           </div>
         </div>
+        {canCreate && (
         <Button onClick={openAddDialog} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700">
           <PlusCircle className="mr-2 h-4 w-4" />
           Add Entry
         </Button>
+        )}
       </div>
 
       <div className="h-0.5 bg-gradient-to-r from-blue-500/50 via-indigo-500/30 to-transparent" />
@@ -510,14 +514,18 @@ export default function AccountEntryPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            {canUpdate && (
                             <DropdownMenuItem onClick={() => openEditDialog(item)}>
                               <Edit3 className="mr-2 h-4 w-4" />
                               Edit
                             </DropdownMenuItem>
+                            )}
+                            {canDelete && (
                             <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(item.id)}>
                               <Trash2 className="mr-2 h-4 w-4" />
                               Delete
                             </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

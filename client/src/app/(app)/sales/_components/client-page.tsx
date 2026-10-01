@@ -18,6 +18,8 @@ import {
 } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
+import { useCrudPermissions } from '@/hooks/usePermissions';
+import { SALES_PERMISSION } from '@/lib/permission-pages';
 import { useQueryClient } from '@tanstack/react-query';
 import { Printer, Loader2, RotateCcw, FileSpreadsheet, FileDown } from 'lucide-react';
 import { printSaleReceipt, type SaleReceiptData } from './sale-receipt';
@@ -93,6 +95,7 @@ export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) 
   const { companyId } = useCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { canUpdate, canDelete } = useCrudPermissions(SALES_PERMISSION);
 
   const company: Company | undefined = companies.find(c => c.id === companyId);
 
@@ -340,7 +343,7 @@ export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) 
     }
   };
 
-  const columns = getColumns(handleDelete, handlePayHold, openReturnDialog, (sale) => setReplaceTarget(sale));
+  const columns = getColumns(handleDelete, handlePayHold, openReturnDialog, (sale) => setReplaceTarget(sale), canUpdate, canDelete);
 
   const pagedSales = useMemo(() => {
     if (pageSize === 'all') return data;

@@ -21,6 +21,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import api from '@/lib/api';
+import { useCrudPermissions } from '@/hooks/usePermissions';
+import { MESSAGE_NEW_PERMISSION } from '@/lib/permission-pages';
 
 const DEFAULT_PARAMS = ['name', 'cableAmount', 'internetAmount', 'received', 'balance', 'date', 'bill'];
 
@@ -98,6 +100,7 @@ export default function NewMessagesPage() {
   const { companyId } = useCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { canCreate, canUpdate, canDelete } = useCrudPermissions(MESSAGE_NEW_PERMISSION);
 
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<MessageTemplate | null>(null);
@@ -350,10 +353,12 @@ export default function NewMessagesPage() {
                 <p className="text-xs text-muted-foreground">Dynamic parameters inside curly braces e.g. {`{name}, {balance}`} are filled when sending</p>
               </div>
             </div>
-            <Button onClick={openAddTemplate} className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white hover:from-blue-600 hover:to-cyan-700 shadow-sm transition-all duration-300 hover:shadow-md">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Template
-            </Button>
+            {canCreate && (
+              <Button onClick={openAddTemplate} className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white hover:from-blue-600 hover:to-cyan-700 shadow-sm transition-all duration-300 hover:shadow-md">
+                <Plus className="mr-2 h-4 w-4" />
+                Add Template
+              </Button>
+            )}
           </div>
 
           <div className="min-w-0 overflow-x-auto rounded-md border [&_th]:px-2 [&_th]:py-2.5 [&_td]:px-2 [&_td]:py-2.5">
@@ -409,12 +414,16 @@ export default function NewMessagesPage() {
                             <DropdownMenuItem onClick={() => setPreviewTemplate(template)}>
                               <Eye className="mr-2 h-4 w-4 text-blue-600" /> Preview
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openEditTemplate(template)}>
-                              <Pencil className="mr-2 h-4 w-4 text-amber-600" /> Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive data-[highlighted]:text-red-600" onClick={() => handleDeleteTemplate(template)}>
-                              <Trash2 className="mr-2 h-4 w-4" /> Delete
-                            </DropdownMenuItem>
+                            {canUpdate && (
+                              <DropdownMenuItem onClick={() => openEditTemplate(template)}>
+                                <Pencil className="mr-2 h-4 w-4 text-amber-600" /> Edit
+                              </DropdownMenuItem>
+                            )}
+                            {canDelete && (
+                              <DropdownMenuItem className="text-destructive data-[highlighted]:text-red-600" onClick={() => handleDeleteTemplate(template)}>
+                                <Trash2 className="mr-2 h-4 w-4" /> Delete
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

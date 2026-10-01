@@ -9,6 +9,7 @@ import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
 import { useCrudPermissions } from '@/hooks/usePermissions';
+import { PURCHASE_PERMISSION } from '@/lib/permission-pages';
 
 import { z } from 'zod';
 import { purchaseSchema } from '@/lib/schemas';
@@ -44,7 +45,7 @@ export function ClientPage({ data }: ClientPageProps) {
   const { companyId, companyName, companies } = useCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { canCreate, canUpdate, canDelete } = useCrudPermissions();
+  const { canCreate, canUpdate, canDelete } = useCrudPermissions(PURCHASE_PERMISSION);
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);

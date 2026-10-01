@@ -16,6 +16,8 @@ import { cn } from '@/lib/utils';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
+import { usePagePermissions } from '@/hooks/usePermissions';
+import { SUBSCRIBER_REPORT_NEW_SUBSCRIBERS_PERMISSIONS } from '@/lib/permission-pages';
 
 interface NewSubscriberRecord {
   id: string;
@@ -41,6 +43,7 @@ const PAGE_SIZE_OPTIONS = [10, 50, 100] as const;
 
 export default function NewSubscribersListPage() {
   const { companyId } = useCompany();
+  const { can } = usePagePermissions(SUBSCRIBER_REPORT_NEW_SUBSCRIBERS_PERMISSIONS);
 
   const { data: connections = [], isLoading: loading } = useGenericQuery<any>('admin/connections', companyId ?? undefined);
   const { data: areas = [] } = useGenericQuery<any>('network/areas', companyId ?? undefined);
@@ -214,6 +217,7 @@ export default function NewSubscribersListPage() {
       </div>
       <div className="h-0.5 bg-gradient-to-r from-emerald-500/50 via-teal-500/30 to-transparent no-print" />
 
+      {can('summary') && (
       <div className="grid gap-4 md:grid-cols-2 no-print">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center justify-between">
@@ -238,7 +242,9 @@ export default function NewSubscribersListPage() {
           </div>
         </div>
       </div>
+      )}
 
+      {can('filters') && (
       <Card className="no-print transition-all duration-300 hover:shadow-md">
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -329,6 +335,7 @@ export default function NewSubscribersListPage() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       <div className="print-report">
         <Card>
@@ -340,6 +347,7 @@ export default function NewSubscribersListPage() {
                   From: {format(filterFromDate, 'dd MMM yyyy')} — To: {format(filterToDate, 'dd MMM yyyy')}
                 </p>
               </div>
+              {can('export') && (
               <div className="flex gap-2 no-print">
                 <Button variant="outline" size="sm" onClick={handlePrint} disabled={!showReport}>
                   <Printer className="mr-2 h-4 w-4" />
@@ -350,6 +358,7 @@ export default function NewSubscribersListPage() {
                   Excel
                 </Button>
               </div>
+              )}
             </div>
 
             {!showReport ? (

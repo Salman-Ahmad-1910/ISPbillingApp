@@ -18,6 +18,8 @@ import { DataTable } from './data-table';
 import { getColumns } from './columns';
 import { AdvanceLoanForm } from './advance-loan-form';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
+import { useCrudPermissions } from '@/hooks/usePermissions';
+import { ADVANCE_LOAN_PERMISSION } from '@/lib/permission-pages';
 
   import api from '@/lib/api';
   import { smartMatch } from '@/lib/search';
@@ -34,6 +36,7 @@ export function ClientPage({ data, staff }: ClientPageProps) {
     const { companyId } = useCompany();
     const { toast } = useToast();
     const queryClient = useQueryClient();
+    const { canCreate, canUpdate, canDelete } = useCrudPermissions(ADVANCE_LOAN_PERMISSION);
     const [searchQuery, setSearchQuery] = useState('');
     const [filterStaffId, setFilterStaffId] = useState<string>('all');
     const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -193,7 +196,7 @@ export function ClientPage({ data, staff }: ClientPageProps) {
         setIsDeleteDialogOpen(true);
     };
 
-    const columns = getColumns({ onEdit: handleEdit, onDelete: openDeleteDialog });
+    const columns = getColumns({ onEdit: handleEdit, onDelete: openDeleteDialog, canUpdate, canDelete });
 
     return (
         <>
@@ -263,12 +266,14 @@ export function ClientPage({ data, staff }: ClientPageProps) {
                     </Button>
                     <div className="flex-1" />
                     <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+                        {canCreate && (
                         <DialogTrigger asChild>
                             <Button onClick={() => setSelectedAdvance(null)} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700">
                                 <PlusCircle className="mr-2 h-4 w-4" />
                                 Add Advance/Loan
                             </Button>
                         </DialogTrigger>
+                        )}
                         <DialogContent className="max-h-[85vh] overflow-y-auto rounded-xl shadow-lg">
                             <DialogHeader>
                                 <DialogTitle className="flex items-center gap-2">

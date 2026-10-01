@@ -8,10 +8,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Warehouse, Boxes, Package, DollarSign, Eye, Download, Printer, ArrowLeft, CalendarDays } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { usePagePermissions } from '@/hooks/usePermissions';
+import { REPORT_ABSTRACT_STOCK_PERMISSION } from '@/lib/permission-pages';
 import api from '@/lib/api';
 
 export default function AbstractStockPage() {
   const { companyId, companies } = useCompany();
+
+  const { can } = usePagePermissions(REPORT_ABSTRACT_STOCK_PERMISSION);
 
   const { data: products = [], isLoading } = useGenericQuery<any>('inventory/purchased-products', companyId ?? undefined);
 
@@ -290,6 +294,7 @@ export default function AbstractStockPage() {
 
       <div className="h-0.5 bg-gradient-to-r from-sky-500/50 via-blue-500/30 to-transparent" />
 
+      {can('summary') && (
       <div className="grid gap-4 md:grid-cols-3">
         {kpiData.map((kpi) => (
           <div key={kpi.title} className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
@@ -309,7 +314,9 @@ export default function AbstractStockPage() {
           </div>
         ))}
       </div>
+      )}
 
+      {can('filters') && (
       <Card className="transition-all duration-300 hover:shadow-md">
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -332,6 +339,7 @@ export default function AbstractStockPage() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {showReport && (
         <Card className="transition-all duration-300 hover:shadow-md">
@@ -341,6 +349,7 @@ export default function AbstractStockPage() {
                 <CalendarDays className="h-5 w-5 text-sky-600" />
                 Stock for {monthLabel}
               </h2>
+              {can('export') && (
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" className="gap-2 transition-all duration-300 hover:shadow-md" onClick={handleExportCSV}>
                   <Download className="h-4 w-4" /> Export
@@ -349,6 +358,7 @@ export default function AbstractStockPage() {
                   <Printer className="h-4 w-4" /> Print
                 </Button>
               </div>
+              )}
             </div>
 
             <div className="min-w-0 overflow-x-auto">

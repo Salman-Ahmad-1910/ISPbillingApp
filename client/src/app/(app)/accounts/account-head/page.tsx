@@ -24,6 +24,8 @@ import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
+import { useCrudPermissions } from '@/hooks/usePermissions';
+import { ACCOUNT_HEAD_PERMISSION } from '@/lib/permission-pages';
 import api from '@/lib/api';
 import { smartMatch } from '@/lib/search';
 import { Layers, PlusCircle, MoreHorizontal, Edit3, Trash2, Search, Loader2 } from 'lucide-react';
@@ -57,6 +59,8 @@ export default function AccountHeadPage() {
   const { companyId } = useCompany();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { canCreate, canUpdate, canDelete } = useCrudPermissions(ACCOUNT_HEAD_PERMISSION);
+
   const { data: apiHeads = [], isLoading } = useGenericQuery<any>('accounts/heads', companyId ?? undefined);
   const { data: apiSubHeads = [] } = useGenericQuery<any>('accounts/sub-heads', companyId ?? undefined);
 
@@ -308,10 +312,12 @@ export default function AccountHeadPage() {
         <CardContent className="pt-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Account Heads</h2>
+            {canCreate && (
             <Button onClick={openAddHeadDialog} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:from-emerald-600 hover:to-green-700">
               <PlusCircle className="mr-2 h-4 w-4" />
               Add Head
             </Button>
+            )}
           </div>
 
           <div className="flex items-center justify-between mb-4">
@@ -375,14 +381,18 @@ export default function AccountHeadPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            {canUpdate && (
                             <DropdownMenuItem onClick={() => openEditHeadDialog(item)}>
                               <Edit3 className="mr-2 h-4 w-4" />
                               Edit
                             </DropdownMenuItem>
+                            )}
+                            {canDelete && (
                             <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteHead(item.id)}>
                               <Trash2 className="mr-2 h-4 w-4" />
                               Delete
                             </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -415,10 +425,12 @@ export default function AccountHeadPage() {
         <CardContent className="pt-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Account Sub Heads</h2>
+            {canCreate && (
             <Button onClick={openAddSubDialog} className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white shadow-sm hover:from-blue-600 hover:to-cyan-700">
               <PlusCircle className="mr-2 h-4 w-4" />
               Add Sub Head
             </Button>
+            )}
           </div>
 
           <div className="flex items-center justify-between mb-4">
@@ -486,14 +498,18 @@ export default function AccountHeadPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            {canUpdate && (
                             <DropdownMenuItem onClick={() => openEditSubDialog(item)}>
                               <Edit3 className="mr-2 h-4 w-4" />
                               Edit
                             </DropdownMenuItem>
+                            )}
+                            {canDelete && (
                             <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteSubHead(item.id)}>
                               <Trash2 className="mr-2 h-4 w-4" />
                               Delete
                             </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

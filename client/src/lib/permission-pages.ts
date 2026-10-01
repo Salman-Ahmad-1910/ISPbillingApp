@@ -353,6 +353,71 @@ export const REPORT_COLLECTION_PERMISSION = '13331';
 export const REPORT_DEFAULTER_PERMISSION = '13332';
 export const REPORT_NEW_DEALER_PERMISSION = '13333';
 export const REPORT_INVOICE_PERMISSION = '13350';
+export const REPORT_ABSTRACT_STOCK_PERMISSION = '15319';
+export const REPORT_ABSTRACT_SALE_PERMISSION = '15320';
+
+// --- Subscriber Reports ------------------------------------------------------
+// PERMISSION_PAGES maps five different permission ids onto
+// /subscriber-reports/collections, two onto month-defaulters and two onto
+// monthly-collections. Any one of those ids independently unlocks its route, so
+// each of them needs its own children, and each page must resolve its feature
+// permissions against ALL of its ids. Passing the array to usePagePermissions
+// makes `can` true when any one of them grants the child, so a user granted only
+// one of the aliases keeps the controls.
+export const SUBSCRIBER_REPORT_COLLECTIONS_PERMISSIONS = ['13326', '13330', '13356', '13358', '13306'];
+export const SUBSCRIBER_REPORT_ALLOCATED_DEFAULTERS_PERMISSIONS = ['13307'];
+export const SUBSCRIBER_REPORT_MONTH_DEFAULTERS_PERMISSIONS = ['13325', '13353'];
+export const SUBSCRIBER_REPORT_PACKAGE_WISE_PERMISSIONS = ['13328'];
+export const SUBSCRIBER_REPORT_PROMISE_DATES_PERMISSIONS = ['13329'];
+export const SUBSCRIBER_REPORT_MONTHLY_COLLECTIONS_PERMISSIONS = ['13355', '13354'];
+export const SUBSCRIBER_REPORT_EXPIRY_DEFAULTERS_PERMISSIONS = ['13349'];
+export const SUBSCRIBER_REPORT_DEACTIVATED_USERS_PERMISSIONS = ['13327'];
+export const SUBSCRIBER_REPORT_CREATOR_SUMMARY_PERMISSIONS = ['15327'];
+export const SUBSCRIBER_REPORT_NEW_SUBSCRIBERS_PERMISSIONS = ['15329'];
+export const SUBSCRIBER_REPORT_SUBSCRIBERS_DEFAULTERS_PERMISSIONS = ['15330'];
+export const SUBSCRIBER_REPORT_ALLOCATED_COLLECTIONS_PERMISSIONS = ['15331'];
+export const SUBSCRIBER_REPORT_MONTHWISE_COLLECTION_MONTHLY_PERMISSIONS = ['15332'];
+export const SUBSCRIBER_REPORT_NOT_GENERATED_COLLECTIONS_PERMISSIONS = ['15382'];
+export const SUBSCRIBER_REPORT_UNPAID_COLLECTIONS_PERMISSIONS = ['15383'];
+export const SUBSCRIBER_REPORT_PENDING_SUBSCRIBERS_PERMISSIONS = ['15380'];
+export const SUBSCRIBER_REPORT_ADVANCE_SUBSCRIBERS_PERMISSIONS = ['15381'];
+
+// --- Pages that gained Create / Update / Delete children --------------------
+// Each id below is a page that already had a top-level permission but no
+// per-operation children, so its Add / Edit / Delete buttons used to be gated
+// only by the app-wide CRUD switches. They now declare children so each page can
+// be granted its own operations.
+
+// Complain
+export const COMPLAINT_SUBJECT_PERMISSION = '15323';
+export const COMPLAINT_TYPE_PERMISSION = '15325';
+export const COMPLAINTS_USER_PERMISSION = '13342';
+export const COMPLAINTS_ALLOCATED_PERMISSION = '13343';
+
+// Messages. Sent Messages (13348) is a read-only viewer and declares no
+// children, matching the fact that it renders no Add / Edit / Delete control.
+export const MESSAGE_DRAFT_PERMISSION = '13347';
+export const MESSAGE_WHATSAPP_DRAFT_PERMISSION = '13359';
+export const MESSAGE_OTHER_PERMISSION = '13346';
+export const MESSAGE_EXPIRED_PERMISSION = '13345';
+export const MESSAGE_NEW_PERMISSION = '13344';
+
+// Accounts
+export const ACCOUNT_HEAD_PERMISSION = '13322';
+export const ACCOUNT_ENTRY_PERMISSION = '13323';
+export const ONE_DAY_BALANCE_PERMISSION = '13341';
+
+// Inventory / Sales. Inventory Status (15314) and Stock (15373) are read-only
+// reports and declare no children.
+export const PURCHASE_PERMISSION = '15313';
+export const SALES_PERMISSION = '15315';
+
+// Human Resources. Attendance Report (15324) is read-only and declares no
+// children.
+export const STAFF_PERMISSION = '15316';
+export const STAFF_SALARY_PERMISSION = '15318';
+export const STAFF_ATTENDANCE_PERMISSION = '15322';
+export const ADVANCE_LOAN_PERMISSION = '15317';
 
 export type CrudAction = 'create' | 'update' | 'delete';
 
@@ -366,6 +431,45 @@ export const CRUD_CHILDREN: PageChildPermission[] = [
   { key: 'create', label: 'Create' },
   { key: 'update', label: 'Update' },
   { key: 'delete', label: 'Delete' },
+];
+
+// Subset shapes for pages that only expose part of CRUD. A page must only
+// declare an action it actually renders, otherwise the Roles page grows a
+// checkbox that controls nothing and the operator cannot tell which pages
+// support which operation at a glance.
+
+// Update + Delete, no Add: Allocated Complains (an officer-assigned queue),
+// One Day Balance Sheet (a ledger report with inline row edit/delete) and the
+// Sales list (rows are created by Point of Sale, so the list has no Add button).
+export const UPDATE_DELETE_CHILDREN: PageChildPermission[] = [
+  { key: 'update', label: 'Update' },
+  { key: 'delete', label: 'Delete' },
+];
+
+// Create + Delete, no Edit: the message lists, whose row action is a read-only
+// preview, so there is nothing to update in place.
+export const CREATE_DELETE_CHILDREN: PageChildPermission[] = [
+  { key: 'create', label: 'Create' },
+  { key: 'delete', label: 'Delete' },
+];
+
+// Create + Update, no Delete: Staff Attendance saves whole-day attendance
+// upserts and never removes a record.
+export const CREATE_UPDATE_CHILDREN: PageChildPermission[] = [
+  { key: 'create', label: 'Create' },
+  { key: 'update', label: 'Update' },
+];
+
+// Delete only: WhatsApp Draft, Other and Expiry Messages can only discard a
+// queued message; sending is governed separately from creation.
+export const DELETE_ONLY_CHILDREN: PageChildPermission[] = [
+  { key: 'delete', label: 'Delete' },
+];
+
+// Create only: Staff Salary pays a salary and offers no edit or delete, since a
+// paid salary is a financial record rather than a draft.
+export const CREATE_ONLY_CHILDREN: PageChildPermission[] = [
+  { key: 'create', label: 'Create' },
 ];
 
 // Subscriber Detail exposes more than CRUD, so it declares its own set.
@@ -468,10 +572,27 @@ export const VENDOR_INVOICE_CHILDREN: PageChildPermission[] = [
 
 // The four collection pages all show the same pair of regions: a row of summary
 // cards and a search bar. Both are gated independently so the numbers can be
-// hidden while the search stays usable (and vice versa).
+// hidden while the search stays usable (and vice versa). The CRUD children below
+// then differ per page, matching the row actions each one actually renders.
 const COLLECTION_CHILDREN: PageChildPermission[] = [
   { key: 'summary', label: 'Summary' },
   { key: 'search', label: 'Search' },
+];
+
+// Subscribers Collections and Dealers Collections both record a payment, edit
+// that row and delete it. On Dealers Collections the paid/unpaid settlement is
+// the same edit permission, so it needs nothing extra.
+const COLLECTION_FULL_CRUD_CHILDREN: PageChildPermission[] = [
+  ...COLLECTION_CHILDREN,
+  ...CRUD_CHILDREN,
+];
+
+// Allocated Collection and Baddebt Collection only ever add a payment; a
+// mis-keyed row is corrected from the page that owns the underlying bill, so
+// neither page renders a row edit or delete.
+const COLLECTION_CREATE_CHILDREN: PageChildPermission[] = [
+  ...COLLECTION_CHILDREN,
+  { key: 'create', label: 'Create' },
 ];
 
 // Transaction Type is a plain CRUD lookup table.
@@ -506,8 +627,10 @@ export const DEALER_DASHBOARD_CHILDREN: PageChildPermission[] = [
   { key: 'summary', label: 'Summary' },
 ];
 
-// The four Dealer > Reports pages share one surface: a filter panel, a set of
-// summary cards, and the combined Print / Excel export pair.
+// The Dealer > Reports pages and the two Abstract reports share one surface: a
+// filter panel, a set of summary cards, and the combined Print / Excel export
+// pair. Abstract Stock / Abstract Sales render exactly these three regions and
+// no row-level controls, so they take the same child set.
 const REPORT_CHILDREN: PageChildPermission[] = [
   { key: 'filters', label: 'Filters' },
   { key: 'summary', label: 'Summary' },
@@ -551,10 +674,10 @@ export const PAGE_PERMISSIONS: Record<string, { name: string; children: PageChil
   [PRODUCT_PERMISSION]: { name: 'Products', children: INVENTORY_CATALOG_CHILDREN },
   [PRODUCT_TYPE_PERMISSION]: { name: 'Product Type', children: INVENTORY_CATALOG_CHILDREN },
   [VENDOR_INVOICE_PERMISSION]: { name: 'Vendor Invoice', children: VENDOR_INVOICE_CHILDREN },
-  [SUBSCRIBER_COLLECTION_PERMISSION]: { name: 'Subscribers Collections', children: COLLECTION_CHILDREN },
-  [DEALER_COLLECTION_PERMISSION]: { name: 'Dealers Collections', children: COLLECTION_CHILDREN },
-  [ALLOCATED_COLLECTION_PERMISSION]: { name: 'Allocated Collection', children: COLLECTION_CHILDREN },
-  [BADDEBT_COLLECTION_PERMISSION]: { name: 'Baddebt Collection', children: COLLECTION_CHILDREN },
+  [SUBSCRIBER_COLLECTION_PERMISSION]: { name: 'Subscribers Collections', children: COLLECTION_FULL_CRUD_CHILDREN },
+  [DEALER_COLLECTION_PERMISSION]: { name: 'Dealers Collections', children: COLLECTION_FULL_CRUD_CHILDREN },
+  [ALLOCATED_COLLECTION_PERMISSION]: { name: 'Allocated Collection', children: COLLECTION_CREATE_CHILDREN },
+  [BADDEBT_COLLECTION_PERMISSION]: { name: 'Baddebt Collection', children: COLLECTION_CREATE_CHILDREN },
   [TRANSACTION_TYPE_PERMISSION]: { name: 'Transaction Type', children: TRANSACTION_TYPE_CHILDREN },
   [BILL_CREATOR_PERMISSION]: { name: 'Bills Creator', children: BILL_CREATOR_CHILDREN },
   [MY_DEALER_PERMISSION]: { name: 'My Dealer', children: MY_DEALER_CHILDREN },
@@ -563,6 +686,66 @@ export const PAGE_PERMISSIONS: Record<string, { name: string; children: PageChil
   [REPORT_DEFAULTER_PERMISSION]: { name: 'Defaulter Report', children: REPORT_CHILDREN },
   [REPORT_NEW_DEALER_PERMISSION]: { name: 'New Dealer Report', children: REPORT_CHILDREN },
   [REPORT_INVOICE_PERMISSION]: { name: 'Invoice Report', children: REPORT_CHILDREN },
+  [REPORT_ABSTRACT_STOCK_PERMISSION]: { name: 'Abstract Stock', children: REPORT_CHILDREN },
+  [REPORT_ABSTRACT_SALE_PERMISSION]: { name: 'Abstract Sales', children: REPORT_CHILDREN },
+
+  // Complain
+  [COMPLAINT_SUBJECT_PERMISSION]: { name: 'Subject Type', children: CRUD_CHILDREN },
+  [COMPLAINT_TYPE_PERMISSION]: { name: 'Complain Type', children: CRUD_CHILDREN },
+  [COMPLAINTS_USER_PERMISSION]: { name: 'Subscribers Complain', children: CRUD_CHILDREN },
+  [COMPLAINTS_ALLOCATED_PERMISSION]: { name: 'Allocated Complains', children: UPDATE_DELETE_CHILDREN },
+
+  // Messages
+  [MESSAGE_DRAFT_PERMISSION]: { name: 'Draft Messages', children: CREATE_DELETE_CHILDREN },
+  [MESSAGE_WHATSAPP_DRAFT_PERMISSION]: { name: 'Whatsapp Draft Message', children: DELETE_ONLY_CHILDREN },
+  [MESSAGE_OTHER_PERMISSION]: { name: 'Other Messages', children: DELETE_ONLY_CHILDREN },
+  [MESSAGE_EXPIRED_PERMISSION]: { name: 'Expiry Messages', children: DELETE_ONLY_CHILDREN },
+  [MESSAGE_NEW_PERMISSION]: { name: 'New Messages', children: CRUD_CHILDREN },
+
+  // Accounts
+  [ACCOUNT_HEAD_PERMISSION]: { name: 'Account Heads', children: CRUD_CHILDREN },
+  [ACCOUNT_ENTRY_PERMISSION]: { name: 'Account Entry', children: CRUD_CHILDREN },
+  [ONE_DAY_BALANCE_PERMISSION]: { name: 'One Day Accounts', children: UPDATE_DELETE_CHILDREN },
+
+  // Inventory / Sales
+  [PURCHASE_PERMISSION]: { name: 'Purchase', children: CRUD_CHILDREN },
+  [SALES_PERMISSION]: { name: 'Sales', children: UPDATE_DELETE_CHILDREN },
+
+  // Human Resources
+  [STAFF_PERMISSION]: { name: 'Staff', children: CRUD_CHILDREN },
+  [STAFF_SALARY_PERMISSION]: { name: 'Staff Salary', children: CREATE_ONLY_CHILDREN },
+  [STAFF_ATTENDANCE_PERMISSION]: { name: 'Staff Attendance', children: CREATE_UPDATE_CHILDREN },
+  [ADVANCE_LOAN_PERMISSION]: { name: 'Advance and Loans', children: CRUD_CHILDREN },
+
+  // Subscriber Reports. Every page in this section renders the same three
+  // regions: a filter card, a KPI summary grid, and a Print / Excel pair, so
+  // they all share REPORT_CHILDREN. These are read-only reports that never
+  // mutate a record, hence no CRUD keys. Where one route is unlocked by several
+  // permission ids (see the SUBSCRIBER_REPORT_*_PERMISSIONS arrays), every id
+  // gets the set so granting any single alias is enough.
+  ['13326']: { name: 'New Subscribers List', children: REPORT_CHILDREN },
+  ['13330']: { name: 'Allocated Collections', children: REPORT_CHILDREN },
+  ['13356']: { name: 'Collection Not Generated', children: REPORT_CHILDREN },
+  ['13358']: { name: 'Unpaid Collection', children: REPORT_CHILDREN },
+  ['13306']: { name: 'Subscriber Collections', children: REPORT_CHILDREN },
+  ['13307']: { name: 'Allocated Defualters', children: REPORT_CHILDREN },
+  ['13325']: { name: 'Subscribers Defaulter', children: REPORT_CHILDREN },
+  ['13353']: { name: 'Month Wise Defualter', children: REPORT_CHILDREN },
+  ['13328']: { name: 'Package Wise List', children: REPORT_CHILDREN },
+  ['13329']: { name: 'Promise Date Report', children: REPORT_CHILDREN },
+  ['13355']: { name: 'Month Wise Collection', children: REPORT_CHILDREN },
+  ['13354']: { name: 'Monthly Collection Month Wise', children: REPORT_CHILDREN },
+  ['13349']: { name: 'Expiry Wise Defaulter', children: REPORT_CHILDREN },
+  ['13327']: { name: 'Deactivate Subscriber List', children: REPORT_CHILDREN },
+  ['15327']: { name: 'Subscribers Creator Summary', children: REPORT_CHILDREN },
+  ['15329']: { name: 'New Subscribers List', children: REPORT_CHILDREN },
+  ['15330']: { name: 'Subscribers Defaulters', children: REPORT_CHILDREN },
+  ['15331']: { name: 'Allocated Collections', children: REPORT_CHILDREN },
+  ['15332']: { name: 'Month Wise Collection Monthly', children: REPORT_CHILDREN },
+  ['15382']: { name: 'Not Generated Collections', children: REPORT_CHILDREN },
+  ['15383']: { name: 'Unpaid Collections', children: REPORT_CHILDREN },
+  ['15380']: { name: 'Pending Subscribers', children: REPORT_CHILDREN },
+  ['15381']: { name: 'Advance Subscribers', children: REPORT_CHILDREN },
 };
 
 // Child permission definitions, derived from PAGE_PERMISSIONS. These are
@@ -600,14 +783,23 @@ export const CHILDREN_BY_PARENT: Record<string, typeof PERMISSION_CHILD_DEFS> =
 // page (cards, bulk edit, status, ...) is governed purely by that page's child
 // permission. Admin/owner roles and users with no per-user configuration always
 // pass, matching hasFeaturePermission.
+//
+// pagePermissionId may be an array when one route is unlocked by several
+// permission ids (PERMISSION_PAGES maps five ids onto
+// /subscriber-reports/collections, for example). The child is then granted if ANY
+// of those parents grants it, so an operator who ticked the boxes under only one
+// of the alias permissions still gets the controls.
 export function hasPagePermission(
   grantedPermissions: string[],
   permissionsConfigured: boolean,
   isAdmin: boolean,
-  pagePermissionId: string,
+  pagePermissionId: string | string[],
   key: string,
 ): boolean {
-  return hasFeaturePermission(grantedPermissions, permissionsConfigured, isAdmin, childPermissionId(pagePermissionId, key));
+  const parentIds = Array.isArray(pagePermissionId) ? pagePermissionId : [pagePermissionId];
+  return parentIds.some(id =>
+    hasFeaturePermission(grantedPermissions, permissionsConfigured, isAdmin, childPermissionId(id, key)),
+  );
 }
 
 // Resolve whether a CRUD action is allowed on a page, honouring the page's own

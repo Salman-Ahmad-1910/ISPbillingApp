@@ -28,6 +28,8 @@ import api from '@/lib/api';
 import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
 import type { Connection, Area, Complaint, Staff, RecoveryOfficer, Subscriber } from '@/lib/types';
 import { smartMatch, smartSearch } from '@/lib/search';
+import { useCrudPermissions } from '@/hooks/usePermissions';
+import { COMPLAINTS_USER_PERMISSION } from '@/lib/permission-pages';
 import {
   STATUS_COLORS,
   STATUS_LABELS,
@@ -44,6 +46,7 @@ const PRIORITIES = ['Low', 'Medium', 'High'] as const;
 export default function SubscriberComplaintPage() {
   const { companyId, companies } = useCompany();
   const { toast } = useToast();
+  const { canCreate, canUpdate, canDelete } = useCrudPermissions(COMPLAINTS_USER_PERMISSION);
 
   const { data: complaints = [], isLoading, refetch } = useGenericQuery<Complaint>('support/complaints', companyId ?? undefined);
   const { data: connections = [] } = useGenericQuery<Connection>('admin/connections', companyId ?? undefined);
@@ -354,10 +357,12 @@ export default function SubscriberComplaintPage() {
                 />
               </div>
             <div className="flex items-center gap-2">
-              <Button onClick={() => setShowForm(true)} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm">
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Add Complaint
-              </Button>
+              {canCreate && (
+                <Button onClick={() => setShowForm(true)} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm">
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Add Complaint
+                </Button>
+              )}
             </div>
           </div>
 
@@ -418,14 +423,18 @@ export default function SubscriberComplaintPage() {
                               <UserRound className="mr-2 h-4 w-4" />
                               Allocate
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="data-[highlighted]:text-emerald-600" onClick={() => { setEditComplaint(item); setEditDescription(item.description); setEditStatus(item.status); setEditOperatorId(item.assignedToId || ''); setShowEdit(true); }}>
-                              <Edit3 className="mr-2 h-4 w-4" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive data-[highlighted]:text-red-600" onClick={() => { setDeleteComplaint(item); setShowDelete(true); }}>
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
-                            </DropdownMenuItem>
+                            {canUpdate && (
+                              <DropdownMenuItem className="data-[highlighted]:text-emerald-600" onClick={() => { setEditComplaint(item); setEditDescription(item.description); setEditStatus(item.status); setEditOperatorId(item.assignedToId || ''); setShowEdit(true); }}>
+                                <Edit3 className="mr-2 h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
+                            )}
+                            {canDelete && (
+                              <DropdownMenuItem className="text-destructive data-[highlighted]:text-red-600" onClick={() => { setDeleteComplaint(item); setShowDelete(true); }}>
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

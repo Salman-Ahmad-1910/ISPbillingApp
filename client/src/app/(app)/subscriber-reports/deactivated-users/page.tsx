@@ -16,6 +16,8 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { smartMatch } from '@/lib/search';
 import { useCompany } from '@/context/company-context';
+import { usePagePermissions } from '@/hooks/usePermissions';
+import { SUBSCRIBER_REPORT_DEACTIVATED_USERS_PERMISSIONS } from '@/lib/permission-pages';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
 
@@ -36,6 +38,7 @@ interface DeactivatedRecord {
 
 export default function DeactivatedUsersPage() {
   const { companyId } = useCompany();
+  const { can } = usePagePermissions(SUBSCRIBER_REPORT_DEACTIVATED_USERS_PERMISSIONS);
 
   const { data: connections = [], isLoading: loading } = useGenericQuery<any>('admin/connections', companyId ?? undefined);
 
@@ -166,6 +169,7 @@ export default function DeactivatedUsersPage() {
       <div className="h-0.5 bg-gradient-to-r from-red-500/50 via-rose-500/30 to-transparent no-print" />
 
       {/* Summary */}
+      {can('summary') && (
       <div className="grid gap-4 md:grid-cols-1 no-print">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center justify-between">
@@ -179,8 +183,10 @@ export default function DeactivatedUsersPage() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Filter Card */}
+      {can('filters') && (
       <Card className="no-print transition-all duration-300 hover:shadow-md">
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -219,6 +225,7 @@ export default function DeactivatedUsersPage() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Printable Report Section */}
       <div className="print-report">
@@ -231,6 +238,7 @@ export default function DeactivatedUsersPage() {
                   {totalRecords} deactivated subscribers
                 </p>
               </div>
+              {can('export') && (
               <div className="flex gap-2 no-print">
                 <Button variant="outline" size="sm" onClick={handlePrint}>
                   <Printer className="mr-2 h-4 w-4" />
@@ -241,6 +249,7 @@ export default function DeactivatedUsersPage() {
                   Excel
                 </Button>
               </div>
+              )}
             </div>
 
             {loading ? (

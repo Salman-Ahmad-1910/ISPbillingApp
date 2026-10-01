@@ -63,7 +63,7 @@ export default function AllocatedCollectionsPage() {
   const { companyId } = useCompany();
   const { toast } = useToast();
   const { user } = useUser();
-  const { canCreate, canUpdate, canDelete } = useCrudPermissions();
+  const { canCreate } = useCrudPermissions(ALLOCATED_COLLECTION_PERMISSION);
   const collectionPage = usePagePermissions(ALLOCATED_COLLECTION_PERMISSION);
 
   const [selectedSubscriberId, setSelectedSubscriberId] = useState<string | null>(null);

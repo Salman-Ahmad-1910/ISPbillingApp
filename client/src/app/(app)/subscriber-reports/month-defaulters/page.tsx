@@ -15,6 +15,8 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { usePagePermissions } from '@/hooks/usePermissions';
+import { SUBSCRIBER_REPORT_MONTH_DEFAULTERS_PERMISSIONS } from '@/lib/permission-pages';
 import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
 import SubscriberSystemDatesTable, { systemDatesExcel, systemDatesInvoiceColumns, type SystemDateRow } from '@/components/shared/subscriber-system-dates';
 import SubscriberInternetPackageTable, { internetPackageExcel, internetPackageInvoiceColumns, type InternetPackageRow } from '@/components/shared/subscriber-internet-package';
@@ -96,6 +98,7 @@ function parseBillingPeriod(billingPeriod?: string): Date | null {
 
 export default function MonthDefaultersPage() {
   const { companyId } = useCompany();
+  const { can } = usePagePermissions(SUBSCRIBER_REPORT_MONTH_DEFAULTERS_PERMISSIONS);
 
   const { data: invoices = [], isLoading: loading } = useGenericQuery<any>('billing/invoices', companyId ?? undefined);
   const { data: connections = [] } = useGenericQuery<any>('admin/connections', companyId ?? undefined);
@@ -393,6 +396,7 @@ export default function MonthDefaultersPage() {
       <div className="h-0.5 bg-gradient-to-r from-indigo-500/50 via-blue-500/30 to-transparent no-print" />
 
       {/* Summary */}
+      {can('summary') && (
       <div className="grid gap-4 md:grid-cols-2 no-print">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center justify-between">
@@ -417,8 +421,10 @@ export default function MonthDefaultersPage() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Filter Card */}
+      {can('filters') && (
       <Card className="no-print transition-all duration-300 hover:shadow-md">
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
@@ -503,6 +509,7 @@ export default function MonthDefaultersPage() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Printable Report Section */}
       <div className="print-report">
@@ -515,6 +522,7 @@ export default function MonthDefaultersPage() {
                   From: {format(historyFromDate, 'dd MMM yyyy')} — To: {format(historyToDate, 'dd MMM yyyy')}
                 </p>
               </div>
+              {can('export') && (
               <div className="flex gap-2 no-print">
                 <Button variant="outline" size="sm" onClick={handlePrint}>
                   <Printer className="mr-2 h-4 w-4" />
@@ -525,6 +533,7 @@ export default function MonthDefaultersPage() {
                   Excel
                 </Button>
               </div>
+              )}
             </div>
 
             {loading ? (

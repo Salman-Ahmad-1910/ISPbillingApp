@@ -62,6 +62,33 @@ const (
 	ProductPermission          = "15312"
 	ProductTypePermission      = "15321"
 	VendorInvoicePermission    = "15372"
+
+	// Pages that gained Create / Update / Delete children. Keep in sync with
+	// PAGE_PERMISSIONS in permission-pages.ts. Only routes owned by a single page
+	// are guarded with these; see routes/api.go for the shared-endpoint cases
+	// that deliberately have no page guard.
+	ComplaintSubjectPermission    = "15323"
+	ComplaintTypePermission       = "15325"
+	ComplaintsUserPermission      = "13342"
+	ComplaintsAllocatedPermission = "13343"
+	MessageDraftPermission        = "13347"
+	MessageNewPermission          = "13344"
+	MessageWhatsappPermission     = "13359"
+	MessageOtherPermission        = "13346"
+	MessageExpiredPermission      = "13345"
+	AccountHeadPermission         = "13322"
+	AccountEntryPermission        = "13323"
+	OneDayBalancePermission       = "13341"
+	PurchasePermission            = "15313"
+	SalesPermission               = "15315"
+	StaffPermission               = "15316"
+	StaffSalaryPermission         = "15318"
+	StaffAttendancePermission     = "15322"
+	AdvanceLoanPermission         = "15317"
+	SubscriberCollectionPage      = "13304"
+	DealerCollectionPage          = "13321"
+	AllocatedCollectionPage       = "13305"
+	BaddebtCollectionPage         = "13357"
 )
 
 // CRUD child action keys shared by every page that exposes CRUD children.

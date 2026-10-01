@@ -35,6 +35,8 @@ import { Badge } from '@/components/ui/badge';
 import type { Staff, SalaryPayment } from '@/lib/types';
 import { useCompany } from '@/context/company-context';
 import { PaySalaryDialog } from './_components/pay-salary-dialog';
+import { useCrudPermissions } from '@/hooks/usePermissions';
+import { STAFF_SALARY_PERMISSION } from '@/lib/permission-pages';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -43,6 +45,7 @@ const formatPKR = (value: number) =>
 
 export default function StaffSalaryPage() {
     const { companyId } = useCompany();
+    const { canCreate } = useCrudPermissions(STAFF_SALARY_PERMISSION);
 
     const currentYear = new Date().getFullYear();
     const [month, setMonth] = useState<string>(() => new Date().toLocaleString('en-US', { month: 'long' }));
@@ -269,6 +272,7 @@ export default function StaffSalaryPage() {
                                                         </TableCell>
                                                         <TableCell>{member.fatherName || '—'}</TableCell>
                                                         <TableCell className="text-right">
+                                                            {canCreate && (
                                                             <Button
                                                                 size="sm"
                                                                 onClick={() => handlePay(member)}
@@ -276,6 +280,7 @@ export default function StaffSalaryPage() {
                                                             >
                                                                 Pay
                                                             </Button>
+                                                            )}
                                                         </TableCell>
                                                     </TableRow>
                                                 ))

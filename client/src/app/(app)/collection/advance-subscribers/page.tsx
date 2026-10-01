@@ -11,6 +11,7 @@ import { useCompany } from '@/context/company-context';
 import { useQueryClient } from '@tanstack/react-query';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
+import { usePagePermissions } from '@/hooks/usePermissions';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import type { Connection, Area, DistributionBox, Package, Company } from '@/lib/types';
@@ -18,6 +19,7 @@ import { ConnectionFilterBar } from '@/components/shared/connection-filter-bar';
 import { applyConnectionFilters, applyConnectionDateRange, defaultConnectionFilters, type ConnectionFilterState } from '@/lib/connection-filters';
 import { DateRangeFilter } from '@/components/shared/date-range-filter';
 import { CollectionPagination } from '@/components/shared/collection-pagination';
+import { SUBSCRIBER_REPORT_ADVANCE_SUBSCRIBERS_PERMISSIONS } from '@/lib/permission-pages';
 
 function getPackagePrice(c: Connection): number {
   const cable = Number(c.amount) || 0;
@@ -29,6 +31,7 @@ function getPackagePrice(c: Connection): number {
 
 export default function AdvanceSubscribersPage() {
   const { companyId } = useCompany();
+  const { can } = usePagePermissions(SUBSCRIBER_REPORT_ADVANCE_SUBSCRIBERS_PERMISSIONS);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
@@ -118,6 +121,7 @@ export default function AdvanceSubscribersPage() {
 
       <div className="h-0.5 bg-gradient-to-r from-emerald-500/50 via-green-500/30 to-transparent" />
 
+      {can('summary') && (
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardContent className="pt-6">
@@ -163,7 +167,10 @@ export default function AdvanceSubscribersPage() {
           </CardContent>
         </Card>
       </div>
+      )}
 
+      {can('filters') && (
+      <>
       <ConnectionFilterBar
         filters={filters}
         onChange={setFilter}
@@ -181,8 +188,11 @@ export default function AdvanceSubscribersPage() {
         onFromChange={(v) => setDateFrom(v)}
         onToChange={(v) => setDateTo(v)}
       />
+      </>
+      )}
 
       <div className="flex items-center gap-3">
+        {can('filters') && (
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -192,7 +202,8 @@ export default function AdvanceSubscribersPage() {
             className="pl-9"
           />
         </div>
-        {advanceSubscribers.length > 0 && (
+        )}
+        {can('export') && advanceSubscribers.length > 0 && (
           <Button onClick={handlePrintAll} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm">
             <Printer className="mr-2 h-4 w-4" />
             Print All

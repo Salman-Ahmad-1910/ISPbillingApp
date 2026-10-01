@@ -10,9 +10,11 @@ import { Clock, ArrowLeft, Users, Wallet, Loader2, Search, Tv, Wifi, Layers, Fil
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
+import { usePagePermissions } from '@/hooks/usePermissions';
 import { Button } from '@/components/ui/button';
 import api from '@/lib/api';
 import type { Connection, Area, DistributionBox, Package, Company } from '@/lib/types';
+import { SUBSCRIBER_REPORT_PENDING_SUBSCRIBERS_PERMISSIONS } from '@/lib/permission-pages';
 import { ConnectionFilterBar } from '@/components/shared/connection-filter-bar';
 import { defaultConnectionFilters, type ConnectionFilterState } from '@/lib/connection-filters';
 import { DateRangeFilter } from '@/components/shared/date-range-filter';
@@ -29,6 +31,7 @@ function getPackagePrice(c: Connection): number {
 
 export default function PendingSubscribersPage() {
   const { companyId, companyName } = useCompany();
+  const { can } = usePagePermissions(SUBSCRIBER_REPORT_PENDING_SUBSCRIBERS_PERMISSIONS);
   const { toast } = useToast();
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -218,6 +221,7 @@ export default function PendingSubscribersPage() {
 
       <div className="h-0.5 bg-gradient-to-r from-amber-500/50 via-orange-500/30 to-transparent" />
 
+      {can('summary') && (
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardContent className="pt-6">
@@ -301,7 +305,10 @@ export default function PendingSubscribersPage() {
           </CardContent>
         </Card>
       </div>
+      )}
 
+      {can('filters') && (
+      <>
       <ConnectionFilterBar
         filters={filters}
         onChange={setFilter}
@@ -319,8 +326,11 @@ export default function PendingSubscribersPage() {
         onFromChange={(v) => setDateFrom(v)}
         onToChange={(v) => setDateTo(v)}
       />
+      </>
+      )}
 
       <div className="flex items-center justify-between gap-4">
+        {can('filters') && (
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -330,6 +340,8 @@ export default function PendingSubscribersPage() {
             className="pl-9"
           />
         </div>
+        )}
+        {can('export') && (
         <div className="flex items-center gap-2 shrink-0">
           <Button variant="outline" onClick={handleExportXlsx}>
             <FileSpreadsheet className="mr-2 h-4 w-4" />
@@ -340,6 +352,7 @@ export default function PendingSubscribersPage() {
             PDF
           </Button>
         </div>
+        )}
       </div>
 
       <Card>

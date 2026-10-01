@@ -76,7 +76,7 @@ export default function SubscriberCollectionsPage() {
   const currentCompany = companies.find(c => c.id === companyId);
   const { toast } = useToast();
   const { user } = useUser();
-  const { canCreate, canUpdate, canDelete } = useCrudPermissions();
+  const { canCreate, canUpdate, canDelete } = useCrudPermissions(SUBSCRIBER_COLLECTION_PERMISSION);
   const collectionPage = usePagePermissions(SUBSCRIBER_COLLECTION_PERMISSION);
   const canViewCollectionSummary = collectionPage.can('summary');
   const canViewCollectionSearch = collectionPage.can('search');

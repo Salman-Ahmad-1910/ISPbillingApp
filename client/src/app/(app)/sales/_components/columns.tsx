@@ -39,7 +39,7 @@ interface SaleItem {
   model?: string;
 }
 
-export function getColumns(onDelete?: (id: string) => void, onPay?: (sale: Sale) => void, onReturn?: (sale: Sale) => void, onReplace?: (sale: Sale) => void): ColumnDef<Sale>[] {
+export function getColumns(onDelete?: (id: string) => void, onPay?: (sale: Sale) => void, onReturn?: (sale: Sale) => void, onReplace?: (sale: Sale) => void, canUpdate = true, canDelete = true): ColumnDef<Sale>[] {
   return [
     {
       accessorKey: 'id',
@@ -278,6 +278,7 @@ export function getColumns(onDelete?: (id: string) => void, onPay?: (sale: Sale)
                   Mark as Paid
                 </DropdownMenuItem>
               )}
+              {canUpdate && (
               <DropdownMenuItem onClick={(e) => {
                 e.stopPropagation();
                 row.original;
@@ -285,6 +286,8 @@ export function getColumns(onDelete?: (id: string) => void, onPay?: (sale: Sale)
                 <Pencil className="mr-2 h-4 w-4" />
                 Edit
               </DropdownMenuItem>
+              )}
+              {canDelete && (
               <DropdownMenuItem
                 className="text-red-600"
                 onClick={(e) => {
@@ -295,6 +298,7 @@ export function getColumns(onDelete?: (id: string) => void, onPay?: (sale: Sale)
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete
               </DropdownMenuItem>
+              )}
               {sale.status !== 'hold' && sale.status !== 'returned' && sale.status !== 'replaced' && !sale.isInstallment && (
                 <DropdownMenuItem
                   onClick={(e) => {

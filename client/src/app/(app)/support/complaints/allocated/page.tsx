@@ -29,6 +29,8 @@ import api from '@/lib/api';
 import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
 import type { Complaint, Staff, RecoveryOfficer } from '@/lib/types';
 import { smartMatch } from '@/lib/search';
+import { useCrudPermissions } from '@/hooks/usePermissions';
+import { COMPLAINTS_ALLOCATED_PERMISSION } from '@/lib/permission-pages';
 import {
   STATUS_COLORS,
   STATUS_LABELS,
@@ -46,6 +48,7 @@ export default function AllocatedComplaintPage() {
   const { companyId } = useCompany();
   const { toast } = useToast();
   const { user } = useUser();
+  const { canUpdate, canDelete } = useCrudPermissions(COMPLAINTS_ALLOCATED_PERMISSION);
 
   const { data: complaints = [], isLoading, refetch } = useGenericQuery<Complaint>('support/complaints', companyId ?? undefined);
   const { data: staff = [] } = useGenericQuery<Staff>('hr/staff', companyId ?? undefined);
@@ -360,14 +363,18 @@ export default function AllocatedComplaintPage() {
                               <CircleDot className="mr-2 h-4 w-4" />
                               Status
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="data-[highlighted]:text-emerald-600" onClick={() => { setEditComplaint(item); setEditDescription(item.description); setEditStatus(item.status); setEditOperatorId(item.assignedToId || ''); setShowEdit(true); }}>
-                              <Edit3 className="mr-2 h-4 w-4" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive data-[highlighted]:text-red-600" onClick={() => { setDeleteComplaint(item); setShowDelete(true); }}>
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
-                            </DropdownMenuItem>
+                            {canUpdate && (
+                              <DropdownMenuItem className="data-[highlighted]:text-emerald-600" onClick={() => { setEditComplaint(item); setEditDescription(item.description); setEditStatus(item.status); setEditOperatorId(item.assignedToId || ''); setShowEdit(true); }}>
+                                <Edit3 className="mr-2 h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
+                            )}
+                            {canDelete && (
+                              <DropdownMenuItem className="text-destructive data-[highlighted]:text-red-600" onClick={() => { setDeleteComplaint(item); setShowDelete(true); }}>
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

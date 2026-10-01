@@ -71,7 +71,10 @@ export function useCrudPermissions(pagePermissionId?: string) {
 // governed purely by that page's own child permission - there is no global
 // fallback. Pass the page permission id (e.g. SUBSCRIBER_DETAIL_PERMISSION) and
 // call `can` with the child key declared in PAGE_PERMISSIONS.
-export function usePagePermissions(pagePermissionId: string) {
+//
+// Pass an array of ids when one route is unlocked by several permissions: `can`
+// is then true if any of them grants the child.
+export function usePagePermissions(pagePermissionId: string | string[]) {
   const perms = useUserPermissions();
   const isAdmin = perms.isAdmin() || perms.userRole === ROLES.OWNER;
   const granted = perms.grantedPermissions || [];

@@ -18,6 +18,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { useCrudPermissions } from '@/hooks/usePermissions';
+import { MESSAGE_DRAFT_PERMISSION } from '@/lib/permission-pages';
 
 const messageTitles = [
   'All',
@@ -47,6 +49,7 @@ export default function DraftMessagesPage() {
   const { user } = useUser();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { canCreate, canDelete } = useCrudPermissions(MESSAGE_DRAFT_PERMISSION);
 
   const { data: messages = [], isLoading } = useGenericQuery<Message>('messages', companyId ?? undefined);
   const { data: connections = [] } = useGenericQuery<Connection>('admin/connections', companyId ?? undefined);
@@ -361,65 +364,67 @@ export default function DraftMessagesPage() {
               {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               Send Selected ({selected.size})
             </Button>
-            <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-              <DialogTrigger asChild>
-                <Button className="gap-2 bg-gradient-to-r from-blue-500 to-cyan-600 text-white hover:from-blue-600 hover:to-cyan-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
-                  <PlusCircle className="h-4 w-4" />
-                  New Draft
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>New Draft Message</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Recipient Name</Label>
-                    <Input value={newDraftName} onChange={e => setNewDraftName(e.target.value)} placeholder="e.g., Ahmed Khan" className="border-muted-foreground/20" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Mobile Number</Label>
-                    <Input value={newDraftMobile} onChange={e => setNewDraftMobile(e.target.value)} placeholder="e.g., 0300-1234567" className="border-muted-foreground/20" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
+            {canCreate && (
+              <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+                <DialogTrigger asChild>
+                  <Button className="gap-2 bg-gradient-to-r from-blue-500 to-cyan-600 text-white hover:from-blue-600 hover:to-cyan-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
+                    <PlusCircle className="h-4 w-4" />
+                    New Draft
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>New Draft Message</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label>Message Title</Label>
-                      <Select value={newDraftTitle} onValueChange={setNewDraftTitle}>
-                        <SelectTrigger className="border-muted-foreground/20">
-                          <SelectValue placeholder="Select title" />
-                        </SelectTrigger>
-                        <SelectContent portal={false}>
-                          {messageTitles.map((t) => (
-                            <SelectItem key={t} value={t}>{t}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Label>Recipient Name</Label>
+                      <Input value={newDraftName} onChange={e => setNewDraftName(e.target.value)} placeholder="e.g., Ahmed Khan" className="border-muted-foreground/20" />
                     </div>
                     <div className="space-y-2">
-                      <Label>Send To</Label>
-                      <Select value={newDraftSendTo} onValueChange={setNewDraftSendTo}>
-                        <SelectTrigger className="border-muted-foreground/20">
-                          <SelectValue placeholder="Select recipient type" />
-                        </SelectTrigger>
-                        <SelectContent portal={false}>
-                          {SEND_TO_OPTIONS.map((s) => (
-                            <SelectItem key={s} value={s}>{s}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Label>Mobile Number</Label>
+                      <Input value={newDraftMobile} onChange={e => setNewDraftMobile(e.target.value)} placeholder="e.g., 0300-1234567" className="border-muted-foreground/20" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label>Message Title</Label>
+                        <Select value={newDraftTitle} onValueChange={setNewDraftTitle}>
+                          <SelectTrigger className="border-muted-foreground/20">
+                            <SelectValue placeholder="Select title" />
+                          </SelectTrigger>
+                          <SelectContent portal={false}>
+                            {messageTitles.map((t) => (
+                              <SelectItem key={t} value={t}>{t}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Send To</Label>
+                        <Select value={newDraftSendTo} onValueChange={setNewDraftSendTo}>
+                          <SelectTrigger className="border-muted-foreground/20">
+                            <SelectValue placeholder="Select recipient type" />
+                          </SelectTrigger>
+                          <SelectContent portal={false}>
+                            {SEND_TO_OPTIONS.map((s) => (
+                              <SelectItem key={s} value={s}>{s}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Message</Label>
+                      <textarea value={newDraftMessage} onChange={e => setNewDraftMessage(e.target.value)} placeholder="Type your message..." className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 border-muted-foreground/20" />
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2">
+                      <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)} className="border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-800 dark:hover:bg-rose-950/30 transition-all duration-300">Cancel</Button>
+                      <Button onClick={handleCreateDraft} className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white hover:from-blue-600 hover:to-cyan-700 shadow-sm transition-all duration-300 hover:shadow-md">Save Draft</Button>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Message</Label>
-                    <textarea value={newDraftMessage} onChange={e => setNewDraftMessage(e.target.value)} placeholder="Type your message..." className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 border-muted-foreground/20" />
-                  </div>
-                  <div className="flex justify-end gap-2 pt-2">
-                    <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)} className="border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-800 dark:hover:bg-rose-950/30 transition-all duration-300">Cancel</Button>
-                    <Button onClick={handleCreateDraft} className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white hover:from-blue-600 hover:to-cyan-700 shadow-sm transition-all duration-300 hover:shadow-md">Save Draft</Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
+                </DialogContent>
+              </Dialog>
+            )}
             <Button variant="destructive" className="gap-2 bg-gradient-to-r from-rose-500 to-red-600 text-white hover:from-rose-600 hover:to-red-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105" onClick={handleClearDrafts}>
               <AlertTriangle className="h-4 w-4" />
               Clear Draft Messages
@@ -494,9 +499,11 @@ export default function DraftMessagesPage() {
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-950/30 transition-all duration-300 hover:scale-110" title="Preview" onClick={() => setPreview(item)}>
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/30 transition-all duration-300 hover:scale-110" title="Delete" onClick={() => handleDeleteDraft(item.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {canDelete && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/30 transition-all duration-300 hover:scale-110" title="Delete" onClick={() => handleDeleteDraft(item.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

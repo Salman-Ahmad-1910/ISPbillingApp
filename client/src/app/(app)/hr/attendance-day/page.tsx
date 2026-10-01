@@ -35,6 +35,8 @@ import {
 import type { Staff, Attendance } from '@/lib/types';
 import { useCompany } from '@/context/company-context';
 import { useToast } from '@/hooks/use-toast';
+import { useCrudPermissions } from '@/hooks/usePermissions';
+import { STAFF_ATTENDANCE_PERMISSION } from '@/lib/permission-pages';
 import api from '@/lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -58,6 +60,7 @@ export default function StaffAttendancePage() {
     const { companyId } = useCompany();
     const { toast } = useToast();
     const queryClient = useQueryClient();
+    const { canCreate } = useCrudPermissions(STAFF_ATTENDANCE_PERMISSION);
 
     const [date, setDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
     const [rows, setRows] = useState<Record<string, RowState>>({});
@@ -181,6 +184,7 @@ export default function StaffAttendancePage() {
                             <Input type="date" value={date} max={new Date().toISOString().split('T')[0]} onChange={(e) => setDate(e.target.value)} className="w-full sm:w-56" />
                         </div>
                         <div className="flex-1" />
+                        {canCreate && (
                         <Button
                             onClick={handleSave}
                             disabled={isSaving || staff.length === 0}
@@ -190,6 +194,7 @@ export default function StaffAttendancePage() {
                             <Save className="mr-2 h-4 w-4" />
                             {isSaving ? 'Saving...' : 'Save Attendance'}
                         </Button>
+                        )}
                     </div>
                 </CardContent>
             </Card>

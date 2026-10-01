@@ -14,6 +14,8 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { usePagePermissions } from '@/hooks/usePermissions';
+import { SUBSCRIBER_REPORT_UNPAID_COLLECTIONS_PERMISSIONS } from '@/lib/permission-pages';
 import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
 import SubscriberSystemDatesTable, { systemDatesExcel, systemDatesInvoiceColumns, type SystemDateRow } from '@/components/shared/subscriber-system-dates';
 import SubscriberInternetPackageTable, { internetPackageExcel, internetPackageInvoiceColumns, type InternetPackageRow } from '@/components/shared/subscriber-internet-package';
@@ -65,6 +67,7 @@ function toInternetPackageRow(item: UnpaidRecord): InternetPackageRow {
 
 export default function UnpaidCollectionsPage() {
   const { companyId } = useCompany();
+  const { can } = usePagePermissions(SUBSCRIBER_REPORT_UNPAID_COLLECTIONS_PERMISSIONS);
 
   const { data: invoices = [], isLoading: loading } = useGenericQuery<Invoice>('billing/invoices', companyId ?? undefined);
   const { data: connections = [] } = useGenericQuery<Connection>('admin/connections', companyId ?? undefined);
@@ -405,6 +408,7 @@ export default function UnpaidCollectionsPage() {
       <div className="h-0.5 bg-gradient-to-r from-amber-500/50 via-orange-500/30 to-transparent no-print" />
 
       {/* Summary Cards */}
+      {can('summary') && (
       <div className="grid gap-4 md:grid-cols-2 no-print">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center justify-between">
@@ -429,8 +433,10 @@ export default function UnpaidCollectionsPage() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Filter Card */}
+      {can('filters') && (
       <Card className="no-print transition-all duration-300 hover:shadow-md">
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -509,6 +515,7 @@ export default function UnpaidCollectionsPage() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Printable Report Section */}
       <div className="print-report">
@@ -521,6 +528,7 @@ export default function UnpaidCollectionsPage() {
                   From: {format(filterFromDate, 'dd MMM yyyy')} — To: {format(filterToDate, 'dd MMM yyyy')}
                 </p>
               </div>
+              {can('export') && (
               <div className="flex gap-2 no-print">
                 <Button variant="outline" size="sm" onClick={handlePrint} disabled={!showReport}>
                   <Printer className="mr-2 h-4 w-4" />
@@ -531,6 +539,7 @@ export default function UnpaidCollectionsPage() {
                   Excel
                 </Button>
               </div>
+              )}
             </div>
 
             {!showReport ? (

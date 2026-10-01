@@ -25,6 +25,8 @@ import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import { smartMatch } from '@/lib/search';
 import { useQueryClient } from '@tanstack/react-query';
+import { useCrudPermissions } from '@/hooks/usePermissions';
+import { COMPLAINT_TYPE_PERMISSION } from '@/lib/permission-pages';
 
 interface ComplaintType {
   id: string;
@@ -35,6 +37,7 @@ export default function ComplaintTypePage() {
   const { companyId } = useCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { canCreate, canUpdate, canDelete } = useCrudPermissions(COMPLAINT_TYPE_PERMISSION);
 
   const { data: fetchedData = [], isLoading } = useGenericQuery<ComplaintType>('support/complaint-types', companyId ?? undefined);
 
@@ -228,10 +231,12 @@ export default function ComplaintTypePage() {
                   className="pl-8"
                 />
               </div>
-              <Button onClick={openAddDialog} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:shadow-md transition-all duration-300">
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Add Complaint Type
-              </Button>
+              {canCreate && (
+                <Button onClick={openAddDialog} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-sm hover:shadow-md transition-all duration-300">
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Add Complaint Type
+                </Button>
+              )}
             </div>
           </div>
 
@@ -264,14 +269,18 @@ export default function ComplaintTypePage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openEditDialog(item)} className="data-[highlighted]:text-emerald-600">
-                              <Edit3 className="mr-2 h-4 w-4" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive data-[highlighted]:text-red-600" onClick={() => handleDelete(item.id)}>
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
-                            </DropdownMenuItem>
+                            {canUpdate && (
+                              <DropdownMenuItem onClick={() => openEditDialog(item)} className="data-[highlighted]:text-emerald-600">
+                                <Edit3 className="mr-2 h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
+                            )}
+                            {canDelete && (
+                              <DropdownMenuItem className="text-destructive data-[highlighted]:text-red-600" onClick={() => handleDelete(item.id)}>
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

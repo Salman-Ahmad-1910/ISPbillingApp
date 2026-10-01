@@ -15,6 +15,8 @@ import { cn } from '@/lib/utils';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
+import { useCrudPermissions } from '@/hooks/usePermissions';
+import { ONE_DAY_BALANCE_PERMISSION } from '@/lib/permission-pages';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import {
@@ -46,6 +48,7 @@ export default function OneDayBalanceSheetPage() {
   const { companyId } = useCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { canUpdate, canDelete } = useCrudPermissions(ONE_DAY_BALANCE_PERMISSION);
 
   const { data: apiEntries = [], isLoading } = useGenericQuery<any>('accounts/entries', companyId ?? undefined);
   const { data: apiHeads = [] } = useGenericQuery<any>('accounts/heads', companyId ?? undefined);
@@ -369,19 +372,25 @@ export default function OneDayBalanceSheetPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
+                                {canUpdate && (
                                 <DropdownMenuItem onClick={() => openEditDialog(item)}>
                                   <Pencil className="mr-2 h-4 w-4" />
                                   Edit Entry
                                 </DropdownMenuItem>
+                                )}
                                 <DropdownMenuItem onClick={() => handlePrintSingle(item)}>
                                   <Printer className="mr-2 h-4 w-4" />
                                   Print Entry
                                 </DropdownMenuItem>
+                                {canDelete && (
+                                <>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(item.id)}>
                                   <Trash2 className="mr-2 h-4 w-4" />
                                   Delete Entry
                                 </DropdownMenuItem>
+                                </>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>

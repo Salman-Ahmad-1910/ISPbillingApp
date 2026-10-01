@@ -11,6 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { UserPlus, Download, Printer, Loader2, Search } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
+import { usePagePermissions } from '@/hooks/usePermissions';
+import { SUBSCRIBER_REPORT_CREATOR_SUMMARY_PERMISSIONS } from '@/lib/permission-pages';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import type { User, Connection } from '@/lib/types';
 import { smartMatch } from '@/lib/search';
@@ -29,6 +31,7 @@ interface CreatorSummary {
 
 export default function CreatorSummaryPage() {
   const { companyId } = useCompany();
+  const { can } = usePagePermissions(SUBSCRIBER_REPORT_CREATOR_SUMMARY_PERMISSIONS);
 
   const { data: users = [], isLoading: loading } = useGenericQuery<User>('admin/users', companyId ?? undefined, { includeAdmin: true });
   const { data: connections = [], isLoading: loadingConnections } = useGenericQuery<Connection>('admin/connections', companyId ?? undefined);
@@ -145,6 +148,7 @@ export default function CreatorSummaryPage() {
       <div className="h-0.5 bg-gradient-to-r from-purple-500/50 via-pink-500/30 to-transparent no-print" />
 
       {/* Summary Cards */}
+      {can('summary') && (
       <div className="grid gap-4 md:grid-cols-3 no-print">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center justify-between">
@@ -180,8 +184,10 @@ export default function CreatorSummaryPage() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Filter Card */}
+      {can('filters') && (
       <Card className="no-print transition-all duration-300 hover:shadow-md">
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -209,15 +215,18 @@ export default function CreatorSummaryPage() {
                 </SelectContent>
               </Select>
             </div>
+            {can('export') && (
             <div className="flex items-end">
               <Button variant="outline" onClick={exportExcel} className="gap-2">
                 <Download className="h-4 w-4" />
                 Export CSV
               </Button>
             </div>
+            )}
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Printable Report Section */}
       <div className="print-report">
@@ -228,12 +237,14 @@ export default function CreatorSummaryPage() {
                 <h2 className="text-xl font-bold">Subscribers Creator Summary</h2>
                 <p className="text-sm text-muted-foreground mt-1">Subscribers created by each staff member</p>
               </div>
+              {can('export') && (
               <div className="flex gap-2 no-print">
                 <Button variant="outline" size="sm" onClick={handlePrint}>
                   <Printer className="mr-2 h-4 w-4" />
                   Print
                 </Button>
               </div>
+              )}
             </div>
 
             {loading || loadingConnections ? (
