@@ -381,9 +381,9 @@ func updateConnection(c *gin.Context) {
 		return
 	}
 
-	// Set when the update carries a prorated package fee change, so the
-	// adjustment is recorded in the connection history alongside field edits.
-	var prorationChange *connChange
+	// Set when the update carries a manually created balance, so the amount is
+	// recorded in the connection history alongside field edits.
+	var balanceChange *connChange
 
 	tx := config.DB.Begin()
 	if tx.Error != nil {
@@ -499,79 +499,35 @@ func updateConnection(c *gin.Context) {
 		updates["remaining_amount"] = *input.RemainingAmount
 	}
 
-	// A package fee change is prorated across the billing month it takes effect
-	// in. The month is billed in advance at the old rate, so only the days
-	// still ahead of the subscriber carry the new rate.
-	oldFee := monthlyPackageFee(old.ConnectionType, old.Amount, old.SameAmount)
-	newFee := packageFeeAfterUpdate(old, input)
+	// Changing a package only changes the package and its fee. It never moves
+	// the balance on its own: a mid-month change is billed by the operator
+	// through the "Create balance" option below, where they pick the number of
+	// days themselves. Anything automatic here silently altered money the
+	// operator never asked for.
+	if input.CreateBalance && input.BalanceDays > 0 {
+		// The base is the fee being saved, i.e. the new package, using the same
+		// formula as a new subscriber so both paths agree: fee / 30 * days.
+		fee := packageFeeAfterUpdate(old, input)
+		manualBalance := roundToTwo(fee / 30 * float64(input.BalanceDays))
 
-	now := time.Now()
-	if delta, applyDelta := packageProration(now, oldFee, newFee); applyDelta {
-		// remaining_amount is a running balance, not a per-month figure: Bill
-		// Creator adds the next month's full package fee onto whatever is
-		// already there. A package change therefore has to fold into the running
-		// balance instead of replacing it, or it would silently wipe out dues
-		// already owed or an advance already held.
-		//
-		// An upgrade adds to it, leaving the subscriber pending, and a downgrade
-		// subtracts from it, which either reduces the dues they owe or tips a
-		// settled balance into an advance. The balance it started from is kept so
-		// the change stays auditable.
-		previousBalance := old.RemainingAmount
-		newBalance := roundToTwo(previousBalance + delta)
+		// remaining_amount accumulates, so an existing balance is kept and the
+		// manually created amount is added on top of it.
+		newBalance := roundToTwo(old.RemainingAmount + manualBalance)
 		if input.RemainingAmount != nil {
-			// An explicit balance from the caller overrides the starting point, so
-			// an admin resetting an advance and changing the package gets both.
-			newBalance = roundToTwo(*input.RemainingAmount + delta)
+			// An explicit balance from the caller replaces the starting point.
+			newBalance = roundToTwo(*input.RemainingAmount + manualBalance)
 		}
 
 		updates["remaining_amount"] = newBalance
-		// Always resync the status with the balance just written, otherwise a
-		// stale "advance" would keep the subscriber listed on the advance page.
+		// Keep the status in step with the balance just written, otherwise the
+		// pending and advance pages disagree with what is actually owed.
 		updates["payment_status"] = paymentStatusForBalance(newBalance)
-		updates["package_previous_fee"] = oldFee
-		updates["package_new_fee"] = newFee
-		updates["package_adjustment_amount"] = delta
-		updates["package_previous_balance"] = previousBalance
-		updates["package_adjusted_on"] = now.Format("2006-01-02")
 
-		daysUsed, daysRemaining, daysInMonth := packageProrationBreakdown(now)
-		action := "Package Upgraded"
-		changeType := "UPGRADE"
-		if delta < 0 {
-			action = "Package Downgraded"
-			changeType = "DOWNGRADE"
-		}
-		prorationChange = &connChange{
-			FieldName:  "Package Fee (prorated)",
-			ActionType: action + " " + fmtNum(delta),
-			Old:        fmtNum(oldFee) + " for " + fmtInt(daysUsed) + " days (balance was " + fmtNum(previousBalance) + ")",
-			New:        fmtNum(newFee) + " for " + fmtInt(daysRemaining) + " days (balance now " + fmtNum(newBalance) + ")",
-		}
-
-		// Record the financial effect in the existing ledger. An upgrade is a
-		// financial obligation (debit), a downgrade is a credit the subscriber
-		// now holds as advance. Neither is a payment: no money has changed hands,
-		// so this must not be written as a receipt. It is created inside the
-		// transaction, so a failure here rolls the package change and the balance
-		// change back together rather than leaving one without the other.
-		ledger := models.LedgerEntry{
-			TenantModel:  models.TenantModel{CompanyID: old.CompanyID},
-			Date:         now.Format(time.RFC3339),
-			Description:  fmt.Sprintf("%s package change: fee %s -> %s, prorated %s over %d of %d days", changeType, fmtNum(oldFee), fmtNum(newFee), fmtNum(delta), daysRemaining, daysInMonth),
-			AccountType:  "customer",
-			SubscriberID: &old.ID,
-			Balance:      newBalance,
-		}
-		if delta > 0 {
-			ledger.Debit = delta
-		} else {
-			ledger.Credit = -delta
-		}
-		if err := tx.Create(&ledger).Error; err != nil {
-			tx.Rollback()
-			utils.ErrorResponse(c, 500, "Failed to record package change in ledger", err.Error())
-			return
+		balanceChange = &connChange{
+			FieldName:  "Balance",
+			ActionType: "Balance Created",
+			Old:        fmtNum(old.RemainingAmount),
+			New:        fmtNum(newBalance) + " (+" + fmtNum(manualBalance) + " for " + fmtInt(input.BalanceDays) + " days at " + fmtNum(fee) + " per month)",
 		}
 	}
 
@@ -626,8 +582,8 @@ func updateConnection(c *gin.Context) {
 		reason = input.DeactivationReason
 	}
 	changes := connectionFieldChanges(old, input)
-	if prorationChange != nil {
-		changes = append(changes, *prorationChange)
+	if balanceChange != nil {
+		changes = append(changes, *balanceChange)
 	}
 	createConnectionLogs(c, updated, changes, reason, input.Comments)
 
@@ -961,47 +917,6 @@ func valueOrZero(v *float64) float64 {
 		return 0
 	}
 	return *v
-}
-
-// packageProrationBreakdown splits the billing month into the part already
-// consumed at the old rate and the part still to come at the new rate.
-func packageProrationBreakdown(effective time.Time) (daysUsed, daysRemaining, daysInMonth int) {
-	daysInMonth = time.Date(effective.Year(), effective.Month()+1, 0, 0, 0, 0, 0, effective.Location()).Day()
-	daysUsed = effective.Day() - 1
-	daysRemaining = daysInMonth - effective.Day() + 1
-	return
-}
-
-// packageProration returns the balance adjustment owed (positive) or refunded
-// (negative) when a subscriber's package fee changes part-way through a month
-// that was already billed in full at the old rate.
-//
-//	delta = (newFee - oldFee) * remainingDays / daysInMonth
-//
-// Only the days still ahead of the subscriber carry the new rate, which is
-// equivalent to charging (oldFee * daysUsed + newFee * daysRemaining) and
-// subtracting the old fee that was already billed.
-//
-// A change effective on the 1st is the full difference, because the whole
-// month still carries the new rate. That is what happens when the month has
-// already been billed and paid at the old rate: an upgrade collects the whole
-// difference and the subscriber returns to the pending list, while a
-// downgrade refunds it and the subscriber moves to the advance list.
-//
-// The returned value is a delta to fold into the subscriber's running balance,
-// not a replacement for it: remaining_amount accumulates, so Bill Creator's
-// next run adds the new month's full fee on top of whatever this leaves behind.
-//
-// The bool reports whether an adjustment applies at all.
-func packageProration(effective time.Time, oldFee, newFee float64) (float64, bool) {
-	if oldFee == newFee {
-		return 0, false
-	}
-
-	_, daysRemaining, daysInMonth := packageProrationBreakdown(effective)
-
-	delta := (newFee - oldFee) * float64(daysRemaining) / float64(daysInMonth)
-	return roundToTwo(delta), true
 }
 
 // paymentStatusForBalance mirrors the status rules used when a payment is

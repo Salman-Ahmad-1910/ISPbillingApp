@@ -46,13 +46,6 @@ type Connection struct {
 	PaymentStatus      string     `gorm:"type:varchar(20);default:''" json:"paymentStatus"` // pending, advance, or empty
 	TransactionId      string     `gorm:"type:varchar(255);uniqueIndex:idx_connection_transaction_id_company,priority:2,where:transaction_id <> ''" json:"transactionId"`
 	CreatedBy          *uuid.UUID `gorm:"type:uuid;index" json:"createdBy"`
-	// Snapshot of the most recent prorated package change, so the adjustment
-	// stays auditable after later package edits overwrite the live fees.
-	PackagePreviousFee      float64 `gorm:"type:decimal(10,2);default:0" json:"packagePreviousFee"`
-	PackageNewFee           float64 `gorm:"type:decimal(10,2);default:0" json:"packageNewFee"`
-	PackageAdjustmentAmount float64 `gorm:"type:decimal(10,2);default:0" json:"packageAdjustmentAmount"`
-	PackagePreviousBalance  float64 `gorm:"type:decimal(10,2);default:0" json:"packagePreviousBalance"`
-	PackageAdjustedOn       string  `gorm:"type:varchar(50)" json:"packageAdjustedOn"`
 }
 
 // ConnectionStatusChange logs every status transition for accurate historical tracking

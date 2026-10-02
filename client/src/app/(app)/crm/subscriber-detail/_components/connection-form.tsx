@@ -23,19 +23,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import type { Connection, Area, DistributionBox, Package, Company, Splitter } from '@/lib/types';
 import { connectionSchema } from '@/lib/schemas';
-import { formatPkr, monthlyPackageFee, packageProration } from '@/lib/package-proration';
+import { monthlyPackageFee } from '@/lib/package-proration';
 
 type ConnectionFormValues = z.infer<typeof connectionSchema>;
 
@@ -199,14 +189,6 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
     return monthlyPackageFee(connectionType, amount, sameAmount);
   }, [connectionType, amount, sameAmount]);
 
-  // A fee change on an existing subscriber is prorated across the billing month
-  // and applied to remaining_amount the moment the form is saved.
-  const proration = React.useMemo(() => {
-    if (!connection) return null;
-    const oldFee = monthlyPackageFee(connection.connectionType, connection.amount, connection.sameAmount);
-    return packageProration(new Date(), oldFee, packageFeeTotal);
-  }, [connection, packageFeeTotal]);
-
   // Opening balance = package fee prorated for the remaining days of the month (fee / 30 * days).
   const openingBalance = React.useMemo(() => {
     if (!createBalance || !(Number(balanceDays) > 0)) return 0;
@@ -260,23 +242,8 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
     }
   }, [internetBase, sameDiscount, showInternet, form]);
 
-  // A fee change is not applied on submit straight away. The values are parked
-  // here and the operator has to confirm, so selecting a package by accident can
-  // never move money.
-  const [pendingConfirm, setPendingConfirm] = React.useState<ConnectionFormValues | null>(null);
-
   function onSubmit(values: ConnectionFormValues) {
-    if (proration?.applies) {
-      setPendingConfirm(values);
-      return;
-    }
     onSave(values);
-  }
-
-  function confirmPackageChange() {
-    if (!pendingConfirm) return;
-    onSave(pendingConfirm);
-    setPendingConfirm(null);
   }
 
   const discountOptions = [
@@ -802,52 +769,6 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
           </div>
         </div>
 
-        {proration && (
-          <div className="rounded-lg border border-border bg-muted/40 p-4 space-y-2">
-            <p className="text-sm font-medium">This Month&rsquo;s Package Adjustment</p>
-
-            {proration.applies ? (
-              <>
-                <p className="text-xs text-muted-foreground">
-                  {formatPkr(proration.oldFee)} billed for {proration.daysUsed} days, then{' '}
-                  {formatPkr(proration.newFee)} for the remaining {proration.daysRemaining} of {proration.daysInMonth} days.
-                </p>
-                <p className="text-sm font-medium">
-                  {proration.delta > 0 ? 'Extra amount to collect' : 'Advance credit'}: PKR{' '}
-                  <span className={proration.delta > 0 ? 'text-amber-600' : 'text-emerald-600'}>
-                    {proration.delta > 0 ? '+' : ''}
-                    {formatPkr(proration.delta)}
-                  </span>
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {proration.delta > 0
-                    ? 'This is added to the outstanding balance, so the subscriber moves to the pending list. The full new package fee is added on top of it when the next bill is created.'
-                    : 'This is deducted from the balance, so it reduces any dues still owed and only becomes an advance once those are cleared.'}
-                </p>
-                {connection && (
-                  <p className="text-xs text-muted-foreground">
-                    Balance of PKR{' '}
-                    {Number(connection.remainingAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
-                    becomes PKR{' '}
-                    {(Number(connection.remainingAmount) + proration.delta).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    {Number(connection.remainingAmount) + proration.delta > 0
-                      ? ', so they are pending.'
-                      : Number(connection.remainingAmount) + proration.delta < 0
-                        ? ', so they are on the advance list.'
-                        : ', which settles the balance.'}
-                  </p>
-                )}
-              </>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                {proration.daysUsed === 0
-                  ? `The whole month moves to the new fee of ${formatPkr(proration.newFee)}, so the full difference is applied.`
-                  : 'The package fee is unchanged, so the balance stays as it is.'}
-              </p>
-            )}
-          </div>
-        )}
-
         {selectedCablePkg && selectedInternetPkg && (
           <div className="rounded-lg border border-border bg-muted/40 p-4">
             <p className="text-sm font-medium">Total Amount</p>
@@ -908,95 +829,6 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
         </div>
       </form>
 
-      <AlertDialog
-        open={pendingConfirm !== null}
-        onOpenChange={(open) => {
-          if (!open) setPendingConfirm(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {proration && proration.delta > 0 ? 'Confirm package upgrade' : 'Confirm package downgrade'}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to change this subscriber&apos;s package? The change takes effect
-              immediately.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          {proration && (
-            <div className="space-y-3 py-2 text-sm">
-              <div className="grid grid-cols-2 gap-2 rounded-lg border p-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">Current</p>
-                  <p className="font-medium">
-                    {connection?.packageCable || connection?.packageInternet || 'No package'}
-                  </p>
-                  <p className="text-xs text-muted-foreground">PKR {formatPkr(proration.oldFee)} / month</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">New</p>
-                  <p className="font-medium">{packageFeeTotal > 0 ? formatPkr(packageFeeTotal) + ' / month' : 'No package'}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {connection?.packageCable || connection?.packageInternet
-                      ? `${cablePkgId || internetPkgId ? 'Selected package' : 'Same package'}`
-                      : 'No package'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950">
-                <p className="text-xs text-muted-foreground">
-                  {proration.delta > 0 ? 'Additional amount to collect' : 'Advance created'}
-                </p>
-                <p
-                  className={`text-lg font-semibold ${
-                    proration.delta > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'
-                  }`}
-                >
-                  PKR {proration.delta > 0 ? '+' : ''}
-                  {formatPkr(proration.delta)}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {proration.oldFee === 0 || proration.daysUsed === 0
-                    ? 'Full difference, the month has not been used at the old rate yet.'
-                    : `Prorated: ${formatPkr(proration.oldFee)} for ${proration.daysUsed} used days, ${formatPkr(
-                        proration.newFee,
-                      )} for the remaining ${proration.daysRemaining} of ${proration.daysInMonth}.`}
-                </p>
-              </div>
-
-              {connection && (
-                <p className="text-xs text-muted-foreground">
-                  Balance goes from PKR{' '}
-                  {Number(connection.remainingAmount).toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}{' '}
-                  to PKR{' '}
-                  {(Number(connection.remainingAmount) + proration.delta).toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                  {Number(connection.remainingAmount) + proration.delta > 0
-                    ? ' (pending).'
-                    : Number(connection.remainingAmount) + proration.delta < 0
-                      ? ' (advance).'
-                      : ' (settled).'}
-                </p>
-              )}
-            </div>
-          )}
-
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isSaving}>Cancel</AlertDialogCancel>
-            <AlertDialogAction disabled={isSaving} onClick={confirmPackageChange}>
-              {isSaving ? 'Saving...' : 'Confirm package change'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </Form>
   );
 }
