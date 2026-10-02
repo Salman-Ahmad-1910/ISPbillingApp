@@ -36,3 +36,30 @@ func AuthMiddleware() gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// OptionalAuthMiddleware mounts the JWT claims when a valid token is present
+// but lets anonymous requests through.
+//
+// A few route groups are intentionally reachable without a token (accounts is
+// documented as public for testing), yet they also carry page permission guards.
+// Those guards resolve permissions against the request's user, so without this
+// every guarded write on such a group failed with "User not authenticated"
+// regardless of how the caller was authenticated. Mounting the claims when
+// available lets the guards work for signed-in users while an anonymous caller
+// is still rejected by the guard itself rather than crashing on a missing key.
+func OptionalAuthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			tokenString := strings.Split(authHeader, "Bearer ")[1]
+			if claims, err := utils.ValidateToken(tokenString); err == nil {
+				c.Set("userID", claims.UserID)
+				c.Set("companyID", claims.CompanyID)
+				c.Set("roleInCompany", claims.RoleInCompany)
+			}
+		}
+
+		c.Next()
+	}
+}

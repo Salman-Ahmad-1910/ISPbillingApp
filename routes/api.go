@@ -41,6 +41,9 @@ func SetupRoutes(r *gin.Engine) {
 
 	// Accounts routes (temporarily public for testing)
 	accounts := api.Group("/accounts")
+	// Mounts the JWT claims when present so the Account Head permission guards
+	// can resolve the user. Anonymous callers still reach the unguarded reads.
+	accounts.Use(middleware.OptionalAuthMiddleware())
 	accounts.Use(func(c *gin.Context) {
 		// Get company ID from header first, then query parameter
 		companyIDHeader := c.GetHeader("x-company-id")
@@ -229,6 +232,9 @@ billing.PUT("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "ed
 		}
 
 		crm := api.Group("/crm")
+		// Mounts the JWT claims when present so the vendor invoice permission
+		// guards can resolve the user on this otherwise unguarded group.
+		crm.Use(middleware.OptionalAuthMiddleware())
 		crm.Use(func(c *gin.Context) {
 			// Get company ID from header first, then query parameter
 			companyIDHeader := c.GetHeader("x-company-id")
@@ -617,6 +623,9 @@ billing.PUT("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "ed
 
 		// Inventory routes
 		inventory := api.Group("/inventory")
+		// Mounts the JWT claims when present so the vendor invoice and purchase
+		// permission guards can resolve the user on this group.
+		inventory.Use(middleware.OptionalAuthMiddleware())
 		inventory.Use(func(c *gin.Context) {
 			// Get company ID from header first, then query parameter
 			companyIDHeader := c.GetHeader("x-company-id")
