@@ -7,11 +7,23 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 
 	"awesomeProject/config"
 	"awesomeProject/models"
 )
+
+// balanceAfterMonthlyFee applies one monthly package fee to a subscriber's
+// running balance and returns the new balance together with its status.
+//
+// remaining_amount is signed and cumulative, so an advance already held is
+// consumed by the fee first: a fee of 1000 against a 500 advance leaves 500
+// payable and no advance, while a 1000 fee against a 1500 advance leaves the
+// balance at -500, which keeps the unused 500 as an advance that carries
+// forward to the following period rather than being lost.
+func balanceAfterMonthlyFee(remaining, fee float64) (float64, string) {
+	newRemaining := roundToTwo(remaining + fee)
+	return newRemaining, paymentStatusForBalance(newRemaining)
+}
 
 type BillGroup struct {
 	ConnectionIDs []string `json:"connectionIds"`
@@ -131,6 +143,11 @@ func CreateBills(c *gin.Context) {
 			}
 
 			// Add the package fee to each billed subscriber's remaining balance.
+			// remaining_amount is a running balance, so an advance already held is
+			// consumed by this month's fee first and only a leftover credit stays
+			// negative. The status is resynced from the resulting balance in the
+			// same statement: without it a subscriber whose advance cleared would
+			// still be listed as advance while actually owing money.
 			for _, conn := range conns {
 				fee := conn.Amount
 				switch conn.ConnectionType {
@@ -139,9 +156,13 @@ func CreateBills(c *gin.Context) {
 				case "both":
 					fee = conn.Amount + conn.SameAmount
 				}
+				newRemaining, newStatus := balanceAfterMonthlyFee(conn.RemainingAmount, fee)
 				config.DB.Model(&models.Connection{}).
 					Where("id = ? AND company_id = ?", conn.ID, companyID).
-					UpdateColumn("remaining_amount", gorm.Expr("remaining_amount + ?", fee))
+					Updates(map[string]interface{}{
+						"remaining_amount": newRemaining,
+						"payment_status":   newStatus,
+					})
 			}
 
 			billRecord := models.BillRecord{
@@ -256,10 +277,16 @@ func CreateBills(c *gin.Context) {
 			continue // Already created
 		}
 
-		// Add the package fee to the subscriber's remaining balance.
+		// Add the package fee to the subscriber's remaining balance, consuming any
+		// advance they already hold. The status follows the resulting balance so
+		// the advance page and the pending page agree with the amount owed.
+		newRemaining, newStatus := balanceAfterMonthlyFee(conn.RemainingAmount, amount)
 		config.DB.Model(&models.Connection{}).
 			Where("id = ? AND company_id = ?", connID, companyID).
-			UpdateColumn("remaining_amount", gorm.Expr("remaining_amount + ?", amount))
+			Updates(map[string]interface{}{
+				"remaining_amount": newRemaining,
+				"payment_status":   newStatus,
+			})
 
 		billRecord := models.BillRecord{
 			ConnectionID:    connID,

@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func decrementSplitterPorts(tx *gorm.DB, splitterID string) error {
@@ -365,6 +366,21 @@ func updateConnection(c *gin.Context) {
 		return
 	}
 
+	// Package fees are the basis of every proration calculation, so they are
+	// validated on the backend rather than trusted from the client.
+	if input.Amount != nil && *input.Amount < 0 {
+		utils.ErrorResponse(c, 400, "Cable package fee cannot be negative", nil)
+		return
+	}
+	if input.SameAmount != nil && *input.SameAmount < 0 {
+		utils.ErrorResponse(c, 400, "Internet package fee cannot be negative", nil)
+		return
+	}
+	if input.RemainingAmount != nil && math.IsNaN(*input.RemainingAmount) {
+		utils.ErrorResponse(c, 400, "Remaining amount is not a valid number", nil)
+		return
+	}
+
 	// Set when the update carries a prorated package fee change, so the
 	// adjustment is recorded in the connection history alongside field edits.
 	var prorationChange *connChange
@@ -374,9 +390,17 @@ func updateConnection(c *gin.Context) {
 		utils.ErrorResponse(c, 500, "Failed to start transaction", tx.Error.Error())
 		return
 	}
+	// Safety net for the error paths that return without an explicit rollback.
+	defer tx.Rollback()
 
+	// SELECT ... FOR UPDATE. The proration delta is derived from the fee read
+	// here, so two concurrent submissions of the same upgrade could otherwise
+	// both read the old fee and each add the difference, charging twice. The
+	// row lock makes the second request wait and then observe the already
+	// updated fee, which makes the adjustment a no-op instead of a duplicate.
 	var old models.Connection
-	if err := tx.First(&old, "id = ?", id).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		First(&old, "id = ?", id).Error; err != nil {
 		tx.Rollback()
 		utils.ErrorResponse(c, 404, "Connection not found", nil)
 		return
@@ -483,14 +507,20 @@ func updateConnection(c *gin.Context) {
 
 	now := time.Now()
 	if delta, applyDelta := packageProration(now, oldFee, newFee); applyDelta {
-		// The prorated difference becomes the subscriber's balance for the month,
-		// so its sign decides the outcome: a higher fee leaves dues (pending), a
-		// lower fee leaves an advance. The balance being replaced is kept so the
-		// change stays auditable.
+		// remaining_amount is a running balance, not a per-month figure: Bill
+		// Creator adds the next month's full package fee onto whatever is
+		// already there. A package change therefore has to fold into the running
+		// balance instead of replacing it, or it would silently wipe out dues
+		// already owed or an advance already held.
+		//
+		// An upgrade adds to it, leaving the subscriber pending, and a downgrade
+		// subtracts from it, which either reduces the dues they owe or tips a
+		// settled balance into an advance. The balance it started from is kept so
+		// the change stays auditable.
 		previousBalance := old.RemainingAmount
-		newBalance := delta
+		newBalance := roundToTwo(previousBalance + delta)
 		if input.RemainingAmount != nil {
-			// An explicit balance from the caller acts as the starting point, so
+			// An explicit balance from the caller overrides the starting point, so
 			// an admin resetting an advance and changing the package gets both.
 			newBalance = roundToTwo(*input.RemainingAmount + delta)
 		}
@@ -505,16 +535,43 @@ func updateConnection(c *gin.Context) {
 		updates["package_previous_balance"] = previousBalance
 		updates["package_adjusted_on"] = now.Format("2006-01-02")
 
-		daysUsed, daysRemaining, _ := packageProrationBreakdown(now)
+		daysUsed, daysRemaining, daysInMonth := packageProrationBreakdown(now)
 		action := "Package Upgraded"
+		changeType := "UPGRADE"
 		if delta < 0 {
 			action = "Package Downgraded"
+			changeType = "DOWNGRADE"
 		}
 		prorationChange = &connChange{
 			FieldName:  "Package Fee (prorated)",
 			ActionType: action + " " + fmtNum(delta),
 			Old:        fmtNum(oldFee) + " for " + fmtInt(daysUsed) + " days (balance was " + fmtNum(previousBalance) + ")",
 			New:        fmtNum(newFee) + " for " + fmtInt(daysRemaining) + " days (balance now " + fmtNum(newBalance) + ")",
+		}
+
+		// Record the financial effect in the existing ledger. An upgrade is a
+		// financial obligation (debit), a downgrade is a credit the subscriber
+		// now holds as advance. Neither is a payment: no money has changed hands,
+		// so this must not be written as a receipt. It is created inside the
+		// transaction, so a failure here rolls the package change and the balance
+		// change back together rather than leaving one without the other.
+		ledger := models.LedgerEntry{
+			TenantModel:  models.TenantModel{CompanyID: old.CompanyID},
+			Date:         now.Format(time.RFC3339),
+			Description:  fmt.Sprintf("%s package change: fee %s -> %s, prorated %s over %d of %d days", changeType, fmtNum(oldFee), fmtNum(newFee), fmtNum(delta), daysRemaining, daysInMonth),
+			AccountType:  "customer",
+			SubscriberID: &old.ID,
+			Balance:      newBalance,
+		}
+		if delta > 0 {
+			ledger.Debit = delta
+		} else {
+			ledger.Credit = -delta
+		}
+		if err := tx.Create(&ledger).Error; err != nil {
+			tx.Rollback()
+			utils.ErrorResponse(c, 500, "Failed to record package change in ledger", err.Error())
+			return
 		}
 	}
 
@@ -930,6 +987,10 @@ func packageProrationBreakdown(effective time.Time) (daysUsed, daysRemaining, da
 // already been billed and paid at the old rate: an upgrade collects the whole
 // difference and the subscriber returns to the pending list, while a
 // downgrade refunds it and the subscriber moves to the advance list.
+//
+// The returned value is a delta to fold into the subscriber's running balance,
+// not a replacement for it: remaining_amount accumulates, so Bill Creator's
+// next run adds the new month's full fee on top of whatever this leaves behind.
 //
 // The bool reports whether an adjustment applies at all.
 func packageProration(effective time.Time, oldFee, newFee float64) (float64, bool) {

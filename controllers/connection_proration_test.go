@@ -245,8 +245,11 @@ func TestRenamingPackageWithoutPriceChangeIsFree(t *testing.T) {
 // replaced by the prorated difference rather than silently absorbing it. Without
 // this the subscriber stayed on the advance page and the upgrade vanished into
 // the old credit.
-func TestUpgradeBecomesPendingEvenWithExistingAdvance(t *testing.T) {
-	storedAdvance := -4000.0
+// TestUpgradeNetsIntoRunningBalance pins the upgrade side of the running
+// balance rule. An upgrade is a credit against a balance the subscriber already
+// holds, so it consumes an advance rather than wiping it, and only produces dues
+// once it overshoots into positive territory.
+func TestUpgradeNetsIntoRunningBalance(t *testing.T) {
 	delta, applied := packageProration(date(2026, time.October, 1), 1000, 3000)
 	if !applied {
 		t.Fatal("expected an adjustment to apply")
@@ -255,22 +258,34 @@ func TestUpgradeBecomesPendingEvenWithExistingAdvance(t *testing.T) {
 		t.Fatalf("delta = %v, want 2000", delta)
 	}
 
-	// The difference becomes the balance outright.
-	newBalance := roundToTwo(delta)
-	if newBalance != 2000 {
-		t.Errorf("balance = %v, want 2000", newBalance)
+	cases := []struct {
+		name        string
+		starting    float64
+		wantBalance float64
+		wantStatus  string
+	}{
+		{"settled subscriber becomes pending", 0, 2000, "pending"},
+		{"small advance is consumed into dues", -500, 1500, "pending"},
+		{"advance is drawn down but still held", -4000, -2000, "advance"},
 	}
-	if got := paymentStatusForBalance(newBalance); got != "pending" {
-		t.Errorf("status = %q, want pending", got)
-	}
-	if storedAdvance == newBalance {
-		t.Error("test is not exercising the replacement path")
+
+	for _, c := range cases {
+		newBalance := roundToTwo(c.starting + delta)
+		if newBalance != c.wantBalance {
+			t.Errorf("%s: balance = %v, want %v", c.name, newBalance, c.wantBalance)
+		}
+		if got := paymentStatusForBalance(newBalance); got != c.wantStatus {
+			t.Errorf("%s: status = %q, want %q", c.name, got, c.wantStatus)
+		}
 	}
 }
 
-// TestDowngradeBecomesAdvanceEvenWithExistingDues is the mirror case: a
-// downgrade always leaves an advance.
-func TestDowngradeBecomesAdvanceEvenWithExistingDues(t *testing.T) {
+// TestDowngradeNetsIntoRunningBalance pins the downgrade side. A downgrade is a
+// credit against the running balance, so it reduces dues the subscriber already
+// owes and only turns into an advance once it exceeds them. This is the case the
+// old replace-the-balance behaviour got wrong by discarding the outstanding
+// dues entirely.
+func TestDowngradeNetsIntoRunningBalance(t *testing.T) {
 	delta, applied := packageProration(date(2026, time.October, 1), 3000, 1000)
 	if !applied {
 		t.Fatal("expected an adjustment to apply")
@@ -279,9 +294,42 @@ func TestDowngradeBecomesAdvanceEvenWithExistingDues(t *testing.T) {
 		t.Fatalf("delta = %v, want -2000", delta)
 	}
 
-	newBalance := roundToTwo(delta)
-	if got := paymentStatusForBalance(newBalance); got != "advance" {
-		t.Errorf("status = %q, want advance", got)
+	cases := []struct {
+		name        string
+		starting    float64
+		wantBalance float64
+		wantStatus  string
+	}{
+		{"settled subscriber gets an advance", 0, -2000, "advance"},
+		{"dues larger than the credit stay pending", 5000, 3000, "pending"},
+		{"dues smaller than the credit tip into advance", 500, -1500, "advance"},
+		{"existing advance grows by the credit", -2000, -4000, "advance"},
+	}
+
+	for _, c := range cases {
+		newBalance := roundToTwo(c.starting + delta)
+		if newBalance != c.wantBalance {
+			t.Errorf("%s: balance = %v, want %v", c.name, newBalance, c.wantBalance)
+		}
+		if got := paymentStatusForBalance(newBalance); got != c.wantStatus {
+			t.Errorf("%s: status = %q, want %q", c.name, got, c.wantStatus)
+		}
+	}
+}
+
+// TestPackageChangePreservesOutstandingDues is the regression guard for the
+// exact bug: a package change must never silently forgive money the subscriber
+// already owed.
+func TestPackageChangePreservesOutstandingDues(t *testing.T) {
+	previousBalance := 5000.0
+	delta, _ := packageProration(date(2026, time.October, 16), 3000, 1000)
+
+	newBalance := roundToTwo(previousBalance + delta)
+	if newBalance == delta {
+		t.Errorf("balance = %v, which means the outstanding dues were discarded", newBalance)
+	}
+	if newBalance >= previousBalance {
+		t.Errorf("balance = %v, want less than the starting %v for a downgrade", newBalance, previousBalance)
 	}
 }
 
