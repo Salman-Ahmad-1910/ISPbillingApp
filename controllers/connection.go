@@ -499,35 +499,49 @@ func updateConnection(c *gin.Context) {
 		updates["remaining_amount"] = *input.RemainingAmount
 	}
 
-	// Changing a package only changes the package and its fee. It never moves
-	// the balance on its own: a mid-month change is billed by the operator
-	// through the "Create balance" option below, where they pick the number of
-	// days themselves. Anything automatic here silently altered money the
-	// operator never asked for.
-	if input.CreateBalance && input.BalanceDays > 0 {
-		// The base is the fee being saved, i.e. the new package, using the same
-		// formula as a new subscriber so both paths agree: fee / 30 * days.
-		fee := packageFeeAfterUpdate(old, input)
-		manualBalance := roundToTwo(fee / 30 * float64(input.BalanceDays))
+	// The package fee is the subscriber's monthly bill, so when the package
+	// changes the balance is set to the new fee: moving 1000 -> 1500 leaves
+	// 1500 remaining, not the old 1000. Only an actual change triggers this, so
+	// saving a subscriber's phone number does not reset what they owe.
+	newPackageFee, packageChanged := packageUpdateBalance(old, input)
 
-		// remaining_amount accumulates, so an existing balance is kept and the
-		// manually created amount is added on top of it.
-		newBalance := roundToTwo(old.RemainingAmount + manualBalance)
-		if input.RemainingAmount != nil {
-			// An explicit balance from the caller replaces the starting point.
-			newBalance = roundToTwo(*input.RemainingAmount + manualBalance)
-		}
-
-		updates["remaining_amount"] = newBalance
+	if packageChanged {
+		updates["remaining_amount"] = newPackageFee
 		// Keep the status in step with the balance just written, otherwise the
 		// pending and advance pages disagree with what is actually owed.
+		updates["payment_status"] = paymentStatusForBalance(newPackageFee)
+
+		balanceChange = &connChange{
+			FieldName:  "Balance",
+			ActionType: "Balance Set to Package Fee",
+			Old:        fmtNum(old.RemainingAmount),
+			New:        fmtNum(newPackageFee) + " (new package fee)",
+		}
+	}
+
+	// On top of that the operator can still create a balance by hand for a
+	// mid-month change, using the same formula as a new subscriber so both paths
+	// agree: fee / 30 * days. It accumulates onto whatever the balance is about
+	// to be, which is the new package fee when the package also changed.
+	if input.CreateBalance && input.BalanceDays > 0 {
+		manualBalance := roundToTwo(newPackageFee / 30 * float64(input.BalanceDays))
+
+		base := old.RemainingAmount
+		if staged, ok := updates["remaining_amount"].(float64); ok {
+			// Includes both the package fee above and an explicit balance from
+			// the caller, whichever was staged last.
+			base = staged
+		}
+		newBalance := roundToTwo(base + manualBalance)
+
+		updates["remaining_amount"] = newBalance
 		updates["payment_status"] = paymentStatusForBalance(newBalance)
 
 		balanceChange = &connChange{
 			FieldName:  "Balance",
 			ActionType: "Balance Created",
 			Old:        fmtNum(old.RemainingAmount),
-			New:        fmtNum(newBalance) + " (+" + fmtNum(manualBalance) + " for " + fmtInt(input.BalanceDays) + " days at " + fmtNum(fee) + " per month)",
+			New:        fmtNum(newBalance) + " (+" + fmtNum(manualBalance) + " for " + fmtInt(input.BalanceDays) + " days at " + fmtNum(newPackageFee) + " per month)",
 		}
 	}
 
@@ -921,6 +935,33 @@ func valueOrZero(v *float64) float64 {
 
 // paymentStatusForBalance mirrors the status rules used when a payment is
 // applied: a positive balance is pending, a negative one is an advance.
+// packageUpdateBalance resolves the monthly fee that will be in force after an
+// update and reports whether the package actually changed. The fee is the
+// subscriber's bill, so a changed package leaves the new fee as the balance.
+//
+// The change check compares the package names and the fee, and treats an omitted
+// field as "unchanged" the same way the handler does, so re-saving a subscriber
+// without touching the package never resets what they owe.
+func packageUpdateBalance(old models.Connection, input connectionInput) (float64, bool) {
+	fee := roundToTwo(packageFeeAfterUpdate(old, input))
+	oldFee := roundToTwo(monthlyPackageFee(old.ConnectionType, old.Amount, old.SameAmount))
+
+	newCable := old.PackageCable
+	if input.PackageCable != "" {
+		newCable = input.PackageCable
+	}
+	newInternet := old.PackageInternet
+	if input.PackageInternet != "" {
+		newInternet = input.PackageInternet
+	}
+
+	changed := newCable != old.PackageCable ||
+		newInternet != old.PackageInternet ||
+		fee != oldFee
+
+	return fee, changed
+}
+
 func paymentStatusForBalance(remaining float64) string {
 	switch {
 	case remaining > 0:

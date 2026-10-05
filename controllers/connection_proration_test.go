@@ -122,33 +122,105 @@ func TestManualBalanceAddsToExistingBalance(t *testing.T) {
 	}
 }
 
-// TestPackageChangeAloneNeverMovesBalance is the regression guard for the flow
-// change: saving a new package must not create, reduce or otherwise touch money.
-// The balance only ever moves when the operator ticks Create balance.
-func TestPackageChangeAloneNeverMovesBalance(t *testing.T) {
-	old := models.Connection{ConnectionType: "internet", Amount: 1000, SameAmount: 1000}
-
-	newAmount := 3000.0
-	input := connectionInput{
-		PackageInternet: "Gold",
-		SameAmount:      &newAmount,
-		CreateBalance:   false,
-		BalanceDays:     0,
+// TestPackageChangeSetsBalanceToNewFee covers the rule the operator asked for:
+// a package change makes the remaining balance equal the new package fee, so
+// moving a 1000 package to 1500 leaves 1500 outstanding rather than 1000.
+func TestPackageChangeSetsBalanceToNewFee(t *testing.T) {
+	cases := []struct {
+		name        string
+		old         models.Connection
+		input       connectionInput
+		wantFee     float64
+		wantChanged bool
+	}{
+		{
+			name:        "1000 upgraded to 1500",
+			old:         models.Connection{ConnectionType: "internet", PackageInternet: "Basic", Amount: 1000, SameAmount: 1000},
+			input:       connectionInput{PackageInternet: "Plus", SameAmount: ptr(1500.0)},
+			wantFee:     1500,
+			wantChanged: true,
+		},
+		{
+			name:        "cable package raised from 1000 to 1500",
+			old:         models.Connection{ConnectionType: "cable", PackageCable: "Basic", Amount: 1000},
+			input:       connectionInput{PackageCable: "Plus", Amount: ptr(1500.0)},
+			wantFee:     1500,
+			wantChanged: true,
+		},
+		{
+			name:        "both package fee is the sum",
+			old:         models.Connection{ConnectionType: "both", PackageCable: "A", PackageInternet: "B", Amount: 1000, SameAmount: 500},
+			input:       connectionInput{Amount: ptr(1200.0), SameAmount: ptr(700.0)},
+			wantFee:     1900,
+			wantChanged: true,
+		},
+		{
+			name:        "reshuffling cable and internet at the same total is not a change",
+			old:         models.Connection{ConnectionType: "both", PackageCable: "A", PackageInternet: "B", Amount: 1000, SameAmount: 500},
+			input:       connectionInput{Amount: ptr(1200.0), SameAmount: ptr(300.0)},
+			wantFee:     1500,
+			wantChanged: false,
+		},
+		{
+			name:        "renaming the package at the same fee still counts as a change",
+			old:         models.Connection{ConnectionType: "internet", PackageInternet: "Basic", Amount: 1000, SameAmount: 1000},
+			input:       connectionInput{PackageInternet: "Basic Plus"},
+			wantFee:     1000,
+			wantChanged: true,
+		},
+		{
+			name:        "saving other fields leaves the package alone",
+			old:         models.Connection{ConnectionType: "internet", PackageInternet: "Basic", Amount: 1000, SameAmount: 1000},
+			input:       connectionInput{Status: "active"},
+			wantFee:     1000,
+			wantChanged: false,
+		},
+		{
+			name:        "resaving the identical package is not a change",
+			old:         models.Connection{ConnectionType: "internet", PackageInternet: "Basic", Amount: 1000, SameAmount: 1000},
+			input:       connectionInput{PackageInternet: "Basic", SameAmount: ptr(1000.0)},
+			wantFee:     1000,
+			wantChanged: false,
+		},
 	}
 
-	if got := packageFeeAfterUpdate(old, input); got != 3000 {
-		t.Fatalf("new fee = %v, want 3000", got)
-	}
-
-	// The handler guards on CreateBalance && BalanceDays > 0, so with the box
-	// unticked no balance branch is entered at all.
-	if input.CreateBalance && input.BalanceDays > 0 {
-		t.Error("balance branch must not be reachable when Create balance is unticked")
-	}
-	if got := old.RemainingAmount; got != 0 {
-		t.Errorf("remaining = %v, want it untouched at 0", got)
+	for _, c := range cases {
+		fee, changed := packageUpdateBalance(c.old, c.input)
+		if fee != c.wantFee {
+			t.Errorf("%s: fee = %v, want %v", c.name, fee, c.wantFee)
+		}
+		if changed != c.wantChanged {
+			t.Errorf("%s: changed = %v, want %v", c.name, changed, c.wantChanged)
+		}
 	}
 }
+
+// TestManualBalanceAccumulatesOntoPackageFee covers the two rules combined: a
+// package change sets the balance to the new fee, and an operator-created
+// balance for the days then lands on top of it.
+func TestManualBalanceAccumulatesOntoPackageFee(t *testing.T) {
+	old := models.Connection{
+		ConnectionType: "internet", PackageInternet: "Basic",
+		Amount: 1000, SameAmount: 1000, RemainingAmount: 1000,
+	}
+
+	fee, changed := packageUpdateBalance(old, connectionInput{
+		PackageInternet: "Plus", SameAmount: ptr(1500.0),
+	})
+	if !changed {
+		t.Fatal("package must be reported as changed")
+	}
+
+	staged := fee
+	manual := roundToTwo(fee / 30 * 15)
+	got := roundToTwo(staged + manual)
+
+	if got != 2250 {
+		t.Errorf("balance = %v, want 2250", got)
+	}
+}
+
+func ptr(f float64) *float64 { return &f }
 
 // TestManualBalanceResyncsStatus covers the status flag written alongside a
 // manual balance, so the pending and advance pages reflect what is owed.
