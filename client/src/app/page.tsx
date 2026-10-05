@@ -9,24 +9,24 @@ import Link from 'next/link';
 function HomePageView() {
   return (
     <div className="flex flex-col min-h-dvh bg-background">
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur-sm">
+      <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-[#04070F]/70 backdrop-blur-xl backdrop-saturate-150">
         <div className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-gray-900 to-black rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-gradient-to-br from-cyan-400/30 to-indigo-500/30 border border-white/25 rounded-lg flex items-center justify-center backdrop-blur-md">
               <span className="text-white font-bold text-sm">F</span>
             </div>
-            <span className="text-lg font-bold text-gray-900">Fintrack ERP</span>
+            <span className="text-lg font-bold text-white">Fintrack ERP</span>
           </Link>
           <nav className="hidden md:flex items-center gap-6">
-            <Link href="/features" className="text-gray-600 hover:text-gray-900 transition-colors">Features</Link>
-            <Link href="/about" className="text-gray-600 hover:text-gray-900 transition-colors">About</Link>
-            <Link href="/contact" className="text-gray-600 hover:text-gray-900 transition-colors">Contact</Link>
+            <Link href="/features" className="text-slate-300 hover:text-white transition-colors">Features</Link>
+            <Link href="/about" className="text-slate-300 hover:text-white transition-colors">About</Link>
+            <Link href="/contact" className="text-slate-300 hover:text-white transition-colors">Contact</Link>
           </nav>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" asChild>
+            <Button variant="ghost" asChild className="text-slate-200 hover:text-white hover:bg-white/10">
               <Link href="/login">Login</Link>
             </Button>
-            <Button asChild className="bg-gray-900 hover:bg-black text-white">
+            <Button asChild className="bg-white hover:bg-slate-100 text-gray-900">
               <Link href="/signup">Sign Up</Link>
             </Button>
           </div>
@@ -34,40 +34,55 @@ function HomePageView() {
       </header>
 
       <main className="flex-1">
-        <section className="relative min-h-screen bg-gradient-to-br from-[#F8FAFC] via-[#E0E7FF] to-[#4F46E5] overflow-hidden">
+        <section className="relative min-h-screen bg-[#04070F] overflow-hidden">
+          {/* Telecom towers and fibre cabling sit behind the glass panel so the
+              backdrop-blur on it has real depth to refract. */}
           <div className="absolute inset-0 overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-[#4F46E5]/20 via-[#2563EB]/10 to-transparent opacity-30" />
-            <div className="absolute top-20 left-10 w-72 h-72 bg-gradient-to-br from-[#06B6D4]/20 to-transparent rounded-full blur-3xl animate-pulse" />
-            <div className="absolute top-40 right-20 w-96 h-96 bg-gradient-to-tr from-[#2563EB]/10 to-transparent rounded-full blur-3xl animate-pulse delay-1000" />
-            <div className="absolute bottom-20 left-1/2 w-80 h-80 bg-gradient-to-bl from-[#06B6D4]/15 to-transparent rounded-full blur-3xl animate-pulse delay-2000" />
+            <div
+              className="absolute inset-0 bg-cover bg-bottom bg-no-repeat"
+              style={{ backgroundImage: 'url(/images/hero-towers.jpg)' }}
+            />
+            <div
+              className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-70"
+              style={{ backgroundImage: 'url(/images/hero-fiber.jpg)' }}
+            />
+            {/* Source photos vary in brightness, so the wash is heavy enough to
+                hold white text at AAA contrast over any of them. */}
+            <div className="absolute inset-0 bg-gradient-to-br from-[#0B1220]/93 via-[#0F172A]/82 to-[#020617]/95" />
+            <div className="absolute top-24 left-[12%] w-80 h-80 bg-gradient-to-br from-[#22D3EE]/25 to-transparent rounded-full blur-3xl animate-pulse" />
+            <div className="absolute top-52 right-[14%] w-96 h-96 bg-gradient-to-tr from-[#4F46E5]/30 to-transparent rounded-full blur-3xl animate-pulse delay-1000" />
+            <div className="absolute bottom-24 left-1/2 w-96 h-96 bg-gradient-to-bl from-[#A855F7]/20 to-transparent rounded-full blur-3xl animate-pulse delay-2000" />
             <div className="absolute inset-0" style={{
-              backgroundImage: `linear-gradient(rgba(37, 99, 235, 0.03) 1px, transparent 1px), linear-gradient(rgba(37, 99, 235, 0.03) 1px, transparent 1px)`,
+              backgroundImage: `linear-gradient(rgba(148, 163, 184, 0.04) 1px, transparent 1px), linear-gradient(rgba(148, 163, 184, 0.04) 1px, transparent 1px)`,
               backgroundSize: '50px 50px'
             }} />
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/5 to-black/10" />
+            {/* Vignette keeps the copy legible over the busiest part of the art. */}
+            <div className="absolute inset-0 bg-gradient-to-b from-[#020617]/75 via-[#020617]/40 to-[#020617]/95" />
           </div>
 
-          <div className="relative z-20 flex items-center justify-center h-full px-4 md:px-6">
-            <div className="max-w-7xl mx-auto text-center">
-              <div className="space-y-8">
-                <div className="animate-in fade-in slide-in-from-top-12 duration-700">
-                  <Badge className="mt-8 mb-3 bg-white/10 backdrop-blur-sm text-[#2563EB] border-[#2563EB]/20 shadow-lg px-6 py-3 text-sm font-semibold tracking-wide">
-                    Enterprise-Grade ISP Management Platform
-                  </Badge>
-                </div>
+          <div className="relative z-20 flex items-center justify-center min-h-screen px-4 py-24 md:px-6">
+            <div className="w-full max-w-5xl">
+              <div className="rounded-[2rem] border border-white/20 bg-white/[0.07] p-8 shadow-[0_8px_60px_-12px_rgba(34,211,238,0.35)] backdrop-blur-2xl backdrop-saturate-150 md:p-14">
+                <div className="space-y-8 text-center">
+                  <div className="animate-in fade-in slide-in-from-top-12 duration-700">
+                    <Badge className="mb-3 border-white/25 bg-white/10 text-cyan-100 shadow-lg backdrop-blur-md px-6 py-3 text-sm font-semibold tracking-wide">
+                      Enterprise-Grade ISP Management Platform
+                    </Badge>
+                  </div>
 
-                <div className="animate-in fade-in slide-in-from-bottom-12 duration-700 delay-200">
-                  <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-black leading-tight mb-6">
-                    Complete Business Management
-                    <br />
-                    <span className="bg-gradient-to-r from-[#06B6D4] to-[#2563EB] bg-clip-text text-transparent drop-shadow-2xl">
-                      Simplified & Powerful
-                    </span>
-                  </h1>
-                  <p className="mx-auto max-w-3xl text-xl md:text-2xl text-black/90 leading-relaxed mb-12 font-light">
-                    Transform your Internet Service Provider operations with our comprehensive ERP solution.
-                    From subscriber management to network monitoring, everything you need in one powerful platform.
-                  </p>
+                  <div className="animate-in fade-in slide-in-from-bottom-12 duration-700 delay-200">
+                    <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-white leading-tight mb-6 drop-shadow-2xl">
+                      Complete Business Management
+                      <br />
+                      <span className="bg-gradient-to-r from-cyan-300 via-sky-300 to-indigo-300 bg-clip-text text-transparent">
+                        Simplified &amp; Powerful
+                      </span>
+                    </h1>
+                    <p className="mx-auto max-w-3xl text-xl md:text-2xl text-slate-200/90 leading-relaxed mb-12 font-light">
+                      Transform your Internet Service Provider operations with our comprehensive ERP solution.
+                      From subscriber management to network monitoring, everything you need in one powerful platform.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>

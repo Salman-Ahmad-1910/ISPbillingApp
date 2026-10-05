@@ -157,7 +157,14 @@ export function ClientPage({ data }: ClientPageProps) {
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [filter]);
+    }, [filter, pageSize]);
+
+    // The result set can also shrink without the operator touching any control
+    // (a refetch after a purchase or sale, for example). Left alone, that leaves
+    // currentPage past the last page and the table renders nothing.
+    useEffect(() => {
+        setCurrentPage(prev => Math.min(prev, Math.max(1, totalPages)));
+    }, [totalPages]);
 
     return (
         <div className="p-6">

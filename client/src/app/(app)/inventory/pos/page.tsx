@@ -21,7 +21,7 @@ import { backendImageUrl } from '@/lib/utils';
 
 import api from '@/lib/api';
 import { useQueryClient } from '@tanstack/react-query';
-import { smartMatch, prefixMatch } from '@/lib/search';
+import { smartMatch, smartSearch } from '@/lib/search';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -647,7 +647,17 @@ export default function POSPage() {
     }, [purchasedProducts]);
 
     const filteredProducts = useMemo(() => {
-        return posProducts.filter(p => prefixMatch(searchTerm, p.name));
+        // Must match the Stock page exactly, otherwise a product that is visibly
+        // listed on Stock cannot be found here. Stock uses smartSearch, which
+        // falls back to a substring match once the name prefix fails and also
+        // searches the serial number, vendor and purchase number. A plain
+        // prefix match on the name alone hid those products from POS.
+        return smartSearch(searchTerm, posProducts, (p: any) => [
+            [p.name],
+            [p.serialNumber],
+            [p.vendorName || ''],
+            [p.purchaseNumber || ''],
+        ]);
     }, [posProducts, searchTerm]);
 
     // Populate cart with original sale items when existing installment is found and products load
