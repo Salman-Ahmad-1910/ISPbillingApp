@@ -5,6 +5,7 @@ import (
 	"awesomeProject/models"
 	"awesomeProject/utils"
 	"encoding/json"
+	"log"
 	"regexp"
 	"strconv"
 	"strings"
@@ -71,25 +72,23 @@ type posSaleRequest struct {
 }
 
 type posSaleItem struct {
-	ProductID   uuid.UUID `json:"productId"`
-	ProductName string    `json:"productName"`
-	Quantity    int       `json:"quantity"`
-	Price       float64   `json:"price"`
-	OriginalPrice float64 `json:"originalPrice"`
-	TaxPercent  float64   `json:"taxPercent"`
-	SaleTax     float64   `json:"saleTax"`
-	WthTax      float64   `json:"wthTax"`
-	SerialNumber string    `json:"serialNumber"`
-	Model        string    `json:"model"`
+	ProductID     uuid.UUID `json:"productId"`
+	ProductName   string    `json:"productName"`
+	Quantity      int       `json:"quantity"`
+	Price         float64   `json:"price"`
+	OriginalPrice float64   `json:"originalPrice"`
+	TaxPercent    float64   `json:"taxPercent"`
+	SaleTax       float64   `json:"saleTax"`
+	WthTax        float64   `json:"wthTax"`
+	SerialNumber  string    `json:"serialNumber"`
+	Model         string    `json:"model"`
 }
 
 type installmentRequest struct {
 	InstallmentPlanID uuid.UUID `json:"installmentPlanId"`
 }
 
-// CreatePOSSale creates a sale together with its line items in a single
-// transaction and decrements the corresponding product stock. The generic
-// CRUD Create cannot do this because it does not persist nested slices.
+// CreatePOSSale records a sale that is paid in full at the counter.
 func CreatePOSSale(c *gin.Context) {
 	companyID := c.MustGet("companyID").(uuid.UUID)
 
@@ -123,31 +122,21 @@ func CreatePOSSale(c *gin.Context) {
 	}
 	for _, it := range req.Items {
 		sale.Items = append(sale.Items, models.SaleItem{
-			ProductID:    it.ProductID,
-			ProductName:  it.ProductName,
-			Quantity:     it.Quantity,
-			Price:        it.Price,
+			ProductID:     it.ProductID,
+			ProductName:   it.ProductName,
+			Quantity:      it.Quantity,
+			Price:         it.Price,
 			OriginalPrice: it.OriginalPrice,
-			TaxPercent:   it.TaxPercent,
-			SaleTax:      it.SaleTax,
-			WthTax:       it.WthTax,
-			SerialNumber: it.SerialNumber,
-			Model:        it.Model,
+			TaxPercent:    it.TaxPercent,
+			SaleTax:       it.SaleTax,
+			WthTax:        it.WthTax,
+			SerialNumber:  it.SerialNumber,
+			Model:         it.Model,
 		})
 	}
 
 	err := config.DB.Transaction(func(tx *gorm.DB) error {
-		// Set company scope on the sale and cascade-create items.
-		sale.CompanyID = companyID
-		if err := tx.Create(&sale).Error; err != nil {
-			return err
-		}
-
-		// Decrement stock from purchase_items and product stock for each sold product.
-		if err := consumeSaleStock(tx, companyID, req.Items); err != nil {
-			return err
-		}
-		return nil
+		return recordPOSSale(tx, companyID, &sale, req.Items)
 	})
 	if err != nil {
 		utils.ErrorResponse(c, 500, "Failed to record sale", err.Error())
@@ -155,6 +144,20 @@ func CreatePOSSale(c *gin.Context) {
 	}
 
 	utils.CreatedResponse(c, "Sale recorded", sale)
+}
+
+// recordPOSSale persists a sale with its line items and consumes the matching
+// stock and serial numbers, inside a caller-supplied transaction. Shared with the
+// POS promise path, which records the same sale and only defers the money.
+//
+// The generic CRUD Create cannot do this because it does not persist nested
+// slices or touch stock.
+func recordPOSSale(tx *gorm.DB, companyID uuid.UUID, sale *models.Sale, items []posSaleItem) error {
+	sale.CompanyID = companyID
+	if err := tx.Create(sale).Error; err != nil {
+		return err
+	}
+	return consumeSaleStock(tx, companyID, items)
 }
 
 // consumeSaleStock keeps the legacy product-level stock counters in sync with
@@ -196,7 +199,7 @@ func consumeSaleStock(tx *gorm.DB, companyID uuid.UUID, items []posSaleItem) err
 				Where("id = ? AND company_id = ?", it.ProductID, companyID).
 				Updates(map[string]interface{}{
 					"serial_number":        strings.Join(remaining, ", "),
-					"stock":               len(remaining),
+					"stock":                len(remaining),
 					"current_serial_index": 0,
 				}).Error; err != nil {
 				return err
@@ -221,14 +224,14 @@ func CreateInstallmentSale(c *gin.Context) {
 	companyID := c.MustGet("companyID").(uuid.UUID)
 
 	var req struct {
-		SubscriberID      uuid.UUID `json:"subscriberId"`
-		SubscriberName    string    `json:"subscriberName"`
-		InstallmentPlanID uuid.UUID `json:"installmentPlanId"`
-		Subtotal          float64   `json:"subtotal"`
-		TaxAmount         float64   `json:"taxAmount"`
-		Discount          float64   `json:"discount"`
-		PaymentMethod     string    `json:"paymentMethod"`
-		Date              string    `json:"date"`
+		SubscriberID      uuid.UUID     `json:"subscriberId"`
+		SubscriberName    string        `json:"subscriberName"`
+		InstallmentPlanID uuid.UUID     `json:"installmentPlanId"`
+		Subtotal          float64       `json:"subtotal"`
+		TaxAmount         float64       `json:"taxAmount"`
+		Discount          float64       `json:"discount"`
+		PaymentMethod     string        `json:"paymentMethod"`
+		Date              string        `json:"date"`
 		Items             []posSaleItem `json:"items"`
 	}
 
@@ -274,16 +277,16 @@ func CreateInstallmentSale(c *gin.Context) {
 	}
 	for _, it := range req.Items {
 		sale.Items = append(sale.Items, models.SaleItem{
-			ProductID:    it.ProductID,
-			ProductName:  it.ProductName,
-			Quantity:     it.Quantity,
-			Price:        it.Price,
+			ProductID:     it.ProductID,
+			ProductName:   it.ProductName,
+			Quantity:      it.Quantity,
+			Price:         it.Price,
 			OriginalPrice: it.OriginalPrice,
-			TaxPercent:   it.TaxPercent,
-			SaleTax:      it.SaleTax,
-			WthTax:       it.WthTax,
-			SerialNumber: it.SerialNumber,
-			Model:        it.Model,
+			TaxPercent:    it.TaxPercent,
+			SaleTax:       it.SaleTax,
+			WthTax:        it.WthTax,
+			SerialNumber:  it.SerialNumber,
+			Model:         it.Model,
 		})
 	}
 
@@ -300,17 +303,17 @@ func CreateInstallmentSale(c *gin.Context) {
 
 		// Create installment record — first installment is already paid
 		installment := models.SubscriberInstallment{
-			SaleID:             sale.ID,
-			SubscriberID:       req.SubscriberID,
-			SubscriberName:     req.SubscriberName,
-			InstallmentPlanID:  plan.ID,
-			PlanName:           plan.Name,
-			TotalInstallments:  plan.Installments,
-			PaidInstallments:   1,
-			InstallmentAmount:  amountPerInstallment,
-			TotalAmount:        totalWithIncrease,
-			NextInstallment:    2,
-			Status:             "active",
+			SaleID:            sale.ID,
+			SubscriberID:      req.SubscriberID,
+			SubscriberName:    req.SubscriberName,
+			InstallmentPlanID: plan.ID,
+			PlanName:          plan.Name,
+			TotalInstallments: plan.Installments,
+			PaidInstallments:  1,
+			InstallmentAmount: amountPerInstallment,
+			TotalAmount:       totalWithIncrease,
+			NextInstallment:   2,
+			Status:            "active",
 		}
 		if plan.Installments <= 1 {
 			installment.Status = "completed"
@@ -349,8 +352,8 @@ func CreateInstallmentSale(c *gin.Context) {
 	}
 
 	utils.CreatedResponse(c, "Installment sale recorded", gin.H{
-		"sale":         sale,
-		"installment":  "first installment paid",
+		"sale":        sale,
+		"installment": "first installment paid",
 	})
 }
 
@@ -460,7 +463,8 @@ func PayInstallment(c *gin.Context) {
 // preloaded. Supports backend filtering via query params:
 //   - fromDate / toDate   (YYYY-MM-DD, inclusive on sales.date)
 //   - salesType           (good | bad)
-//   - paymentType         (normal | installment)
+//   - paymentType         (normal | installment | hold | promise)
+//   - promise             (open = only promise sales still owing money)
 //   - search              (matches sale id or subscriber name)
 func GetPOSSales(c *gin.Context) {
 	companyID := c.MustGet("companyID").(uuid.UUID)
@@ -483,9 +487,23 @@ func GetPOSSales(c *gin.Context) {
 		db = db.Where("sales.status = ?", "replaced")
 	}
 
+	promiseFilter := strings.ToLower(strings.TrimSpace(c.Query("promise")))
+	if promiseFilter == "open" || promiseFilter == "pending" {
+		db = db.Where(`sales.promise_payment = ?
+			OR EXISTS (SELECT 1 FROM pos_promises pp
+			           WHERE pp.company_id = sales.company_id AND pp.subscriber_id = sales.subscriber_id
+			             AND pp.status IN ('pending','partial') AND pp.deleted_at IS NULL)`, true)
+	}
+
 	switch paymentType := strings.ToLower(strings.TrimSpace(c.Query("paymentType"))); paymentType {
 	case "hold":
 		db = db.Where("sales.status = ?", "hold")
+	case "promise":
+		// Any sale related to a promise: the original product sale, or a dues
+		// payment row created when the counter took money against it.
+		db = db.Where(`sales.promise_payment = ?
+			OR EXISTS (SELECT 1 FROM pos_promises pp
+			           WHERE pp.sale_id = sales.id AND pp.company_id = sales.company_id AND pp.deleted_at IS NULL)`, true)
 	case "normal":
 		db = db.Where("sales.is_installment = ?", false)
 	case "installment":
@@ -503,7 +521,100 @@ func GetPOSSales(c *gin.Context) {
 		return
 	}
 
+	// Attach the unpaid part of any promise sale so the list can mark it as
+	// pending instead of presenting a partly unpaid sale as fully paid.
+	attachPromiseInfo(companyID, sales)
+
 	utils.SuccessResponse(c, "Records retrieved", sales)
+}
+
+// attachPromiseInfo fills Sale.PromiseInfo in one or two queries, rather than one
+// lookup per row. Promise sales read their linked promise; dues-payment sales
+// read the customer's live open balance so they always stay in step with what is
+// still actually owing.
+func attachPromiseInfo(companyID uuid.UUID, sales []models.Sale) {
+	if len(sales) == 0 {
+		return
+	}
+
+	var saleIDs []uuid.UUID
+	paymentSubscribers := make(map[uuid.UUID]struct{}, len(sales))
+	for i := range sales {
+		if sales[i].PromisePayment {
+			paymentSubscribers[sales[i].SubscriberID] = struct{}{}
+		} else {
+			saleIDs = append(saleIDs, sales[i].ID)
+		}
+	}
+
+	index := make(map[uuid.UUID]*models.Sale, len(sales))
+	for i := range sales {
+		index[sales[i].ID] = &sales[i]
+	}
+
+	var promises []models.POSPromise
+	if len(saleIDs) > 0 {
+		if err := config.DB.Where("company_id = ? AND sale_id IN ?", companyID, saleIDs).Find(&promises).Error; err != nil {
+			log.Printf("attachPromiseInfo: %v", err)
+		}
+	}
+	for _, p := range promises {
+		sale, ok := index[p.SaleID]
+		if !ok {
+			continue
+		}
+		sale.PromiseInfo = &models.SalePromiseInfo{
+			PromiseID:       p.ID.String(),
+			PendingAmount:   p.PendingAmount,
+			PaidAmount:      p.PaidAmount,
+			CollectedAmount: p.CollectedAmount,
+			RemainingAmount: posPromiseRemaining(p),
+			PromiseDate:     p.PromiseDate,
+			Status:          p.Status,
+			Description:     p.Description,
+		}
+	}
+
+	if len(paymentSubscribers) == 0 {
+		return
+	}
+	subscriberIDs := make([]uuid.UUID, 0, len(paymentSubscribers))
+	for id := range paymentSubscribers {
+		subscriberIDs = append(subscriberIDs, id)
+	}
+
+	var open []models.POSPromise
+	if err := config.DB.Where("company_id = ? AND subscriber_id IN ? AND status IN ?",
+		companyID, subscriberIDs, []string{"pending", "partial"}).Find(&open).Error; err != nil {
+		log.Printf("attachPromiseInfo: %v", err)
+		return
+	}
+
+	bySubscriber := make(map[uuid.UUID]float64, len(subscriberIDs))
+	for _, p := range open {
+		bySubscriber[p.SubscriberID] = roundPOSMoney(bySubscriber[p.SubscriberID] + posPromiseRemaining(p))
+	}
+
+	for i := range sales {
+		sale := &sales[i]
+		if !sale.PromisePayment {
+			continue
+		}
+		remaining := bySubscriber[sale.SubscriberID]
+		status := "partial"
+		if remaining <= 0 {
+			status = "completed"
+		}
+		sale.PromiseInfo = &models.SalePromiseInfo{
+			PendingAmount:   roundPOSMoney(remaining + sale.TotalAmount),
+			PaidAmount:      sale.TotalAmount,
+			CollectedAmount: sale.TotalAmount,
+			RemainingAmount: remaining,
+			PromiseDate:     sale.Date,
+			Status:          status,
+			Description:     "Counter dues payment",
+		}
+	}
 }
 
 // GetPOSSale returns a single sale (with items) by id.
@@ -680,11 +791,11 @@ func ReplacePOSSale(c *gin.Context) {
 	// Snapshot the ORIGINAL sale (items + totals) so the replaced page can show
 	// what the entry looked like before the replacement.
 	originalSnapshot := struct {
-		TotalAmount   float64          `json:"totalAmount"`
-		TaxAmount     float64          `json:"taxAmount"`
-		PaymentMethod string           `json:"paymentMethod"`
-		Date          string           `json:"date"`
-		Discount      float64          `json:"discount"`
+		TotalAmount   float64           `json:"totalAmount"`
+		TaxAmount     float64           `json:"taxAmount"`
+		PaymentMethod string            `json:"paymentMethod"`
+		Date          string            `json:"date"`
+		Discount      float64           `json:"discount"`
 		Items         []models.SaleItem `json:"items"`
 	}{
 		TotalAmount:   sale.TotalAmount,

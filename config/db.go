@@ -133,6 +133,8 @@ func RunMigrations() {
 		&models.AccountSubHead{},
 		&models.AccountEntry{},
 		&models.SubscriberInstallment{},
+		&models.POSPromise{},
+		&models.POSPromiseCollection{},
 		&models.Message{},
 		&models.MessageTemplate{},
 		&models.SerialNumberPool{},

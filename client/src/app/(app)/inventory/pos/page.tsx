@@ -20,7 +20,7 @@ import type { Product, InstallmentPlan, SubscriberInstallment } from '@/lib/type
 import { backendImageUrl } from '@/lib/utils';
 
 import api from '@/lib/api';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { smartMatch, smartSearch } from '@/lib/search';
 import {
   AlertDialog,
@@ -463,6 +463,19 @@ export default function POSPage() {
     const [showCustomer, setShowCustomer] = useState(false);
     const [showDealer, setShowDealer] = useState(false);
 
+    // Promise-to-pay: the sale and stock leave now, the unpaid remainder is kept
+    // as a separate debt the customer settles later.
+    const [showPromise, setShowPromise] = useState(false);
+    const [promisePaidNow, setPromisePaidNow] = useState('');
+    const [promiseDate, setPromiseDate] = useState(() => new Date().toISOString().slice(0, 10));
+    const [promiseDescription, setPromiseDescription] = useState('');
+    const [promiseSubmitting, setPromiseSubmitting] = useState(false);
+
+    // Counter collection of old pending dues: entered amount + Create Payment,
+    // only shown when a customer with dues is selected and no product is carted.
+    const [duesAmount, setDuesAmount] = useState('');
+    const [isPayingDues, setIsPayingDues] = useState(false);
+
     const [isInstallment, setIsInstallment] = useState(false);
     const [selectedPlanId, setSelectedPlanId] = useState<string>('');
     const [existingInstallment, setExistingInstallment] = useState<SubscriberInstallment | null>(null);
@@ -476,7 +489,7 @@ export default function POSPage() {
         type: 'success' | 'error';
         title: string;
         description: string;
-        details?: { items: number; total: number };
+        details?: { items: number; total: number; paidNow?: number; pending?: number };
     }
     const [orderResult, setOrderResult] = useState<OrderResult | null>(null);
 
@@ -597,6 +610,48 @@ export default function POSPage() {
         if (customerType === 'dealer') return dealerList.find(d => d.id === customerId)?.name || '';
         return '';
     }, [customerId, customerType, subscribersData, customerList, dealerList]);
+
+const selectedInternetId = useMemo(() => {
+    if (customerType !== 'subscriber' || !customerId) return '';
+    const match = (Array.isArray(subscribersData) ? subscribersData.find((s: any) => s.id === customerId) : null);
+    return match?.internetId || match?.internet_id || '';
+  }, [customerId, customerType, subscribersData]);
+
+    const selectedPhone = useMemo(() => {
+        if (!customerId || !Array.isArray(customersData) && !Array.isArray(dealersData)) return '';
+        if (customerType === 'subscriber') {
+            const s = (Array.isArray(subscribersData) ? subscribersData.find((x: any) => x.id === customerId) : null);
+            return s?.phone || s?.cell || s?.mobile || '';
+        }
+        // customerList/dealerList are trimmed to id+name, so read the phone from
+        // the raw query data instead of the dropdown projection.
+        if (customerType === 'customer') {
+            const c = (Array.isArray(customersData) ? customersData.find((x: any) => x.id === customerId) : null);
+            return c?.phone || c?.cell || c?.mobile || '';
+        }
+        if (customerType === 'dealer') {
+            const d = (Array.isArray(dealersData) ? dealersData.find((x: any) => x.id === customerId) : null);
+            return d?.contactPhone || d?.phone || '';
+        }
+        return '';
+    }, [customerId, customerType, subscribersData, customersData, dealersData]);
+
+    // Money this customer still owes from earlier POS promise sales, so the
+    // counter knows at a glance that they are coming in with an open balance.
+    const { data: existingPending = 0 } = useQuery({
+        queryKey: ['pos/promises', 'customer-pending', customerId, companyId],
+        enabled: !!customerId && !!companyId,
+        queryFn: async () => {
+            const res = await api.get(
+                `/pos/promises?subscriberId=${customerId}&status=open&companyId=${companyId}`,
+            );
+            const list = (res.data?.data ?? []) as any[];
+            return list.reduce((sum: number, p: any) => {
+                const remaining = (Number(p.remainingAmount) || 0);
+                return sum + remaining;
+            }, 0);
+        },
+    });
 
     const posProducts = useMemo(() => {
         if (!purchasedProducts) return [];
@@ -978,6 +1033,150 @@ export default function POSPage() {
         }
     };
 
+    const handleMakePromise = async () => {
+        if (!customerId) {
+            setOrderResult({ type: 'error', title: 'Customer not selected', description: 'Please select a customer to proceed.' });
+            return;
+        }
+        if (cart.length === 0) {
+            setOrderResult({ type: 'error', title: 'Cart is empty', description: 'Add products before making a promise.' });
+            return;
+        }
+        if (!promiseDate) {
+            setOrderResult({ type: 'error', title: 'Promise date required', description: 'Please choose the date the customer will pay by.' });
+            return;
+        }
+        if (!validateSelectedSNs()) {
+            return;
+        }
+
+        // Blank means the customer pays nothing right now.
+        const paidNow = promisePaidNow === '' ? 0 : (parseFloat(promisePaidNow) || 0);
+        if (paidNow < 0) {
+            setOrderResult({ type: 'error', title: 'Invalid amount', description: 'Amount paid now cannot be negative.' });
+            return;
+        }
+        if (paidNow >= total) {
+            setOrderResult({
+                type: 'error',
+                title: 'Nothing left to promise',
+                description: 'The amount paid now covers the whole total. Use Complete Payment instead.',
+            });
+            return;
+        }
+
+        setPromiseSubmitting(true);
+        try {
+            const expandedItems = cart.flatMap(item => buildExpandedItems(item));
+
+            await api.post(`/pos/promises?companyId=${companyId}`, {
+                subscriberId: customerId,
+                subscriberName: selectedName || 'Unknown',
+                internetId: selectedInternetId || '',
+                phone: selectedPhone,
+                totalAmount: total,
+                taxAmount: tax,
+                discount,
+                paymentMethod: paymentMethod,
+                date: new Date().toISOString(),
+                companyId: companyId!,
+                items: expandedItems,
+                paidNow,
+                promiseDate,
+                description: promiseDescription,
+            });
+
+            queryClient.invalidateQueries({ queryKey: ['pos/sales'] });
+            queryClient.invalidateQueries({ queryKey: ['pos/promises'] });
+            queryClient.invalidateQueries({ queryKey: ['inventory/purchased-products', companyId] });
+            queryClient.invalidateQueries({ queryKey: ['inventory/products', companyId] });
+            queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+
+            setOrderResult({
+                type: 'success',
+                title: 'Promise Recorded!',
+                description: `PKR ${(total - paidNow).toLocaleString()} is pending payment by ${promiseDate}.`,
+                details: { items: cart.length, total, paidNow, pending: total - paidNow },
+            });
+
+            setCart([]);
+            setCustomerId('');
+            setCustomerType('');
+            setShowSubscriber(false);
+            setShowCustomer(false);
+            setShowDealer(false);
+            setDiscount(0);
+            setShowPromise(false);
+            setPromisePaidNow('');
+            setPromiseDescription('');
+            setPromiseDate(new Date().toISOString().slice(0, 10));
+        } catch (error: any) {
+            setOrderResult({
+                type: 'error',
+                title: 'Promise Failed',
+                description: error.response?.data?.message || error.response?.data?.error || 'Failed to record promise',
+            });
+        } finally {
+            setPromiseSubmitting(false);
+        }
+    };
+
+    const handlePayDues = async () => {
+        if (!customerId || !companyId) {
+            setOrderResult({ type: 'error', title: 'Customer not selected', description: 'Please select a customer to proceed.' });
+            return;
+        }
+        const amount = parseFloat(duesAmount);
+        if (!amount || amount <= 0) {
+            setOrderResult({ type: 'error', title: 'Invalid amount', description: 'Enter an amount greater than zero.' });
+            return;
+        }
+        if (amount > existingPending) {
+            setOrderResult({
+                type: 'error',
+                title: 'Amount too high',
+                description: `The customer only owes PKR ${existingPending.toLocaleString()}.`,
+            });
+            return;
+        }
+
+        setIsPayingDues(true);
+        try {
+            const res = await api.post(`/pos/dues/pay?companyId=${companyId}`, {
+                subscriberId: customerId,
+                subscriberName: selectedName || 'Unknown',
+                amount,
+                paymentMethod: paymentMethod || 'cash',
+                date: new Date().toISOString(),
+            });
+
+            const remaining = Number(res.data?.data?.remainingAmount ?? 0);
+
+            queryClient.invalidateQueries({ queryKey: ['pos/sales'] });
+            queryClient.invalidateQueries({ queryKey: ['pos/promises'] });
+            queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+
+            setOrderResult({
+                type: 'success',
+                title: remaining > 0 ? 'Dues Collected' : 'All Dues Settled!',
+                description: remaining > 0
+                    ? `PKR ${amount.toLocaleString()} received. PKR ${remaining.toLocaleString()} still pending for this customer.`
+                    : `PKR ${amount.toLocaleString()} received. This customer now owes nothing.`,
+                details: { items: 0, total: amount },
+            });
+
+            setDuesAmount('');
+        } catch (error: any) {
+            setOrderResult({
+                type: 'error',
+                title: 'Payment Failed',
+                description: error.response?.data?.message || error.response?.data?.error || 'Failed to record dues payment',
+            });
+        } finally {
+            setIsPayingDues(false);
+        }
+    };
+
     const handleHoldBill = async () => {
         if (!customerId) {
             setOrderResult({ type: 'error', title: 'Customer not selected', description: 'Please select a customer to hold a bill.' });
@@ -1232,7 +1431,7 @@ export default function POSPage() {
                 <Dialog open={!!orderResult} onOpenChange={(o) => { if (!o) setOrderResult(null); }}>
                     <DialogContent className="max-w-md rounded-xl shadow-lg">
                         <DialogHeader>
-                            <DialogTitle className="flex items-center gap-3">
+                            <DialogTitle className="flex items-center gap-3 flex-wrap min-w-0">
                                 <div className={`rounded-full p-2.5 ${orderResult?.type === 'success' ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400' : 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400'}`}>
                                     {orderResult?.type === 'success' ? <CheckCircle2 className="h-6 w-6" /> : <XCircle className="h-6 w-6" />}
                                 </div>
@@ -1343,14 +1542,19 @@ export default function POSPage() {
                             )}
 
                             {customerType && customerId && (
-                                <div className="flex items-center justify-between bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-md px-3 py-2">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">{selectedName}</span>
-                                        <Badge variant="outline" className="text-[10px] capitalize">{customerType}</Badge>
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-2 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-md px-3 py-2">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400 truncate">{selectedName}</span>
+                                        <Badge variant="outline" className="text-[10px] capitalize shrink-0">{customerType}</Badge>
                                     </div>
+                                    {existingPending > 0 && (
+                                        <span className="text-xs font-semibold text-fuchsia-700 dark:text-fuchsia-300">
+                                            Already owes PKR {existingPending.toLocaleString()}
+                                        </span>
+                                    )}
                                     <button
                                         type="button"
-                                        className="text-xs text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300 font-medium"
+                                        className="text-xs text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300 font-medium ml-auto"
                                         onClick={() => {
                                             setCustomerId('');
                                             setCustomerType('');
@@ -1364,6 +1568,54 @@ export default function POSPage() {
                                     >
                                         Clear
                                     </button>
+                                </div>
+                            )}
+
+                            {/* Counter collection of old pending dues: shown when
+                                this customer owes money and no new product is being
+                                sold. The payment becomes its own sales entry. */}
+                            {customerType && customerId && existingPending > 0 && cart.length === 0 && (
+                                <div className="flex flex-col gap-3 rounded-lg border border-fuchsia-300 bg-fuchsia-50/60 p-3 dark:border-fuchsia-800 dark:bg-fuchsia-950/20">
+                                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                                        <span className="text-xs font-semibold text-fuchsia-700 dark:text-fuchsia-300">
+                                            Collect outstanding dues
+                                        </span>
+                                        <span className="text-xs text-muted-foreground">
+                                            Owing: <span className="font-semibold text-fuchsia-700 dark:text-fuchsia-300">PKR {existingPending.toLocaleString()}</span>
+                                        </span>
+                                    </div>
+                                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                        <Input
+                                            type="number"
+                                            min={0}
+                                            max={existingPending}
+                                            step="any"
+                                            placeholder={`Enter amount (max PKR ${existingPending.toLocaleString()})`}
+                                            value={duesAmount}
+                                            onChange={(e) => {
+                                                const raw = e.target.value;
+                                                if (raw === '') { setDuesAmount(''); return; }
+                                                const num = parseFloat(raw);
+                                                if (isNaN(num)) return;
+                                                setDuesAmount(String(num > existingPending ? existingPending : num));
+                                            }}
+                                            className="h-9 flex-1 min-w-0"
+                                        />
+                                        <Button
+                                            size="sm"
+                                            disabled={isPayingDues}
+                                            onClick={handlePayDues}
+                                            className="shrink-0 bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white hover:from-fuchsia-600 hover:to-purple-700 shadow-sm transition-all duration-300"
+                                        >
+                                            {isPayingDues && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                            Pay
+                                        </Button>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <Button variant={paymentMethod === 'cash' ? 'default' : 'outline'} size="sm" onClick={() => setPaymentMethod('cash')} className="h-8 text-xs min-w-0">Cash</Button>
+                                        <Button variant={paymentMethod === 'card' ? 'default' : 'outline'} size="sm" onClick={() => setPaymentMethod('card')} className="h-8 text-xs min-w-0">Card</Button>
+                                        <Button variant={paymentMethod === 'bank' ? 'default' : 'outline'} size="sm" onClick={() => setPaymentMethod('bank')} className="h-8 text-xs min-w-0">Bank</Button>
+                                    </div>
                                 </div>
                             )}
 
@@ -1422,8 +1674,8 @@ export default function POSPage() {
                                                     {item.product.name.charAt(0).toUpperCase()}
                                                 </div>
                                             )}
-                                            <div className="flex-1 mx-3">
-                                                <p className="font-medium">{item.product.name}</p>
+                                            <div className="flex-1 mx-3 min-w-0">
+                                                <p className="font-medium truncate" title={item.product.name}>{item.product.name}</p>
                                                 <div className="flex items-center gap-3 mt-1 flex-wrap">
                                                     <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                                                         Price
@@ -1545,7 +1797,7 @@ export default function POSPage() {
                                             value={discount || ''}
                                             onChange={(e) => setDiscount(Math.max(0, Math.min(parseFloat(e.target.value) || 0, maxDiscount)))}
                                             placeholder={`0 (max ${maxDiscount})`}
-                                            className="h-8 text-right"
+                                            className="h-8 text-right flex-1 min-w-0"
                                             min="0"
                                             max={maxDiscount}
                                         />
@@ -1554,29 +1806,29 @@ export default function POSPage() {
 
                                 {/* Totals */}
                                 <div className="flex flex-col gap-1.5 text-sm">
-                                    <div className="flex justify-between text-muted-foreground">
+                                    <div className="flex justify-between gap-3 text-muted-foreground">
                                         <span>Subtotal</span>
-                                        <span>PKR {subtotal.toLocaleString()}</span>
+                                        <span className="text-right whitespace-nowrap">PKR {subtotal.toLocaleString()}</span>
                                     </div>
                                     {isInstallment && percentageIncrease > 0 && (
-                                        <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                                        <div className="flex justify-between gap-3 text-emerald-600 dark:text-emerald-400">
                                             <span>+ {percentageIncrease}% Increase</span>
-                                            <span>PKR {increaseAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                                            <span className="text-right whitespace-nowrap">PKR {increaseAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
                                         </div>
                                     )}
                                     {!isInstallment && discount > 0 && (
-                                        <div className="flex justify-between text-emerald-500">
+                                        <div className="flex justify-between gap-3 text-emerald-500">
                                             <span>Discount</span>
-                                            <span>- PKR {discount.toLocaleString()}</span>
+                                            <span className="text-right whitespace-nowrap">- PKR {discount.toLocaleString()}</span>
                                         </div>
                                     )}
-                                    <div className="flex justify-between text-muted-foreground">
+                                    <div className="flex justify-between gap-3 text-muted-foreground">
                                         <span>Tax</span>
-                                        <span>PKR {tax.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                        <span className="text-right whitespace-nowrap">PKR {tax.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                     </div>
-                                    <div className="flex justify-between font-bold text-lg border-t pt-1.5">
+                                    <div className="flex justify-between gap-3 font-bold text-lg border-t pt-1.5">
                                         <span>Total</span>
-                                        <span>PKR {isInstallment
+                                        <span className="text-right whitespace-nowrap">PKR {isInstallment
                                             ? (subtotal * (1 + percentageIncrease / 100)).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })
                                             : total.toLocaleString(undefined, { minimumFractionDigits: 2 })
                                         }</span>
@@ -1642,6 +1894,17 @@ export default function POSPage() {
                                                 {isProcessing ? 'Processing...' : 'Complete Payment'}
                                             </Button>
                                             )}
+                                            {canCollectPayment && (
+                                            <Button
+                                                variant="outline"
+                                                size="lg"
+                                                disabled={cart.length === 0 || isProcessing}
+                                                onClick={() => setShowPromise(true)}
+                                                className="col-span-2 border-amber-300 text-amber-700 transition-all duration-300 hover:scale-[1.02] hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950/30"
+                                            >
+                                                Make a Promise
+                                            </Button>
+                                            )}
                                         </div>
                                     </>
                                 )}
@@ -1650,6 +1913,91 @@ export default function POSPage() {
                     </Card>
                 </div>
             </div>
+
+        {/* Promise-to-pay: goods are handed over now, the remainder is collected later. */}
+        <Dialog open={showPromise} onOpenChange={setShowPromise}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Make a Promise</DialogTitle>
+                    <DialogDescription>
+                        The sale and stock are recorded now. Anything not paid today is kept as a
+                        separate pending amount for this customer.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4">
+                    <div className="rounded-lg border bg-muted/40 p-3 text-sm space-y-1">
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">Sale total</span>
+                            <span className="font-medium">PKR {total.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">Items</span>
+                            <span className="font-medium">{cart.length}</span>
+                        </div>
+                    </div>
+
+                    {cart.some(item => item.price < item.product.price) && (
+                        <p className="text-xs text-muted-foreground">
+                            Reduced prices are applied to this sale and saved with it.
+                        </p>
+                    )}
+
+                    <div className="space-y-2">
+                        <Label htmlFor="promise-paid">Paid now (PKR)</Label>
+                        <Input
+                            id="promise-paid"
+                            type="number"
+                            min={0}
+                            step="any"
+                            placeholder="0"
+                            value={promisePaidNow}
+                            onChange={(e) => setPromisePaidNow(e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Leave blank if the customer pays nothing today.
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="promise-date">Payment date</Label>
+                        <Input
+                            id="promise-date"
+                            type="date"
+                            value={promiseDate}
+                            onChange={(e) => setPromiseDate(e.target.value)}
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="promise-description">Description</Label>
+                        <Input
+                            id="promise-description"
+                            placeholder="Optional note about this promise"
+                            value={promiseDescription}
+                            onChange={(e) => setPromiseDescription(e.target.value)}
+                        />
+                    </div>
+
+                    {promisePaidNow !== '' && !isNaN(parseFloat(promisePaidNow)) && (
+                        <div className="flex justify-between rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-medium dark:border-amber-700 dark:bg-amber-950/30">
+                            <span>Pending after today</span>
+                            <span>PKR {(total - (parseFloat(promisePaidNow) || 0)).toLocaleString()}</span>
+                        </div>
+                    )}
+
+                    <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setShowPromise(false)} disabled={promiseSubmitting}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleMakePromise} disabled={promiseSubmitting || cart.length === 0}>
+                            {promiseSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {promiseSubmitting ? 'Recording...' : 'Record Promise'}
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
         </div>
     );
 }

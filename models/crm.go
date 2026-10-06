@@ -176,22 +176,45 @@ type Sale struct {
 	Discount       float64    `gorm:"type:decimal(10,2);default:0" json:"discount"`
 	ReplacedFrom   string     `gorm:"type:jsonb;default:null" json:"replacedFrom"` // snapshot of the ORIGINAL items captured when this sale was replaced
 	Items          []SaleItem `gorm:"foreignKey:SaleID;constraint:OnDelete:CASCADE" json:"items"`
+
+	// PromisePayment marks a sale row that was created when a customer settled an
+	// existing POS promise at the counter. It has no product items and no stock
+	// effect; it exists so the money received shows up in the sales list with a
+	// Paid / Pending label instead of vanishing.
+	PromisePayment bool `gorm:"default:false" json:"promisePayment"`
+
+	// PromiseInfo is filled in when a sale was made on a promise-to-pay. It is
+	// read from pos_promises rather than stored on the sale, so the money owed is
+	// never duplicated and stays in step with what has actually been collected.
+	PromiseInfo *SalePromiseInfo `gorm:"-" json:"promiseInfo"`
+}
+
+// SalePromiseInfo describes the unpaid part of a promise-to-pay sale.
+type SalePromiseInfo struct {
+	PromiseID       string  `json:"promiseId"`
+	PendingAmount   float64 `json:"pendingAmount"`
+	PaidAmount      float64 `json:"paidAmount"`
+	CollectedAmount float64 `json:"collectedAmount"`
+	RemainingAmount float64 `json:"remainingAmount"`
+	PromiseDate     string  `json:"promiseDate"`
+	Status          string  `json:"status"`
+	Description     string  `json:"description"`
 }
 
 // SaleItem - Individual product in a Sale
 type SaleItem struct {
 	TenantModel
-	SaleID       uuid.UUID `gorm:"type:uuid;not null;index" json:"saleId"`
-	ProductID    uuid.UUID `gorm:"type:uuid;not null;index" json:"productId"`
-	ProductName  string    `gorm:"type:varchar(255)" json:"productName"`
-	Quantity     int       `gorm:"not null" json:"quantity"`
-	Price        float64   `gorm:"type:decimal(10,2);not null" json:"price"`
-	OriginalPrice float64  `gorm:"type:decimal(10,2);default:0" json:"originalPrice"` // product list price at sale time
-	TaxPercent   float64   `gorm:"type:decimal(5,2);not null;default:0" json:"taxPercent"` // tax % applied to this line
-	SaleTax      float64   `gorm:"type:decimal(10,2);default:0" json:"saleTax"`
-	WthTax       float64   `gorm:"type:decimal(10,2);default:0" json:"wthTax"`
-	SerialNumber string    `gorm:"type:text" json:"serialNumber"`
-	Model        string    `gorm:"type:text" json:"model"`
+	SaleID        uuid.UUID `gorm:"type:uuid;not null;index" json:"saleId"`
+	ProductID     uuid.UUID `gorm:"type:uuid;not null;index" json:"productId"`
+	ProductName   string    `gorm:"type:varchar(255)" json:"productName"`
+	Quantity      int       `gorm:"not null" json:"quantity"`
+	Price         float64   `gorm:"type:decimal(10,2);not null" json:"price"`
+	OriginalPrice float64   `gorm:"type:decimal(10,2);default:0" json:"originalPrice"`      // product list price at sale time
+	TaxPercent    float64   `gorm:"type:decimal(5,2);not null;default:0" json:"taxPercent"` // tax % applied to this line
+	SaleTax       float64   `gorm:"type:decimal(10,2);default:0" json:"saleTax"`
+	WthTax        float64   `gorm:"type:decimal(10,2);default:0" json:"wthTax"`
+	SerialNumber  string    `gorm:"type:text" json:"serialNumber"`
+	Model         string    `gorm:"type:text" json:"model"`
 }
 
 // SubscriberInstallment tracks an installment agreement for a subscriber on a sale.

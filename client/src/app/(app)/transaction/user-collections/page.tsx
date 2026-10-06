@@ -31,7 +31,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { useCompany } from '@/context/company-context';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
@@ -39,10 +39,27 @@ import { useUser } from '@/hooks/use-user';
 import { useCrudPermissions, usePagePermissions } from '@/hooks/usePermissions';
 import { SUBSCRIBER_COLLECTION_PERMISSION } from '@/lib/permission-pages';
 import { smartMatchScore } from '@/lib/search';
-import { Loader2, MoreHorizontal, Wallet, DollarSign, UserCheck, Trash2, Pencil, Copy, FileText, Users, CalendarClock, Clock } from 'lucide-react';
+import { Loader2, MoreHorizontal, Wallet, DollarSign, UserCheck, Trash2, Pencil, Copy, FileText, Users, CalendarClock, Clock, ShoppingCart } from 'lucide-react';
 
 import type { Connection, Payment, Area, RecoveryOfficer, TransactionType, PromiseEntry } from '@/lib/types';
 import { SubscriberPrintDialog } from './_components/subscriber-print-dialog';
+
+// Money owed on goods already handed over at the POS, tracked separately from the
+// monthly billing balance.
+interface POSPromiseEntry {
+  id: string;
+  saleNumber?: string;
+  subscriberName?: string;
+  totalAmount: number;
+  paidAmount: number;
+  pendingAmount: number;
+  collectedAmount: number;
+  remainingAmount?: number;
+  promiseDate?: string;
+  description?: string;
+  status: string;
+  collectorName?: string;
+}
 
 function getMonthsSince(dateStr: string): number {
   if (!dateStr) return 0;
@@ -103,6 +120,13 @@ export default function SubscriberCollectionsPage() {
   const [promiseDate, setPromiseDate] = useState(new Date().toISOString().split('T')[0]);
   const [promiseDescription, setPromiseDescription] = useState('');
   const [isSavingPromise, setIsSavingPromise] = useState(false);
+
+  // Collecting against a POS promise-to-pay.
+  const [showPOSCollectDialog, setShowPOSCollectDialog] = useState(false);
+  const [posCollectTarget, setPosCollectTarget] = useState<POSPromiseEntry | null>(null);
+  const [posCollectAmount, setPosCollectAmount] = useState('');
+  const [posCollectMethod, setPosCollectMethod] = useState('cash');
+  const [isSavingPOSCollect, setIsSavingPOSCollect] = useState(false);
 
   const [receiveAmount, setReceiveAmount] = useState(0);
   const [receiveDate, setReceiveDate] = useState(new Date().toISOString().split('T')[0]);
@@ -179,6 +203,30 @@ export default function SubscriberCollectionsPage() {
     const all = promises as PromiseEntry[];
     return all.filter(p => p.subscriberId === selectedSubscriberId && p.status !== 'completed');
   }, [promises, selectedSubscriberId]);
+
+  // POS promise-to-pay debt. Kept apart from the monthly billing balance above so
+  // the two are never added together and the same money is not counted twice.
+  const { data: posPromiseData } = useQuery({
+    queryKey: ['pos/promises', selectedSubscriberId, companyId],
+    enabled: !!selectedSubscriberId && !!companyId,
+    queryFn: async () => {
+      const res = await api.get(
+        `/pos/promises?subscriberId=${selectedSubscriberId}&status=open&companyId=${companyId}`,
+      );
+      return (res.data?.data ?? []) as POSPromiseEntry[];
+    },
+  });
+
+  const subscriberPOSPromises = useMemo(() => {
+    return (posPromiseData ?? []).filter(p => p.status === 'pending' || p.status === 'partial');
+  }, [posPromiseData]);
+
+  const totalPOSPending = useMemo(() => {
+    return subscriberPOSPromises.reduce((sum, p) => sum + (Number(p.remainingAmount) || 0), 0);
+  }, [subscriberPOSPromises]);
+
+  const posRemaining = (p: POSPromiseEntry) =>
+    Math.max(0, (Number(p.pendingAmount) || 0) - (Number(p.collectedAmount) || 0));
 
   const totalSubscribers = useMemo(() => {
     if (!Array.isArray(connections)) return 0;
@@ -449,6 +497,53 @@ export default function SubscriberCollectionsPage() {
     setShowReceiveDialog(true);
   };
 
+  const openPOSCollect = (promise: POSPromiseEntry) => {
+    // Default to settling the whole outstanding amount; the operator can type
+    // less to take a part payment.
+    setPosCollectTarget(promise);
+    setPosCollectAmount(String(posRemaining(promise)));
+    setPosCollectMethod('cash');
+    setShowPOSCollectDialog(true);
+  };
+
+  const handlePOSCollect = async () => {
+    if (!posCollectTarget || !companyId) return;
+
+    const amount = parseFloat(posCollectAmount);
+    const remaining = posRemaining(posCollectTarget);
+    if (!amount || amount <= 0) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Enter an amount greater than zero.' });
+      return;
+    }
+    if (amount > remaining) {
+      toast({ variant: 'destructive', title: 'Error', description: `Amount cannot be more than PKR ${remaining.toLocaleString()}.` });
+      return;
+    }
+
+    setIsSavingPOSCollect(true);
+    try {
+      await api.post(`/pos/promises/${posCollectTarget.id}/collect?companyId=${companyId}`, {
+        amount,
+        paymentMethod: posCollectMethod,
+      });
+
+      toast({ title: 'Collection recorded', description: `PKR ${amount.toLocaleString()} collected against POS promise.` });
+
+      setShowPOSCollectDialog(false);
+      setPosCollectTarget(null);
+      setPosCollectAmount('');
+      await queryClient.invalidateQueries({ queryKey: ['pos/promises'] });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Collection failed',
+        description: error.response?.data?.message || 'Failed to record the collection',
+      });
+    } finally {
+      setIsSavingPOSCollect(false);
+    }
+  };
+
   const handleEditOpen = (payment: Payment) => {
     setEditPayment(payment);
     setEditAmount(payment.amount);
@@ -707,6 +802,68 @@ export default function SubscriberCollectionsPage() {
                 Make Promise
               </Button>
             </div>
+
+            {/* POS promise-to-pay: shown apart from the monthly balance on purpose,
+                because collecting it must not change what the subscriber owes for billing. */}
+            {subscriberPOSPromises.length > 0 && (
+              <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50/60 p-4 dark:border-amber-700/60 dark:bg-amber-950/20">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <ShoppingCart className="h-4 w-4 text-amber-700 dark:text-amber-400" />
+                      <h4 className="text-sm font-semibold text-amber-900 dark:text-amber-300">
+                        POS Pending Payments
+                      </h4>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {subscriberPOSPromises.length} open promise{subscriberPOSPromises.length > 1 ? 's' : ''} from shop sales. This is separate from the monthly bill.
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-muted-foreground">Total Pending</div>
+                    <div className="text-lg font-bold text-amber-800 dark:text-amber-300">
+                      PKR {totalPOSPending.toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  {subscriberPOSPromises.map((promise) => (
+                    <div
+                      key={promise.id}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-background/70 px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="font-mono text-muted-foreground">
+                            {promise.saleNumber || `POS ${promise.id.slice(0, 8)}`}
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className="border-amber-300 px-1.5 py-0 text-[10px] text-amber-700 dark:text-amber-400"
+                          >
+                            {promise.status}
+                          </Badge>
+                        </div>
+                        {promise.description && (
+                          <div className="truncate text-xs text-muted-foreground" title={promise.description}>
+                            {promise.description}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-semibold">
+                          PKR {posRemaining(promise).toLocaleString()}
+                        </span>
+                        <Button size="sm" variant="outline" onClick={() => openPOSCollect(promise)}>
+                          Collect
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="p-4">
               <h3 className="text-lg font-semibold mb-4">{selectedSubscriber.name}&apos;s Payment History</h3>
@@ -1107,6 +1264,67 @@ export default function SubscriberCollectionsPage() {
             >
               {isSavingPromise && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save Promise
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Collect against a POS promise-to-pay. */}
+      <Dialog
+        open={showPOSCollectDialog}
+        onOpenChange={(open) => {
+          setShowPOSCollectDialog(open);
+          if (!open) setPosCollectTarget(null);
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Collect POS Pending</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-lg border border-amber-300 bg-amber-50/60 p-3 text-sm dark:border-amber-700/60 dark:bg-amber-950/20">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Sale</span>
+                <span className="font-mono">
+                  {posCollectTarget?.saleNumber || `POS ${posCollectTarget?.id.slice(0, 8)}`}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Outstanding</span>
+                <span className="font-medium">
+                  PKR {posCollectTarget ? posRemaining(posCollectTarget).toLocaleString() : '0'}
+                </span>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Amount Collected</Label>
+              <Input
+                type="number"
+                min={0}
+                step="any"
+                value={posCollectAmount}
+                onChange={(e) => setPosCollectAmount(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Payment Method</Label>
+              <select
+                value={posCollectMethod}
+                onChange={(e) => setPosCollectMethod(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+              >
+                <option value="cash">Cash</option>
+                <option value="card">Card</option>
+                <option value="bank">Bank</option>
+              </select>
+            </div>
+            <Button
+              onClick={handlePOSCollect}
+              disabled={isSavingPOSCollect || !posCollectTarget}
+              className="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white hover:from-amber-600 hover:to-orange-700 shadow-sm transition-all duration-300 hover:shadow-md"
+            >
+              {isSavingPOSCollect && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Record Collection
             </Button>
           </div>
         </DialogContent>

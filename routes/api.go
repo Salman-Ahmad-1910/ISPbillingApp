@@ -103,12 +103,12 @@ func SetupRoutes(r *gin.Engine) {
 		authProtected.PUT("/status", controllers.UpdateUserStatus)
 	}
 
-		// Admin routes for company management
-		admin := api.Group("/admin")
-		admin.Use(middleware.AuthMiddleware())
-		{
-			controllers.RegisterGenericCRUDScoped[models.Company](admin, "/companies", false)
-			controllers.RegisterConnectionRoutes(admin)
+	// Admin routes for company management
+	admin := api.Group("/admin")
+	admin.Use(middleware.AuthMiddleware())
+	{
+		controllers.RegisterGenericCRUDScoped[models.Company](admin, "/companies", false)
+		controllers.RegisterConnectionRoutes(admin)
 
 		// Custom users endpoint to handle password and role properly
 		adminUsers := admin.Group("/users")
@@ -170,24 +170,24 @@ func SetupRoutes(r *gin.Engine) {
 			upload.DELETE("/company-image", controllers.DeleteCompanyImage)
 			upload.POST("/company-stamp", controllers.UploadCompanyStamp)
 			upload.DELETE("/company-stamp", controllers.DeleteCompanyStamp)
-		upload.POST("/product-image/:id", controllers.UploadProductImage)
-		upload.POST("/driver", controllers.UploadDriverFile)
-		upload.POST("/application", controllers.UploadApplicationFile)
-	}
+			upload.POST("/product-image/:id", controllers.UploadProductImage)
+			upload.POST("/driver", controllers.UploadDriverFile)
+			upload.POST("/application", controllers.UploadApplicationFile)
+		}
 
-	// Static file serving for company images
-	api.GET("/uploads/company_images/:companyId", controllers.GetCompanyImage)
-	// Static file serving for company stamps
-	api.GET("/uploads/company_stamps/:companyId", controllers.GetCompanyStamp)
-	// Static file serving for product images
-	api.GET("/uploads/product_images/:filename", controllers.GetProductImage)
-	// Static file serving for shared files (drivers, application) downloads
-	api.GET("/uploads/files/:filename", controllers.DownloadSharedFile)
+		// Static file serving for company images
+		api.GET("/uploads/company_images/:companyId", controllers.GetCompanyImage)
+		// Static file serving for company stamps
+		api.GET("/uploads/company_stamps/:companyId", controllers.GetCompanyStamp)
+		// Static file serving for product images
+		api.GET("/uploads/product_images/:filename", controllers.GetProductImage)
+		// Static file serving for shared files (drivers, application) downloads
+		api.GET("/uploads/files/:filename", controllers.DownloadSharedFile)
 
-	// Shared file management routes
-	protected.GET("/drivers", controllers.ListDriverFiles)
-	protected.GET("/applications", controllers.ListApplications)
-	protected.DELETE("/files/:id", controllers.DeleteSharedFile)
+		// Shared file management routes
+		protected.GET("/drivers", controllers.ListDriverFiles)
+		protected.GET("/applications", controllers.ListApplications)
+		protected.DELETE("/files/:id", controllers.DeleteSharedFile)
 
 		// Network routes (with RBAC)
 		network := protected.Group("/network")
@@ -218,8 +218,8 @@ func SetupRoutes(r *gin.Engine) {
 			billing.POST("/payments/process", middleware.RBACMiddleware(config.DB, "billing", "add"), controllers.ProcessPayment)
 			billing.GET("/payments", controllers.GetPayments)
 			billing.POST("/payments", middleware.RBACMiddleware(config.DB, "billing", "add"), controllers.CreatePayment)
-billing.PUT("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "edit"), controllers.UpdatePayment)
-		billing.DELETE("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "delete"), controllers.DeletePayment)
+			billing.PUT("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "edit"), controllers.UpdatePayment)
+			billing.DELETE("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "delete"), controllers.DeletePayment)
 			controllers.RegisterGenericCRUD[models.TransactionType](billing, "/transaction-types")
 			billing.POST("/bills/create", middleware.RBACMiddleware(config.DB, "billing", "add"), controllers.CreateBills)
 			billing.POST("/bills/delete", middleware.RBACMiddleware(config.DB, "billing", "add"), controllers.DeleteBills)
@@ -263,15 +263,15 @@ billing.PUT("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "ed
 			controllers.RegisterGenericCRUD[models.Guarantor](crm, "/guarantors")
 			controllers.RegisterGenericCRUD[models.Vendor](crm, "/vendors")
 
-// Vendor Invoice specific routes. Same resource as
-		// /inventory/vendor-invoices, so they share its permission guards; on
-		// the bare crm group they were an unguarded duplicate write path.
-		crmVendorInvoiceWrite := middleware.RequirePageCrud(config.DB, middleware.VendorInvoicePermission)
-		crm.GET("/vendor-invoices", controllers.GetVendorInvoices)
-		crm.GET("/vendor-invoices/:id", controllers.GetVendorInvoiceByID)
-		crm.POST("/vendor-invoices", crmVendorInvoiceWrite, controllers.CreateVendorInvoice)
-		crm.PUT("/vendor-invoices/:id", crmVendorInvoiceWrite, controllers.UpdateVendorInvoice)
-		crm.DELETE("/vendor-invoices/:id", crmVendorInvoiceWrite, controllers.DeleteVendorInvoice)
+			// Vendor Invoice specific routes. Same resource as
+			// /inventory/vendor-invoices, so they share its permission guards; on
+			// the bare crm group they were an unguarded duplicate write path.
+			crmVendorInvoiceWrite := middleware.RequirePageCrud(config.DB, middleware.VendorInvoicePermission)
+			crm.GET("/vendor-invoices", controllers.GetVendorInvoices)
+			crm.GET("/vendor-invoices/:id", controllers.GetVendorInvoiceByID)
+			crm.POST("/vendor-invoices", crmVendorInvoiceWrite, controllers.CreateVendorInvoice)
+			crm.PUT("/vendor-invoices/:id", crmVendorInvoiceWrite, controllers.UpdateVendorInvoice)
+			crm.DELETE("/vendor-invoices/:id", crmVendorInvoiceWrite, controllers.DeleteVendorInvoice)
 		}
 
 		// Roles and permissions
@@ -668,7 +668,7 @@ billing.PUT("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "ed
 			}
 			inventory.GET("/vendor-invoices", controllers.GetVendorInvoices)
 			inventory.GET("/vendor-invoices/:id", controllers.GetVendorInvoiceByID)
-// Same resource as /crm/vendor-invoices, so it shares that route's permission
+			// Same resource as /crm/vendor-invoices, so it shares that route's permission
 			// guards (Vendor Invoice 15372).
 			vendorInvoiceWrite := middleware.RequirePageCrud(config.DB, middleware.VendorInvoicePermission)
 			inventory.POST("/vendor-invoices", vendorInvoiceWrite, controllers.CreateVendorInvoice)
@@ -726,6 +726,13 @@ billing.PUT("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "ed
 			pos.PATCH("/sales/:id/status", controllers.UpdatePOSSaleStatus)
 			pos.GET("/installment/:subscriberId", controllers.GetSubscriberInstallment)
 			pos.PUT("/installment/:id/pay", controllers.PayInstallment)
+			// POS promise-to-pay: the sale and stock are recorded in full while
+			// only the unpaid remainder is kept as a separate debt.
+			pos.POST("/promises", controllers.CreatePOSPromise)
+			pos.GET("/promises", controllers.GetPOSPromises)
+			pos.GET("/promises/:id/collections", controllers.GetPOSPromiseCollections)
+			pos.POST("/promises/:id/collect", controllers.CollectPOSPromise)
+			pos.POST("/dues/pay", controllers.CreatePOSDuesPayment)
 		}
 
 		// Support routes
@@ -828,11 +835,11 @@ billing.PUT("/payments/:id", middleware.RBACMiddleware(config.DB, "billing", "ed
 			subscribers.PUT("/:id", controllers.UpdateSubscriber)
 			subscribers.DELETE("/:id", controllers.DeleteSubscriber)
 
-		subscriberImportExport := controllers.SubscriberImportExport{}
-		subscribers.GET("/export", subscriberImportExport.ExportSubscribers)
-		subscribers.GET("/template", subscriberImportExport.DownloadTemplate)
-		subscribers.POST("/import/preview", subscriberImportExport.PreviewImportSubscribers)
-		subscribers.POST("/import/confirm", subscriberImportExport.ConfirmImportSubscribers)
+			subscriberImportExport := controllers.SubscriberImportExport{}
+			subscribers.GET("/export", subscriberImportExport.ExportSubscribers)
+			subscribers.GET("/template", subscriberImportExport.DownloadTemplate)
+			subscribers.POST("/import/preview", subscriberImportExport.PreviewImportSubscribers)
+			subscribers.POST("/import/confirm", subscriberImportExport.ConfirmImportSubscribers)
 
 			controllers.RegisterGenericCRUD[models.Inquiry](subscribers, "/inquiries")
 			controllers.RegisterGenericCRUD[models.CorporateCustomer](subscribers, "/corporate")

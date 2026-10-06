@@ -84,7 +84,7 @@ export interface SaleFilters {
   fromDate: string;
   toDate: string;
   salesType: 'all' | 'good' | 'bad' | 'replaced';
-  paymentType: 'all' | 'normal' | 'installment' | 'hold';
+  paymentType: 'all' | 'normal' | 'installment' | 'promise' | 'hold';
   search: string;
 }
 
@@ -445,6 +445,7 @@ export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) 
                     <SelectItem value="all">All Payments</SelectItem>
                     <SelectItem value="normal">Normal</SelectItem>
                     <SelectItem value="installment">Installments</SelectItem>
+                    <SelectItem value="promise">Promises</SelectItem>
                     <SelectItem value="hold">Hold</SelectItem>
                   </SelectContent>
                 </Select>

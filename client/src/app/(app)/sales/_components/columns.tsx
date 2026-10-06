@@ -23,6 +23,17 @@ interface Sale {
   companyId: string;
   isInstallment?: boolean;
   items: SaleItem[];
+  promisePayment?: boolean;
+  promiseInfo?: {
+    promiseId: string;
+    pendingAmount: number;
+    paidAmount: number;
+    collectedAmount: number;
+    remainingAmount: number;
+    promiseDate?: string;
+    status?: string;
+    description?: string;
+  } | null;
 }
 
 interface SaleItem {
@@ -76,6 +87,8 @@ export function getColumns(onDelete?: (id: string) => void, onPay?: (sale: Sale)
         const isHold = row.original.status === 'hold';
         const isReturned = row.original.status === 'returned';
         const isReplaced = row.original.status === 'replaced';
+        const promiseInfo = row.original.promiseInfo;
+        const isOpenPromise = !!promiseInfo && promiseInfo.remainingAmount > 0;
         // A line is a "good sale" when its selling price exceeds the product's
         // original list price captured at sale time.
         const isGoodSale = (row.original.items || []).some(i => {
@@ -110,6 +123,25 @@ export function getColumns(onDelete?: (id: string) => void, onPay?: (sale: Sale)
             {isInstallment && (
               <Badge variant="secondary" className="text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
                 Installment
+              </Badge>
+            )}
+            {promiseInfo && (
+              <Badge
+                variant="secondary"
+                title={
+                  promiseInfo.promiseDate
+                    ? `Payment date: ${promiseInfo.promiseDate}`
+                    : 'Promise-to-pay'
+                }
+                className={isOpenPromise
+                  ? 'cursor-help text-[10px] bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900 dark:text-fuchsia-300'
+                  : 'cursor-help text-[10px] bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}
+              >
+                {isOpenPromise
+                  ? `Pending PKR ${Number(promiseInfo.remainingAmount).toLocaleString()}`
+                  : row.original.promisePayment
+                    ? 'Paid'
+                    : 'Promise Paid'}
               </Badge>
             )}
           </div>
