@@ -24,6 +24,9 @@ interface Sale {
   isInstallment?: boolean;
   items: SaleItem[];
   promisePayment?: boolean;
+  saleType?: string;
+  paidAmount?: number;
+  paymentStatus?: string;
   promiseInfo?: {
     promiseId: string;
     pendingAmount: number;
@@ -96,8 +99,26 @@ export function getColumns(onDelete?: (id: string) => void, onPay?: (sale: Sale)
           const salePrice = Number(i.price) || 0;
           return originalPrice > 0 && salePrice > originalPrice;
         });
+        const isFiber = row.original.saleType === 'fiber_jointing';
+        const fiberStatusMap: Record<string, { label: string; className: string }> = {
+          paid: { label: 'Paid', className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300' },
+          partial: { label: 'Partially Paid', className: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' },
+          promise: { label: 'Promise to Pay', className: 'bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900 dark:text-fuchsia-300' },
+          unpaid: { label: 'Unpaid', className: 'bg-rose-100 text-rose-700 dark:bg-rose-900 dark:text-rose-300' },
+        };
+        const fiberStatus = isFiber ? fiberStatusMap[String(row.original.paymentStatus || '')] : undefined;
         return (
           <div className="flex items-center gap-1.5">
+            {isFiber && (
+              <Badge variant="secondary" className="text-[10px] bg-sky-100 text-sky-700 dark:bg-sky-900 dark:text-sky-300">
+                Fiber Jointing
+              </Badge>
+            )}
+            {fiberStatus && (
+              <Badge variant="secondary" className={`text-[10px] ${fiberStatus.className}`}>
+                {fiberStatus.label}
+              </Badge>
+            )}
             {isHold ? (
               <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
                 Hold

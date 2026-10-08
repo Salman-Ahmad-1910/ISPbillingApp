@@ -12,8 +12,9 @@ import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useCrudPermissions, usePagePermissions } from '@/hooks/usePermissions';
 import { POS_PERMISSION } from '@/lib/permission-pages';
 
-import { PlusCircle, Trash2, CreditCard, Landmark, CircleDollarSign, Loader2, ShoppingCart, Search, Users, UserRound, Handshake, CalendarDays, Receipt, MoreVertical, Hash, ChevronDown, Tag, CheckCircle2, XCircle } from 'lucide-react';
+import { PlusCircle, Trash2, CreditCard, Landmark, CircleDollarSign, Loader2, ShoppingCart, Search, Users, UserRound, Handshake, CalendarDays, Receipt, MoreVertical, Hash, ChevronDown, Tag, CheckCircle2, XCircle, Cable } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import type { Product, InstallmentPlan, SubscriberInstallment } from '@/lib/types';
@@ -1284,14 +1285,21 @@ const selectedInternetId = useMemo(() => {
 
     return (
         <div className="flex flex-col gap-6">
-            <div className="flex items-center gap-3">
-                <div className="rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 p-2.5 text-white shadow-sm">
-                    <ShoppingCart className="h-5 w-5" />
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                    <div className="rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 p-2.5 text-white shadow-sm">
+                        <ShoppingCart className="h-5 w-5" />
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight">Point of Sale (POS)</h1>
+                        <p className="text-sm text-muted-foreground">A retail counter for quick billing, recharges, and device sales.</p>
+                    </div>
                 </div>
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Point of Sale (POS)</h1>
-                    <p className="text-sm text-muted-foreground">A retail counter for quick billing, recharges, and device sales.</p>
-                </div>
+                <Button asChild variant="outline">
+                    <Link href="/fiber-jointing">
+                        <Cable className="mr-2 h-4 w-4" /> Fiber Jointing
+                    </Link>
+                </Button>
             </div>
 
             <div className="h-0.5 bg-gradient-to-r from-amber-500/50 via-orange-500/30 to-transparent" />

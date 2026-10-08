@@ -81,6 +81,7 @@ const (
 	OneDayBalancePermission       = "13341"
 	PurchasePermission            = "15313"
 	SalesPermission               = "15315"
+	FiberJointingPermission       = "15391"
 	StaffPermission               = "15316"
 	StaffSalaryPermission         = "15318"
 	StaffAttendancePermission     = "15322"

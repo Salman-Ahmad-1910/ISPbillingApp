@@ -15,6 +15,8 @@ export default function SalesPage() {
     toDate: '',
     salesType: 'all',
     paymentType: 'all',
+    serviceType: 'all',
+    fiberPaymentStatus: 'all',
     search: '',
   });
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -30,6 +32,8 @@ export default function SalesPage() {
     if (filters.toDate) p.toDate = filters.toDate;
     if (filters.salesType && filters.salesType !== 'all') p.salesType = filters.salesType;
     if (filters.paymentType && filters.paymentType !== 'all') p.paymentType = filters.paymentType;
+    if (filters.serviceType && filters.serviceType !== 'all') p.serviceType = filters.serviceType;
+    if (filters.fiberPaymentStatus && filters.fiberPaymentStatus !== 'all') p.paymentStatus = filters.fiberPaymentStatus;
     if (debouncedSearch.trim()) p.search = debouncedSearch.trim();
     return p;
   }, [filters, debouncedSearch]);

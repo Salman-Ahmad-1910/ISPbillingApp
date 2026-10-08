@@ -510,6 +510,22 @@ func GetPOSSales(c *gin.Context) {
 		db = db.Where("sales.is_installment = ?", true)
 	}
 
+	// One-time service types (fiber jointing / cable repair) are recorded as
+	// sales rows tagged with sale_type, separate from the monthly POS flow.
+	switch serviceType := strings.ToLower(strings.TrimSpace(c.Query("serviceType"))); serviceType {
+	case "fiber_jointing", "fiberjointing":
+		db = db.Where("sales.sale_type = ?", models.SaleTypeFiberJointing)
+	case "pos", "product":
+		db = db.Where("sales.sale_type IS NULL OR sales.sale_type = ?", models.SaleTypePOS)
+	}
+
+	// Payment status of the sale's own money, for service-charge rows: paid,
+	// partial, promise, unpaid.
+	switch paymentStatus := strings.ToLower(strings.TrimSpace(c.Query("paymentStatus"))); paymentStatus {
+	case "paid", "partial", "promise", "unpaid":
+		db = db.Where("sales.payment_status = ?", paymentStatus)
+	}
+
 	if q := strings.TrimSpace(c.Query("search")); q != "" {
 		like := strings.ToLower(q) + "%"
 		db = db.Where("LOWER(sales.subscriber_name) LIKE ? OR LOWER(sales.id::text) LIKE ?", like, like)

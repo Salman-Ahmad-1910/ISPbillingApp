@@ -135,6 +135,8 @@ func RunMigrations() {
 		&models.SubscriberInstallment{},
 		&models.POSPromise{},
 		&models.POSPromiseCollection{},
+		&models.FiberJointing{},
+		&models.FiberJointingPayment{},
 		&models.Message{},
 		&models.MessageTemplate{},
 		&models.SerialNumberPool{},

@@ -177,6 +177,21 @@ type Sale struct {
 	ReplacedFrom   string     `gorm:"type:jsonb;default:null" json:"replacedFrom"` // snapshot of the ORIGINAL items captured when this sale was replaced
 	Items          []SaleItem `gorm:"foreignKey:SaleID;constraint:OnDelete:CASCADE" json:"items"`
 
+	// SaleType tags the origin of the sale: pos (counter sale, the default),
+	// fiber_jointing (a one-time fiber jointing / cable repair service charge),
+	// or any future service type. Filters on the sales page use it to separate
+	// monthly-package-ish rows from one-time services.
+	SaleType string `gorm:"type:varchar(30);default:'pos';index" json:"saleType"`
+
+	// PaidAmount is the money actually received against this sale. For an
+	// ordinary POS sale it equals TotalAmount; for a promise or fiber jointing
+	// sale it is kept in step with the linked debt record so the sales list can
+	// show Received / Remaining without a join.
+	PaidAmount float64 `gorm:"type:decimal(10,2);not null;default:0" json:"paidAmount"`
+	// PaymentStatus mirrors the debt record's status (paid, partial, promise,
+	// unpaid) so the sales list can filter and label service charges.
+	PaymentStatus string `gorm:"type:varchar(20)" json:"paymentStatus"`
+
 	// PromisePayment marks a sale row that was created when a customer settled an
 	// existing POS promise at the counter. It has no product items and no stock
 	// effect; it exists so the money received shows up in the sales list with a

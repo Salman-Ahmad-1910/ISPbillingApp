@@ -49,6 +49,7 @@ import {
   ReceiptText,
   Settings,
   LogOut,
+  Cable,
   LifeBuoy,
   BarChartBig,
   AreaChart,
@@ -135,6 +136,7 @@ const navItems: NavItemGroup[] = [
       { title: 'Guarantors', href: '/crm/guarantors', icon: UserCheck, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
       { title: 'Installment Plans', href: '/sales/installment-plans', icon: FileCog, allowedRoles: ['admin', 'manager'] },
       { title: 'Point of Sale', href: '/inventory/pos', icon: ShoppingCart, allowedRoles: ['admin', 'manager', 'dealer'] },
+      { title: 'Fiber Jointing', href: '/fiber-jointing', icon: Cable, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff'] },
     ],
   },
   {

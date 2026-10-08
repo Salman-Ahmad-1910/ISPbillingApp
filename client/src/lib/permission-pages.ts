@@ -64,6 +64,7 @@ export const PERMISSION_DEFS: PermissionDef[] = [
   { id: '15336', name: 'Customers', module: 'Sales' },
   { id: '15337', name: 'Installment Plans', module: 'Sales' },
   { id: '15338', name: 'Point of Sale', module: 'Sales' },
+  { id: '15391', name: 'Fiber Jointing', module: 'Sales' },
   { id: '15370', name: 'Guarantors', module: 'Sales' },
   { id: '15316', name: 'Staff', module: 'Human Resources' },
   { id: '15318', name: 'Staff Salary', module: 'Human Resources' },
@@ -243,6 +244,7 @@ export const PERMISSION_PAGES: Record<string, string[]> = {
   '15336': ['/sales/customers', '/crm/customers'],
   '15337': ['/sales/installment-plans'],
   '15338': ['/inventory/pos'],
+  '15391': ['/fiber-jointing'],
   '15317': ['/hr/advances'],
   '15318': ['/hr/salary'],
   '15324': ['/hr/attendance-subscriber'],
@@ -414,6 +416,7 @@ export const ONE_DAY_BALANCE_PERMISSION = '13341';
 // reports and declare no children.
 export const PURCHASE_PERMISSION = '15313';
 export const SALES_PERMISSION = '15315';
+export const FIBER_JOINTING_PERMISSION = '15391';
 
 // Human Resources. Attendance Report (15324) is read-only and declares no
 // children.
@@ -715,6 +718,7 @@ export const PAGE_PERMISSIONS: Record<string, { name: string; children: PageChil
   // Inventory / Sales
   [PURCHASE_PERMISSION]: { name: 'Purchase', children: CRUD_CHILDREN },
   [SALES_PERMISSION]: { name: 'Sales', children: UPDATE_DELETE_CHILDREN },
+  [FIBER_JOINTING_PERMISSION]: { name: 'Fiber Jointing', children: CRUD_CHILDREN },
 
   // Human Resources
   [STAFF_PERMISSION]: { name: 'Staff', children: CRUD_CHILDREN },

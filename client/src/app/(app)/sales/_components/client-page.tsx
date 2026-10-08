@@ -46,6 +46,9 @@ interface Sale {
   companyId: string;
   isInstallment?: boolean;
   installmentPlanId?: string;
+  saleType?: string;
+  paidAmount?: number;
+  paymentStatus?: string;
   items: {
     id: string;
     saleId: string;
@@ -85,6 +88,8 @@ export interface SaleFilters {
   toDate: string;
   salesType: 'all' | 'good' | 'bad' | 'replaced';
   paymentType: 'all' | 'normal' | 'installment' | 'promise' | 'hold';
+  serviceType: 'all' | 'pos' | 'fiber_jointing';
+  fiberPaymentStatus: 'all' | 'paid' | 'partial' | 'promise' | 'unpaid';
   search: string;
 }
 
@@ -392,8 +397,8 @@ export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) 
         </CardHeader>
         <CardContent className="p-0">
           <div className="p-4 pb-0">
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
-              <div className="xl:col-span-1">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+              <div>
                 <Input
                   placeholder="Search by sale ID or customer name..."
                   value={filters.search}
@@ -450,6 +455,38 @@ export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) 
                   </SelectContent>
                 </Select>
               </div>
+              <div>
+                <Select
+                  value={filters.serviceType}
+                  onValueChange={(val) => onFiltersChange({ ...filters, serviceType: val as SaleFilters['serviceType'] })}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Service type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Service Types</SelectItem>
+                    <SelectItem value="pos">POS / Product</SelectItem>
+                    <SelectItem value="fiber_jointing">Fiber Jointing</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Select
+                  value={filters.fiberPaymentStatus}
+                  onValueChange={(val) => onFiltersChange({ ...filters, fiberPaymentStatus: val as SaleFilters['fiberPaymentStatus'] })}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Payment status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="paid">Paid</SelectItem>
+                    <SelectItem value="partial">Partially Paid</SelectItem>
+                    <SelectItem value="promise">Promise to Pay</SelectItem>
+                    <SelectItem value="unpaid">Unpaid</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="flex items-center gap-2 mt-3">
               <p className="text-xs text-muted-foreground">
@@ -464,11 +501,11 @@ export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) 
                 <FileDown className="mr-1.5 h-4 w-4" />
                 PDF
               </Button>
-              {(filters.fromDate || filters.toDate || filters.salesType !== 'all' || filters.paymentType !== 'all' || filters.search) && (
+              {(filters.fromDate || filters.toDate || filters.salesType !== 'all' || filters.paymentType !== 'all' || filters.serviceType !== 'all' || filters.fiberPaymentStatus !== 'all' || filters.search) && (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => onFiltersChange({ fromDate: '', toDate: '', salesType: 'all', paymentType: 'all', search: '' })}
+                  onClick={() => onFiltersChange({ fromDate: '', toDate: '', salesType: 'all', paymentType: 'all', serviceType: 'all', fiberPaymentStatus: 'all', search: '' })}
                   className="text-xs"
                 >
                   Clear Filters

@@ -290,4 +290,13 @@ func ConnectDB() {
 	}
 	log.Println("SharedFile table migrated successfully!")
 
+	// Fiber jointing / cable repair service charges and their receipts
+	log.Println("Attempting to migrate FiberJointing tables...")
+	err = DB.AutoMigrate(&models.FiberJointing{}, &models.FiberJointingPayment{})
+	if err != nil {
+		log.Fatal("Failed to migrate FiberJointing tables:", err)
+		return
+	}
+	log.Println("FiberJointing tables migrated successfully!")
+
 }

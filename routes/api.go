@@ -231,6 +231,19 @@ func SetupRoutes(r *gin.Engine) {
 			billing.DELETE("/promises/:id", controllers.DeletePromise)
 		}
 
+		// Fiber jointing / cable repair service charges. Reads require an
+		// authenticated company session; creating a charge and collecting money
+		// against one are guarded by the page's Create / Update child
+		// permissions (middleware.FiberJointingPermission), enforced server-side.
+		fiberJointing := protected.Group("/fiber-jointing")
+		{
+			fiberJointing.GET("", controllers.GetFiberJointings)
+			fiberJointing.GET("/:id", controllers.GetFiberJointing)
+			fiberJointing.GET("/:id/payments", controllers.GetFiberJointingPayments)
+			fiberJointing.POST("", middleware.RequirePageCrud(config.DB, middleware.FiberJointingPermission), controllers.CreateFiberJointing)
+			fiberJointing.POST("/:id/payment", middleware.RequirePageCrudAction(config.DB, middleware.FiberJointingPermission, "update"), controllers.CollectFiberJointing)
+		}
+
 		crm := api.Group("/crm")
 		// Mounts the JWT claims when present so the vendor invoice permission
 		// guards can resolve the user on this otherwise unguarded group.
