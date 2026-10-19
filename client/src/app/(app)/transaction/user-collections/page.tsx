@@ -1118,7 +1118,11 @@ export default function SubscriberCollectionsPage() {
               <Input
                 type="date"
                 value={receiveDate}
+                // Date is always shown and pre-selected (today), but only users
+                // holding the update permission may open the picker / change it.
+                readOnly={!canUpdate}
                 onChange={(e) => setReceiveDate(e.target.value)}
+                className={canUpdate ? undefined : 'pointer-events-none opacity-70'}
               />
             </div>
             <div className="space-y-1">

@@ -1,4 +1,4 @@
-package routes
+﻿package routes
 
 import (
 	"awesomeProject/config"
@@ -858,5 +858,10 @@ func SetupRoutes(r *gin.Engine) {
 			controllers.RegisterGenericCRUD[models.CorporateCustomer](subscribers, "/corporate")
 		}
 
+		// Transactional sync endpoint
+		sync := protected.Group("/sync")
+		{
+			sync.POST("/transaction", controllers.SyncTransaction)
+		}
 	}
 }
