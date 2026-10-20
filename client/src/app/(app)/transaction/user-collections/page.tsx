@@ -16,6 +16,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Table,
   TableBody,
   TableCell,
@@ -134,6 +144,9 @@ export default function SubscriberCollectionsPage() {
   const [receiveComment, setReceiveComment] = useState('');
   const [receiveTransactionId, setReceiveTransactionId] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+
+  const [isDeletingDues, setIsDeletingDues] = useState(false);
+  const [showDeleteDuesDialog, setShowDeleteDuesDialog] = useState(false);
 
   const [printPayment, setPrintPayment] = useState<Payment | null>(null);
   const [printPromise, setPrintPromise] = useState<PromiseEntry | null>(null);
@@ -487,6 +500,27 @@ export default function SubscriberCollectionsPage() {
     }
   };
 
+  // Admin-only: zeroes the selected subscriber's remaining amount. Only this
+  // one field is sent - a full-record PUT would carry createBalance/balanceDays
+  // along and the backend would re-add the prorated dues on top of the zero.
+  // Confirmation happens in the styled dialog, not the browser's confirm().
+  const handleDeleteDues = async () => {
+    if (!selectedSubscriber || isDeletingDues) return;
+    const label = selectedSubscriber.name || selectedSubscriber.internetId;
+    setIsDeletingDues(true);
+    try {
+      await api.put(`/admin/connections/${selectedSubscriber.id}`, { remainingAmount: 0 });
+      toast({ title: 'Deleted', description: `Remaining amount for "${label}" has been reset to zero.` });
+      queryClient.invalidateQueries({ queryKey: ['admin/connections'] });
+    } catch (error: any) {
+      const serverMsg = error.response?.data?.message || error.response?.data?.error || '';
+      toast({ variant: 'destructive', title: 'Error', description: serverMsg || 'Failed to reset the remaining amount.' });
+    } finally {
+      setIsDeletingDues(false);
+      setShowDeleteDuesDialog(false);
+    }
+  };
+
   const handleReceivePromise = (promise: PromiseEntry) => {
     setSelectedPromiseId(promise.id);
     setReceiveAmount(promise.amount);
@@ -801,6 +835,21 @@ export default function SubscriberCollectionsPage() {
                 <CalendarClock className="mr-2 h-4 w-4" />
                 Make Promise
               </Button>
+              {user?.role === 'admin' && (
+                <Button
+                  variant="outline"
+                  className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                  onClick={() => setShowDeleteDuesDialog(true)}
+                  disabled={isDeletingDues || displayRemaining <= 0}
+                >
+                  {isDeletingDues ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="mr-2 h-4 w-4" />
+                  )}
+                  Delete
+                </Button>
+              )}
             </div>
 
             {/* POS promise-to-pay: shown apart from the monthly balance on purpose,
@@ -1389,6 +1438,50 @@ export default function SubscriberCollectionsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={showDeleteDuesDialog}
+        onOpenChange={(open) => { if (!isDeletingDues) setShowDeleteDuesDialog(open); }}
+      >
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-100 ring-4 ring-red-50 sm:mx-0">
+              <Trash2 className="h-7 w-7 text-red-600" />
+            </div>
+            <AlertDialogTitle className="text-xl">Delete dues?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm">
+              This will reset the remaining amount of{' '}
+              <span className="font-semibold text-foreground">
+                {selectedSubscriber?.name || selectedSubscriber?.internetId}
+              </span>{' '}
+              to zero. 
+            </AlertDialogDescription>
+            <div className="mt-1 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-950">
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="text-muted-foreground">Remaining amount</span>
+                <span className="flex items-center gap-2">
+                  <span className="font-semibold text-amber-600">
+                    PKR {displayRemaining.toLocaleString()}
+                  </span>
+                  <span className="text-muted-foreground">→</span>
+                  <span className="font-semibold text-emerald-600">PKR 0</span>
+                </span>
+              </div>
+            </div>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingDues}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isDeletingDues}
+              onClick={(e) => { e.preventDefault(); handleDeleteDues(); }}
+              className="bg-red-600 text-white shadow-sm hover:bg-red-700 focus:ring-red-600"
+            >
+              {isDeletingDues && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isDeletingDues ? 'Deleting…' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <SubscriberPrintDialog
         isOpen={isPrintDialogOpen}

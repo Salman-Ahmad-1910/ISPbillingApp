@@ -195,7 +195,7 @@ type connectionInput struct {
 	Discount            string  `json:"discount"`
 	Amount              *float64 `json:"amount"`
 	PackageInternet     string   `json:"packageInternet"`
-	CreateBalance       bool     `json:"createBalance"`
+	CreateBalance       *bool    `json:"createBalance"`
 	BalanceDays         int      `json:"balanceDays"`
 	SameDiscount        string   `json:"sameDiscount"`
 	SameAmount          *float64 `json:"sameAmount"`
@@ -300,7 +300,7 @@ func createConnection(c *gin.Context) {
 		Discount:            input.Discount,
 		Amount:              valueOrZero(input.Amount),
 		PackageInternet:     input.PackageInternet,
-		CreateBalance:       input.CreateBalance,
+		CreateBalance:       input.CreateBalance != nil && *input.CreateBalance,
 		BalanceDays:         input.BalanceDays,
 		SameDiscount:        input.SameDiscount,
 		SameAmount:          valueOrZero(input.SameAmount),
@@ -315,7 +315,7 @@ func createConnection(c *gin.Context) {
 	// is enabled, an opening balance equal to the package fee prorated for the
 	// remaining days of the month is created (fee / 30 * days).
 	conn.RemainingAmount = 0
-	if input.CreateBalance && input.BalanceDays > 0 {
+	if input.CreateBalance != nil && *input.CreateBalance && input.BalanceDays > 0 {
 		cableFee := valueOrZero(input.Amount)
 		internetFee := valueOrZero(input.SameAmount)
 		fee := cableFee
@@ -457,7 +457,11 @@ func updateConnection(c *gin.Context) {
 	if input.PackageInternet != "" {
 		updates["package_internet"] = input.PackageInternet
 	}
-	updates["create_balance"] = input.CreateBalance
+	// Only touch the create-balance flag when the caller actually sent it;
+	// a partial update (e.g. resetting the balance) must not flip it off.
+	if input.CreateBalance != nil {
+		updates["create_balance"] = *input.CreateBalance
+	}
 	if input.BalanceDays != 0 {
 		updates["balance_days"] = input.BalanceDays
 	}
@@ -523,7 +527,7 @@ func updateConnection(c *gin.Context) {
 	// mid-month change, using the same formula as a new subscriber so both paths
 	// agree: fee / 30 * days. It accumulates onto whatever the balance is about
 	// to be, which is the new package fee when the package also changed.
-	if input.CreateBalance && input.BalanceDays > 0 {
+	if input.CreateBalance != nil && *input.CreateBalance && input.BalanceDays > 0 {
 		manualBalance := roundToTwo(newPackageFee / 30 * float64(input.BalanceDays))
 
 		base := old.RemainingAmount
@@ -717,8 +721,8 @@ func connectionFieldChanges(old models.Connection, input connectionInput) []conn
 	if input.BalanceDays != 0 {
 		add("balanceDays", "Balance Days Updated", fmtInt(old.BalanceDays), fmtInt(input.BalanceDays))
 	}
-	if input.CreateBalance != old.CreateBalance {
-		add("createBalance", "Balance Setting Updated", fmtBool(old.CreateBalance), fmtBool(input.CreateBalance))
+	if input.CreateBalance != nil && *input.CreateBalance != old.CreateBalance {
+		add("createBalance", "Balance Setting Updated", fmtBool(old.CreateBalance), fmtBool(*input.CreateBalance))
 	}
 	if input.SplitterPort != 0 && input.SplitterPort != old.SplitterPort {
 		add("splitterPort", "Splitter Port Changed", fmtInt(old.SplitterPort), fmtInt(input.SplitterPort))
