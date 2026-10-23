@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { IdBall } from '@/components/shared/id-ball';
 import { Wallet, ArrowLeft, Loader2 } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
@@ -169,7 +170,9 @@ export default function CollectionDetailsPage() {
                 <TableBody>
                   {filteredData.map((item: CollectionRecord, i: number) => (
                     <TableRow key={item.id}>
-                      <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <IdBall value={i + 1} label="Collection #" />
+                      </TableCell>
                       <TableCell className="font-medium">
                         <Link
                           href={`/crm/subscriber-detail?connectionId=${item.connectionId || item.subscriberId}`}

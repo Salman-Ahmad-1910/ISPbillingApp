@@ -4,6 +4,7 @@ import { type ColumnDef } from '@tanstack/react-table';
 import type { Guarantor } from '@/lib/types';
 import { Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { IdBall } from '@/components/shared/id-ball';
 
 interface GuarantorColumnsProps {
   onEdit: (guarantor: Guarantor) => void;
@@ -14,11 +15,7 @@ export const getColumns = ({ onEdit, onDelete }: GuarantorColumnsProps): ColumnD
   {
     accessorKey: 'id',
     header: 'ID',
-    cell: ({ row }) => (
-      <div className="text-xs font-mono text-muted-foreground">
-        {row.index + 1}
-      </div>
-    ),
+    cell: ({ row }) => <IdBall value={row.index + 1} label="Guarantor ID" />,
   },
   {
     accessorKey: 'name',

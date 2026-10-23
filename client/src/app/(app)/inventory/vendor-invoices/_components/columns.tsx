@@ -5,6 +5,7 @@ import type { VendorInvoice, VendorInvoiceItem } from '@/lib/types';
 import { parseSerialNumbers } from '@/components/shared/serial-entries';
 import { MoreHorizontal, Calendar, Building2, Printer, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { IdBall } from '@/components/shared/id-ball';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,7 +34,7 @@ export const columns = ({ onEdit, onDelete, onPrint, canUpdate = true, canDelete
   {
     id: 'index',
     header: '#',
-    cell: ({ row }) => <span className="font-mono text-xs">{row.index + 1}</span>,
+    cell: ({ row }) => <IdBall value={row.index + 1} label="#" />,
   },
   {
     id: 'vendorName',

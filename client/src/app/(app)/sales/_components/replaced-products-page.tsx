@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { smartMatch } from '@/lib/search';
 import { type ColumnDef } from '@tanstack/react-table';
 import { DataTable } from './data-table';
+import { IdBall } from '@/components/shared/id-ball';
 
 interface ReplacedProductRow {
   saleId: string;
@@ -103,6 +104,11 @@ export function ClientPage({ data }: { data: any[] }) {
   };
 
   const columns = useMemo<ColumnDef<ReplacedProductRow>[]>(() => [
+    {
+      id: 'id',
+      header: 'ID',
+      cell: ({ row }) => <IdBall value={row.index + 1} label="Row ID" />,
+    },
     {
       accessorKey: 'date',
       header: 'Date',

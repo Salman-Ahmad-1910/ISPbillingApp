@@ -245,6 +245,7 @@ export const inquirySchema = z.object({
 
 export const corporateCustomerSchema = z.object({
   id: z.string().optional(),
+  customerId: z.string().min(1, 'ID is required'),
   companyName: z.string().min(1, 'Company name is required'),
   contactPerson: z.string().min(1, 'Contact person is required'),
   contactPhone: z.string().min(1, 'Contact phone is required'),

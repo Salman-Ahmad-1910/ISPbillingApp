@@ -17,8 +17,14 @@ export const getColumns = ({ onEdit, onDelete, canUpdate = true, canDelete = tru
     accessorKey: 'id',
     header: 'ID',
     cell: ({ row }) => (
-      <div className="text-xs font-mono text-muted-foreground">
-        {row.index + 1}
+      <div
+        className="relative inline-flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-green-800 via-green-600 to-green-400 text-[11px] font-bold text-white ring-1 ring-green-900/40 shadow-[inset_0_1px_1px_rgba(255,255,255,0.45),inset_0_-2px_4px_rgba(0,0,0,0.35),0_3px_6px_rgba(0,0,0,0.3)]"
+        title={`Area ID: ${row.index + 1}`}
+      >
+        <span className="pointer-events-none absolute left-2 top-1 h-2 w-2 rounded-full bg-white/50 blur-[1px]" aria-hidden />
+        <span className="relative drop-shadow-[0_1px_1px_rgba(0,0,0,0.6)]">
+          {row.index + 1}
+        </span>
       </div>
     ),
   },

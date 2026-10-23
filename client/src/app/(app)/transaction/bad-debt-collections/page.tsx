@@ -27,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { IdBall } from '@/components/shared/id-ball';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCompany } from '@/context/company-context';
 import { useQueryClient } from '@tanstack/react-query';
@@ -449,7 +450,6 @@ const { canCreate, canUpdate, canDelete } = useCrudPermissions(BADDEBT_COLLECTIO
                       <Table className="text-xs">
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="py-1 px-1.5">#</TableHead>
                             <TableHead className="py-1 px-1.5">Bill #</TableHead>
                             <TableHead className="py-1 px-1.5">Name</TableHead>
                             <TableHead className="py-1 px-1.5">Month/Year</TableHead>
@@ -463,8 +463,9 @@ const { canCreate, canUpdate, canDelete } = useCrudPermissions(BADDEBT_COLLECTIO
                         <TableBody>
                           {subscriberPayments.map((payment, idx) => (
                             <TableRow key={payment.id}>
-                              <TableCell className="py-1.5 px-1.5 font-mono">{idx + 1}</TableCell>
-                              <TableCell className="py-1.5 px-1.5 font-mono">{idx + 1}</TableCell>
+                              <TableCell className="py-1.5 px-1.5 whitespace-nowrap">
+                                <IdBall value={idx + 1} label="Bill #" />
+                              </TableCell>
                               <TableCell className="py-1.5 px-1.5">{payment.subscriberName}</TableCell>
                               <TableCell className="py-1.5 px-1.5">
                                 {payment.paymentDate ? new Date(payment.paymentDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '---'}
@@ -568,7 +569,6 @@ const { canCreate, canUpdate, canDelete } = useCrudPermissions(BADDEBT_COLLECTIO
                       <Table className="text-xs">
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="py-1 px-1.5">#</TableHead>
                             <TableHead className="py-1 px-1.5">Bill #</TableHead>
                             <TableHead className="py-1 px-1.5">Dealer</TableHead>
                             <TableHead className="py-1 px-1.5">Date</TableHead>
@@ -580,8 +580,9 @@ const { canCreate, canUpdate, canDelete } = useCrudPermissions(BADDEBT_COLLECTIO
                         <TableBody>
                           {dealerPayments.map((col: any, idx: number) => (
                             <TableRow key={col.id}>
-                              <TableCell className="py-1.5 px-1.5 font-mono">{idx + 1}</TableCell>
-                              <TableCell className="py-1.5 px-1.5 font-mono">{idx + 1}</TableCell>
+                              <TableCell className="py-1.5 px-1.5 whitespace-nowrap">
+                                <IdBall value={idx + 1} label="Bill #" />
+                              </TableCell>
                               <TableCell className="py-1.5 px-1.5">{col.dealerName}</TableCell>
                               <TableCell className="py-1.5 px-1.5">{col.collectionDate || '---'}</TableCell>
                               <TableCell className="py-1.5 px-1.5 capitalize">{col.transactionType || 'cash'}</TableCell>

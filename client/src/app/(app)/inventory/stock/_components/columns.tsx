@@ -2,6 +2,7 @@
 
 import { type ColumnDef } from '@tanstack/react-table';
 import { Badge } from '@/components/ui/badge';
+import { IdBall } from '@/components/shared/id-ball';
 
 // One purchase line ("version") of a product. Purchase records are static, so
 // each line keeps the quantity, serial numbers and models exactly as recorded.
@@ -57,11 +58,7 @@ export const columns: ColumnDef<StockProduct>[] = [
   {
     id: 'index',
     header: '#',
-    cell: ({ row }) => (
-      <div className="text-xs font-mono text-muted-foreground">
-        {row.index + 1}
-      </div>
-    ),
+    cell: ({ row }) => <IdBall value={row.index + 1} label="#" />,
   },
   {
     accessorKey: 'name',

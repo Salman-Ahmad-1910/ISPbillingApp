@@ -26,6 +26,20 @@ import {
 } from '@/components/ui/dialog';
 import { PackageForm } from './_components/package-form';
 
+function IdBall({ value }: { value: string | number | null | undefined }) {
+  const text = String(value ?? '-');
+  const sizeClass = text.length <= 3 ? 'text-sm' : text.length <= 8 ? 'text-[10px]' : 'text-[8px]';
+  return (
+    <div
+      className={`relative inline-flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-green-800 via-green-600 to-green-400 px-1 text-center font-bold leading-tight text-white ring-1 ring-green-900/40 shadow-[inset_0_1px_1px_rgba(255,255,255,0.45),inset_0_-2px_4px_rgba(0,0,0,0.35),0_3px_6px_rgba(0,0,0,0.3)] ${sizeClass}`}
+      title={`Package ID: ${text}`}
+    >
+      <span className="pointer-events-none absolute left-3 top-1.5 h-2.5 w-2.5 rounded-full bg-white/50 blur-[1px]" aria-hidden />
+      <span className="relative break-all drop-shadow-[0_1px_1px_rgba(0,0,0,0.6)]">{text}</span>
+    </div>
+  );
+}
+
 export default function PackagesPage() {
   const { companyId } = useCompany();
   const { toast } = useToast();
@@ -337,7 +351,9 @@ export default function PackagesPage() {
               ) : (
                 filteredPackages.filter((pkg: Package) => pkg.packageType === 'TV Cable').map((pkg: Package) => (
                   <TableRow key={pkg.id}>
-                    <TableCell className="font-mono text-sm">{pkg.packageNumber || '-'}</TableCell>
+                    <TableCell>
+                      <IdBall value={pkg.packageNumber} />
+                    </TableCell>
                     <TableCell className="font-medium">{pkg.name}</TableCell>
                     <TableCell>{pkg.companyName || '-'}</TableCell>
                     <TableCell className="text-right">{(pkg.salePrice || 0).toLocaleString()}</TableCell>
@@ -395,7 +411,9 @@ export default function PackagesPage() {
               ) : (
                 filteredPackages.filter((pkg: Package) => pkg.packageType === 'Internet').map((pkg: Package) => (
                   <TableRow key={pkg.id}>
-                    <TableCell className="font-mono text-sm">{pkg.packageNumber || '-'}</TableCell>
+                    <TableCell>
+                      <IdBall value={pkg.packageNumber} />
+                    </TableCell>
                     <TableCell className="font-medium">{pkg.name}</TableCell>
                     <TableCell>{pkg.companyName || '-'}</TableCell>
                     <TableCell className="text-right">{(pkg.salePrice || 0).toLocaleString()}</TableCell>

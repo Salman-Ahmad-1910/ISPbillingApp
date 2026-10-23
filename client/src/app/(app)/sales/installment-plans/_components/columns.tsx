@@ -12,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { IdBall } from '@/components/shared/id-ball';
 
 interface InstallmentPlanColumnsProps {
   onEdit: (plan: InstallmentPlan) => void;
@@ -19,6 +20,11 @@ interface InstallmentPlanColumnsProps {
 }
 
 export const getColumns = ({ onEdit, onDelete }: InstallmentPlanColumnsProps): ColumnDef<InstallmentPlan>[] => [
+  {
+    accessorKey: 'id',
+    header: 'ID',
+    cell: ({ row }) => <IdBall value={row.index + 1} label="Plan ID" />,
+  },
   {
     accessorKey: 'name',
     header: 'Plan Name',

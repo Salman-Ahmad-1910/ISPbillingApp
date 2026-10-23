@@ -98,6 +98,7 @@ type Inquiry struct {
 // CorporateCustomer specialized billing
 type CorporateCustomer struct {
 	TenantModel
+	CustomerID        string `gorm:"type:varchar(100)" json:"customerId"`
 	CompanyName       string `gorm:"type:varchar(255);not null" json:"companyName"`
 	ContactPerson     string `gorm:"type:varchar(255);not null" json:"contactPerson"`
 	ContactPhone      string `gorm:"type:varchar(20);not null" json:"contactPhone"`

@@ -5,6 +5,7 @@ import { type Customer } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Pencil, Trash2, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { IdBall } from '@/components/shared/id-ball';
 
 interface SalesCustomerColumnsProps {
   onEdit: (customer: Customer) => void;
@@ -12,6 +13,11 @@ interface SalesCustomerColumnsProps {
 }
 
 export const getColumns = ({ onEdit, onDelete }: SalesCustomerColumnsProps): ColumnDef<Customer>[] => [
+  {
+    accessorKey: 'id',
+    header: 'ID',
+    cell: ({ row }) => <IdBall value={row.index + 1} label="Customer ID" />,
+  },
   {
     accessorKey: 'name',
     header: 'Name',

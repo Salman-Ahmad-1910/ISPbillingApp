@@ -34,6 +34,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { IdBall } from '@/components/shared/id-ball';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
@@ -379,7 +380,9 @@ export default function AllocatedCollectionsPage() {
                     <TableBody>
                       {allocatedPayments.map((payment, idx) => (
                         <TableRow key={payment.id}>
-                          <TableCell className="font-mono text-xs">{idx + 1}</TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            <IdBall value={idx + 1} label="Bill Number" />
+                          </TableCell>
                           <TableCell className="font-mono text-xs">{selectedSubscriber.id?.slice(0, 8) || '---'}</TableCell>
                           <TableCell>{new Date(payment.paymentDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</TableCell>
                           <TableCell className="capitalize">Monthly</TableCell>

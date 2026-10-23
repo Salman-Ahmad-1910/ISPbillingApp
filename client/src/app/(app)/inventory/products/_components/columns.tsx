@@ -12,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { IdBall } from '@/components/shared/id-ball';
 
 interface ProductColumnsProps {
   onEdit: (product: Product) => void;
@@ -22,11 +23,7 @@ export const columns = ({ onEdit, onDelete }: ProductColumnsProps): ColumnDef<Pr
   {
     accessorKey: 'productId',
     header: 'Product ID',
-    cell: ({ row }) => (
-      <div className="text-xs font-mono text-muted-foreground">
-        {row.original.productId || '-'}
-      </div>
-    ),
+    cell: ({ row }) => <IdBall value={row.original.productId || '-'} label="Product ID" />,
   },
   {
     accessorKey: 'name',

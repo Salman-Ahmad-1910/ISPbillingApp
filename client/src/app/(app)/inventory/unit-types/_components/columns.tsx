@@ -4,6 +4,7 @@ import { type ColumnDef } from '@tanstack/react-table';
 import type { UnitType } from '@/lib/types';
 import { Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { IdBall } from '@/components/shared/id-ball';
 
 interface UnitTypeColumnsProps {
   onEdit: (unitType: UnitType) => void;
@@ -14,11 +15,7 @@ export const columns = ({ onEdit, onDelete }: UnitTypeColumnsProps): ColumnDef<U
   {
     accessorKey: 'id',
     header: 'ID',
-    cell: ({ row }) => (
-      <div className="text-xs font-mono text-muted-foreground">
-        {row.index + 1}
-      </div>
-    ),
+    cell: ({ row }) => <IdBall value={row.index + 1} label="ID" />,
   },
   {
     accessorKey: 'name',

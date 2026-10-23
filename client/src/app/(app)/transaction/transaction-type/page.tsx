@@ -27,6 +27,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useCompany } from '@/context/company-context';
+import { IdBall } from '@/components/shared/id-ball';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
 import { useCrudPermissions } from '@/hooks/usePermissions';
@@ -273,7 +274,9 @@ export default function TransactionTypePage() {
               <TableBody>
                 {paginated.map((record, index) => (
                   <TableRow key={record.id}>
-                    <TableCell className="font-mono text-xs">{index + 1}</TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      <IdBall value={index + 1} label="ID" />
+                    </TableCell>
                     <TableCell className="font-medium">{record.paymentChannel || '---'}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">

@@ -5,6 +5,7 @@ import type { Purchase } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Pencil, Printer, DollarSign, Trash2, MoreHorizontal, PackagePlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { IdBall } from '@/components/shared/id-ball';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,7 +40,7 @@ export const columns = ({ onEdit, onPay, onPrint, onDelete, onAddQuantity, compa
     header: 'Bill ID',
     cell: ({ row }) => {
       const billId = row.original.billId || row.original.purchaseNumber;
-      return <span className="font-medium">{billId}</span>;
+      return <IdBall value={billId || '-'} label="Bill ID" />;
     },
   },
   {

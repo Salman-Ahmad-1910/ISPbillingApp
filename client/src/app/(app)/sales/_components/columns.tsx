@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Pencil, Trash2, BadgeCheck, RotateCcw, RefreshCw } from 'lucide-react';
+import { IdBall } from '@/components/shared/id-ball';
 
 interface Sale {
   id: string;
@@ -58,11 +59,7 @@ export function getColumns(onDelete?: (id: string) => void, onPay?: (sale: Sale)
     {
       accessorKey: 'id',
       header: 'ID',
-      cell: ({ row }) => (
-        <div className="text-xs font-mono text-muted-foreground">
-          {row.index + 1}
-        </div>
-      ),
+      cell: ({ row }) => <IdBall value={row.index + 1} label="Sale ID" />,
     },
     {
       accessorKey: 'date',

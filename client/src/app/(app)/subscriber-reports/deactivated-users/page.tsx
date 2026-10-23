@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { CalendarIcon, Download, Printer, UserX, Loader2 } from 'lucide-react';
+import { CalendarIcon, Download, Printer, Search, UserX, Loader2 } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
@@ -75,16 +75,26 @@ export default function DeactivatedUsersPage() {
       }));
   }, [connections]);
 
-  const filteredData = useMemo(() => deactivatedData.filter((item) => {
-    const connectionMatch = connectionType === 'both' || item.connectionType === connectionType;
-    const badDebtMatch = badDebtFilter === 'all' ||
-      (badDebtFilter === 'yes' && item.badDebt) ||
-      (badDebtFilter === 'no' && !item.badDebt);
-    const searchMatch = !searchTerm ||
-      smartMatch(searchTerm, [item.internetId, item.cnic, item.id], [item.name]);
+  const filteredData = useMemo(() => {
+    const from = new Date(filterFromDate);
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(filterToDate);
+    to.setHours(23, 59, 59, 999);
 
-    return connectionMatch && badDebtMatch && searchMatch;
-  }), [deactivatedData, connectionType, badDebtFilter, searchTerm]);
+    return deactivatedData.filter((item) => {
+      const connectionMatch = connectionType === 'both' || item.connectionType === connectionType;
+      const badDebtMatch = badDebtFilter === 'all' ||
+        (badDebtFilter === 'yes' && item.badDebt) ||
+        (badDebtFilter === 'no' && !item.badDebt);
+      const searchMatch = !searchTerm ||
+        smartMatch(searchTerm, [item.internetId, item.cnic, item.id], [item.name]);
+      const leavingDate = item.leavingDate ? new Date(item.leavingDate) : null;
+      const dateMatch = !!leavingDate && !isNaN(leavingDate.getTime()) &&
+        leavingDate >= from && leavingDate <= to;
+
+      return connectionMatch && badDebtMatch && searchMatch && dateMatch;
+    });
+  }, [deactivatedData, connectionType, badDebtFilter, searchTerm, filterFromDate, filterToDate]);
 
   const totalRecords = filteredData.length;
 
@@ -134,7 +144,7 @@ export default function DeactivatedUsersPage() {
       <div className="p-6">
         <SubscriberReportInvoice<DeactivatedRecord>
           title="DEACTIVATED USERS REPORT"
-          subtitle={`${totalRecords} deactivated subscribers`}
+          subtitle={`${totalRecords} deactivated subscribers • ${format(filterFromDate, 'dd MMM yyyy')} - ${format(filterToDate, 'dd MMM yyyy')}`}
           accent={accent}
           data={filteredData}
           columns={columns}
@@ -191,12 +201,33 @@ export default function DeactivatedUsersPage() {
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
-              <Label>Search</Label>
-              <Input
-                placeholder="Search by name, ID, or CNIC..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+              <Label>From Date</Label>
+              <Popover open={filterFromDateOpen} onOpenChange={setFilterFromDateOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn('w-full justify-start text-left font-normal', !filterFromDate && 'text-muted-foreground')}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {filterFromDate ? format(filterFromDate, 'PPP') : 'Pick a date'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar mode="single" selected={filterFromDate} onSelect={(date) => { if (date) { setFilterFromDate(date); setFilterFromDateOpen(false); } }} initialFocus />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="space-y-2">
+              <Label>To Date</Label>
+              <Popover open={filterToDateOpen} onOpenChange={setFilterToDateOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn('w-full justify-start text-left font-normal', !filterToDate && 'text-muted-foreground')}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {filterToDate ? format(filterToDate, 'PPP') : 'Pick a date'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar mode="single" selected={filterToDate} onSelect={(date) => { if (date) { setFilterToDate(date); setFilterToDateOpen(false); } }} initialFocus />
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="space-y-2">
@@ -227,6 +258,21 @@ export default function DeactivatedUsersPage() {
       </Card>
       )}
 
+      {/* Search */}
+      <Card className="no-print transition-all duration-300 hover:shadow-md">
+        <CardContent className="pt-6">
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, ID, or CNIC..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Printable Report Section */}
       <div className="print-report">
         <Card>
@@ -235,7 +281,7 @@ export default function DeactivatedUsersPage() {
               <div>
                 <h2 className="text-xl font-bold">Deactivation History</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {totalRecords} deactivated subscribers
+                  {totalRecords} deactivated subscribers • {format(filterFromDate, 'dd MMM yyyy')} - {format(filterToDate, 'dd MMM yyyy')}
                 </p>
               </div>
               {can('export') && (

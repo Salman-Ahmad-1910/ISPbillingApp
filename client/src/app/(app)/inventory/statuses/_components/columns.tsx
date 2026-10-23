@@ -1,6 +1,7 @@
 'use client';
 
 import { type ColumnDef } from '@tanstack/react-table';
+import { IdBall } from '@/components/shared/id-ball';
 
 export interface PurchasedProduct {
   purchaseItemId: string;
@@ -27,7 +28,10 @@ export const columns: ColumnDef<PurchasedProduct, unknown>[] = [
     accessorKey: 'billId',
     header: 'Bill ID',
     cell: ({ row }) => (
-      <span className="font-medium">{row.original.billId || row.original.purchaseNumber || '-'}</span>
+      <IdBall
+        value={row.original.billId || row.original.purchaseNumber || '-'}
+        label="Bill ID"
+      />
     ),
   },
   {

@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { IdBall } from '@/components/shared/id-ball';
 import {
   Table,
   TableBody,
@@ -375,6 +376,7 @@ export default function FiberJointingPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">ID</TableHead>
                   <TableHead>Subscriber</TableHead>
                   <TableHead>Service</TableHead>
                   <TableHead>Technician</TableHead>
@@ -389,13 +391,16 @@ export default function FiberJointingPage() {
               <TableBody>
                 {charges.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
+                    <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">
                       No fiber jointing charges yet.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  (charges as any[]).map((r) => (
+                  (charges as any[]).map((r, i) => (
                     <TableRow key={r.id}>
+                      <TableCell>
+                        <IdBall value={i + 1} label="Charge ID" />
+                      </TableCell>
                       <TableCell>
                         <div className="font-medium">{r.subscriberName || '-'}</div>
                         {r.internetId && <div className="text-xs text-muted-foreground">{r.internetId}</div>}

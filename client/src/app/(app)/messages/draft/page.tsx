@@ -485,7 +485,17 @@ export default function DraftMessagesPage() {
                       <TableCell>
                         <Checkbox checked={selected.has(item.id)} onCheckedChange={() => toggleOne(item.id)} aria-label={`Select ${item.name}`} />
                       </TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">{(currentPage - 1) * parseInt(pageSize) + i + 1}</TableCell>
+                      <TableCell>
+                          <div
+                            className="relative inline-flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-green-800 via-green-600 to-green-400 text-[11px] font-bold text-white ring-1 ring-green-900/40 shadow-[inset_0_1px_1px_rgba(255,255,255,0.45),inset_0_-2px_4px_rgba(0,0,0,0.35),0_3px_6px_rgba(0,0,0,0.3)]"
+                            title={`ID: ${(currentPage - 1) * parseInt(pageSize) + i + 1}`}
+                          >
+                            <span className="pointer-events-none absolute left-2 top-1 h-2 w-2 rounded-full bg-white/50 blur-[1px]" aria-hidden />
+                            <span className="relative drop-shadow-[0_1px_1px_rgba(0,0,0,0.6)]">
+                              {(currentPage - 1) * parseInt(pageSize) + i + 1}
+                            </span>
+                          </div>
+                        </TableCell>
                       <TableCell className="min-w-0">
                         <span className="truncate font-medium" title={item.name}>{item.name}</span>
                         {item.messageType && <p className="truncate text-xs text-muted-foreground" title={item.messageType}>{item.messageType}</p>}

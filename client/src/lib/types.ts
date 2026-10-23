@@ -228,6 +228,7 @@ export type Subscriber = {
 
 export type CorporateCustomer = {
   id: string;
+  customerId?: string;
   companyName: string;
   contactPerson: string;
   contactPhone: string;

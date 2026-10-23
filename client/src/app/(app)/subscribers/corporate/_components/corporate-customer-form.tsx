@@ -31,6 +31,7 @@ export function CorporateCustomerForm({ customer, onSave, onCancel, isSaving }: 
   const form = useForm<CorporateCustomerFormValues>({
     resolver: zodResolver(corporateCustomerSchema),
     defaultValues: customer || {
+      customerId: '',
       companyName: '',
       contactPerson: '',
       contactPhone: '',
@@ -48,6 +49,19 @@ export function CorporateCustomerForm({ customer, onSave, onCancel, isSaving }: 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="customerId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>ID</FormLabel>
+              <FormControl>
+                <Input className="border-muted-foreground/20" placeholder="e.g., CORP-001" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         <FormField
           control={form.control}
           name="companyName"

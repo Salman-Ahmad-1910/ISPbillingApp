@@ -4,6 +4,7 @@ import { type ColumnDef } from '@tanstack/react-table';
 import type { Brand } from '@/lib/types';
 import { Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { IdBall } from '@/components/shared/id-ball';
 
 interface BrandColumnsProps {
   onEdit: (brand: Brand) => void;
@@ -14,11 +15,7 @@ export const columns = ({ onEdit, onDelete }: BrandColumnsProps): ColumnDef<Bran
   {
     accessorKey: 'id',
     header: 'Brand ID',
-    cell: ({ row }) => (
-      <div className="text-xs font-mono text-muted-foreground">
-        {row.index + 1}
-      </div>
-    ),
+    cell: ({ row }) => <IdBall value={row.index + 1} label="Brand ID" />,
   },
   {
     accessorKey: 'name',

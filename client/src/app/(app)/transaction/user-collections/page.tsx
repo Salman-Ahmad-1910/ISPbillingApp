@@ -40,6 +40,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { IdBall } from '@/components/shared/id-ball';
 import { useCompany } from '@/context/company-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
@@ -1012,7 +1013,9 @@ export default function SubscriberCollectionsPage() {
                       ))}
                       {subscriberPayments.map((payment, index) => (
                         <TableRow key={payment.id}>
-                          <TableCell className="py-1.5 px-1.5 font-mono whitespace-nowrap">{payment.billNo || index + 1}</TableCell>
+                          <TableCell className="py-1.5 px-1.5 whitespace-nowrap">
+                            <IdBall value={payment.billNo || index + 1} label="Bill #" />
+                          </TableCell>
                           <TableCell className="py-1.5 px-1.5 font-mono whitespace-nowrap">{payment.subscriberId?.slice(0, 8) || '---'}</TableCell>
                           <TableCell className="py-1.5 px-1.5 whitespace-nowrap">{payment.subscriberName}</TableCell>
                           <TableCell className="py-1.5 px-1.5 max-w-[100px] truncate" title={selectedSubscriber.address}>{selectedSubscriber.address || '---'}</TableCell>

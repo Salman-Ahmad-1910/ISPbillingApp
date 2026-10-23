@@ -1,6 +1,7 @@
 'use client';
 
 import { type ColumnDef } from '@tanstack/react-table';
+import { IdBall } from '@/components/shared/id-ball';
 
 interface BillRow {
   id: string;
@@ -19,6 +20,7 @@ export const getColumns = (): ColumnDef<BillRow>[] => [
   {
     accessorKey: 'id',
     header: 'ID',
+    cell: ({ row }) => <IdBall value={row.original.id} label="ID" />,
   },
   {
     accessorKey: 'month',
