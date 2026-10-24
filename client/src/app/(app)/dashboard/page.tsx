@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +18,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import dynamic from 'next/dynamic';
 import { PageHeader } from '@/components/shared/page-header';
 import { GaugeMeter } from './_components/gauge-meter';
+import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import type { Connection } from '@/lib/types';
 
 const DailyCollectionChart = dynamic(
   () => import('@/app/(app)/dashboard/_components/daily-collection-chart').then(mod => mod.DailyCollectionChart),
@@ -41,6 +43,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showSummary, setShowSummary] = useState(false);
+  const { data: connectionsData = [] } = useGenericQuery<Connection[]>('admin/connections', companyId ?? undefined);
 
   const { userRole, grantedPermissions, permissionsConfigured } = useUserPermissions();
   const isAdminRole = ['admin', 'owner', 'manager'].includes(userRole);
@@ -111,6 +114,9 @@ export default function DashboardPage() {
   }, [companyId]);
 
   const totalCollection = data?.totalCollection || 0;
+  const inactiveCount = useMemo(() => {
+    return (connectionsData as Connection[]).filter(c => c.status === 'inactive').length;
+  }, [connectionsData]);
 
   const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const selectedMonthName = monthNames[parseInt(selectedMonth, 10) - 1] || '';
@@ -259,8 +265,8 @@ export default function DashboardPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="relative pt-0 flex-1 flex flex-col justify-end pb-6">
-                  <div className="text-2xl font-bold tracking-tight">{data?.subscribersStats?.inactive || 0}</div>
-                  <p className="text-xs text-muted-foreground mt-1">suspended / inactive</p>
+                  <div className="text-2xl font-bold tracking-tight">{inactiveCount}</div>
+                  <p className="text-xs text-muted-foreground mt-1">inactive subscribers</p>
                 </CardContent>
               </Card>
             </Link>

@@ -16,36 +16,17 @@ import { applyConnectionFilters, applyConnectionDateRange, defaultConnectionFilt
 import { DateRangeFilter } from '@/components/shared/date-range-filter';
 import { CollectionPagination } from '@/components/shared/collection-pagination';
 
-function getDaysSince(dateStr: string): number {
-  if (!dateStr) return 0;
-  const d = new Date(dateStr);
-  const now = new Date();
-  return Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
-}
-
 function getLastActiveDate(c: Connection): string {
-  return c.lastPaymentDate || c.rechargeDate || c.createdAt;
-}
-
-function getMonthsSince(dateStr: string): number {
-  if (!dateStr) return 0;
-  const d = new Date(dateStr);
-  const now = new Date();
-  return (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+  return c.lastPaymentDate || c.rechargeDate || c.installationDate || c.createdAt || '';
 }
 
 function getTotalOwed(c: Connection): number {
   const remaining = Number(c.remainingAmount) || 0;
-  const activeDate = getLastActiveDate(c);
-  const months = getMonthsSince(activeDate);
   const cable = Number(c.amount) || 0;
   const internet = Number(c.sameAmount) || 0;
   const packagePrice = c.connectionType === 'tv_cable' ? cable : c.connectionType === 'internet' ? internet : cable + internet;
-  return remaining + packagePrice * Math.max(0, months);
+  return remaining + packagePrice;
 }
-
-// Billing cycle is monthly (30 days) with a 3-day grace period (33 days total).
-const GRACE_DAYS = 33;
 
 export default function InactiveSubscribersPage() {
   const { companyId } = useCompany();
@@ -66,14 +47,7 @@ export default function InactiveSubscribersPage() {
   const { data: companiesData } = useGenericQuery<Company>('companies', companyId ?? undefined);
 
   const inactiveSubscribers = useMemo(() => {
-    return (connections as Connection[]).filter(c => {
-      const activeDate = getLastActiveDate(c);
-      if (!activeDate) return false;
-      // Inactive = still owes money (remaining_amount > 0) AND past the grace
-      // window (33 days). Membership matches the backend dashboard card.
-      const owes = (Number(c.remainingAmount) || 0) > 0;
-      return owes && getDaysSince(activeDate) > GRACE_DAYS;
-    });
+    return (connections as Connection[]).filter(c => c.status === 'inactive');
   }, [connections]);
 
   const filteredSubscribers = useMemo(
@@ -113,7 +87,7 @@ export default function InactiveSubscribersPage() {
         </div>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Inactive Subscribers</h1>
-          <p className="text-sm text-muted-foreground">Subscribers who failed to pay within 33 days (30-day cycle + 3-day grace)</p>
+          <p className="text-sm text-muted-foreground">Subscribers with inactive status</p>
         </div>
       </div>
 
@@ -186,7 +160,7 @@ export default function InactiveSubscribersPage() {
             <div className="text-center py-12 text-muted-foreground">
               <AlertCircle className="h-10 w-10 opacity-30 mx-auto mb-3" />
               <p className="text-sm font-medium">No inactive subscribers</p>
-              <p className="text-xs mt-1">All subscribers are up to date with their payments.</p>
+              <p className="text-xs mt-1">No subscribers with inactive status found.</p>
             </div>
           ) : (
             <div className="min-w-0 overflow-x-auto">
@@ -201,16 +175,12 @@ export default function InactiveSubscribersPage() {
                     <TableHead>Package</TableHead>
                     <TableHead>Pending Amount</TableHead>
                     <TableHead>Last Payment</TableHead>
-                    <TableHead>Days Inactive</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                    {pagedSubscribers.map((c, i) => {
                      const activeDate = getLastActiveDate(c);
-                    const monthsSince = getMonthsSince(activeDate);
-                    const daysSince = getDaysSince(activeDate);
-                    const isCurrentMonthOnly = monthsSince <= 0 && (Number(c.remainingAmount) || 0) > 0;
                     return (
                          <TableRow key={c.id}>
                          <TableCell className="text-muted-foreground">{startIdx + i + 1}</TableCell>
@@ -222,7 +192,7 @@ export default function InactiveSubscribersPage() {
                             {c.name}
                           </Link>
                         </TableCell>
-                        <TableCell className="font-mono text-xs">{c.id?.slice(0, 8) || '---'}</TableCell>
+                        <TableCell className="font-mono text-xs">{c.internetId || c.id?.slice(0, 8) || '---'}</TableCell>
                         <TableCell>{c.cell || c.mobile || '---'}</TableCell>
                         <TableCell className="text-xs text-muted-foreground max-w-[150px] truncate" title={c.address}>
                           {c.address || '---'}
@@ -232,13 +202,6 @@ export default function InactiveSubscribersPage() {
                           PKR {getTotalOwed(c).toLocaleString()}
                         </TableCell>
                         <TableCell className="text-xs">{activeDate ? new Date(activeDate).toLocaleDateString() : '---'}</TableCell>
-                        <TableCell>
-                          {isCurrentMonthOnly ? (
-                            <Badge variant="secondary" className="text-xs">Current</Badge>
-                          ) : (
-                            <Badge variant="destructive" className="text-xs">{daysSince} days</Badge>
-                          )}
-                        </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="capitalize">{c.status}</Badge>
                         </TableCell>
