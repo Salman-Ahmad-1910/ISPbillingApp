@@ -14,7 +14,8 @@ fintrack-erp.exe
 fintrack-erp.exe~
 .fuse_hidden00019f3400000017
 
-frontend/
+frontend/*
+!frontend/.gitkeep
 client/.next-export
 client/build
 

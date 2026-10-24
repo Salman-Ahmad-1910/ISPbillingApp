@@ -1,0 +1,2 @@
+Placeholder so //go:embed all:frontend compiles on a fresh clone.
+Run ./build.sh (or client npm run build + copy to frontend/) before go build.
