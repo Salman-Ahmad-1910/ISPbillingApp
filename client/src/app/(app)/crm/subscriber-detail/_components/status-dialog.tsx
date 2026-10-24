@@ -14,6 +14,7 @@ const STATUS_OPTIONS = [
   { value: 'inactive', label: 'Inactive' },
   { value: 'deactivated', label: 'Deactivated' },
   { value: 'suspended', label: 'Suspended' },
+  { value: 'expired', label: 'Expired' },
 ] as const;
 
 const DEACTIVATION_REASONS = [
@@ -54,7 +55,7 @@ export function StatusDialog({ isOpen, onClose, onChangeStatus, connection, isSa
     }
   }, [isOpen, connection]);
 
-  const isDeactivating = status === 'deactivated';
+  const isDeactivating = status === 'deactivated' || status === 'expired';
   const needsReason = isDeactivating && !reason;
 
   const handleClose = () => {

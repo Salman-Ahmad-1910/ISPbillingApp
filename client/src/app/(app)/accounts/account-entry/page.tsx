@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import { IdBall } from '@/components/shared/id-ball';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -479,7 +480,7 @@ export default function AccountEntryPage() {
             <Table className="table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[60px]">ID</TableHead>
+                  <TableHead className="w-[92px]">ID</TableHead>
                   <TableHead className="w-[120px]">Head</TableHead>
                   <TableHead className="w-[120px]">Sub Head</TableHead>
                   <TableHead className="w-[200px]">Description</TableHead>
@@ -499,7 +500,7 @@ export default function AccountEntryPage() {
                 ) : (
                   paginatedData.map((item, index) => (
                     <TableRow key={item.id}>
-                      <TableCell className="text-muted-foreground truncate">{index + 1}</TableCell>
+                      <TableCell className="truncate"><IdBall value={index + 1} label="ID" /></TableCell>
                       <TableCell className="font-medium truncate">{getHeadName(item.head)}</TableCell>
                       <TableCell className="truncate">{getSubHeadName(item.subHead)}</TableCell>
                       <TableCell className="truncate">{item.description}</TableCell>

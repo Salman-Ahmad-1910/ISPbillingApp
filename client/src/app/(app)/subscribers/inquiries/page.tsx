@@ -31,7 +31,7 @@ export default function InquiriesPage() {
           <UserPlus className="h-5 w-5" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">New Inquiries</h1>
+          <h1 className="text-2xl font-bold tracking-tight">New Request</h1>
           <p className="text-sm text-muted-foreground">Manage leads and potential new subscribers.</p>
         </div>
       </div>

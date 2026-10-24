@@ -1,6 +1,7 @@
 'use client';
 
 import { MoreHorizontal } from 'lucide-react';
+import { IdBall } from '@/components/shared/id-ball';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,11 +24,7 @@ export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<Recove
   {
     accessorKey: 'id',
     header: 'ID',
-    cell: ({ row }) => (
-      <div className="text-xs font-mono text-muted-foreground">
-        {row.index + 1}
-      </div>
-    ),
+    cell: ({ row }) => <IdBall value={row.index + 1} label="ID" />,
   },
   {
     accessorKey: 'name',

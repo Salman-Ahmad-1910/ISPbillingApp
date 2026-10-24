@@ -1,6 +1,7 @@
 'use client';
 
 import { type ColumnDef } from '@tanstack/react-table';
+import { IdBall } from '@/components/shared/id-ball';
 import type { Complaint } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { MoreHorizontal } from 'lucide-react';
@@ -23,11 +24,7 @@ export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<Compla
   {
     accessorKey: 'id',
     header: 'ID',
-    cell: ({ row }) => (
-      <div className="text-xs font-mono text-muted-foreground">
-        {row.index + 1}
-      </div>
-    ),
+    cell: ({ row }) => <IdBall value={row.index + 1} label="ID" />,
   },
   {
     accessorKey: 'subscriberName',

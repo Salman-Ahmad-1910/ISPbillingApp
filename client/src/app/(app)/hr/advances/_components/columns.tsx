@@ -1,6 +1,7 @@
 'use client';
 
 import { type ColumnDef } from '@tanstack/react-table';
+import { IdBall } from '@/components/shared/id-ball';
 import type { AdvanceLoan } from '@/lib/types';
 import { Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -17,9 +18,7 @@ export const getColumns = ({ onEdit, onDelete, canUpdate = true, canDelete = tru
     accessorKey: 'id',
     header: 'ID',
     cell: ({ row }) => (
-      <div className="text-xs font-mono text-muted-foreground">
-        {row.original.id?.slice(0, 8)}
-      </div>
+      <IdBall value={row.original.id?.slice(0, 8) || '-'} label="ID" />
     ),
   },
   {

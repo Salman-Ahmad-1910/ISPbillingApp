@@ -3,12 +3,21 @@
 import { type ColumnDef } from '@tanstack/react-table';
 import type { Inquiry } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
-import { Pencil, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Pencil, Trash2, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface ColumnsProps {
   onEdit: (inquiry: Inquiry) => void;
   onDelete: (inquiry: Inquiry) => void;
+  onFeasible?: (inquiry: Inquiry) => void;
   canUpdate?: boolean;
   canDelete?: boolean;
 }
@@ -34,7 +43,7 @@ function IdBall({ value }: { value: string | number | null | undefined }) {
   );
 }
 
-export const getColumns = ({ onEdit, onDelete, canUpdate = true, canDelete = true }: ColumnsProps): ColumnDef<Inquiry>[] => [
+export const getColumns = ({ onEdit, onDelete, onFeasible, canUpdate = true, canDelete = true }: ColumnsProps): ColumnDef<Inquiry>[] => [
   {
     accessorKey: 'id',
     header: '#',
@@ -107,16 +116,39 @@ export const getColumns = ({ onEdit, onDelete, canUpdate = true, canDelete = tru
       const inquiry = row.original;
       return (
         <div className="flex items-center justify-end gap-1">
-          {canUpdate && (
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" onClick={() => onEdit(inquiry)}>
-            <Pencil className="h-4 w-4" />
-          </Button>
-          )}
-          {canDelete && (
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50" onClick={() => onDelete(inquiry)}>
-            <Trash2 className="h-4 w-4" />
-          </Button>
-          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreHorizontal className="h-4 w-4" />
+                <span className="sr-only">Open menu</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {canUpdate && (
+                <DropdownMenuItem onClick={() => onEdit(inquiry)}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit
+                </DropdownMenuItem>
+              )}
+              {onFeasible && (
+                <DropdownMenuItem onClick={() => onFeasible(inquiry)}>
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  Feasible
+                </DropdownMenuItem>
+              )}
+              {canDelete && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => onDelete(inquiry)} className="text-rose-600 focus:text-rose-600">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       );
     },

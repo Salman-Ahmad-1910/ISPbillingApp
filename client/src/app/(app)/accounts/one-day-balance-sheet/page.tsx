@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { IdBall } from '@/components/shared/id-ball';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -356,7 +357,7 @@ export default function OneDayBalanceSheetPage() {
                     <TableBody>
                       {filteredData.map((item, idx) => (
                         <TableRow key={item.id}>
-                          <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
+                          <TableCell><IdBall value={idx + 1} label="#" /></TableCell>
                           <TableCell>{item.date}</TableCell>
                           <TableCell className="font-medium">{getHeadName(item.head)}</TableCell>
                           <TableCell>{getSubHeadName(item.subHead)}</TableCell>

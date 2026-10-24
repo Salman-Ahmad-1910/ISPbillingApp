@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
-import { Users, Wifi, WifiOff, UserX, Pause, Loader2 } from 'lucide-react';
+import { Users, Wifi, WifiOff, UserX, Pause, Loader2, Clock } from 'lucide-react';
 import { ClientPage } from './_components/client-page';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
@@ -28,7 +28,8 @@ export default function SubscriberDetailPage() {
     const inactive = connections.filter(c => c.status === 'inactive').length;
     const deactivated = connections.filter(c => c.status === 'deactivated').length;
     const suspended = connections.filter(c => c.status === 'suspended').length;
-    return { total, active, inactive, deactivated, suspended };
+    const expired = connections.filter(c => c.status === 'expired').length;
+    return { total, active, inactive, deactivated, suspended, expired };
   }, [connections]);
 
   if (!companyId) {
@@ -78,7 +79,7 @@ export default function SubscriberDetailPage() {
       <div className="h-0.5 bg-gradient-to-r from-blue-500/50 via-blue-400/30 to-transparent" />
 
       {canViewCards && (
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
@@ -131,6 +132,17 @@ export default function SubscriberDetailPage() {
             <div>
               <p className="text-xs font-medium text-muted-foreground">Suspended</p>
               <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{stats.suspended}</p>
+            </div>
+          </div>
+        </div>
+        <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
+              <Clock className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Expired</p>
+              <p className="text-2xl font-bold text-violet-600 dark:text-violet-400">{stats.expired}</p>
             </div>
           </div>
         </div>

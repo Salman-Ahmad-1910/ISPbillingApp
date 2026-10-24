@@ -13,7 +13,7 @@ import type { Inquiry } from '@/lib/types';
 import { inquirySchema } from '@/lib/schemas';
 import { smartMatch } from '@/lib/search';
 import { z } from 'zod';
-import { PlusCircle, Send, Users, Search, ChevronLeft, ChevronRight, UserPlus, UserCheck, XCircle, Sparkles, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { PlusCircle, Send, Users, Search, ChevronLeft, ChevronRight, UserPlus, UserCheck, XCircle, Sparkles, RefreshCw, CheckCircle2, Calendar } from 'lucide-react';
 
 import { DataTable } from './data-table';
 import { getColumns } from './columns';
@@ -50,6 +50,9 @@ export function ClientPage({ data, areas, boxes, packages }: ClientPageProps) {
     const [selectedInquiry, setSelectedInquiry] = useState<Inquiry | null>(null);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [isFeasibleDialogOpen, setIsFeasibleDialogOpen] = useState(false);
+    const [feasibleInquiry, setFeasibleInquiry] = useState<Inquiry | null>(null);
+    const [feasibleInternetId, setFeasibleInternetId] = useState('');
 
     const [currentPage, setCurrentPage] = useState<number>(1);
     const [pageSize, setPageSize] = useState<number>(10);
@@ -145,14 +148,14 @@ export function ClientPage({ data, areas, boxes, packages }: ClientPageProps) {
         try {
             if (selectedInquiry) {
                 await api.put(`/subscribers/inquiries/${selectedInquiry.id}?companyId=${companyId}`, formData);
-                toast({ title: "Success", description: "Inquiry updated successfully." });
+                toast({ title: "Success", description: "Request updated successfully." });
             } else {
                 const response = await api.post(`/subscribers/inquiries?companyId=${companyId}`, { ...formData, companyId });
                 const created = response.data?.data;
                 if (created) {
                     queryClient.setQueryData<Inquiry[]>(['subscribers/inquiries', companyId], (old = []) => [created, ...old]);
                 }
-                toast({ title: "Success", description: "Inquiry added successfully." });
+                toast({ title: "Success", description: "Request added successfully." });
             }
             queryClient.invalidateQueries({ queryKey: ['subscribers/inquiries', companyId] });
             setIsFormOpen(false);
@@ -161,7 +164,7 @@ export function ClientPage({ data, areas, boxes, packages }: ClientPageProps) {
             toast({
                 variant: 'destructive',
                 title: "Error",
-                description: error.response?.data?.message || "Failed to save inquiry"
+                description: error.response?.data?.message || "Failed to save request"
             });
         } finally {
             setIsSaving(false);
@@ -177,7 +180,7 @@ export function ClientPage({ data, areas, boxes, packages }: ClientPageProps) {
         if (selectedInquiry) {
             try {
                 await api.delete(`/subscribers/inquiries/${selectedInquiry.id}?companyId=${companyId}`);
-                toast({ title: "Success", description: "Inquiry deleted successfully." });
+                toast({ title: "Success", description: "Request deleted successfully." });
                 queryClient.invalidateQueries({ queryKey: ['subscribers/inquiries', companyId] });
                 setIsDeleteDialogOpen(false);
                 setSelectedInquiry(null);
@@ -185,7 +188,7 @@ export function ClientPage({ data, areas, boxes, packages }: ClientPageProps) {
                 toast({
                     variant: 'destructive',
                     title: "Error",
-                    description: error.response?.data?.message || "Failed to delete inquiry"
+                    description: error.response?.data?.message || "Failed to delete request"
                 });
             }
         }
@@ -196,9 +199,44 @@ export function ClientPage({ data, areas, boxes, packages }: ClientPageProps) {
         setIsDeleteDialogOpen(true);
     };
 
+    const handleFeasible = (inquiry: Inquiry) => {
+        setFeasibleInquiry(inquiry);
+        setFeasibleInternetId(inquiry.internetId || '');
+        setIsFeasibleDialogOpen(true);
+    };
+
+    const handleFeasibleSubmit = async () => {
+        if (!feasibleInquiry) return;
+        setIsSaving(true);
+        try {
+            const feasibilityDate = new Date().toISOString();
+            await api.put(`/subscribers/inquiries/${feasibleInquiry.id}?companyId=${companyId}`, {
+                ...feasibleInquiry,
+                internetId: feasibleInternetId,
+                status: 'converted',
+                feasibilityDate,
+                createdAt: feasibleInquiry.createdAt,
+            });
+            toast({ title: "Success", description: "Request marked as feasible and added to subscriber detail." });
+            queryClient.invalidateQueries({ queryKey: ['subscribers/inquiries', companyId] });
+            setIsFeasibleDialogOpen(false);
+            setFeasibleInquiry(null);
+            setFeasibleInternetId('');
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: "Error",
+                description: error.response?.data?.message || "Failed to mark as feasible"
+            });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     const columns = getColumns({
         onEdit: handleEdit,
         onDelete: openDeleteDialog,
+        onFeasible: handleFeasible,
         canUpdate,
         canDelete,
     });
@@ -340,7 +378,7 @@ export function ClientPage({ data, areas, boxes, packages }: ClientPageProps) {
                         <DialogTrigger asChild>
                             <Button onClick={() => setSelectedInquiry(null)} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
                                 <PlusCircle className="mr-2 h-4 w-4" />
-                                Add Inquiry
+                                Add Request
                             </Button>
                         </DialogTrigger>
                         <DialogContent className="max-w-lg max-h-[90vh]">
@@ -349,7 +387,7 @@ export function ClientPage({ data, areas, boxes, packages }: ClientPageProps) {
                                     <div className="rounded-md bg-gradient-to-br from-emerald-500 to-violet-600 p-1 text-white">
                                         <UserPlus className="h-4 w-4" />
                                     </div>
-                                    {selectedInquiry ? 'Edit' : 'Add'} Inquiry
+                                    {selectedInquiry ? 'Edit' : 'Add'} Request
                                 </DialogTitle>
                             </DialogHeader>
                             <ScrollArea className="pr-4 max-h-[75vh]">
@@ -388,7 +426,7 @@ export function ClientPage({ data, areas, boxes, packages }: ClientPageProps) {
                     <div className="relative">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
-                            placeholder="Search inquiries..."
+                            placeholder="Search requests..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="w-[200px] pl-8"
@@ -401,7 +439,7 @@ export function ClientPage({ data, areas, boxes, packages }: ClientPageProps) {
                 {totalPages > 1 && (
                     <div className="flex items-center justify-between">
                         <div className="text-sm text-muted-foreground">
-                            Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredData.length)} of {filteredData.length} inquiries
+                            Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredData.length)} of {filteredData.length} requests
                         </div>
                         <div className="flex items-center gap-2">
                             <Button
@@ -476,6 +514,104 @@ export function ClientPage({ data, areas, boxes, packages }: ClientPageProps) {
                 onDelete={handleDelete}
                 itemName={selectedInquiry?.name}
             />
+
+            <Dialog open={isFeasibleDialogOpen} onOpenChange={setIsFeasibleDialogOpen}>
+                <DialogContent className="max-w-2xl max-h-[90vh]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <div className="rounded-md bg-gradient-to-br from-emerald-500 to-green-600 p-1 text-white">
+                                <CheckCircle2 className="h-4 w-4" />
+                            </div>
+                            Feasibility - Request Details
+                        </DialogTitle>
+                    </DialogHeader>
+                    <ScrollArea className="pr-4 max-h-[75vh]">
+                        {feasibleInquiry && (
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <Label>Name</Label>
+                                        <div className="text-sm mt-1 p-2 bg-muted rounded">{feasibleInquiry.name}</div>
+                                    </div>
+                                    <div>
+                                        <Label>Internet ID</Label>
+                                        <Input
+                                            value={feasibleInternetId}
+                                            onChange={(e) => setFeasibleInternetId(e.target.value)}
+                                            placeholder="Enter Internet ID"
+                                            className="mt-1"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label>Cell</Label>
+                                        <div className="text-sm mt-1 p-2 bg-muted rounded">{feasibleInquiry.cell || '-'}</div>
+                                    </div>
+                                    <div>
+                                        <Label>Mobile</Label>
+                                        <div className="text-sm mt-1 p-2 bg-muted rounded">{feasibleInquiry.mobile || '-'}</div>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <Label>Address</Label>
+                                        <div className="text-sm mt-1 p-2 bg-muted rounded">{feasibleInquiry.address}</div>
+                                    </div>
+                                    <div>
+                                        <Label>Connection Type</Label>
+                                        <div className="text-sm mt-1 p-2 bg-muted rounded">{feasibleInquiry.connectionType || '-'}</div>
+                                    </div>
+                                    <div>
+                                        <Label>Sublocality</Label>
+                                        <div className="text-sm mt-1 p-2 bg-muted rounded">{feasibleInquiry.subLocality || '-'}</div>
+                                    </div>
+                                    <div>
+                                        <Label>Package Cable</Label>
+                                        <div className="text-sm mt-1 p-2 bg-muted rounded">{feasibleInquiry.packageCable || '-'}</div>
+                                    </div>
+                                    <div>
+                                        <Label>Box Number</Label>
+                                        <div className="text-sm mt-1 p-2 bg-muted rounded">{feasibleInquiry.boxNumber || '-'}</div>
+                                    </div>
+                                    <div>
+                                        <Label>Installation Date</Label>
+                                        <div className="text-sm mt-1 p-2 bg-muted rounded">{feasibleInquiry.installationDate || '-'}</div>
+                                    </div>
+                                    <div>
+                                        <Label>Recharge Date</Label>
+                                        <div className="text-sm mt-1 p-2 bg-muted rounded">{feasibleInquiry.rechargeDate || '-'}</div>
+                                    </div>
+                                    <div>
+                                        <Label>Installation Amount</Label>
+                                        <div className="text-sm mt-1 p-2 bg-muted rounded">{feasibleInquiry.installationAmount || 0}</div>
+                                    </div>
+                                    <div>
+                                        <Label>Amount</Label>
+                                        <div className="text-sm mt-1 p-2 bg-muted rounded">{feasibleInquiry.amount || 0}</div>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <Label>Comments</Label>
+                                        <div className="text-sm mt-1 p-2 bg-muted rounded">{feasibleInquiry.comments || '-'}</div>
+                                    </div>
+                                    <div>
+                                        <Label className="flex items-center gap-1"><Calendar className="h-3 w-3" /> Entry Created Date</Label>
+                                        <div className="text-sm mt-1 p-2 bg-muted rounded">{feasibleInquiry.createdAt ? new Date(feasibleInquiry.createdAt).toLocaleString() : '-'}</div>
+                                    </div>
+                                    <div>
+                                        <Label className="flex items-center gap-1"><Calendar className="h-3 w-3" /> Feasibility Date</Label>
+                                        <div className="text-sm mt-1 p-2 bg-muted rounded">{new Date().toLocaleString()}</div>
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-2 pt-2">
+                                    <Button type="button" variant="outline" onClick={() => setIsFeasibleDialogOpen(false)} disabled={isSaving}>
+                                        Cancel
+                                    </Button>
+                                    <Button onClick={handleFeasibleSubmit} disabled={isSaving || !feasibleInternetId} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700">
+                                        {isSaving ? 'Saving...' : 'Mark as Feasible & Add to Subscriber'}
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </ScrollArea>
+                </DialogContent>
+            </Dialog>
         </>
     )
 }

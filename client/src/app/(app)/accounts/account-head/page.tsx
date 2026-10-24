@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import { IdBall } from '@/components/shared/id-ball';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -352,7 +353,7 @@ export default function AccountHeadPage() {
             <Table className="table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[80px]">ID</TableHead>
+                  <TableHead className="w-[92px]">ID</TableHead>
                   <TableHead className="w-[200px]">Master Account</TableHead>
                   <TableHead className="w-[200px]">Account Type</TableHead>
                   <TableHead className="w-[300px]">Description</TableHead>
@@ -369,7 +370,7 @@ export default function AccountHeadPage() {
                 ) : (
                   paginatedHeads.map((item, index) => (
                     <TableRow key={item.id}>
-                      <TableCell className="text-muted-foreground truncate">{index + 1}</TableCell>
+                      <TableCell className="truncate"><IdBall value={index + 1} label="ID" /></TableCell>
                       <TableCell className="font-medium truncate">{item.masterAccount}</TableCell>
                       <TableCell className="truncate">{item.accountType}</TableCell>
                       <TableCell className="truncate">{item.description}</TableCell>
@@ -465,7 +466,7 @@ export default function AccountHeadPage() {
             <Table className="table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[60px]">ID</TableHead>
+                  <TableHead className="w-[92px]">ID</TableHead>
                   <TableHead className="w-[160px]">Sub Master Account</TableHead>
                   <TableHead className="w-[160px]">Master Account</TableHead>
                   <TableHead className="w-[100px]">Budget</TableHead>
@@ -484,7 +485,7 @@ export default function AccountHeadPage() {
                 ) : (
                   paginatedSubHeads.map((item, index) => (
                     <TableRow key={item.id}>
-                      <TableCell className="text-muted-foreground truncate">{index + 1}</TableCell>
+                      <TableCell className="truncate"><IdBall value={index + 1} label="ID" /></TableCell>
                       <TableCell className="font-medium truncate">{item.subMasterAccount}</TableCell>
                       <TableCell className="truncate">{item.masterAccount}</TableCell>
                       <TableCell className="font-mono truncate">{item.budget ? `Rs. ${Number(item.budget).toLocaleString()}` : '-'}</TableCell>

@@ -1,6 +1,7 @@
 'use client';
 
 import { type ColumnDef } from '@tanstack/react-table';
+import { IdBall } from '@/components/shared/id-ball';
 import type { LedgerEntry } from '@/lib/types';
 import { MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -23,11 +24,7 @@ export const getColumns = ({ onEdit, onDelete }: ColumnsProps): ColumnDef<Ledger
   {
     accessorKey: 'id',
     header: 'ID',
-    cell: ({ row }) => (
-      <div className="text-xs font-mono text-muted-foreground">
-        {row.index + 1}
-      </div>
-    ),
+    cell: ({ row }) => <IdBall value={row.index + 1} label="ID" />,
   },
   {
     accessorKey: 'date',

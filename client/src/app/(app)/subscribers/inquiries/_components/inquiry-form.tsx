@@ -117,6 +117,7 @@ export function InquiryForm({ inquiry, areas, boxes, packages, onSave, onCancel,
             </FormItem>
           )}
         />
+        {!inquiry && (
         <FormField
           control={form.control}
           name="internetId"
@@ -130,6 +131,7 @@ export function InquiryForm({ inquiry, areas, boxes, packages, onSave, onCancel,
             </FormItem>
           )}
         />
+        )}
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}

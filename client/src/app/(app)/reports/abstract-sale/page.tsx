@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { IdBall } from '@/components/shared/id-ball';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -404,7 +405,7 @@ export default function AbstractSalePage() {
                       const itemSummary = items.slice(0, 2).map((it: any) => `${it.productName} x${it.quantity}`).join(', ');
                       return (
                         <TableRow key={item.id}>
-                          <TableCell className="font-mono text-xs text-muted-foreground">{index + 1}</TableCell>
+                          <TableCell><IdBall value={index + 1} label="#" /></TableCell>
                           <TableCell className="text-sm text-muted-foreground">{new Date(item.date).toLocaleDateString()}</TableCell>
                           <TableCell className="font-medium">{item.subscriberName || 'Unknown'}</TableCell>
                           <TableCell>

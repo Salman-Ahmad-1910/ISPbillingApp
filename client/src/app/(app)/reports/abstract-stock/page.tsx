@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { IdBall } from '@/components/shared/id-ball';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -385,7 +386,7 @@ export default function AbstractStockPage() {
                   ) : (
                     filteredData.map((item, index) => (
                       <TableRow key={item.purchaseItemId || item.id}>
-                        <TableCell className="font-mono text-xs text-muted-foreground">{index + 1}</TableCell>
+                        <TableCell><IdBall value={index + 1} label="#" /></TableCell>
                         <TableCell className="font-medium">{item.name}</TableCell>
                         <TableCell>{item.vendorName || '—'}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{item.purchaseDate}</TableCell>

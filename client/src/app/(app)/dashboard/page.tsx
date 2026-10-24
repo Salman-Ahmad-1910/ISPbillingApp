@@ -249,7 +249,7 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
             </Link>
-            <Link href="/collection/overdue-subscribers" className="block flex-1 min-w-[180px] max-w-[280px]">
+            <Link href="/collection/inactive-subscribers" className="block flex-1 min-w-[180px] max-w-[280px]">
               <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 min-h-[140px] cursor-pointer h-full">
                 <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] bg-gradient-to-br from-orange-500 to-amber-500" />
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 relative">

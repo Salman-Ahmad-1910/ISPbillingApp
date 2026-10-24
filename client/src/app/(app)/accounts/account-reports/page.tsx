@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import { IdBall } from '@/components/shared/id-ball';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -422,7 +423,7 @@ export default function AccountReportsPage() {
                   ) : (
                     filteredData.map((item, idx) => (
                       <TableRow key={item.id}>
-                        <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
+                        <TableCell><IdBall value={idx + 1} label="#" /></TableCell>
                         <TableCell>{item.date}</TableCell>
                         <TableCell className="font-medium">{getHeadName(item.head)}</TableCell>
                         <TableCell>{getSubHeadName(item.subHead)}</TableCell>
