@@ -44,6 +44,8 @@ echo ""
 echo "[3/3] Copying frontend build to embed directory..."
 rm -rf ../frontend
 cp -r .next-export ../frontend
+# Keep the tracked placeholder so the working tree stays clean after a build.
+touch ../frontend/.gitkeep
 cd ..
 
 echo ""

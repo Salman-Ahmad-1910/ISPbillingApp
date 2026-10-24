@@ -106,7 +106,7 @@ func main() {
 
 	config.ConnectDatabase()
 	config.RunMigrations()
-
+    
 	// Migrate any plaintext passwords to bcrypt hashes .this is for the export the .env
 	if err := utils.HashExistingPasswords(); err != nil {
 		log.Printf("Warning: password migration error (non-fatal): %v", err)
