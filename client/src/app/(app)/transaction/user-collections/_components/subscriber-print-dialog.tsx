@@ -237,6 +237,17 @@ function A4Invoice({ payment, company, logoUrl, stampUrl, subscriberName, collec
 }
 
 function ThermalInvoice({ payment, company, logoUrl, subscriberName, collectorName, onPrint }: { payment: Payment; company: Company | undefined; logoUrl: string | null; subscriberName?: string; collectorName?: string; onPrint: () => void }) {
+  const paymentDate = payment.paymentDate ? new Date(payment.paymentDate) : new Date();
+  const dateStr = paymentDate.toLocaleDateString();
+  const timeStr = paymentDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const monthYear = paymentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const receiverName = collectorName || payment.collectedByName || payment.collectorId || '---';
+  const connectionType = (payment as any).connectionType || (payment as any).type || 'internet';
+  const normalizedType = connectionType?.toString().toLowerCase() === 'cable+internet' || connectionType?.toString().toLowerCase() === 'combo' || connectionType?.toString().toLowerCase() === 'cable_internet' ? 'cable-internet' : connectionType?.toString().toLowerCase() === 'cable' ? 'cable' : connectionType?.toString().toLowerCase() === 'internet' ? 'internet' : connectionType || 'internet';
+  const total = (payment as any).totalAmount ?? payment.amount ?? 0;
+  const received = payment.amount ?? 0;
+  const balance = (payment as any).balance ?? Math.max(0, Number(total) - Number(received));
+
   return (
     <div className="space-y-4">
       <div className="flex justify-end no-print">
@@ -247,59 +258,54 @@ function ThermalInvoice({ payment, company, logoUrl, subscriberName, collectorNa
       </div>
 
       <div className="flex justify-center">
-        <div className="print-area bg-white border rounded-lg p-4 w-[300px] font-mono text-sm text-gray-900" style={{ forcedColorAdjust: 'none' }} id="print-thermal">
+        <div className="print-area bg-white border rounded-lg p-3 w-[80mm] max-w-full font-mono text-[11px] text-black" style={{ forcedColorAdjust: 'none', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }} id="print-thermal">
 
-          <div className="text-center mb-3 pb-2 border-b border-dashed border-gray-400">
+          <div className="text-center mb-2">
             {logoUrl && (
-              <img src={logoUrl} alt="Logo" style={{ width: '80px', height: '80px', objectFit: 'contain', margin: '0 auto 8px' }} />
+              <img src={logoUrl} alt="Logo" style={{ width: '70px', height: '70px', objectFit: 'contain', margin: '0 auto 4px' }} />
             )}
-            <p className="font-bold text-base">{company?.name || 'Company'}</p>
-            <p className="text-xs text-gray-500">{company?.address}</p>
-            {company?.contact1 && <p className="text-xs text-gray-500">{company.contact1}</p>}
+            <div className="font-bold text-[13px] leading-tight">{company?.name || 'Company Name'}</div>
+            {company?.address && <div className="text-[10px] leading-tight whitespace-pre-wrap break-words">{company.address}</div>}
           </div>
 
-          <div className="mb-3 pb-2 border-b border-dashed border-gray-400">
-            <div className="flex justify-between mb-1">
-              <span className="text-gray-700 font-bold">Bill ID:</span>
-              <span className="font-bold">{payment.billNo || '---'}</span>
-            </div>
-            <div className="flex justify-between mb-1">
-              <span className="text-gray-700 font-bold">Date:</span>
-              <span className="font-bold">{payment.paymentDate}</span>
-            </div>
-            <div className="flex justify-between mb-1">
-              <span className="text-gray-700 font-bold">Month:</span>
-              <span className="font-bold">
-                {new Date(payment.paymentDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-              </span>
-            </div>
+          <div className="mb-2 leading-tight">
+            <div>Bill ID: <span className="font-bold">{payment.billNo || (payment as any).billId || '---'}</span></div>
+            <div>Date: <span className="font-bold">{dateStr}</span> Time: <span className="font-bold">{timeStr}</span></div>
           </div>
 
-          <div className="mb-3 pb-2 border-b border-dashed border-gray-400">
-            <div className="flex justify-between mb-1">
-              <span className="text-gray-700 font-bold">Subscriber:</span>
-              <span className="font-bold">{subscriberName || payment.subscriberName}</span>
-            </div>
-            <div className="flex justify-between mb-1">
-              <span className="text-gray-700 font-bold">Method:</span>
-              <span className="font-bold capitalize">{payment.method || 'Cash'}</span>
-            </div>
-            <div className="flex justify-between mb-1">
-              <span className="text-gray-700 font-bold">Received By:</span>
-              <span className="font-bold">{collectorName || payment.collectorId?.slice(0, 8) || '---'}</span>
-            </div>
+          <div className="mb-2 leading-tight">
+            <div>Recovery officer/Receiver name: <span className="font-bold">{receiverName}</span></div>
+            <div>Subscriber name: <span className="font-bold">{subscriberName || payment.subscriberName || '---'}</span></div>
           </div>
 
-          <div className="mb-3 pb-2 border-b border-dashed border-gray-400">
-            <div className="flex justify-between mb-1">
-              <span className="text-gray-700 font-bold">Amount:</span>
-              <span className="font-bold">PKR {payment.amount.toLocaleString()}</span>
-            </div>
+          <table className="w-full border-collapse mb-2 text-[10px]">
+            <thead>
+              <tr>
+                <th className="border border-black px-1 py-0.5 text-left">Month</th>
+                <th className="border border-black px-1 py-0.5 text-left">Type</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="border border-black px-1 py-0.5">{monthYear}</td>
+                <td className="border border-black px-1 py-0.5 capitalize">{normalizedType}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div className="mb-2 leading-tight">
+            <div className="flex justify-between"><span>Total:</span><span className="font-bold">PKR {Number(total).toLocaleString()}</span></div>
+            <div className="flex justify-between"><span>Received:</span><span className="font-bold">PKR {Number(received).toLocaleString()}</span></div>
+            <div className="flex justify-between"><span>Balance:</span><span className="font-bold">PKR {Number(balance).toLocaleString()}</span></div>
           </div>
 
-          <div className="text-center border-t border-dashed border-gray-400 pt-2">
-            <p className="font-bold text-xs">{company?.name || 'Company'}</p>
-            <p className="text-xs text-gray-500">Computer generated receipt</p>
+          <div className="text-center mt-3 mb-1">
+            <div className="font-bold">THANK YOU</div>
+          </div>
+
+          <div className="text-center leading-tight">
+            <div>For any query contack:</div>
+            <div className="font-bold">{(company as any)?.contact1 || (company as any)?.contact2 || (company as any)?.phone || (company as any)?.mobile || '---'}</div>
           </div>
         </div>
       </div>
