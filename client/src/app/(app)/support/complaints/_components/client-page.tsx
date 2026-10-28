@@ -12,6 +12,7 @@ import { useCompany } from '@/context/company-context';
 import { z } from 'zod';
 
 import type { Complaint, Subscriber, Staff, RecoveryOfficer } from '@/lib/types';
+import { getComplaintAssigneeIds, joinAssigneeIds } from '@/lib/complaints';
 import { complaintSchema } from '@/lib/schemas';
 import { smartMatch } from '@/lib/search';
 
@@ -107,11 +108,19 @@ export function ClientPage({ data, subscribers, staff, recoveryOfficers = [] }: 
                 return;
             }
 
+            // Keep any existing multi-assignment unless the primary assignee was changed.
+            const assignedToId = formData.assignedToId === 'unassigned' ? '' : formData.assignedToId;
+            const currentIds = selectedComplaint ? getComplaintAssigneeIds(selectedComplaint) : [];
+            const nextIds = assignedToId
+                ? (currentIds.includes(assignedToId) ? currentIds : [assignedToId])
+                : [];
+
             const payload = {
                 ...formData,
                 companyId: companyId!,
                 subscriberName: subscriber.name,
-                assignedToId: formData.assignedToId === 'unassigned' ? null : formData.assignedToId,
+                assignedToId: nextIds[0] ?? null,
+                assignedToIds: joinAssigneeIds(nextIds),
             };
 
             if (selectedComplaint) {

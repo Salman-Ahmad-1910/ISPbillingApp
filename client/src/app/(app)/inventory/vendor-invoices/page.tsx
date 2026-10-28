@@ -1,16 +1,64 @@
 'use client';
 
-import { Card, CardContent } from '@/components/ui/card';
+import { useMemo, useState } from 'react';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { Loader2, ShoppingCart, DollarSign, Receipt } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
 
 import { ClientPage } from './_components/client-page';
 
+/** Normalises an invoice date (e.g. "2024-05-03", "2024-05-03T00:00:00Z") to "YYYY-MM-DD". */
+function toDateKey(value?: string | null): string | null {
+  if (!value) return null;
+
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  const isoMatch = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export default function VendorInvoicesPage() {
   const { companyId } = useCompany();
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   const { data: vendorInvoices = [], isLoading, error } = useGenericQuery<any>('inventory/vendor-invoices', companyId ?? undefined);
+
+  // Invoices restricted to the selected buying-date range (inclusive).
+  const filteredVendorInvoices = useMemo(() => {
+    if (!Array.isArray(vendorInvoices)) return [];
+    if (!fromDate && !toDate) return vendorInvoices;
+
+    return vendorInvoices.filter((invoice: any) => {
+      const key = toDateKey(invoice?.invoiceDate);
+      if (!key) return false;
+      if (fromDate && key < fromDate) return false;
+      if (toDate && key > toDate) return false;
+      return true;
+    });
+  }, [vendorInvoices, fromDate, toDate]);
+
+  const totalSpent = useMemo(
+    () => filteredVendorInvoices.reduce((sum: number, invoice: any) => sum + (Number(invoice.totalAmount) || 0), 0),
+    [filteredVendorInvoices]
+  );
+
+  const handleClearDateFilter = () => {
+    setFromDate('');
+    setToDate('');
+  };
 
   if (isLoading) {
     return (
@@ -49,7 +97,7 @@ export default function VendorInvoicesPage() {
             </div>
             <div>
               <p className="text-xs font-medium text-muted-foreground">Total Invoices</p>
-              <p className="text-2xl font-bold">{Array.isArray(vendorInvoices) ? vendorInvoices.length : 0}</p>
+              <p className="text-2xl font-bold">{filteredVendorInvoices.length}</p>
             </div>
           </div>
         </div>
@@ -60,11 +108,7 @@ export default function VendorInvoicesPage() {
             </div>
             <div>
               <p className="text-xs font-medium text-muted-foreground">Total Spent</p>
-              <p className="text-2xl font-bold">
-                PKR {Array.isArray(vendorInvoices)
-                  ? vendorInvoices.reduce((s: number, v: any) => s + (Number(v.totalAmount) || 0), 0).toLocaleString()
-                  : 0}
-              </p>
+              <p className="text-2xl font-bold">PKR {totalSpent.toLocaleString()}</p>
             </div>
           </div>
         </div>
@@ -76,8 +120,8 @@ export default function VendorInvoicesPage() {
             <div>
               <p className="text-xs font-medium text-muted-foreground">Avg Per Purchase</p>
               <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                PKR {Array.isArray(vendorInvoices) && vendorInvoices.length > 0
-                  ? Math.round(vendorInvoices.reduce((s: number, v: any) => s + (Number(v.totalAmount) || 0), 0) / vendorInvoices.length).toLocaleString()
+                PKR {filteredVendorInvoices.length > 0
+                  ? Math.round(totalSpent / filteredVendorInvoices.length).toLocaleString()
                   : 0}
               </p>
             </div>
@@ -85,11 +129,14 @@ export default function VendorInvoicesPage() {
         </div>
       </div>
 
-      <Card className="transition-all duration-300 hover:shadow-md">
-        <CardContent className="p-0">
-          <ClientPage data={vendorInvoices} />
-        </CardContent>
-      </Card>
+      <ClientPage
+        data={filteredVendorInvoices}
+        fromDate={fromDate}
+        toDate={toDate}
+        onFromDateChange={setFromDate}
+        onToDateChange={setToDate}
+        onClearDateFilter={handleClearDateFilter}
+      />
     </div>
   );
 }

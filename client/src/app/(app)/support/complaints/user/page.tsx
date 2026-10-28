@@ -26,7 +26,9 @@ import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
+import { SearchableMultiSelect } from '@/components/ui/searchable-multi-select';
 import type { Connection, Area, Complaint, Staff, RecoveryOfficer, Subscriber } from '@/lib/types';
+import { getComplaintAssigneeIds, joinAssigneeIds } from '@/lib/complaints';
 import { smartMatch, smartSearch } from '@/lib/search';
 import { useCrudPermissions } from '@/hooks/usePermissions';
 import { COMPLAINTS_USER_PERMISSION } from '@/lib/permission-pages';
@@ -92,7 +94,7 @@ export default function SubscriberComplaintPage() {
   const [statusComplaint, setStatusComplaint] = useState<Complaint | null>(null);
   const [showStatus, setShowStatus] = useState(false);
   const [allocateComplaint, setAllocateComplaint] = useState<Complaint | null>(null);
-  const [allocateOperatorId, setAllocateOperatorId] = useState('');
+  const [allocateOperatorIds, setAllocateOperatorIds] = useState<string[]>([]);
   const [showAllocate, setShowAllocate] = useState(false);
 
   const kpiData = useMemo(() => [
@@ -214,11 +216,18 @@ export default function SubscriberComplaintPage() {
     if (!editComplaint) return;
     setIsSaving(true);
     try {
+      // Keep the existing multi-assignment unless the single operator was changed.
+      const currentIds = getComplaintAssigneeIds(editComplaint);
+      const nextIds = editOperatorId
+        ? (currentIds.includes(editOperatorId) ? currentIds : [editOperatorId])
+        : [];
+
       await api.put(`/support/complaints/${editComplaint.id}`, {
         ...editComplaint,
         description: editDescription,
         status: editStatus,
-        assignedToId: editOperatorId || null,
+        assignedToId: nextIds[0] ?? null,
+        assignedToIds: joinAssigneeIds(nextIds),
       });
       toast({ title: 'Success', description: 'Complaint updated.' });
       setShowEdit(false);
@@ -232,17 +241,21 @@ export default function SubscriberComplaintPage() {
   };
 
   const handleAllocate = async () => {
-    if (!allocateComplaint || !allocateOperatorId) return;
+    if (!allocateComplaint || allocateOperatorIds.length === 0) return;
     setIsSaving(true);
     try {
       await api.put(`/support/complaints/${allocateComplaint.id}`, {
         ...allocateComplaint,
-        assignedToId: allocateOperatorId,
+        assignedToId: allocateOperatorIds[0] ?? null,
+        assignedToIds: joinAssigneeIds(allocateOperatorIds),
       });
-      toast({ title: 'Success', description: `Complaint allocated successfully.` });
+      toast({
+        title: 'Success',
+        description: `Complaint allocated to ${allocateOperatorIds.length} staff member${allocateOperatorIds.length === 1 ? '' : 's'}.`,
+      });
       setShowAllocate(false);
       setAllocateComplaint(null);
-      setAllocateOperatorId('');
+      setAllocateOperatorIds([]);
       refetch();
     } catch (err: any) {
       toast({ variant: 'destructive', title: 'Error', description: err.response?.data?.message || 'Allocation failed' });
@@ -419,7 +432,7 @@ export default function SubscriberComplaintPage() {
                               <CircleDot className="mr-2 h-4 w-4" />
                               Status
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="data-[highlighted]:text-violet-600" onClick={() => { setAllocateComplaint(item); setAllocateOperatorId(item.assignedToId || ''); setShowAllocate(true); }}>
+                            <DropdownMenuItem className="data-[highlighted]:text-violet-600" onClick={() => { setAllocateComplaint(item); setAllocateOperatorIds(getComplaintAssigneeIds(item)); setShowAllocate(true); }}>
                               <UserRound className="mr-2 h-4 w-4" />
                               Allocate
                             </DropdownMenuItem>
@@ -755,8 +768,8 @@ export default function SubscriberComplaintPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showAllocate} onOpenChange={(open) => { setShowAllocate(open); if (!open) setAllocateComplaint(null); }}>
-        <DialogContent className="max-w-lg">
+      <Dialog open={showAllocate} onOpenChange={(open) => { setShowAllocate(open); if (!open) { setAllocateComplaint(null); setAllocateOperatorIds([]); } }}>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Allocate Complaint</DialogTitle>
           </DialogHeader>
@@ -765,18 +778,22 @@ export default function SubscriberComplaintPage() {
               <Label>Complaint</Label>
               <Input value={allocateComplaint ? `${allocateComplaint.subscriberName} - ${allocateComplaint.description}` : ''} readOnly />
             </div>
-            <SearchableDropdown
+            <SearchableMultiSelect
               label="Assign To"
               icon={UserRound}
               color="text-emerald-600"
               items={assigneeOptions}
-              value={allocateOperatorId}
-              onValueChange={setAllocateOperatorId}
+              values={allocateOperatorIds}
+              onChange={setAllocateOperatorIds}
               placeholder="Search staff or recovery officer..."
+              emptyText="No staff or recovery officers found"
             />
+            <p className="text-xs text-muted-foreground">
+              Select one or more staff members. The same complaint will be allocated to everyone selected.
+            </p>
             <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" onClick={() => { setShowAllocate(false); setAllocateComplaint(null); }}>Cancel</Button>
-              <Button onClick={handleAllocate} disabled={isSaving || !allocateOperatorId} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white">
+              <Button variant="outline" onClick={() => { setShowAllocate(false); setAllocateComplaint(null); setAllocateOperatorIds([]); }}>Cancel</Button>
+              <Button onClick={handleAllocate} disabled={isSaving || allocateOperatorIds.length === 0} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white">
                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Allocate
               </Button>

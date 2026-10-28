@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"awesomeProject/config"
@@ -15,6 +17,87 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
+
+// auditIdentifierPattern guards the table name we derive from the URL path
+// before it is handed to GORM (identifiers cannot be parameterised).
+var auditIdentifierPattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
+
+// auditEntitySnapshot captures the human-readable identity of a record just
+// before it is deleted. The audit entry can then say *what* was deleted
+// (subscriber/connection name, internet ID, ...) instead of only a UUID.
+type auditEntitySnapshot struct {
+	EntityID       string
+	EntityType     string
+	Name           string
+	Label          string
+	InternetID     string
+	ConnectionType string
+	// FrontendID is the human-facing reference of the record (Internet ID,
+	// invoice number, serial number, ...) instead of the internal UUID.
+	FrontendID      string
+	FrontendIDLabel string
+	// Info holds additional human-readable fields (phone, address, package,
+	// status, ...) shown in the expanded log entry.
+	Info map[string]string
+}
+
+// auditReferenceColumns lists the columns that hold a record's user-facing
+// identifier, in priority order. The first populated one becomes the
+// "frontend ID" shown in the system log.
+var auditReferenceColumns = []struct {
+	Column string
+	Label  string
+}{
+	{"internet_id", "Internet ID"},
+	{"subscriber_identity", "Subscriber ID"},
+	{"invoice_number", "Invoice No."},
+	{"payment_number", "Payment No."},
+	{"bill_no", "Bill No."},
+	{"po_number", "PO No."},
+	{"transaction_id", "Transaction ID"},
+	{"serial_number", "Serial No."},
+	{"receipt_number", "Receipt No."},
+	{"voucher_number", "Voucher No."},
+	{"expense_number", "Expense No."},
+	{"username", "Username"},
+	{"code", "Code"},
+	{"email", "Email"},
+	{"phone", "Phone"},
+	{"cell", "Cell"},
+}
+
+// auditInfoColumns lists extra descriptive columns included in the expanded
+// log entry so an admin can recognise the affected record without its UUID.
+var auditInfoColumns = []struct {
+	Column string
+	Label  string
+}{
+	{"connection_type", "Connection type"},
+	{"status", "Status"},
+	{"billing_period", "Billing period"},
+	{"due_date", "Due date"},
+	{"amount", "Amount"},
+	{"paid_amount", "Paid"},
+	{"remaining_amount", "Remaining"},
+	{"method", "Method"},
+	{"transaction_type", "Transaction type"},
+	{"batch", "Batch"},
+	{"phone", "Phone"},
+	{"cell", "Cell"},
+	{"mobile", "Mobile"},
+	{"cnic", "CNIC"},
+	{"email", "Email"},
+	{"address", "Address"},
+	{"installation_address", "Installation address"},
+	{"area_name", "Area"},
+	{"sub_locality", "Sub-locality"},
+	{"package_name", "Package"},
+	{"package_internet", "Internet package"},
+	{"package_cable", "Cable package"},
+	{"deactivation_reason", "Deactivation reason"},
+	{"comments", "Comments"},
+	{"role", "Role"},
+}
 
 // AuditMiddleware logs every write / update / delete operation (POST, PUT,
 // PATCH, DELETE) to the audit trail (audit_logs / SystemLog). Read requests
@@ -35,13 +118,23 @@ func AuditMiddleware() gin.HandlerFunc {
 			c.Request.Body = io.NopCloser(bytes.NewBuffer(requestBody))
 		}
 
+		method := c.Request.Method
+
+		// For deletes the record disappears with the request, so snapshot its
+		// display identity *before* the handler runs. This is what lets the
+		// system log expand to show exactly which subscriber/connection/etc.
+		// was removed.
+		var deletedEntity *auditEntitySnapshot
+		if method == "DELETE" {
+			deletedEntity = captureDeletedEntity(c)
+		}
+
 		c.Next()
 
 		if shouldSkipLogging(c.Request.URL.Path) {
 			return
 		}
 
-		method := c.Request.Method
 		if method == "GET" || method == "OPTIONS" || method == "HEAD" {
 			return
 		}
@@ -61,7 +154,7 @@ func AuditMiddleware() gin.HandlerFunc {
 		action, module := determineActionAndModule(method, c.Request.URL.Path)
 		page := extractPageFromPath(c.Request.URL.Path)
 
-		details, serials := buildActivityDetails(c, requestBody, method, action)
+		details, serials := buildActivityDetails(c, requestBody, method, action, deletedEntity)
 
 		status := "success"
 		if statusCode := c.Writer.Status(); statusCode >= 400 {
@@ -218,7 +311,7 @@ func lookupUserName(userID uuid.UUID, role string) string {
 // buildActivityDetails assembles the rich JSON blob stored in the log entry:
 // affected entity id/type, connection context, serial numbers, a redacted
 // request snapshot and (for deletes) the URL that allows later restore.
-func buildActivityDetails(c *gin.Context, body []byte, method, action string) (gin.H, string) {
+func buildActivityDetails(c *gin.Context, body []byte, method, action string, deletedEntity *auditEntitySnapshot) (gin.H, string) {
 	details := gin.H{"path": c.Request.URL.Path}
 	var serials []string
 	isAuthPath := strings.HasSuffix(c.Request.URL.Path, "/auth/login") || strings.HasSuffix(c.Request.URL.Path, "/auth/logout")
@@ -257,6 +350,15 @@ func buildActivityDetails(c *gin.Context, body []byte, method, action string) (g
 					details["subscriberName"] = v
 				}
 			}
+			// Most create/update payloads use "name" for the record being
+			// changed. Keep it so the log can describe the task by name.
+			if v, ok := payload["name"].(string); ok && v != "" {
+				details["recordName"] = v
+			}
+			if frontendID, label := auditFrontendReferenceFromPayload(payload); frontendID != "" {
+				details["frontendId"] = frontendID
+				details["frontendIdLabel"] = label
+			}
 			if v, ok := payload["internetId"].(string); ok && v != "" {
 				details["internetId"] = v
 			}
@@ -281,7 +383,307 @@ func buildActivityDetails(c *gin.Context, body []byte, method, action string) (g
 		}
 	}
 
+	// Prefer the snapshot taken before the delete so the log carries the
+	// record's real name as well as its id.
+	if deletedEntity != nil {
+		details["entityId"] = deletedEntity.EntityID
+		details["entityType"] = deletedEntity.EntityType
+		if deletedEntity.Label != "" {
+			details["entityLabel"] = deletedEntity.Label
+		}
+		if deletedEntity.Name != "" {
+			details["recordName"] = deletedEntity.Name
+		}
+		if deletedEntity.InternetID != "" {
+			details["internetId"] = deletedEntity.InternetID
+		}
+		if deletedEntity.ConnectionType != "" {
+			details["connectionType"] = deletedEntity.ConnectionType
+		}
+		if deletedEntity.FrontendID != "" {
+			details["frontendId"] = deletedEntity.FrontendID
+			details["frontendIdLabel"] = deletedEntity.FrontendIDLabel
+		}
+		if len(deletedEntity.Info) > 0 {
+			details["recordInfo"] = deletedEntity.Info
+		}
+		if isSubscriberEntity(deletedEntity.EntityType) && deletedEntity.Name != "" {
+			details["subscriberName"] = deletedEntity.Name
+		}
+	}
+
 	return details, serializeSerials(serials)
+}
+
+// captureDeletedEntity looks up the record referenced by a DELETE request
+// before it is removed. It is deliberately best-effort: if the table/row
+// cannot be resolved the audit entry still records the id and route.
+func captureDeletedEntity(c *gin.Context) *auditEntitySnapshot {
+	if config.DB == nil {
+		return nil
+	}
+
+	parts := strings.Split(strings.Trim(c.Request.URL.Path, "/"), "/")
+	if len(parts) == 0 {
+		return nil
+	}
+
+	entityID, err := uuid.Parse(parts[len(parts)-1])
+	if err != nil {
+		return nil
+	}
+
+	entityType := guessEntityType(parts)
+	table := auditTableForEntityType(entityType)
+	if table == "" {
+		return nil
+	}
+
+	row, ok := scanAuditRow(table, entityID)
+	if !ok {
+		return nil
+	}
+
+	// Never surface the identity of a record that belongs to another company.
+	if companyID := resolveCompanyID(c); companyID != uuid.Nil {
+		if rowCompany := firstRowString(row, "company_id"); rowCompany != "" && !strings.EqualFold(rowCompany, companyID.String()) {
+			return nil
+		}
+	}
+
+	frontendID, frontendIDLabel := auditFrontendReference(row)
+	return &auditEntitySnapshot{
+		EntityID:        entityID.String(),
+		EntityType:      entityType,
+		Name:            firstRowString(row, "name", "subscriber_name", "full_name", "title", "vendor_name", "customer_name", "dealer_name"),
+		Label:           buildEntityLabel(entityType, row),
+		InternetID:      firstRowString(row, "internet_id", "subscriber_identity"),
+		ConnectionType:  firstRowString(row, "connection_type"),
+		FrontendID:      frontendID,
+		FrontendIDLabel: frontendIDLabel,
+		Info:            auditRecordInfo(row),
+	}
+}
+
+// scanAuditRow loads a single row from a tenant table into a column->value
+// map so the audit code can pick a display label without knowing the model.
+func scanAuditRow(table string, entityID uuid.UUID) (map[string]interface{}, bool) {
+	rows, err := config.DB.Table(table).Select("*").Where("id = ?", entityID).Limit(1).Rows()
+	if err != nil {
+		return nil, false
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return nil, false
+	}
+
+	columns, err := rows.Columns()
+	if err != nil {
+		return nil, false
+	}
+
+	values := make([]interface{}, len(columns))
+	scanTargets := make([]interface{}, len(columns))
+	for i := range values {
+		scanTargets[i] = &values[i]
+	}
+	if err := rows.Scan(scanTargets...); err != nil {
+		return nil, false
+	}
+
+	row := make(map[string]interface{}, len(columns))
+	for i, column := range columns {
+		switch value := values[i].(type) {
+		case []byte:
+			row[column] = string(value)
+		case nil:
+			row[column] = nil
+		default:
+			row[column] = value
+		}
+	}
+	return row, true
+}
+
+// auditTableForEntityType maps a route entity segment (e.g. "connections",
+// "recovery-officers") to the table that holds it. Only identifier-safe names
+// are returned because table names cannot be passed as SQL parameters.
+func auditTableForEntityType(entityType string) string {
+	key := strings.ToLower(strings.TrimSpace(entityType))
+	aliases := map[string]string{
+		"connection":          "connections",
+		"subscriber":          "subscribers",
+		"dealer":              "dealers",
+		"user":                "users",
+		"admin-user":          "users",
+		"recovery-officer":    "users",
+		"recovery-officers":   "users",
+		"recovery_officer":    "users",
+		"recovery_officers":   "users",
+		"vendor-invoice":      "vendor_invoices",
+		"vendor-invoices":     "vendor_invoices",
+		"vendor_invoices":     "vendor_invoices",
+		"serial-number-pool":  "serial_number_pools",
+		"serial_number_pool":  "serial_number_pools",
+		"serial-number-pools": "serial_number_pools",
+		"ledger":              "ledger_entries",
+		"file":                "shared_files",
+		"files":               "shared_files",
+	}
+	if mapped, ok := aliases[key]; ok {
+		return mapped
+	}
+
+	normalized := strings.ReplaceAll(key, "-", "_")
+	if auditIdentifierPattern.MatchString(normalized) {
+		return normalized
+	}
+	return ""
+}
+
+// firstRowString returns the first non-empty string-ish column from a scanned
+// database row.
+func firstRowString(row map[string]interface{}, keys ...string) string {
+	for _, key := range keys {
+		value, ok := row[key]
+		if !ok || value == nil {
+			continue
+		}
+		switch typed := value.(type) {
+		case string:
+			if trimmed := strings.TrimSpace(typed); trimmed != "" {
+				return trimmed
+			}
+		case []byte:
+			if trimmed := strings.TrimSpace(string(typed)); trimmed != "" {
+				return trimmed
+			}
+		case fmt.Stringer:
+			if trimmed := strings.TrimSpace(typed.String()); trimmed != "" {
+				return trimmed
+			}
+		case int:
+			return strconv.Itoa(typed)
+		case int32:
+			return strconv.FormatInt(int64(typed), 10)
+		case int64:
+			return strconv.FormatInt(typed, 10)
+		case uint:
+			return strconv.FormatUint(uint64(typed), 10)
+		case uint32:
+			return strconv.FormatUint(uint64(typed), 10)
+		case uint64:
+			return strconv.FormatUint(typed, 10)
+		case float32:
+			return strconv.FormatFloat(float64(typed), 'f', -1, 32)
+		case float64:
+			return strconv.FormatFloat(typed, 'f', -1, 64)
+		case bool:
+			if typed {
+				return "Yes"
+			}
+			return "No"
+		}
+	}
+	return ""
+}
+
+// auditFrontendReference returns the first user-facing identifier found in a
+// scanned row together with its display label.
+func auditFrontendReference(row map[string]interface{}) (string, string) {
+	for _, ref := range auditReferenceColumns {
+		if value := firstRowString(row, ref.Column); value != "" {
+			return value, ref.Label
+		}
+	}
+	return "", ""
+}
+
+// auditRecordInfo collects the descriptive fields of a row (phone, address,
+// package, status, ...) for the expanded log entry. Empty values are skipped.
+func auditRecordInfo(row map[string]interface{}) map[string]string {
+	info := make(map[string]string)
+	seen := make(map[string]bool)
+	for _, column := range auditInfoColumns {
+		if seen[column.Label] {
+			continue
+		}
+		if value := firstRowString(row, column.Column); value != "" {
+			info[column.Label] = value
+			seen[column.Label] = true
+		}
+	}
+	if len(info) == 0 {
+		return nil
+	}
+	return info
+}
+
+// auditFrontendReferenceFromPayload resolves the user-facing identifier from a
+// create/update JSON payload (camelCase keys) so new entries also avoid UUIDs.
+func auditFrontendReferenceFromPayload(payload map[string]interface{}) (string, string) {
+	references := []struct {
+		Key   string
+		Label string
+	}{
+		{"internetId", "Internet ID"},
+		{"subscriberIdentity", "Subscriber ID"},
+		{"invoiceNumber", "Invoice No."},
+		{"paymentNumber", "Payment No."},
+		{"poNumber", "PO No."},
+		{"transactionId", "Transaction ID"},
+		{"serialNumber", "Serial No."},
+		{"receiptNumber", "Receipt No."},
+		{"voucherNumber", "Voucher No."},
+		{"expenseNumber", "Expense No."},
+		{"username", "Username"},
+		{"code", "Code"},
+	}
+	for _, ref := range references {
+		if value, ok := payload[ref.Key].(string); ok && strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value), ref.Label
+		}
+	}
+	return "", ""
+}
+
+// buildEntityLabel creates the human-readable name shown in the log, e.g.
+// "John Doe (INT-001)" for a connection or "Ali Khan" for a subscriber.
+func buildEntityLabel(entityType string, row map[string]interface{}) string {
+	if strings.Contains(strings.ToLower(entityType), "area") {
+		parts := make([]string, 0, 4)
+		for _, key := range []string{"city", "zone", "locality", "sub_locality"} {
+			if value := firstRowString(row, key); value != "" {
+				parts = append(parts, value)
+			}
+		}
+		if len(parts) > 0 {
+			return strings.Join(parts, " / ")
+		}
+	}
+
+	name := firstRowString(row, "name", "title", "full_name", "vendor_name", "customer_name", "subscriber_name", "dealer_name")
+	identifier := firstRowString(row,
+		"internet_id", "subscriber_identity", "serial_number", "invoice_number",
+		"payment_number", "po_number", "transaction_id", "email", "phone", "cell")
+	if name != "" && identifier != "" && name != identifier {
+		return fmt.Sprintf("%s (%s)", name, identifier)
+	}
+	if name != "" {
+		return name
+	}
+	if identifier != "" {
+		return identifier
+	}
+	return ""
+}
+
+// isSubscriberEntity reports whether the entity represents a subscriber or a
+// connection (whose display name is the subscriber's name).
+func isSubscriberEntity(entityType string) bool {
+	lower := strings.ToLower(entityType)
+	return strings.Contains(lower, "connection") || strings.Contains(lower, "subscriber") || strings.Contains(lower, "customer")
 }
 
 // extractSerialsFromObject walks a decoded JSON payload and collects every
@@ -478,43 +880,43 @@ func determineActionAndModule(method, path string) (string, string) {
 	}
 
 	moduleMap := map[string]string{
-		"auth":             "authentication",
-		"users":            "users",
-		"companies":        "companies",
-		"subscribers":      "subscribers",
-		"dealers":          "dealers",
-		"network":          "network",
-		"billing":          "billing",
-		"reports":          "reports",
-		"areas":            "areas",
-		"olts":             "network",
-		"splitters":        "network",
-		"pops":             "network",
-		"invoices":         "billing",
-		"payments":         "billing",
-		"packages":         "billing",
-		"locations":        "billing",
-		"complaints":       "support",
-		"expenses":         "financial",
-		"dashboard":        "dashboard",
-		"admin":            "admin",
-		"hr":               "hr",
-		"accounts":         "accounts",
-		"inventory":        "inventory",
-		"crm":              "crm",
-		"messages":         "messages",
-		"connections":      "connections",
-		"connection":       "connections",
-		"collection":       "collection",
-		"upload":           "upload",
-		"mail":             "mail",
-		"sms":              "sms",
-		"whatsapp":         "whatsapp",
-		"roles":            "roles",
-		"logs":             "logs",
-		"system-config":    "system",
-		"company-profile":  "company",
-		"settings":         "settings",
+		"auth":              "authentication",
+		"users":             "users",
+		"companies":         "companies",
+		"subscribers":       "subscribers",
+		"dealers":           "dealers",
+		"network":           "network",
+		"billing":           "billing",
+		"reports":           "reports",
+		"areas":             "areas",
+		"olts":              "network",
+		"splitters":         "network",
+		"pops":              "network",
+		"invoices":          "billing",
+		"payments":          "billing",
+		"packages":          "billing",
+		"locations":         "billing",
+		"complaints":        "support",
+		"expenses":          "financial",
+		"dashboard":         "dashboard",
+		"admin":             "admin",
+		"hr":                "hr",
+		"accounts":          "accounts",
+		"inventory":         "inventory",
+		"crm":               "crm",
+		"messages":          "messages",
+		"connections":       "connections",
+		"connection":        "connections",
+		"collection":        "collection",
+		"upload":            "upload",
+		"mail":              "mail",
+		"sms":               "sms",
+		"whatsapp":          "whatsapp",
+		"roles":             "roles",
+		"logs":              "logs",
+		"system-config":     "system",
+		"company-profile":   "company",
+		"settings":          "settings",
 		"recovery-officers": "recovery",
 		"recovery_officers": "recovery",
 	}
@@ -530,7 +932,7 @@ func determineActionAndModule(method, path string) (string, string) {
 // names the operator, the operation type, module/page, entity and serials.
 func generateActivityDescription(userName, action, module, page, serials string, details gin.H) string {
 	verb := map[string]string{
-		"add":    "wrote/added",
+		"add":    "added",
 		"edit":   "updated",
 		"delete": "deleted",
 		"login":  "logged in to",
@@ -545,22 +947,72 @@ func generateActivityDescription(userName, action, module, page, serials string,
 		actor = "An operator"
 	}
 
-	desc := fmt.Sprintf("%s %s %s record on %s", actor, verb, module, page)
-
-	if subscriber, ok := details["subscriberName"].(string); ok && subscriber != "" {
-		desc += fmt.Sprintf(" for %s", subscriber)
-		if internetID, ok := details["internetId"].(string); ok && internetID != "" {
-			desc += fmt.Sprintf(" (%s)", internetID)
-		}
+	entityName, _ := details["entityLabel"].(string)
+	if entityName == "" {
+		entityName, _ = details["subscriberName"].(string)
 	}
+	if entityName == "" {
+		entityName, _ = details["recordName"].(string)
+	}
+	frontendID, _ := details["frontendId"].(string)
+	internetID, _ := details["internetId"].(string)
 
-	if entityID, ok := details["entityId"].(string); ok && entityID != "" {
-		desc += fmt.Sprintf(" (entity %s)", entityID)
+	desc := fmt.Sprintf("%s %s %s", actor, verb, singularEntityName(module))
+	if entityName != "" {
+		desc += fmt.Sprintf(" \"%s\"", entityName)
+	} else if frontendID != "" {
+		desc += fmt.Sprintf(" \"%s\"", frontendID)
+	}
+	desc += fmt.Sprintf(" on %s", page)
+
+	if internetID != "" && !strings.Contains(entityName, internetID) {
+		desc += fmt.Sprintf(" [Internet ID: %s]", internetID)
 	}
 	if serials != "" {
 		desc += fmt.Sprintf(" [serials: %s]", serials)
 	}
 	return desc
+}
+
+// singularEntityName turns a module name into the thing that was acted on so
+// descriptions read naturally ("deleted connection ..." rather than
+// "deleted connections record ...").
+func singularEntityName(module string) string {
+	lower := strings.ToLower(strings.TrimSpace(module))
+	switch lower {
+	case "connections":
+		return "connection"
+	case "subscribers":
+		return "subscriber"
+	case "users":
+		return "user"
+	case "dealers":
+		return "dealer"
+	case "areas":
+		return "area"
+	case "packages":
+		return "package"
+	case "payments":
+		return "payment"
+	case "invoices":
+		return "invoice"
+	case "purchases":
+		return "purchase"
+	case "products":
+		return "product"
+	case "expenses":
+		return "expense"
+	case "complaints":
+		return "complaint"
+	case "messages", "sms", "mail", "email", "whatsapp":
+		return lower + " message"
+	case "":
+		return "record"
+	}
+	if strings.HasSuffix(lower, "s") && len(lower) > 1 {
+		return strings.TrimSuffix(lower, "s")
+	}
+	return lower
 }
 
 // GetAuditLogs retrieves audit logs for a company (for admin users)

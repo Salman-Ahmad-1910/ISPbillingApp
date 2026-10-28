@@ -25,6 +25,9 @@ interface SearchableDropdownProps {
   // or suffix) with no minimum query length. Defaults to smartMatch (IDs
   // prefix-first, names only after 3+ chars).
   matchContainsOnly?: boolean;
+  // Height/extra classes for the search input so the control can line up with
+  // other inputs (e.g. h-10) when used inside a labelled filter grid.
+  inputClassName?: string;
 }
 
 export function SearchableDropdown({
@@ -38,6 +41,7 @@ export function SearchableDropdown({
   allowClear = true,
   className,
   matchContainsOnly = false,
+  inputClassName = 'h-9',
 }: SearchableDropdownProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -85,7 +89,7 @@ export function SearchableDropdown({
         >
           <Search className="ml-2 h-4 w-4 text-muted-foreground shrink-0" />
           <input
-            className="flex-1 bg-transparent border-0 outline-none px-2 py-2 text-sm h-9"
+            className={`flex-1 bg-transparent border-0 outline-none px-2 py-2 text-sm ${inputClassName}`}
             placeholder={placeholder}
             value={selected && !open ? selected.name : query}
             onChange={(e) => {

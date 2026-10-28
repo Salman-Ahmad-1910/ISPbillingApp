@@ -20,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { AlertCircle, ClipboardPen, MoreHorizontal, Edit3, Trash2, Search, ListTodo, CheckCircle2, CircleCheck, Clock, Loader2, CircleDot, UserRound } from 'lucide-react';
+import { AlertCircle, ClipboardPen, MoreHorizontal, Edit3, UserMinus, Search, ListTodo, CheckCircle2, CircleCheck, Clock, Loader2, CircleDot, UserRound } from 'lucide-react';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { useToast } from '@/hooks/use-toast';
@@ -28,6 +28,7 @@ import { useUser } from '@/hooks/use-user';
 import api from '@/lib/api';
 import { SearchableDropdown } from '@/components/ui/searchable-dropdown';
 import type { Complaint, Staff, RecoveryOfficer } from '@/lib/types';
+import { getComplaintAssigneeIds, joinAssigneeIds } from '@/lib/complaints';
 import { smartMatch } from '@/lib/search';
 import { useCrudPermissions } from '@/hooks/usePermissions';
 import { COMPLAINTS_ALLOCATED_PERMISSION } from '@/lib/permission-pages';
@@ -79,6 +80,11 @@ export default function AllocatedComplaintPage() {
     return map;
   }, [staff, recoveryOfficers]);
 
+  const formatAssignees = (complaint: Complaint) => {
+    const names = getComplaintAssigneeIds(complaint).map(id => operatorMap[id] || 'Unknown');
+    return names.length > 0 ? names.join(', ') : '---';
+  };
+
   const assigneeOptions = useMemo(() => {
     const options: { id: string; name: string; secondary?: string }[] = [];
     (staff as Staff[]).forEach(s => options.push({ id: s.id, name: s.name, secondary: `${s.designation} (Staff)` }));
@@ -91,26 +97,34 @@ export default function AllocatedComplaintPage() {
     return (staff as Staff[]).some(s => s.id === user.id) || (recoveryOfficers as RecoveryOfficer[]).some(r => r.id === user.id);
   }, [staff, recoveryOfficers, user]);
 
-  // Only complaints that have been allocated (assignedToId set) belong on this
-  // page. A member (staff/recovery officer) sees only the complaints allocated
-  // to themselves; admins see every allocated complaint.
+  // Only complaints that have been allocated (at least one assignee) belong on
+  // this page. A member (staff/recovery officer) sees the complaints allocated
+  // to themselves - including ones also allocated to other staff; admins see
+  // every allocated complaint.
   const allocatedComplaints = useMemo(() => {
     const all = complaints as Complaint[];
     if (isMember && user?.id) {
-      return all.filter(c => c.assignedToId === user.id);
+      return all.filter(c => getComplaintAssigneeIds(c).includes(user.id));
     }
-    return all.filter(c => !!c.assignedToId);
+    return all.filter(c => getComplaintAssigneeIds(c).length > 0);
   }, [complaints, isMember, user]);
 
   const handleEdit = async () => {
     if (!editComplaint) return;
     setIsSaving(true);
     try {
+      // Keep the existing multi-assignment unless the single operator was changed.
+      const currentIds = getComplaintAssigneeIds(editComplaint);
+      const nextIds = editOperatorId
+        ? (currentIds.includes(editOperatorId) ? currentIds : [editOperatorId])
+        : [];
+
       await api.put(`/support/complaints/${editComplaint.id}`, {
         ...editComplaint,
         description: editDescription,
         status: editStatus,
-        assignedToId: editOperatorId || null,
+        assignedToId: nextIds[0] ?? null,
+        assignedToIds: joinAssigneeIds(nextIds),
       });
       toast({ title: 'Success', description: 'Complaint updated.' });
       setShowEdit(false);
@@ -123,17 +137,34 @@ export default function AllocatedComplaintPage() {
     }
   };
 
-  const handleDeleteConfirm = async () => {
+  // Removing an entry from the allocated list must never delete the complaint
+  // itself. It only clears the allocation so the record stays available on the
+  // Subscriber Complaint page. A member is removed from the assignee list while
+  // an admin clears the whole allocation.
+  const handleRemoveAllocation = async () => {
     if (!deleteComplaint) return;
     setIsSaving(true);
     try {
-      await api.delete(`/support/complaints/${deleteComplaint.id}`);
-      toast({ title: 'Deleted', description: 'Complaint deleted.' });
+      const currentIds = getComplaintAssigneeIds(deleteComplaint);
+      const nextIds =
+        isMember && user?.id && currentIds.includes(user.id)
+          ? currentIds.filter((id) => id !== user.id)
+          : [];
+
+      await api.put(`/support/complaints/${deleteComplaint.id}`, {
+        ...deleteComplaint,
+        assignedToId: nextIds[0] ?? null,
+        assignedToIds: joinAssigneeIds(nextIds),
+      });
+      toast({
+        title: 'Allocation removed',
+        description: 'The complaint was removed from the allocated list and is still available in Subscriber Complaint.',
+      });
       setShowDelete(false);
       setDeleteComplaint(null);
       refetch();
     } catch (err: any) {
-      toast({ variant: 'destructive', title: 'Error', description: err.response?.data?.message || 'Delete failed' });
+      toast({ variant: 'destructive', title: 'Error', description: err.response?.data?.message || 'Failed to remove allocation' });
     } finally {
       setIsSaving(false);
     }
@@ -349,7 +380,7 @@ export default function AllocatedComplaintPage() {
                           {STATUS_LABELS[item.status] || item.status}
                         </span>
                       </TableCell>
-                      <TableCell className="text-sm">{item.assignedToId ? (operatorMap[item.assignedToId] || 'Unknown') : '---'}</TableCell>
+                      <TableCell className="text-sm">{formatAssignees(item)}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{new Date(item.createdAt).toLocaleDateString()}</TableCell>
                       <TableCell>
                         <DropdownMenu>
@@ -369,10 +400,10 @@ export default function AllocatedComplaintPage() {
                                 Edit
                               </DropdownMenuItem>
                             )}
-                            {canDelete && (
+                            {(canUpdate || canDelete) && (
                               <DropdownMenuItem className="text-destructive data-[highlighted]:text-red-600" onClick={() => { setDeleteComplaint(item); setShowDelete(true); }}>
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
+                                <UserMinus className="mr-2 h-4 w-4" />
+                                Remove Allocation
                               </DropdownMenuItem>
                             )}
                           </DropdownMenuContent>
@@ -442,13 +473,16 @@ export default function AllocatedComplaintPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
               <AlertCircle className="h-5 w-5" />
-              Delete Complaint
+              Remove Allocation
             </DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">Are you sure you want to delete this complaint from <strong>{deleteComplaint?.subscriberName}</strong>?</p>
+          <p className="text-sm text-muted-foreground">
+            Remove this complaint from the allocated list of <strong>{deleteComplaint?.subscriberName}</strong>?
+            The complaint itself will <strong>not</strong> be deleted and will stay in Subscriber Complaint.
+          </p>
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="outline" onClick={() => { setShowDelete(false); setDeleteComplaint(null); }}>Cancel</Button>
-            <Button onClick={handleDeleteConfirm} disabled={isSaving} variant="destructive">{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Delete</Button>
+            <Button onClick={handleRemoveAllocation} disabled={isSaving} variant="destructive">{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Remove Allocation</Button>
           </div>
         </DialogContent>
       </Dialog>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CalendarIcon, Download, Search, Filter, RefreshCw, User, Activity, AlertTriangle, CheckCircle, ScrollText, Printer, RotateCcw, X, Hash, ShieldCheck, ChevronDown, ChevronRight, ListTree } from 'lucide-react';
+import { CalendarIcon, Download, Search, Filter, RefreshCw, User, Activity, AlertTriangle, CheckCircle, ScrollText, Printer, RotateCcw, X, Hash, ShieldCheck, ChevronDown, ChevronRight, ListTree, Clock, Globe, FileJson, ArrowRight, Trash2, Pencil, PlusCircle } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -21,10 +21,17 @@ import type { Company } from '@/lib/types';
 
 interface LogDetails {
   entityId?: string;
+  entityType?: string;
+  entityLabel?: string;
+  recordName?: string;
+  deletedRecord?: string;
   path?: string;
   connectionType?: string;
   subscriberName?: string;
   internetId?: string;
+  frontendId?: string;
+  frontendIdLabel?: string;
+  recordInfo?: Record<string, string> | null;
   fieldName?: string;
   oldValue?: string;
   newValue?: string;
@@ -44,6 +51,7 @@ interface LogEntry {
   description: string;
   serialNumbers: string;
   userAgent: string;
+  ipAddress?: string;
   status: 'success' | 'error' | 'warning';
   page: string;
   details?: LogDetails | null;
@@ -92,6 +100,298 @@ function serialChips(serials: string[]) {
       {sn}
     </Badge>
   ));
+}
+
+// Details that are rendered explicitly in the expanded panel. Anything else
+// captured by the audit middleware is shown in the "Additional details" list
+// so new fields automatically show up without a UI change.
+const KNOWN_DETAIL_KEYS = new Set([
+  'entityId',
+  'entityType',
+  'entityLabel',
+  'recordName',
+  'subscriberName',
+  'internetId',
+  'connectionType',
+  'path',
+  'fieldName',
+  'oldValue',
+  'newValue',
+  'actionType',
+  'requestBody',
+  'operatorName',
+  'frontendId',
+  'frontendIdLabel',
+  'recordInfo',
+]);
+
+const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+const UUID_ONLY = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Legacy log rows embedded the raw record UUID in their description. Strip it
+// so the log never exposes internal string ids to the admin.
+function cleanDescription(description?: string): string {
+  if (!description) return '';
+  return description
+    .replace(/\s*\(\s*entity\s*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\s*\)/gi, '')
+    .replace(UUID_PATTERN, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([.,;:])/g, '$1')
+    .trim();
+}
+
+// Keep the route visible but mask any UUID segment in it.
+function cleanPath(path?: string): string {
+  if (!path) return '';
+  return path.replace(UUID_PATTERN, ':id');
+}
+
+// Remove UUID values (and the raw "id" key) from the submitted payload before
+// it is shown, keeping human-facing references such as internetId.
+function sanitizeValue(value: unknown): unknown {
+  if (typeof value === 'string') {
+    return UUID_ONLY.test(value.trim()) ? undefined : value;
+  }
+  if (Array.isArray(value)) {
+    return value.map(sanitizeValue).filter((item) => item !== undefined);
+  }
+  if (value && typeof value === 'object') {
+    const result: Record<string, unknown> = {};
+    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+      if (/^id$/i.test(key)) continue;
+      const cleaned = sanitizeValue(entry);
+      if (cleaned !== undefined) result[key] = cleaned;
+    }
+    return result;
+  }
+  return value;
+}
+
+function detailText(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function parseRequestBody(raw?: string): Record<string, unknown> | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function actionVerb(action: string): string {
+  switch (action) {
+    case 'delete':
+      return 'Deleted';
+    case 'add':
+      return 'Created';
+    case 'edit':
+      return 'Updated';
+    case 'login':
+      return 'Signed in to';
+    case 'logout':
+      return 'Signed out of';
+    default:
+      return 'Performed';
+  }
+}
+
+function actionIcon(action: string) {
+  if (action === 'delete') return Trash2;
+  if (action === 'edit') return Pencil;
+  if (action === 'add') return PlusCircle;
+  return Activity;
+}
+
+function DetailFact({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="rounded-lg border bg-background p-3">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className={cn('mt-1 text-sm break-words', mono && 'font-mono text-xs')}>{value || '—'}</p>
+    </div>
+  );
+}
+
+function LogDetailPanel({ log, colSpan, entryNumber }: { log: LogEntry; colSpan: number; entryNumber: number }) {
+  const details = (log.details || {}) as LogDetails;
+  const requestPayload = parseRequestBody(details.requestBody);
+  const entityLabel = details.entityLabel || details.recordName || details.deletedRecord || details.subscriberName || '';
+  const entityType = details.entityType || log.module;
+  const frontendId = details.frontendId || details.internetId || '';
+  const frontendIdLabel = details.frontendIdLabel || (details.internetId ? 'Internet ID' : 'Reference');
+  const recordInfo = details.recordInfo && typeof details.recordInfo === 'object' && !Array.isArray(details.recordInfo) ? details.recordInfo : {};
+  const recordInfoEntries = Object.entries(recordInfo).filter(([, value]) => String(value) !== frontendId);
+  const hasChange = Boolean(details.fieldName || details.oldValue || details.newValue || details.actionType);
+  const serials = splitSerials(log.serialNumbers || '');
+  const ActionIcon = actionIcon(log.action);
+  const description = cleanDescription(log.description);
+
+  const extraDetails = Object.entries(details).filter(([key, value]) => {
+    if (KNOWN_DETAIL_KEYS.has(key)) return false;
+    return value !== null && value !== undefined && value !== '' && typeof value !== 'object';
+  }) as [string, string][];
+
+  const task = `${actionVerb(log.action)} ${entityType}${entityLabel ? ` "${entityLabel}"` : ''}`;
+
+  return (
+    <TableRow className="bg-muted/20 hover:bg-muted/20">
+      <TableCell colSpan={colSpan} className="p-0">
+        <div className="space-y-4 border-t bg-muted/20 px-4 py-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="gap-1.5 border-blue-200 bg-blue-50 text-blue-700">
+              <ListTree className="h-3 w-3" />
+              Task performed
+            </Badge>
+            <Badge variant="secondary" className="gap-1.5">
+              <ActionIcon className="h-3 w-3" />
+              {task}
+            </Badge>
+            <span className="text-xs text-muted-foreground">
+              {log.status === 'success' ? 'Completed successfully' : log.status === 'error' ? 'Failed' : 'Completed with a warning'}
+            </span>
+          </div>
+
+          <div className="rounded-lg border bg-background p-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Complete description</p>
+            <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed">
+              {description || 'No description was recorded for this action.'}
+            </p>
+          </div>
+
+          {(entityLabel || frontendId) && (
+            <div className={cn(
+              'rounded-lg border p-3',
+              log.action === 'delete'
+                ? 'border-rose-200 bg-rose-50 text-rose-900'
+                : 'border-emerald-200 bg-emerald-50 text-emerald-900',
+            )}>
+              <p className="text-[10px] font-semibold uppercase tracking-wide opacity-80">
+                {log.action === 'delete' ? 'Record affected / deleted' : 'Record affected'}
+              </p>
+              {entityLabel && <p className="mt-1 text-sm font-semibold">{entityLabel}</p>}
+              <p className="mt-0.5 text-xs opacity-80">
+                Type: {entityType || '—'}
+                {frontendId ? ` · ${frontendIdLabel}: ${frontendId}` : ''}
+              </p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <DetailFact label="Entry" value={`#${entryNumber}`} />
+            <DetailFact label="Performed by" value={log.userName || '—'} />
+            <DetailFact label="User role" value={log.userRole || '—'} />
+            <DetailFact label="Date & time" value={format(new Date(log.timestamp), 'dd MMM yyyy, HH:mm:ss')} />
+            <DetailFact label="Module" value={log.module || '—'} />
+            <DetailFact label="Page" value={log.page || '—'} />
+            <DetailFact label="Action" value={log.action || '—'} />
+            {!entityLabel && <DetailFact label="Entity type" value={entityType || '—'} />}
+            {frontendId && <DetailFact label={frontendIdLabel} value={frontendId} mono />}
+            {details.internetId && details.internetId !== frontendId && (
+              <DetailFact label="Internet ID" value={details.internetId} mono />
+            )}
+            {details.subscriberName && details.subscriberName !== entityLabel && (
+              <DetailFact label="Subscriber" value={details.subscriberName} />
+            )}
+            {details.connectionType && <DetailFact label="Connection type" value={details.connectionType} />}
+            {log.ipAddress && <DetailFact label="IP address" value={log.ipAddress} mono />}
+          </div>
+
+          {recordInfoEntries.length > 0 && (
+            <div className="rounded-lg border bg-background p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Record information</p>
+              <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {recordInfoEntries.map(([label, value]) => (
+                  <div key={label}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+                    <p className="mt-0.5 break-words text-sm">{detailText(value) || '—'}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {hasChange && (
+            <div className="rounded-lg border bg-background p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Change{details.fieldName ? ` · ${details.fieldName}` : ''}
+                {details.actionType ? ` (${details.actionType})` : ''}
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                <span className="rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-rose-800">
+                  {cleanDescription(details.oldValue) || '—'}
+                </span>
+                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-emerald-800">
+                  {cleanDescription(details.newValue) || '—'}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {serials.length > 0 && (
+            <div className="rounded-lg border bg-background p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Serial numbers ({serials.length})
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1">{serialChips(serials)}</div>
+            </div>
+          )}
+
+          {details.requestBody && (
+            <div className="rounded-lg border bg-background p-3">
+              <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <FileJson className="h-3 w-3" />
+                Submitted data
+              </p>
+              <pre className="mt-2 max-h-64 overflow-auto rounded-md bg-muted/60 p-3 text-xs">
+                {requestPayload ? JSON.stringify(sanitizeValue(requestPayload), null, 2) : cleanDescription(details.requestBody)}
+              </pre>
+            </div>
+          )}
+
+          {extraDetails.length > 0 && (
+            <div className="rounded-lg border bg-background p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Additional details</p>
+              <dl className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {extraDetails.map(([key, value]) => (
+                  <div key={key} className="flex flex-wrap items-baseline gap-x-2 text-sm">
+                    <dt className="text-muted-foreground">{key}</dt>
+                    <dd className="break-all">{cleanDescription(detailText(value))}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
+            {details.path && (
+              <span className="inline-flex items-center gap-1 break-all">
+                <Globe className="h-3 w-3 shrink-0" />
+                {cleanPath(details.path)}
+              </span>
+            )}
+            <span className="inline-flex items-center gap-1">
+              <Clock className="h-3 w-3 shrink-0" />
+              Entry #{entryNumber}
+            </span>
+            {log.userAgent && <span className="break-all">User agent: {log.userAgent}</span>}
+          </div>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
 }
 
 export default function LogsPage() {
@@ -203,9 +503,10 @@ export default function LogsPage() {
 
   const exportLogs = () => {
     if (logsData.length === 0) return;
-    const header = ['Timestamp', 'User', 'Role', 'Action', 'Module', 'Page', 'Serial Numbers', 'Description', 'Status'];
+    const header = ['Entry #', 'Timestamp', 'User', 'Role', 'Action', 'Module', 'Page', 'Serial Numbers', 'Description', 'Status'];
     const escape = (val: string) => `"${(val || '').replace(/"/g, '""')}"`;
-    const rows = logsData.map((log) => [
+    const rows = logsData.map((log, index) => [
+      String((currentPage - 1) * pageSize + index + 1),
       format(new Date(log.timestamp), 'yyyy-MM-dd HH:mm:ss'),
       log.userName || '',
       log.userRole || '-',
@@ -213,7 +514,7 @@ export default function LogsPage() {
       log.module,
       log.page || '-',
       log.serialNumbers || '',
-      log.description || '',
+      cleanDescription(log.description),
       log.status,
     ].map(escape).join(','));
 
@@ -487,6 +788,7 @@ export default function LogsPage() {
           <CardTitle>Activity Logs</CardTitle>
           <CardDescription>
             Invoices, purchases, dealers, staff, subscribers, connections and every other write/update/delete operation.
+            Click any entry to expand the complete description of the task and the captured details.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -494,7 +796,7 @@ export default function LogsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-8"></TableHead>
+                  <TableHead className="w-20">Entry</TableHead>
                   <TableHead>Timestamp</TableHead>
                   <TableHead>User</TableHead>
                   <TableHead>User Type</TableHead>
@@ -521,86 +823,99 @@ export default function LogsPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  logsData.map((log) => {
+                  logsData.map((log, index) => {
                     const serials = splitSerials(log.serialNumbers || '');
                     const hasExtra = serials.length > SERIAL_PREVIEW_COUNT;
                     const expanded = expandedLogs.has(log.id);
                     const showAllSerials = expanded || !hasExtra;
+                    const entryNumber = (currentPage - 1) * pageSize + index + 1;
                     return (
-                      <TableRow
-                        key={log.id}
-                        className={`transition-colors ${hasExtra ? 'cursor-pointer hover:bg-muted/40' : ''}`}
-                        onClick={hasExtra ? () => toggleExpand(log.id) : undefined}
-                      >
-                        <TableCell className="text-center">
-                          {hasExtra ? (
-                            expanded ? (
-                              <ChevronDown className="h-4 w-4 text-muted-foreground mx-auto" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4 text-muted-foreground mx-auto" />
-                            )
-                          ) : (
-                            <ListTree className="h-4 w-4 text-muted-foreground/40 mx-auto" />
-                          )}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-sm">
-                          {format(new Date(log.timestamp), 'dd MMM yyyy HH:mm:ss')}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <User className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium">{log.userName || '—'}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={cn('border flex items-center gap-1', ROLE_STYLES[log.userRole?.toLowerCase()] || 'bg-gray-100 text-gray-700 border-gray-200')}>
-                            <ShieldCheck className="h-3 w-3" />
-                            {log.userRole || '-'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell><Badge variant="secondary">{log.action}</Badge></TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Activity className="h-4 w-4 text-muted-foreground" />
-                            <span>{log.module}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{log.page || '-'}</TableCell>
-                        <TableCell>
-                          {serials.length > 0 ? (
-                            <div className="flex flex-wrap gap-1 max-w-[200px]">
-                              {serialChips(showAllSerials ? serials : serials.slice(0, SERIAL_PREVIEW_COUNT))}
-                              {!showAllSerials && (
-                                <Badge variant="secondary" className="text-[10px] cursor-pointer">
-                                  +{serials.length - SERIAL_PREVIEW_COUNT} more
-                                </Badge>
+                      <Fragment key={log.id}>
+                        <TableRow
+                          className="cursor-pointer transition-colors hover:bg-muted/40"
+                          onClick={() => toggleExpand(log.id)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              toggleExpand(log.id);
+                            }
+                          }}
+                          tabIndex={0}
+                          aria-expanded={expanded}
+                        >
+                          <TableCell className="text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              {expanded ? (
+                                <ChevronDown className="h-4 w-4 text-blue-600" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
                               )}
+                              <span className="text-xs font-semibold text-muted-foreground">#{entryNumber}</span>
                             </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className={`${expanded ? 'max-w-none' : 'max-w-[260px]'}`}>
-                          <span className={cn('text-sm', !expanded && 'line-clamp-2')}>{log.description || '—'}</span>
-                        </TableCell>
-                        <TableCell>{getStatusBadge(log.status)}</TableCell>
-                        <TableCell className="text-center">
-                          {canRestore(log) ? (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
-                              onClick={(e) => { e.stopPropagation(); handleRestore(log); }}
-                              disabled={restoringId === log.id}
-                            >
-                              <RotateCcw className={`mr-1.5 h-3.5 w-3.5 ${restoringId === log.id ? 'animate-spin' : ''}`} />
-                              {restoringId === log.id ? 'Restoring...' : 'Restore'}
-                            </Button>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-sm">
+                            {format(new Date(log.timestamp), 'dd MMM yyyy HH:mm:ss')}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <User className="h-4 w-4 text-muted-foreground" />
+                              <span className="font-medium">{log.userName || '—'}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={cn('border flex items-center gap-1', ROLE_STYLES[log.userRole?.toLowerCase()] || 'bg-gray-100 text-gray-700 border-gray-200')}>
+                              <ShieldCheck className="h-3 w-3" />
+                              {log.userRole || '-'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell><Badge variant="secondary">{log.action}</Badge></TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Activity className="h-4 w-4 text-muted-foreground" />
+                              <span>{log.module}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{log.page || '-'}</TableCell>
+                          <TableCell>
+                            {serials.length > 0 ? (
+                              <div className="flex flex-wrap gap-1 max-w-[200px]">
+                                {serialChips(showAllSerials ? serials : serials.slice(0, SERIAL_PREVIEW_COUNT))}
+                                {!showAllSerials && (
+                                  <Badge variant="secondary" className="text-[10px] cursor-pointer">
+                                    +{serials.length - SERIAL_PREVIEW_COUNT} more
+                                  </Badge>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className={`${expanded ? 'max-w-none' : 'max-w-[260px]'}`}>
+                            <span className={cn('text-sm', !expanded && 'line-clamp-2')}>{cleanDescription(log.description) || '—'}</span>
+                            {!expanded && (
+                              <p className="mt-0.5 text-[10px] text-muted-foreground">Click to view full details</p>
+                            )}
+                          </TableCell>
+                          <TableCell>{getStatusBadge(log.status)}</TableCell>
+                          <TableCell className="text-center">
+                            {canRestore(log) ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+                                onClick={(e) => { e.stopPropagation(); handleRestore(log); }}
+                                disabled={restoringId === log.id}
+                              >
+                                <RotateCcw className={`mr-1.5 h-3.5 w-3.5 ${restoringId === log.id ? 'animate-spin' : ''}`} />
+                                {restoringId === log.id ? 'Restoring...' : 'Restore'}
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                        {expanded && <LogDetailPanel log={log} colSpan={11} entryNumber={entryNumber} />}
+                      </Fragment>
                     );
                   })
                 )}
@@ -791,7 +1106,7 @@ function LogsPrintDialog({
                     <td className="border border-gray-300 p-2 text-center">{log.module}</td>
                     <td className="border border-gray-300 p-2 text-center">{log.page || '-'}</td>
                     <td className="border border-gray-300 p-2 font-mono text-xs">{log.serialNumbers || '—'}</td>
-                    <td className="border border-gray-300 p-2">{log.description || '—'}</td>
+                    <td className="border border-gray-300 p-2">{cleanDescription(log.description) || '—'}</td>
                     <td className="border border-gray-300 p-2 text-center">{log.status}</td>
                   </tr>
                 ))

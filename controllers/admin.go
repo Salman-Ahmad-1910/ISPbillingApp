@@ -131,6 +131,7 @@ func GetSystemLogs(c *gin.Context) {
 			al.description,
 			al.details,
 			al.user_agent,
+			al.ip_address,
 			al.status,
 			al.page,
 			al.serial_numbers,
@@ -202,6 +203,7 @@ func GetSystemLogs(c *gin.Context) {
 		Description   string          `json:"description"`
 		Details       json.RawMessage `json:"details"`
 		UserAgent     string          `json:"userAgent"`
+		IPAddress     string          `json:"ipAddress"`
 		Status        string          `json:"status"`
 		Page          string          `json:"page"`
 		SerialNumbers string          `json:"serialNumbers"`

@@ -365,7 +365,19 @@ export function VendorInvoiceForm({
         </div>
         <div>
           <Label>Buying Date *</Label>
-          <Input type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} />
+          <Input
+            type="date"
+            value={invoiceDate}
+            onChange={(e) => setInvoiceDate(e.target.value)}
+            onClick={(e) => {
+              // Open the calendar when clicking anywhere on the field, not only the icon.
+              try {
+                (e.currentTarget as HTMLInputElement & { showPicker?: () => void }).showPicker?.();
+              } catch {
+                // Ignore browsers that disallow programmatic showing.
+              }
+            }}
+          />
         </div>
       </div>
 

@@ -1,6 +1,11 @@
 package models
 
-import "github.com/google/uuid"
+import (
+	"strings"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
 
 // Complaint handles customer tickets
 type Complaint struct {
@@ -9,16 +14,74 @@ type Complaint struct {
 	SubscriberName string     `gorm:"type:varchar(255)" json:"subscriberName"`
 	Phone          string     `gorm:"type:varchar(50)" json:"phone"`
 	Address        string     `gorm:"type:text" json:"address"`
-	Type           string     `gorm:"type:varchar(50)" json:"type"`               // internet, cable, both
+	Type           string     `gorm:"type:varchar(50)" json:"type"` // internet, cable, both
 	Subject        string     `gorm:"type:varchar(255)" json:"subject"`
-	Department     string     `gorm:"type:varchar(100)" json:"department"`        // technical, cro-support, technician, subscriber-support-desk, subscriber-care-support, finance
+	Department     string     `gorm:"type:varchar(100)" json:"department"`               // technical, cro-support, technician, subscriber-support-desk, subscriber-care-support, finance
 	Priority       string     `gorm:"type:varchar(20);default:'medium'" json:"priority"` // low, medium, high
 	Deadline       string     `gorm:"type:varchar(50)" json:"deadline"`
 	Category       string     `gorm:"type:varchar(50);not null" json:"category"` // network, billing, service
 	Description    string     `gorm:"type:text;not null" json:"description"`
 	Status         string     `gorm:"type:varchar(50);default:'open'" json:"status"` // open, in-progress, resolved, closed
 	AssignedToID   *uuid.UUID `gorm:"type:uuid" json:"assignedToId"`
-	ResolvedAt     string     `gorm:"type:varchar(50)" json:"resolvedAt"`
+	// AssignedToIDs stores every assignee as a comma-separated list of UUIDs, so
+	// one complaint can be allocated to several staff at once. AssignedToID
+	// mirrors the first entry to keep single-assignee consumers working.
+	AssignedToIDs string `gorm:"type:text" json:"assignedToIds"`
+	ResolvedAt    string `gorm:"type:varchar(50)" json:"resolvedAt"`
+}
+
+// BeforeSave normalises AssignedToIDs and keeps AssignedToID in sync with the
+// first assignee, so the single- and multi-assignee fields never disagree no
+// matter which one the client sent.
+func (c *Complaint) BeforeSave(tx *gorm.DB) error {
+	ids := splitComplaintAssigneeIDs(c.AssignedToIDs)
+
+	if len(ids) == 0 && c.AssignedToID != nil {
+		if primary := c.AssignedToID.String(); primary != "" && primary != "00000000-0000-0000-0000-000000000000" {
+			ids = []string{primary}
+		}
+	}
+
+	c.AssignedToIDs = strings.Join(ids, ",")
+
+	if len(ids) == 0 {
+		c.AssignedToID = nil
+		return nil
+	}
+
+	primary, _ := uuid.Parse(ids[0])
+	c.AssignedToID = &primary
+	return nil
+}
+
+// splitComplaintAssigneeIDs cleans a comma-separated assignee list, dropping
+// blanks, duplicates and values that are not valid UUIDs.
+func splitComplaintAssigneeIDs(raw string) []string {
+	var ids []string
+	for _, part := range strings.Split(raw, ",") {
+		id := strings.TrimSpace(part)
+		if id == "" {
+			continue
+		}
+		parsed, err := uuid.Parse(id)
+		if err != nil {
+			continue
+		}
+		normalized := parsed.String()
+		if !containsString(ids, normalized) {
+			ids = append(ids, normalized)
+		}
+	}
+	return ids
+}
+
+func containsString(list []string, value string) bool {
+	for _, item := range list {
+		if item == value {
+			return true
+		}
+	}
+	return false
 }
 
 // ComplaintSubject defines predefined complaint subjects organized by type
@@ -63,7 +126,7 @@ type Staff struct {
 
 	// Employment
 	AppointedDate string `gorm:"type:varchar(50)" json:"appointedDate"`
-	Technical     string `gorm:"type:varchar(10)" json:"technical"` // yes, no
+	Technical     string `gorm:"type:varchar(10)" json:"technical"`                // yes, no
 	Status        string `gorm:"type:varchar(20);default:'working'" json:"status"` // working, left
 	LeaveDate     string `gorm:"type:varchar(50)" json:"leaveDate"`
 	PlainPassword string `gorm:"type:varchar(255)" json:"plainPassword"`
@@ -215,17 +278,17 @@ type AlertTemplate struct {
 // SystemConfig for global application settings
 type SystemConfig struct {
 	TenantModel
-	AppName         string `gorm:"type:varchar(255);not null" json:"appName"`
-	DefaultCurrency string `gorm:"type:varchar(10);default:'PKR'" json:"defaultCurrency"`
-	AutoSuspend     bool   `gorm:"default:true" json:"autoSuspend"`
-	GracePeriod     int    `gorm:"default:3" json:"gracePeriod"`
-	InvoiceTemplate string `gorm:"type:text" json:"invoiceTemplate"`
-	SMSGateway      string `gorm:"type:varchar(255)" json:"smsGateway"`
-	WhatsAppGateway string `gorm:"type:varchar(255)" json:"whatsAppGateway"`
+	AppName               string `gorm:"type:varchar(255);not null" json:"appName"`
+	DefaultCurrency       string `gorm:"type:varchar(10);default:'PKR'" json:"defaultCurrency"`
+	AutoSuspend           bool   `gorm:"default:true" json:"autoSuspend"`
+	GracePeriod           int    `gorm:"default:3" json:"gracePeriod"`
+	InvoiceTemplate       string `gorm:"type:text" json:"invoiceTemplate"`
+	SMSGateway            string `gorm:"type:varchar(255)" json:"smsGateway"`
+	WhatsAppGateway       string `gorm:"type:varchar(255)" json:"whatsAppGateway"`
 	WhatsAppPhoneNumberID string `gorm:"type:varchar(255)" json:"whatsAppPhoneNumberId"`
-	InvoiceSms      string `gorm:"type:text" json:"invoiceSms"`
-	Enable2FA       bool   `gorm:"default:false" json:"enable2fa"`
-	SessionTimeout  int    `gorm:"default:60" json:"sessionTimeout"`
+	InvoiceSms            string `gorm:"type:text" json:"invoiceSms"`
+	Enable2FA             bool   `gorm:"default:false" json:"enable2fa"`
+	SessionTimeout        int    `gorm:"default:60" json:"sessionTimeout"`
 }
 
 // Message for SMS/notification management (draft, sent, outbox)

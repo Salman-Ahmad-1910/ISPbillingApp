@@ -11,6 +11,7 @@ import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import api from '@/lib/api';
 import type { Complaint, Staff, RecoveryOfficer } from '@/lib/types';
+import { getComplaintAssigneeIds } from '@/lib/complaints';
 
 const statusColors: Record<string, string> = {
   'open': 'bg-yellow-100 text-yellow-800',
@@ -33,6 +34,11 @@ export default function ComplaintReportPage() {
     (recoveryOfficers as RecoveryOfficer[]).forEach(r => { map[r.id] = `${r.name} (Recovery Officer)`; });
     return map;
   }, [staff, recoveryOfficers]);
+
+  const formatAssignees = (complaint: Complaint) => {
+    const names = getComplaintAssigneeIds(complaint).map(id => operatorMap[id] || 'Unknown');
+    return names.length > 0 ? names.join(', ') : '---';
+  };
 
   const [category, setCategory] = useState('All');
   const [status, setStatus] = useState('All');
@@ -79,7 +85,7 @@ export default function ComplaintReportPage() {
       `"${item.description.replace(/"/g, '""')}"`,
       item.category,
       item.status,
-      item.assignedToId ? (operatorMap[item.assignedToId] || 'Unknown') : '---',
+      formatAssignees(item),
       new Date(item.createdAt).toLocaleDateString(),
     ]);
 
@@ -201,7 +207,7 @@ export default function ComplaintReportPage() {
                     <td className="border border-gray-300 p-3 max-w-xs">{item.description}</td>
                     <td className="border border-gray-300 p-3 capitalize">{item.category}</td>
                     <td className="border border-gray-300 p-3 capitalize">{item.status}</td>
-                    <td className="border border-gray-300 p-3">{item.assignedToId ? (operatorMap[item.assignedToId] || 'Unknown') : '---'}</td>
+                    <td className="border border-gray-300 p-3">{formatAssignees(item)}</td>
                     <td className="border border-gray-300 p-3 text-gray-500">{new Date(item.createdAt).toLocaleDateString()}</td>
                   </tr>
                 ))
@@ -396,7 +402,7 @@ export default function ComplaintReportPage() {
                             {item.status}
                           </span>
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{item.assignedToId ? (operatorMap[item.assignedToId] || 'Unknown') : '---'}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{formatAssignees(item)}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{new Date(item.createdAt).toLocaleDateString()}</TableCell>
                       </TableRow>
                     ))

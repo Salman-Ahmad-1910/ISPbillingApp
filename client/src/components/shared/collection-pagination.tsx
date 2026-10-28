@@ -39,7 +39,7 @@ export function CollectionPagination({
 
   return (
     <div className="flex items-center justify-between mt-4 flex-wrap gap-3">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm text-muted-foreground">Show</span>
         <Select value={pageSize} onValueChange={(v) => { setPageSize(v); setCurrentPage(1); }}>
           <SelectTrigger className="w-20">
@@ -58,7 +58,7 @@ export function CollectionPagination({
         Showing {start} to {end} of {total} entries
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Button variant="outline" size="sm" onClick={() => go(currentPage - 1)} disabled={currentPage === 1 || total === 0}>
           Previous
         </Button>

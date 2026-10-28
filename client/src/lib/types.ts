@@ -430,6 +430,7 @@ export type Complaint = {
   description: string;
   status: 'open' | 'done' | 'on-hold' | 'reject' | 'closed';
   assignedToId?: string;
+  assignedToIds?: string;
   createdAt: string;
   resolvedAt?: string;
   companyId: string;
