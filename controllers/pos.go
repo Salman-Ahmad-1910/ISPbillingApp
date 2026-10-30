@@ -459,17 +459,18 @@ func PayInstallment(c *gin.Context) {
 	utils.SuccessResponse(c, "Installment payment recorded", inst)
 }
 
-// GetPOSSales returns all sales for the current company with their line items
-// preloaded. Supports backend filtering via query params:
+// applyPOSSalesFilters builds the WHERE conditions shared by the count, sum
+// and list queries of GetPOSSales. Always call it on a fresh *gorm.DB so the
+// conditions do not leak between the Count/Scan/Find calls. Query params:
 //   - fromDate / toDate   (YYYY-MM-DD, inclusive on sales.date)
-//   - salesType           (good | bad)
+//   - salesType           (good | bad | replaced)
 //   - paymentType         (normal | installment | hold | promise)
+//   - serviceType         (pos | fiber_jointing)
+//   - paymentStatus       (paid | partial | promise | unpaid)
 //   - promise             (open = only promise sales still owing money)
-//   - search              (matches sale id or subscriber name)
-func GetPOSSales(c *gin.Context) {
-	companyID := c.MustGet("companyID").(uuid.UUID)
-
-	db := config.DB.Scopes(models.TenantScope(companyID))
+//   - search              (sale id, customer name, product name or SN)
+func applyPOSSalesFilters(db *gorm.DB, c *gin.Context, companyID uuid.UUID) *gorm.DB {
+	db = db.Scopes(models.TenantScope(companyID))
 
 	if fromDate := strings.TrimSpace(c.Query("fromDate")); fromDate != "" {
 		db = db.Where("LEFT(sales.date, 10) >= ?", fromDate)
@@ -526,22 +527,112 @@ func GetPOSSales(c *gin.Context) {
 		db = db.Where("sales.payment_status = ?", paymentStatus)
 	}
 
+	// OLD search (before product-name search) — kept for easy rollback:
+	// if q := strings.TrimSpace(c.Query("search")); q != "" {
+	// 	like := strings.ToLower(q) + "%"
+	// 	db = db.Where("LOWER(sales.subscriber_name) LIKE ? OR LOWER(sales.id::text) LIKE ?", like, like)
+	// }
+
+	// Search matches the customer name, the sale ID, or the name / SN of any
+	// product sold in the sale. Done in SQL so the frontend only receives the
+	// matching page of rows.
 	if q := strings.TrimSpace(c.Query("search")); q != "" {
-		like := strings.ToLower(q) + "%"
-		db = db.Where("LOWER(sales.subscriber_name) LIKE ? OR LOWER(sales.id::text) LIKE ?", like, like)
+		like := "%" + strings.ToLower(q) + "%"
+		db = db.Where(`LOWER(sales.subscriber_name) LIKE ?
+			OR LOWER(sales.id::text) LIKE ?
+			OR EXISTS (SELECT 1 FROM sale_items si
+			           WHERE si.sale_id = sales.id AND si.deleted_at IS NULL
+			             AND (LOWER(si.product_name) LIKE ? OR LOWER(si.serial_number) LIKE ?))`,
+			like, like, like, like)
 	}
 
-	var sales []models.Sale
-	if err := db.Preload("Items").Order("created_at DESC").Find(&sales).Error; err != nil {
-		utils.ErrorResponse(c, 500, "Failed to fetch sales", err.Error())
+	return db
+}
+
+// GetPOSSales lists POS sales with optional filters.
+//
+// Without a "page" query param it returns the full filtered list as a plain
+// array (used by reports, the replaced page and the mobile app).
+// With "page" (and optional "pageSize": number or "all") it returns one page
+// plus totals for the whole filtered set:
+//
+//	{ sales: [...], total, totalRevenue, page, pageSize }
+func GetPOSSales(c *gin.Context) {
+	companyID := c.MustGet("companyID").(uuid.UUID)
+
+	// OLD body (before backend pagination) — kept for easy rollback. The
+	// filters now live in applyPOSSalesFilters above:
+	// db := config.DB.Scopes(models.TenantScope(companyID))
+	// ... filters ...
+	// var sales []models.Sale
+	// if err := db.Preload("Items").Order("created_at DESC").Find(&sales).Error; err != nil {
+	// 	utils.ErrorResponse(c, 500, "Failed to fetch sales", err.Error())
+	// 	return
+	// }
+	// attachPromiseInfo(companyID, sales)
+	// utils.SuccessResponse(c, "Records retrieved", sales)
+
+	pageParam := strings.TrimSpace(c.Query("page"))
+	if pageParam == "" {
+		var sales []models.Sale
+		if err := applyPOSSalesFilters(config.DB.Model(&models.Sale{}), c, companyID).
+			Preload("Items").Order("created_at DESC").Find(&sales).Error; err != nil {
+			utils.ErrorResponse(c, 500, "Failed to fetch sales", err.Error())
+			return
+		}
+		// Attach the unpaid part of any promise sale so the list can mark it as
+		// pending instead of presenting a partly unpaid sale as fully paid.
+		attachPromiseInfo(companyID, sales)
+		utils.SuccessResponse(c, "Records retrieved", sales)
 		return
 	}
 
-	// Attach the unpaid part of any promise sale so the list can mark it as
-	// pending instead of presenting a partly unpaid sale as fully paid.
+	page, _ := strconv.Atoi(pageParam)
+	if page < 1 {
+		page = 1
+	}
+	pageSizeParam := strings.TrimSpace(c.DefaultQuery("pageSize", "10"))
+
+	var total int64
+	if err := applyPOSSalesFilters(config.DB.Model(&models.Sale{}), c, companyID).
+		Count(&total).Error; err != nil {
+		utils.ErrorResponse(c, 500, "Failed to count sales", err.Error())
+		return
+	}
+
+	var sumRow struct{ Total float64 }
+	if err := applyPOSSalesFilters(config.DB.Model(&models.Sale{}), c, companyID).
+		Select("COALESCE(SUM(sales.total_amount), 0) AS total").
+		Scan(&sumRow).Error; err != nil {
+		utils.ErrorResponse(c, 500, "Failed to sum sales", err.Error())
+		return
+	}
+
+	query := applyPOSSalesFilters(config.DB.Model(&models.Sale{}), c, companyID).
+		Preload("Items").Order("created_at DESC")
+	if pageSizeParam != "all" {
+		pageSize, err := strconv.Atoi(pageSizeParam)
+		if err != nil || pageSize < 1 {
+			pageSize = 10
+			pageSizeParam = "10"
+		}
+		query = query.Limit(pageSize).Offset((page - 1) * pageSize)
+	}
+
+	var sales []models.Sale
+	if err := query.Find(&sales).Error; err != nil {
+		utils.ErrorResponse(c, 500, "Failed to fetch sales", err.Error())
+		return
+	}
 	attachPromiseInfo(companyID, sales)
 
-	utils.SuccessResponse(c, "Records retrieved", sales)
+	utils.SuccessResponse(c, "Records retrieved", gin.H{
+		"sales":        sales,
+		"total":        total,
+		"totalRevenue": sumRow.Total,
+		"page":         page,
+		"pageSize":     pageSizeParam,
+	})
 }
 
 // attachPromiseInfo fills Sale.PromiseInfo in one or two queries, rather than one

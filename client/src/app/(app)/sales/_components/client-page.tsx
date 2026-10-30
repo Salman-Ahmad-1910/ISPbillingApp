@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+// OLD: import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -77,10 +78,28 @@ interface InstallmentInfo {
   saleId?: string;
 }
 
+// OLD props (before backend pagination):
+// interface ClientPageProps {
+//   data: Sale[];
+//   filters: SaleFilters;
+//   onFiltersChange: (filters: SaleFilters) => void;
+// }
+
 interface ClientPageProps {
+  /** Rows of the current page, already filtered and paged by the backend. */
   data: Sale[];
+  /** Total number of sales matching the filters (all pages). */
+  total: number;
+  /** True while a new page / search result is being fetched. */
+  isFetching?: boolean;
+  /** Backend filter params (without paging) used for the full Excel export. */
+  exportParams: Record<string, string>;
   filters: SaleFilters;
   onFiltersChange: (filters: SaleFilters) => void;
+  pageSize: string;
+  setPageSize: (v: string) => void;
+  currentPage: number;
+  setCurrentPage: (n: number) => void;
 }
 
 export interface SaleFilters {
@@ -95,7 +114,18 @@ export interface SaleFilters {
 
 const fmtPKR = (n: number) => new Intl.NumberFormat('en-US').format(Number(n) || 0);
 
-export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) {
+export function ClientPage({
+  data,
+  total,
+  isFetching = false,
+  exportParams,
+  filters,
+  onFiltersChange,
+  pageSize,
+  setPageSize,
+  currentPage,
+  setCurrentPage,
+}: ClientPageProps) {
   const { companies } = useCompany();
   const { companyId } = useCompany();
   const { toast } = useToast();
@@ -114,8 +144,9 @@ export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) 
   const [returnTarget, setReturnTarget] = useState<Sale | null>(null);
   const [isReturning, setIsReturning] = useState(false);
   const [replaceTarget, setReplaceTarget] = useState<Sale | null>(null);
-  const [pageSize, setPageSize] = useState<string>('10');
-  const [currentPage, setCurrentPage] = useState<number>(1);
+  // OLD: paging state lived here; it is now owned by the parent page.
+  // const [pageSize, setPageSize] = useState<string>('10');
+  // const [currentPage, setCurrentPage] = useState<number>(1);
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'error' | 'info';
     title: string;
@@ -156,7 +187,7 @@ export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) 
 
   const toReceipt = (s: Sale): SaleReceiptData => ({
     id: s.id,
-    invoiceNumber: data.indexOf(s) + 1,
+    invoiceNumber: pageOffset + data.indexOf(s) + 1,
     subscriberName: s.subscriberName,
     totalAmount: Number(s.totalAmount) || 0,
     taxAmount: Number(s.taxAmount) || 0,
@@ -350,12 +381,15 @@ export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) 
 
   const columns = getColumns(handleDelete, handlePayHold, openReturnDialog, (sale) => setReplaceTarget(sale), canUpdate, canDelete);
 
-  const pagedSales = useMemo(() => {
-    if (pageSize === 'all') return data;
-    const size = parseInt(pageSize, 10) || 10;
-    const start = (currentPage - 1) * size;
-    return data.slice(start, start + size);
-  }, [data, pageSize, currentPage]);
+  // OLD client-side paging — kept for easy rollback:
+  // const pagedSales = useMemo(() => {
+  //   if (pageSize === 'all') return data;
+  //   const size = parseInt(pageSize, 10) || 10;
+  //   const start = (currentPage - 1) * size;
+  //   return data.slice(start, start + size);
+  // }, [data, pageSize, currentPage]);
+  // The backend already returns only the requested page.
+  const pagedSales = data;
 
   const exportColumns: ExportColumn[] = [
     { key: 'id', header: 'Sale ID' },
@@ -368,8 +402,27 @@ export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) 
     { key: 'status', header: 'Status', getValue: (r) => String((r as any).status ?? '') },
   ];
 
-  const handleExportXlsx = () => {
-    exportToExcel(data, exportColumns, `Sales-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Sales');
+  // OLD export (only had the rows already loaded in the browser):
+  // const handleExportXlsx = () => {
+  //   exportToExcel(data, exportColumns, `Sales-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Sales');
+  // };
+
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Excel exports every sale matching the filters, not just the visible page,
+  // so it asks the backend for the full (unpaged) list.
+  const handleExportXlsx = async () => {
+    if (!companyId) return;
+    setIsExporting(true);
+    try {
+      const res = await api.get('/pos/sales', { params: { ...exportParams, companyId } });
+      const rows = Array.isArray(res.data?.data) ? res.data.data : [];
+      exportToExcel(rows, exportColumns, 'Sales', 'Sales', toast); // helper appends _<date>.xlsx
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Export failed', description: errorMsg(error, 'Could not export sales') });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleExportPdf = () => {
@@ -382,9 +435,13 @@ export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) 
     });
   };
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filters, pageSize]);
+  // OLD: reset to page 1 on any filter change (now done in the parent page,
+  // after the search debounce):
+  // useEffect(() => {
+  //   setCurrentPage(1);
+  // }, [filters, pageSize]);
+
+  const pageOffset = pageSize === 'all' ? 0 : (currentPage - 1) * (parseInt(pageSize, 10) || 10);
 
   const viewSubtotal = viewSale ? (Number(viewSale.totalAmount) || 0) - (Number(viewSale.taxAmount) || 0) : 0;
   const viewTotalItems = viewSale ? (viewSale.items || []).reduce((sum, i) => sum + (Number(i.quantity) || 0), 0) : 0;
@@ -400,7 +457,7 @@ export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
               <div>
                 <Input
-                  placeholder="Search by sale ID or customer name..."
+                  placeholder="Search by customer, product name or sale ID..."
                   value={filters.search}
                   onChange={(e) => onFiltersChange({ ...filters, search: e.target.value })}
                   className="w-full"
@@ -490,11 +547,12 @@ export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) 
             </div>
             <div className="flex items-center gap-2 mt-3">
               <p className="text-xs text-muted-foreground">
-                Showing {data.length} sale{data.length === 1 ? '' : 's'}
+                Showing {total} sale{total === 1 ? '' : 's'}
               </p>
+              {isFetching && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
               <div className="flex-1" />
-              <Button variant="outline" size="sm" onClick={handleExportXlsx} className="text-xs">
-                <FileSpreadsheet className="mr-1.5 h-4 w-4" />
+              <Button variant="outline" size="sm" onClick={handleExportXlsx} disabled={isExporting} className="text-xs">
+                {isExporting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileSpreadsheet className="mr-1.5 h-4 w-4" />}
                 Excel
               </Button>
               <Button variant="outline" size="sm" onClick={handleExportPdf} className="text-xs">
@@ -546,7 +604,7 @@ export function ClientPage({ data, filters, onFiltersChange }: ClientPageProps) 
           </div>
           <div className="px-4 pb-4">
             <CollectionPagination
-              total={data.length}
+              total={total}
               pageSize={pageSize}
               setPageSize={setPageSize}
               currentPage={currentPage}

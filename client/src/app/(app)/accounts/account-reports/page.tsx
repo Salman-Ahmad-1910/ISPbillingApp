@@ -29,6 +29,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { smartMatch } from '@/lib/search';
+import { exportToExcel, type ExportColumn } from '@/components/shared/table-export';
 import type { RecoveryOfficer, Staff } from '@/lib/types';
 
 interface AccountHead {
@@ -164,6 +165,28 @@ export default function AccountReportsPage() {
     if (toDate) params.set('to', format(toDate, 'yyyy-MM-dd'));
     if (search) params.set('search', search);
     window.open(`/accounts/account-reports/print?${params.toString()}`, '_blank');
+  };
+
+  // Excel export of the entries matching the current filters (same rows as
+  // the report table / Print All).
+  const handleExportExcel = () => {
+    const columns: ExportColumn[] = [
+      { key: 'sr', header: '#', getValue: (r) => filteredData.indexOf(r) + 1 },
+      { key: 'date', header: 'Date' },
+      { key: 'head', header: 'Head', getValue: (r) => getHeadName(r.head) },
+      { key: 'subHead', header: 'Sub Head', getValue: (r) => getSubHeadName(r.subHead) },
+      { key: 'description', header: 'Description', getValue: (r) => r.description ?? '' },
+      { key: 'amount', header: 'Amount (PKR)', getValue: (r) => Number(r.amount) || 0 },
+      { key: 'transactionType', header: 'Transaction Type', getValue: (r) => getTxnTypeName(r.transactionType) },
+      { key: 'addBy', header: 'Add By', getValue: (r) => r.addBy ?? '' },
+    ];
+    exportToExcel(
+      filteredData,
+      columns,
+      'Account-Report', // helper appends _<date>.xlsx
+      'Account Report',
+      toast,
+    );
   };
 
   const handlePrintSingle = (entry: AccountEntry) => {
@@ -373,7 +396,8 @@ export default function AccountReportsPage() {
               <Printer className="mr-2 h-4 w-4" />
               Print All
             </Button>
-            <Button variant="outline">
+            {/* OLD: <Button variant="outline"> — had no onClick, so it did nothing */}
+            <Button variant="outline" onClick={handleExportExcel}>
               <Download className="mr-2 h-4 w-4" />
               Excel
             </Button>
