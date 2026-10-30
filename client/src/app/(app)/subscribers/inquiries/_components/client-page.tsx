@@ -207,18 +207,63 @@ export function ClientPage({ data, areas, boxes, packages }: ClientPageProps) {
 
     const handleFeasibleSubmit = async () => {
         if (!feasibleInquiry) return;
+        const internetId = feasibleInternetId.trim();
+        if (!internetId) return;
         setIsSaving(true);
         try {
-            const feasibilityDate = new Date().toISOString();
+            // The inquiry sublocality stores the area name, while subscribers
+            // store the area UUID, so resolve it before creating the subscriber.
+            const normalize = (value: any) => String(value ?? '').trim().toLowerCase();
+            const wanted = normalize(feasibleInquiry.subLocality);
+            const area = areas.find((a: any) =>
+                [a.id, a.subLocality, a.locality].some((value) => normalize(value) === wanted)
+            );
+
+            let alreadyExists = false;
+            try {
+                await api.post(`/admin/connections?companyId=${companyId}`, {
+                    companyId,
+                    internetId,
+                    name: feasibleInquiry.name,
+                    address: feasibleInquiry.address || '',
+                    cell: feasibleInquiry.cell || '',
+                    mobile: feasibleInquiry.mobile || '',
+                    installationAmount: feasibleInquiry.installationAmount || 0,
+                    otherAmount: feasibleInquiry.otherAmount || 0,
+                    installationDate: feasibleInquiry.installationDate || '',
+                    rechargeDate: feasibleInquiry.rechargeDate || '',
+                    connectionType: feasibleInquiry.connectionType || 'both',
+                    boxNumber: feasibleInquiry.boxNumber || '',
+                    packageCable: feasibleInquiry.packageCable || '',
+                    discount: feasibleInquiry.discount ? String(feasibleInquiry.discount) : '',
+                    amount: feasibleInquiry.amount || 0,
+                    sublocalityId: area?.id || '',
+                    status: 'active',
+                    comments: feasibleInquiry.comments || '',
+                });
+            } catch (connectionError: any) {
+                // 409 means the subscriber already exists; still mark the
+                // request converted instead of failing the whole action.
+                if (connectionError.response?.status !== 409) {
+                    throw connectionError;
+                }
+                alreadyExists = true;
+            }
+
             await api.put(`/subscribers/inquiries/${feasibleInquiry.id}?companyId=${companyId}`, {
                 ...feasibleInquiry,
-                internetId: feasibleInternetId,
+                internetId,
                 status: 'converted',
-                feasibilityDate,
-                createdAt: feasibleInquiry.createdAt,
             });
-            toast({ title: "Success", description: "Request marked as feasible and added to subscriber detail." });
+
+            queryClient.invalidateQueries({ queryKey: ['admin/connections', companyId] });
             queryClient.invalidateQueries({ queryKey: ['subscribers/inquiries', companyId] });
+            toast({
+                title: "Success",
+                description: alreadyExists
+                    ? "Request marked as feasible. A subscriber with this Internet ID already exists in Subscriber Detail."
+                    : "Request marked as feasible and added to Subscriber Detail.",
+            });
             setIsFeasibleDialogOpen(false);
             setFeasibleInquiry(null);
             setFeasibleInternetId('');
