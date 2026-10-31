@@ -84,6 +84,29 @@ func serveFrontend() gin.HandlerFunc {
 			return
 		}
 
+		// A normal browser page load of a Next.js RSC payload file
+		// (".../index.txt") happens when the client router gives up on a soft
+		// navigation and does a full reload — e.g. after a new deploy changed the
+		// build ID while a tab was still running the previous version. In static
+		// export mode Next reloads the .txt URL itself, so the user saw raw RSC
+		// text. Send the browser to the real page instead; it then loads the
+		// current build. RSC fetches made by the router carry the "RSC" header and
+		// do not ask for text/html, so they are not affected.
+		if strings.HasSuffix(path, "/index.txt") &&
+			c.GetHeader("RSC") == "" &&
+			strings.Contains(c.GetHeader("Accept"), "text/html") {
+			c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+			c.Redirect(http.StatusFound, strings.TrimSuffix(path, "index.txt"))
+			return
+		}
+
+		// Go's built-in MIME table has no ".txt" entry, so on a server without
+		// /etc/mime.types the type depended on content sniffing. Next's router
+		// only accepts the RSC payload when it is served as text/plain.
+		if strings.HasSuffix(path, ".txt") {
+			c.Header("Content-Type", "text/plain; charset=utf-8")
+		}
+
 		// Hashed static assets can be cached forever (content-addressed names).
 		// Everything else (HTML) must never be cached so the browser always
 		// picks up newly deployed bundles.
