@@ -32,6 +32,19 @@ import { smartMatch } from '@/lib/search';
 import { exportToExcel, type ExportColumn } from '@/components/shared/table-export';
 import type { RecoveryOfficer, Staff } from '@/lib/types';
 
+// Normalises an entry date to "yyyy-MM-dd" so the From/To filters compare
+// whole days. Entry dates are free-form strings: some carry a time
+// ("2026-10-30T10:15:00Z", "2026-10-30 10:15") or use dd/MM/yyyy, and a plain
+// string compare then dropped entries on the selected To day.
+const toYMD = (raw: unknown): string => {
+  const s = String(raw ?? '').trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+  if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? s : format(d, 'yyyy-MM-dd');
+};
+
 interface AccountHead {
   id: string;
   masterAccount: string;
@@ -140,20 +153,41 @@ export default function AccountReportsPage() {
       if (filterSubHead !== 'All' && e.subHead !== filterSubHead) return false;
       if (filterUser !== 'All' && e.addBy !== filterUser) return false;
       if (filterTxnType !== 'All' && e.transactionType !== filterTxnType) return false;
-      if (fromDate) {
-        const from = format(fromDate, 'yyyy-MM-dd');
-        if (e.date < from) return false;
-      }
-      if (toDate) {
-        const to = format(toDate, 'yyyy-MM-dd');
-        if (e.date > to) return false;
-      }
+      // OLD (compared the raw date string, so the To day could be excluded):
+      // if (fromDate) { const from = format(fromDate, 'yyyy-MM-dd'); if (e.date < from) return false; }
+      // if (toDate) { const to = format(toDate, 'yyyy-MM-dd'); if (e.date > to) return false; }
+      const entryDay = toYMD(e.date);
+      if (fromDate && entryDay < format(fromDate, 'yyyy-MM-dd')) return false;
+      if (toDate && entryDay > format(toDate, 'yyyy-MM-dd')) return false;
       if (search && !smartMatch(search, [], [getHeadName(e.head), getSubHeadName(e.subHead), e.description])) return false;
       return true;
     });
   }, [entriesList, filterHead, filterSubHead, filterUser, filterTxnType, fromDate, toDate, search, headsList, subHeadsList]);
 
   const totalAmount = filteredData.reduce((s, e) => s + e.amount, 0);
+
+  // Selecting a date must always take effect. Previously the To Date calendar
+  // disabled every day before the From Date, so picking an earlier To Date did
+  // nothing at all (the field stayed on "Pick date" and the table looked
+  // unfiltered). Instead, keep the range valid by dropping the opposite bound
+  // when it would make From > To.
+  const handleFromSelect = (d: Date | undefined) => {
+    if (!d) return;
+    setFromDate(d);
+    setFromDateOpen(false);
+    if (toDate && format(d, 'yyyy-MM-dd') > format(toDate, 'yyyy-MM-dd')) {
+      setToDate(undefined);
+    }
+  };
+
+  const handleToSelect = (d: Date | undefined) => {
+    if (!d) return;
+    setToDate(d);
+    setToDateOpen(false);
+    if (fromDate && format(d, 'yyyy-MM-dd') < format(fromDate, 'yyyy-MM-dd')) {
+      setFromDate(undefined);
+    }
+  };
 
   const handlePrintAll = () => {
     const params = new URLSearchParams();
@@ -361,7 +395,7 @@ export default function AccountReportsPage() {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
-                  <Calendar mode="single" selected={fromDate} onSelect={(d) => { if (d) { setFromDate(d); setFromDateOpen(false); } }} initialFocus />
+                  <Calendar mode="single" selected={fromDate} onSelect={handleFromSelect} initialFocus />
                 </PopoverContent>
               </Popover>
             </div>
@@ -375,7 +409,7 @@ export default function AccountReportsPage() {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
-                  <Calendar mode="single" selected={toDate} onSelect={(d) => { if (d) { setToDate(d); setToDateOpen(false); } }} initialFocus />
+                  <Calendar mode="single" selected={toDate} onSelect={handleToSelect} initialFocus />
                 </PopoverContent>
               </Popover>
             </div>

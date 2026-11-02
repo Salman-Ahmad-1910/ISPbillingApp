@@ -7,6 +7,20 @@ import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { Loader2, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
+
+// Normalises an entry date to "yyyy-MM-dd" so the From/To filters compare
+// whole days. Entry dates are free-form strings: some carry a time
+// ("2026-10-30T10:15:00Z", "2026-10-30 10:15") or use dd/MM/yyyy, and a plain
+// string compare then dropped entries on the selected To day.
+const toYMD = (raw: unknown): string => {
+  const s = String(raw ?? '').trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+  if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? s : format(d, 'yyyy-MM-dd');
+};
+
 import type { Company } from '@/lib/types';
 import api from '@/lib/api';
 import { smartMatch } from '@/lib/search';
@@ -104,8 +118,10 @@ export default function PrintAccountReportsPage() {
       if (filterSubHead !== 'all' && e.subHead !== filterSubHead) return false;
       if (filterUser !== 'all' && e.addBy !== filterUser) return false;
       if (filterTxnType !== 'all' && e.transactionType !== filterTxnType) return false;
-      if (filterFrom && e.date < filterFrom) return false;
-      if (filterTo && e.date > filterTo) return false;
+      // OLD: if (filterFrom && e.date < filterFrom) return false;
+      // OLD: if (filterTo && e.date > filterTo) return false;
+      if (filterFrom && toYMD(e.date) < filterFrom) return false;
+      if (filterTo && toYMD(e.date) > filterTo) return false;
       if (filterSearch && !smartMatch(filterSearch, [], [getHeadName(e.head), getSubHeadName(e.subHead), e.description])) return false;
       return true;
     });
