@@ -138,12 +138,16 @@ export default function PackagesPage() {
     try {
       if (selectedPackage) {
         await api.put(`/billing/packages/${selectedPackage.id}?companyId=${companyId}`, data);
-        toast({ title: "Success", description: "Package updated successfully." });
+        toast({ title: "Success", description: "Package updated and subscribers on it were re-priced." });
       } else {
         await api.post(`/billing/packages?companyId=${companyId}`, { ...data, companyId });
         toast({ title: "Success", description: "Package added successfully." });
       }
       queryClient.invalidateQueries({ queryKey: ['billing/packages', companyId] });
+      // Saving a package re-prices the subscribers that use it (and can move
+      // their open balance), so refresh every screen that reads connections.
+      queryClient.invalidateQueries({ queryKey: ['admin/connections', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['subscribers', companyId] });
       setIsFormOpen(false);
       setSelectedPackage(null);
     } catch (error: any) {
