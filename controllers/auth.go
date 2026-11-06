@@ -145,8 +145,12 @@ func GetMe(c *gin.Context) {
 		response["company_id"] = firstCompany.CompanyID
 
 		// Include granted page/feature permissions for this user in the company.
-		permissions, configured := getUserPermissionIDs(user.ID, firstCompany.CompanyID, user.Email)
+		// OLD: permissions, configured := getUserPermissionIDs(user.ID, firstCompany.CompanyID, user.Email)
+		permissions, mobilePermissions, configured := getUserPermissionIDs(user.ID, firstCompany.CompanyID, user.Email)
 		response["permissions"] = permissions
+		// The Roles page has separate Web and Mobile switches per permission.
+		// The mobile app reads this list so its buttons follow the Mobile switch.
+		response["mobilePermissions"] = mobilePermissions
 		response["permissionsConfigured"] = configured
 	}
 
@@ -157,7 +161,10 @@ func GetMe(c *gin.Context) {
 // within a company. Permissions may be saved against the user record itself or
 // against the linked staff / recovery officer / dealer record (which can carry a
 // different primary key), so those are resolved via the user's email.
-func getUserPermissionIDs(userID uuid.UUID, companyID uuid.UUID, email string) ([]string, bool) {
+// It returns the web-enabled ids, the mobile-enabled ids, and whether the user
+// has any per-user configuration at all.
+// OLD signature: func getUserPermissionIDs(...) ([]string, bool)
+func getUserPermissionIDs(userID uuid.UUID, companyID uuid.UUID, email string) ([]string, []string, bool) {
 	entityIDs := []string{userID.String()}
 
 	var staffIDs []string
@@ -174,17 +181,22 @@ func getUserPermissionIDs(userID uuid.UUID, companyID uuid.UUID, email string) (
 
 	var perms []models.UserPermission
 	if err := config.DB.Where("user_id IN ? AND company_id = ?", entityIDs, companyID).Find(&perms).Error; err != nil {
-		return nil, false
+		return nil, nil, false
 	}
 
 	ids := make([]string, 0, len(perms))
+	mobileIDs := make([]string, 0, len(perms))
 	for _, p := range perms {
 		if p.WebEnabled {
 			ids = append(ids, p.PermissionID)
 		}
+		if p.MobileEnabled {
+			mobileIDs = append(mobileIDs, p.PermissionID)
+		}
 	}
 
-	return ids, len(perms) > 0
+	// OLD: return ids, len(perms) > 0
+	return ids, mobileIDs, len(perms) > 0
 }
 
 // Logout handles user logout
