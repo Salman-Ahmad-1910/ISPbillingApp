@@ -9,7 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
-
+//this is for exporting
 //go:embed all:frontend
 var embeddedFrontend embed.FS
 
