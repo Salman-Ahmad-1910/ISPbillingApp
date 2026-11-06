@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"awesomeProject/models"
 
@@ -13,6 +14,34 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
+
+// ClientPlatformHeader is sent by the mobile app so the server can apply the
+// "App/Mobile" switch from the Roles & Permissions page instead of the "Web"
+// switch. Browsers do not send it, so an absent/unknown value means "web" and
+// keeps the existing behaviour unchanged.
+const ClientPlatformHeader = "X-Client-Platform"
+
+const (
+	platformWeb    = "web"
+	platformMobile = "mobile"
+)
+
+// requestPlatform reports which set of platform flags applies to this request.
+func requestPlatform(c *gin.Context) string {
+	if strings.EqualFold(strings.TrimSpace(c.GetHeader(ClientPlatformHeader)), platformMobile) {
+		return platformMobile
+	}
+	return platformWeb
+}
+
+// permissionEnabled reports whether a stored permission is switched on for the
+// given platform.
+func permissionEnabled(p models.UserPermission, platform string) bool {
+	if platform == platformMobile {
+		return p.MobileEnabled
+	}
+	return p.WebEnabled
+}
 
 // Server-side enforcement of the per-page child permissions managed from the
 // web Roles & Permissions page (client/src/lib/permission-pages.ts).
@@ -162,7 +191,11 @@ func (s userPermissionSet) hasPageFeature(pageID, key string) bool {
 // linked staff / recovery officer / dealer record (which can carry a different
 // primary key), so those are resolved via the user's email - the same rule
 // already used by checkUserGrantedPermission.
-func loadUserPermissionSet(db *gorm.DB, userID, companyID uuid.UUID) (userPermissionSet, error) {
+//
+// platform selects which Roles & Permissions switch applies: "web" reads
+// web_enabled (browser traffic), "mobile" reads mobile_enabled (the Flutter app,
+// identified by ClientPlatformHeader).
+func loadUserPermissionSet(db *gorm.DB, userID, companyID uuid.UUID, platform string) (userPermissionSet, error) {
 	set := userPermissionSet{granted: map[string]bool{}}
 
 	// owner/admin bypass everything, mirroring the frontend's isAdmin check.
@@ -215,7 +248,7 @@ func loadUserPermissionSet(db *gorm.DB, userID, companyID uuid.UUID) (userPermis
 	// never used per-user permissions are not locked out.
 	set.configured = len(perms) > 0
 	for _, p := range perms {
-		if p.WebEnabled {
+		if permissionEnabled(p, platform) {
 			set.granted[p.PermissionID] = true
 		}
 	}
@@ -248,7 +281,7 @@ func resolvePermissionSet(c *gin.Context, db *gorm.DB) (userPermissionSet, bool)
 		return userPermissionSet{}, false
 	}
 
-	set, err := loadUserPermissionSet(db, userID, companyID)
+	set, err := loadUserPermissionSet(db, userID, companyID, requestPlatform(c))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,

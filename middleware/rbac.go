@@ -59,25 +59,25 @@ var grantedPermissionModules = map[string][]string{
 
 	// User Reports. Several report pages read from billing/network APIs, so they
 	// also unlock those modules.
-	"13307": {"reports"},   // Allocated Defaulters (subscribers)
-	"13325": {"reports"},   // Users Defaulter (subscribers)
-	"13326": {"reports", "billing"}, // New Users List -> billing/payments
-	"13328": {"reports", "billing"}, // Package Wise List -> billing/packages
-	"13329": {"reports", "billing"}, // Promise Date Report -> billing/promises
-	"13330": {"reports", "billing"}, // Allocated Collections -> billing/payments
-	"13355": {"reports", "billing"}, // Month Wise Collection -> billing/payments
-	"13349": {"reports", "network"}, // Expiry Wise Defaulter -> network/areas
+	"13307": {"reports"},                       // Allocated Defaulters (subscribers)
+	"13325": {"reports"},                       // Users Defaulter (subscribers)
+	"13326": {"reports", "billing"},            // New Users List -> billing/payments
+	"13328": {"reports", "billing"},            // Package Wise List -> billing/packages
+	"13329": {"reports", "billing"},            // Promise Date Report -> billing/promises
+	"13330": {"reports", "billing"},            // Allocated Collections -> billing/payments
+	"13355": {"reports", "billing"},            // Month Wise Collection -> billing/payments
+	"13349": {"reports", "network"},            // Expiry Wise Defaulter -> network/areas
 	"13356": {"reports", "billing", "network"}, // Collection Not Generated -> billing/bills, network/areas
-	"13354": {"reports", "billing"}, // Monthly Collection Month Wise -> billing/payments
+	"13354": {"reports", "billing"},            // Monthly Collection Month Wise -> billing/payments
 	"13358": {"reports", "billing", "network"}, // Unpaid Collection -> billing/invoices, network/areas
-	"13306": {"reports", "billing"}, // User Collections -> billing/payments
+	"13306": {"reports", "billing"},            // User Collections -> billing/payments
 	"13353": {"reports", "billing", "network"}, // Month Wise Defaulter -> billing/invoices, network/areas
-	"13327": {"reports"},   // Deactivate User List (admin/connections)
-	"15327": {"reports"},   // Subscribers Creator Summary (admin/users + admin/connections)
-	"15329": {"reports", "network"}, // New Subscribers List (admin/connections + network/areas)
-	"15330": {"reports", "network"}, // Subscribers Defaulters (admin/connections + network/areas)
-	"15331": {"reports", "network"}, // Allocated Collections (billing/payments + admin/connections + network/areas + admin/users)
-	"15332": {"reports", "network"}, // Month Wise Collection Monthly (billing/payments + admin/connections)
+	"13327": {"reports"},                       // Deactivate User List (admin/connections)
+	"15327": {"reports"},                       // Subscribers Creator Summary (admin/users + admin/connections)
+	"15329": {"reports", "network"},            // New Subscribers List (admin/connections + network/areas)
+	"15330": {"reports", "network"},            // Subscribers Defaulters (admin/connections + network/areas)
+	"15331": {"reports", "network"},            // Allocated Collections (billing/payments + admin/connections + network/areas + admin/users)
+	"15332": {"reports", "network"},            // Month Wise Collection Monthly (billing/payments + admin/connections)
 
 	// Dealers Reports -> reports + the APIs their pages load
 	"13331": {"reports", "network"}, // Dealers Collection -> network/areas
@@ -108,26 +108,27 @@ var grantedPermissionModules = map[string][]string{
 	"15338": {"pos", "sales", "crm", "inventory"}, // Sales > Point of Sale
 
 	// Newly added sidebar page permissions.
-	"15365": {"network"},                          // POPs
-	"15366": {"network"},                          // OLTs
-	"15367": {"network"},                          // Splitters
-	"15368": {"subscribers", "crm", "billing"},    // Corporate Clients
-	"15370": {"crm"},                              // Guarantors
-	"15371": {"pos", "sales", "billing"},          // Replaced Products
-	"15372": {"inventory"},                        // Vendor Invoice
-	"15373": {"inventory"},                        // Stock
-	"15376": {"system"},                          // My Company Profile
-	"15378": {"system"},                           // Drivers
-	"15379": {"system"},                           // Application
-	"15380": {"reports", "billing", "network"},    // Pending Subscribers
-	"15381": {"reports", "billing", "network"},    // Advance Subscribers
-	"15382": {"reports", "billing", "network"},    // Not Generated Collections
-	"15383": {"reports", "billing", "network"},    // Unpaid Collections
+	"15365": {"network"},                       // POPs
+	"15366": {"network"},                       // OLTs
+	"15367": {"network"},                       // Splitters
+	"15368": {"subscribers", "crm", "billing"}, // Corporate Clients
+	"15370": {"crm"},                           // Guarantors
+	"15371": {"pos", "sales", "billing"},       // Replaced Products
+	"15372": {"inventory"},                     // Vendor Invoice
+	"15373": {"inventory"},                     // Stock
+	"15376": {"system"},                        // My Company Profile
+	"15378": {"system"},                        // Drivers
+	"15379": {"system"},                        // Application
+	"15380": {"reports", "billing", "network"}, // Pending Subscribers
+	"15381": {"reports", "billing", "network"}, // Advance Subscribers
+	"15382": {"reports", "billing", "network"}, // Not Generated Collections
+	"15383": {"reports", "billing", "network"}, // Unpaid Collections
 }
 
 // checkUserGrantedPermission verifies whether the user has been granted, via the
 // web Roles & Permissions page, a permission that unlocks the given module.
-func checkUserGrantedPermission(db *gorm.DB, userID, companyID uuid.UUID, module string) (bool, error) {
+// platform selects the Web or App/Mobile switch for the request.
+func checkUserGrantedPermission(db *gorm.DB, userID, companyID uuid.UUID, module, platform string) (bool, error) {
 	// Resolve the entity IDs permissions may be saved against: the user record
 	// itself plus any staff / recovery officer / dealer record sharing the email.
 	entityIDs := []string{userID.String()}
@@ -151,11 +152,14 @@ func checkUserGrantedPermission(db *gorm.DB, userID, companyID uuid.UUID, module
 	}
 
 	var perms []models.UserPermission
-	if err := db.Where("user_id IN ? AND company_id = ? AND web_enabled = ?", entityIDs, companyID, true).Find(&perms).Error; err != nil {
+	if err := db.Where("user_id IN ? AND company_id = ?", entityIDs, companyID).Find(&perms).Error; err != nil {
 		return false, err
 	}
 
 	for _, p := range perms {
+		if !permissionEnabled(p, platform) {
+			continue
+		}
 		if modules, ok := grantedPermissionModules[p.PermissionID]; ok {
 			for _, m := range modules {
 				if m == module {
@@ -192,7 +196,7 @@ func RBACMiddleware(db *gorm.DB, module, action string) gin.HandlerFunc {
 		}
 
 		// Check if user has permission
-		hasPermission, err := checkUserPermission(db, userID.(uuid.UUID), companyID.(uuid.UUID), module, action)
+		hasPermission, err := checkUserPermission(db, userID.(uuid.UUID), companyID.(uuid.UUID), module, action, requestPlatform(c))
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"success": false,
@@ -216,8 +220,9 @@ func RBACMiddleware(db *gorm.DB, module, action string) gin.HandlerFunc {
 	}
 }
 
-// checkUserPermission verifies if a user has permission for a specific action on a module
-func checkUserPermission(db *gorm.DB, userID, companyID uuid.UUID, module, action string) (bool, error) {
+// checkUserPermission verifies if a user has permission for a specific action on a module.
+// platform selects the Web or App/Mobile permission switches.
+func checkUserPermission(db *gorm.DB, userID, companyID uuid.UUID, module, action, platform string) (bool, error) {
 	// Get user's role in company
 	var userCompany models.UserCompany
 	err := db.Where("user_id = ? AND company_id = ?", userID, companyID).First(&userCompany).Error
@@ -249,7 +254,7 @@ func checkUserPermission(db *gorm.DB, userID, companyID uuid.UUID, module, actio
 		}
 		// No role-based permission found. Fall back to permissions granted
 		// directly to the user via the web Roles & Permissions page.
-		hasGranted, grantErr := checkUserGrantedPermission(db, userID, companyID, module)
+		hasGranted, grantErr := checkUserGrantedPermission(db, userID, companyID, module, platform)
 		if grantErr != nil {
 			return false, grantErr
 		}
@@ -355,9 +360,11 @@ func RequireOwnerOrAdmin(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-// PermissionChecker is a helper function to check permissions in controllers
+// PermissionChecker is a helper function to check permissions in controllers.
+// It keeps the original, web-platform behaviour for callers that have no
+// request context; request-aware guards should use requestPlatform(c).
 func PermissionChecker(db *gorm.DB, userID, companyID uuid.UUID, module, action string) (bool, error) {
-	return checkUserPermission(db, userID, companyID, module, action)
+	return checkUserPermission(db, userID, companyID, module, action, platformWeb)
 }
 
 // GetCompanyUsers returns all users belonging to a company (for admin users)
