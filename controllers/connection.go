@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -179,38 +180,38 @@ func findConnections(c *gin.Context) {
 }
 
 type connectionInput struct {
-	InternetID          string  `json:"internetId"`
-	Name                string  `json:"name"`
-	Address             string  `json:"address"`
-	Cell                string  `json:"cell"`
-	Mobile              string  `json:"mobile"`
-	InstallationAmount  float64 `json:"installationAmount"`
-	OtherAmount         float64 `json:"otherAmount"`
-	InstallationDate    string  `json:"installationDate"`
-	RechargeDate        string  `json:"rechargeDate"`
-	ConnectionProvider  string  `json:"connectionProvider"`
-	ConnectionType      string  `json:"connectionType"`
-	BoxNumber           string  `json:"boxNumber"`
-	PackageCable        string  `json:"packageCable"`
-	Discount            string  `json:"discount"`
-	Amount              *float64 `json:"amount"`
-	PackageInternet     string   `json:"packageInternet"`
-	CreateBalance       *bool    `json:"createBalance"`
-	BalanceDays         int      `json:"balanceDays"`
-	SameDiscount        string   `json:"sameDiscount"`
-	SameAmount          *float64 `json:"sameAmount"`
-	Status              string  `json:"status"`
-	SublocalityID       string  `json:"sublocalityId"`
-	SplitterID          string  `json:"splitterId"`
-	SplitterPort        int     `json:"splitterPort"`
-	LeavingDate         string  `json:"leavingDate"`
-	DeactivationReason  string  `json:"deactivationReason"`
-	Comments            string  `json:"comments"`
-	Reason              string  `json:"reason"`
-	BadDebt             *bool   `json:"badDebt"`
-	PaymentStatus       *string `json:"paymentStatus"`
-	RemainingAmount     *float64 `json:"remainingAmount"`
-	TransactionId       string  `json:"transactionId"`
+	InternetID         string   `json:"internetId"`
+	Name               string   `json:"name"`
+	Address            string   `json:"address"`
+	Cell               string   `json:"cell"`
+	Mobile             string   `json:"mobile"`
+	InstallationAmount float64  `json:"installationAmount"`
+	OtherAmount        float64  `json:"otherAmount"`
+	InstallationDate   string   `json:"installationDate"`
+	RechargeDate       string   `json:"rechargeDate"`
+	ConnectionProvider string   `json:"connectionProvider"`
+	ConnectionType     string   `json:"connectionType"`
+	BoxNumber          string   `json:"boxNumber"`
+	PackageCable       string   `json:"packageCable"`
+	Discount           string   `json:"discount"`
+	Amount             *float64 `json:"amount"`
+	PackageInternet    string   `json:"packageInternet"`
+	CreateBalance      *bool    `json:"createBalance"`
+	BalanceDays        int      `json:"balanceDays"`
+	SameDiscount       string   `json:"sameDiscount"`
+	SameAmount         *float64 `json:"sameAmount"`
+	Status             string   `json:"status"`
+	SublocalityID      string   `json:"sublocalityId"`
+	SplitterID         string   `json:"splitterId"`
+	SplitterPort       int      `json:"splitterPort"`
+	LeavingDate        string   `json:"leavingDate"`
+	DeactivationReason string   `json:"deactivationReason"`
+	Comments           string   `json:"comments"`
+	Reason             string   `json:"reason"`
+	BadDebt            *bool    `json:"badDebt"`
+	PaymentStatus      *string  `json:"paymentStatus"`
+	RemainingAmount    *float64 `json:"remainingAmount"`
+	TransactionId      string   `json:"transactionId"`
 }
 
 func createConnection(c *gin.Context) {
@@ -283,32 +284,37 @@ func createConnection(c *gin.Context) {
 		}
 	}
 
+	// The connection type decides which package columns are in use. Normalise
+	// them here for the same reason as an edit: a stale package on the other
+	// side would otherwise be stored and displayed next to the new package.
+	packageCable, packageInternet := packagesForType(input.ConnectionType, input.PackageCable, input.PackageInternet)
+
 	conn := models.Connection{
-		InternetID:          input.InternetID,
-		Name:                input.Name,
-		Address:             input.Address,
-		Cell:                input.Cell,
-		Mobile:              input.Mobile,
-		InstallationAmount:  input.InstallationAmount,
-		OtherAmount:         input.OtherAmount,
-		InstallationDate:    input.InstallationDate,
-		RechargeDate:        input.RechargeDate,
-		ConnectionProvider:  input.ConnectionProvider,
-		ConnectionType:      input.ConnectionType,
-		BoxNumber:           input.BoxNumber,
-		PackageCable:        input.PackageCable,
-		Discount:            input.Discount,
-		Amount:              valueOrZero(input.Amount),
-		PackageInternet:     input.PackageInternet,
-		CreateBalance:       input.CreateBalance != nil && *input.CreateBalance,
-		BalanceDays:         input.BalanceDays,
-		SameDiscount:        input.SameDiscount,
-		SameAmount:          valueOrZero(input.SameAmount),
-		Status:              input.Status,
-		SublocalityID:       input.SublocalityID,
-		SplitterID:          input.SplitterID,
-		SplitterPort:        input.SplitterPort,
-		TransactionId:       input.TransactionId,
+		InternetID:         input.InternetID,
+		Name:               input.Name,
+		Address:            input.Address,
+		Cell:               input.Cell,
+		Mobile:             input.Mobile,
+		InstallationAmount: input.InstallationAmount,
+		OtherAmount:        input.OtherAmount,
+		InstallationDate:   input.InstallationDate,
+		RechargeDate:       input.RechargeDate,
+		ConnectionProvider: input.ConnectionProvider,
+		ConnectionType:     input.ConnectionType,
+		BoxNumber:          input.BoxNumber,
+		PackageCable:       packageCable,
+		Discount:           input.Discount,
+		Amount:             valueOrZero(input.Amount),
+		PackageInternet:    packageInternet,
+		CreateBalance:      input.CreateBalance != nil && *input.CreateBalance,
+		BalanceDays:        input.BalanceDays,
+		SameDiscount:       input.SameDiscount,
+		SameAmount:         valueOrZero(input.SameAmount),
+		Status:             input.Status,
+		SublocalityID:      input.SublocalityID,
+		SplitterID:         input.SplitterID,
+		SplitterPort:       input.SplitterPort,
+		TransactionId:      input.TransactionId,
 	}
 
 	// A new subscriber starts with no balance. If the "Create balance" option
@@ -445,8 +451,15 @@ func updateConnection(c *gin.Context) {
 	if input.BoxNumber != "" {
 		updates["box_number"] = input.BoxNumber
 	}
-	if input.PackageCable != "" {
-		updates["package_cable"] = input.PackageCable
+	// A full edit (one that carries connectionType) owns both package columns:
+	// the side that does not apply to the connection type is cleared so a
+	// subscriber who switched from "both" to internet (or cable) cannot keep a
+	// stale package that the subscriber detail and collection pages would then
+	// show differently. Partial updates omit connectionType and still only touch
+	// the fields they send.
+	newCable, newInternet := packageAssignmentAfterUpdate(old, input)
+	if input.ConnectionType != "" || input.PackageCable != "" {
+		updates["package_cable"] = newCable
 	}
 	if input.Discount != "" {
 		updates["discount"] = input.Discount
@@ -454,8 +467,8 @@ func updateConnection(c *gin.Context) {
 	if input.Amount != nil {
 		updates["amount"] = *input.Amount
 	}
-	if input.PackageInternet != "" {
-		updates["package_internet"] = input.PackageInternet
+	if input.ConnectionType != "" || input.PackageInternet != "" {
+		updates["package_internet"] = newInternet
 	}
 	// Only touch the create-balance flag when the caller actually sent it;
 	// a partial update (e.g. resetting the balance) must not flip it off.
@@ -937,6 +950,44 @@ func valueOrZero(v *float64) float64 {
 	return *v
 }
 
+// packageAssignmentAfterUpdate resolves the package names a connection should
+// carry after an update.
+//
+// A full edit (one that includes connectionType) owns both package columns, and
+// the side that does not apply to the connection type is cleared. That stops a
+// subscriber who switched from "both" to internet-only (or cable-only) keeping
+// a stale package that the subscriber detail and collection pages would then
+// display differently. A partial update that omits connectionType leaves the
+// package columns it did not send untouched.
+func packageAssignmentAfterUpdate(old models.Connection, input connectionInput) (cable, internet string) {
+	cable, internet = old.PackageCable, old.PackageInternet
+
+	if input.ConnectionType == "" {
+		if input.PackageCable != "" {
+			cable = input.PackageCable
+		}
+		if input.PackageInternet != "" {
+			internet = input.PackageInternet
+		}
+		return
+	}
+
+	return packagesForType(input.ConnectionType, input.PackageCable, input.PackageInternet)
+}
+
+// packagesForType returns the package names that are actually in use for a
+// connection type. A value stored on the side the type does not use is ignored.
+func packagesForType(connectionType, cable, internet string) (string, string) {
+	switch strings.ToLower(strings.TrimSpace(connectionType)) {
+	case "internet":
+		return "", internet
+	case "tv_cable":
+		return cable, ""
+	default:
+		return cable, internet
+	}
+}
+
 // paymentStatusForBalance mirrors the status rules used when a payment is
 // applied: a positive balance is pending, a negative one is an advance.
 // packageUpdateBalance resolves the monthly fee that will be in force after an
@@ -950,17 +1001,19 @@ func packageUpdateBalance(old models.Connection, input connectionInput) (float64
 	fee := roundToTwo(packageFeeAfterUpdate(old, input))
 	oldFee := roundToTwo(monthlyPackageFee(old.ConnectionType, old.Amount, old.SameAmount))
 
-	newCable := old.PackageCable
-	if input.PackageCable != "" {
-		newCable = input.PackageCable
+	newType := old.ConnectionType
+	if input.ConnectionType != "" {
+		newType = input.ConnectionType
 	}
-	newInternet := old.PackageInternet
-	if input.PackageInternet != "" {
-		newInternet = input.PackageInternet
-	}
+	storedCable, storedInternet := packageAssignmentAfterUpdate(old, input)
+	oldCable, oldInternet := packagesForType(old.ConnectionType, old.PackageCable, old.PackageInternet)
+	newCable, newInternet := packagesForType(newType, storedCable, storedInternet)
 
-	changed := newCable != old.PackageCable ||
-		newInternet != old.PackageInternet ||
+	// Compare the package sides that are actually in use. Clearing a stale
+	// value on a side the connection type does not use must not look like a
+	// package change, or an unrelated edit would reset the balance.
+	changed := newCable != oldCable ||
+		newInternet != oldInternet ||
 		fee != oldFee
 
 	return fee, changed

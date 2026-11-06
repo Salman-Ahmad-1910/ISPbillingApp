@@ -199,7 +199,10 @@ export function ClientPage({ connections, initialConnectionId, initialPackageNam
         await api.post(`/admin/connections?companyId=${companyId}`, { ...formData, companyId });
         setFeedback({ type: 'success', title: 'Success', message: 'Subscriber added successfully.' });
       }
-      queryClient.invalidateQueries({ queryKey: ['admin/connections', companyId] });
+      // Invalidate every connections query, not just this company's exact key,
+      // so the subscriber detail and collection pages cannot keep a cached row
+      // with the previous package after the edit.
+      queryClient.invalidateQueries({ queryKey: ['admin/connections'] });
       setIsFormOpen(false);
       setSelectedConnection(null);
     } catch (error: any) {

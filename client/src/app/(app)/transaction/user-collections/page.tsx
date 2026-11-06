@@ -50,6 +50,7 @@ import { useUser } from '@/hooks/use-user';
 import { useCrudPermissions, usePagePermissions } from '@/hooks/usePermissions';
 import { SUBSCRIBER_COLLECTION_PERMISSION } from '@/lib/permission-pages';
 import { smartMatchScore } from '@/lib/search';
+import { connectionPackageLabel } from '@/lib/connection-package';
 import { Loader2, MoreHorizontal, Wallet, DollarSign, UserCheck, Trash2, Pencil, Copy, FileText, Users, CalendarClock, Clock, ShoppingCart } from 'lucide-react';
 
 import type { Connection, Payment, Area, RecoveryOfficer, TransactionType, PromiseEntry } from '@/lib/types';
@@ -88,10 +89,9 @@ function getPackagePrice(c: Connection): number {
 }
 
 function getPackageLabel(c: Connection): string {
-  const parts: string[] = [];
-  if (c.packageCable) parts.push(c.packageCable);
-  if (c.packageInternet) parts.push(c.packageInternet);
-  return parts.length ? parts.join(' + ') : '---';
+  // The connection type decides which package sides are in use, so a stale
+  // value on the other side can never show up as a second package here.
+  return connectionPackageLabel(c);
 }
 
 function getTotalOwed(c: Connection): number {

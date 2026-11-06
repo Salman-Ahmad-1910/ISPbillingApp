@@ -182,6 +182,23 @@ func TestPackageChangeSetsBalanceToNewFee(t *testing.T) {
 			wantFee:     1000,
 			wantChanged: false,
 		},
+		{
+			// A stale cable package and its fee may still be stored on an
+			// internet subscriber. A full edit clears them, but that cleanup
+			// must not look like a package change or it would reset the balance.
+			name:        "clearing a stale cable side on an internet subscriber is not a change",
+			old:         models.Connection{ConnectionType: "internet", PackageCable: "Old Cable", PackageInternet: "Basic", Amount: 1000, SameAmount: 1000},
+			input:       connectionInput{ConnectionType: "internet", PackageCable: "", PackageInternet: "Basic", Amount: ptr(0.0), SameAmount: ptr(1000.0)},
+			wantFee:     1000,
+			wantChanged: false,
+		},
+		{
+			name:        "clearing a stale internet side on a cable subscriber is not a change",
+			old:         models.Connection{ConnectionType: "tv_cable", PackageCable: "Basic", PackageInternet: "Old Internet", Amount: 1000, SameAmount: 800},
+			input:       connectionInput{ConnectionType: "tv_cable", PackageCable: "Basic", PackageInternet: "", Amount: ptr(1000.0), SameAmount: ptr(0.0)},
+			wantFee:     1000,
+			wantChanged: false,
+		},
 	}
 
 	for _, c := range cases {
@@ -217,6 +234,61 @@ func TestManualBalanceAccumulatesOntoPackageFee(t *testing.T) {
 
 	if got != 2250 {
 		t.Errorf("balance = %v, want 2250", got)
+	}
+}
+
+// TestPackageAssignmentClearsUnusedSide covers the package columns written by a
+// full edit: a connection that is internet-only or cable-only must not keep the
+// package from the other side, otherwise the subscriber detail and collection
+// pages can show an old package alongside the newly assigned one.
+func TestPackageAssignmentClearsUnusedSide(t *testing.T) {
+	cases := []struct {
+		name         string
+		old          models.Connection
+		input        connectionInput
+		wantCable    string
+		wantInternet string
+	}{
+		{
+			name:         "internet edit clears a stale cable package",
+			old:          models.Connection{ConnectionType: "both", PackageCable: "Old Cable", PackageInternet: "Old Internet"},
+			input:        connectionInput{ConnectionType: "internet", PackageCable: "Old Cable", PackageInternet: "New Internet"},
+			wantCable:    "",
+			wantInternet: "New Internet",
+		},
+		{
+			name:         "cable edit clears a stale internet package",
+			old:          models.Connection{ConnectionType: "both", PackageCable: "Old Cable", PackageInternet: "Old Internet"},
+			input:        connectionInput{ConnectionType: "tv_cable", PackageCable: "New Cable", PackageInternet: "Old Internet"},
+			wantCable:    "New Cable",
+			wantInternet: "",
+		},
+		{
+			name:         "both edit keeps both packages",
+			old:          models.Connection{ConnectionType: "both", PackageCable: "Old Cable", PackageInternet: "Old Internet"},
+			input:        connectionInput{ConnectionType: "both", PackageCable: "New Cable", PackageInternet: "New Internet"},
+			wantCable:    "New Cable",
+			wantInternet: "New Internet",
+		},
+		{
+			name:         "partial update leaves the packages alone",
+			old:          models.Connection{ConnectionType: "internet", PackageCable: "", PackageInternet: "Basic"},
+			input:        connectionInput{Status: "active"},
+			wantCable:    "",
+			wantInternet: "Basic",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			cable, internet := packageAssignmentAfterUpdate(c.old, c.input)
+			if cable != c.wantCable {
+				t.Errorf("cable = %q, want %q", cable, c.wantCable)
+			}
+			if internet != c.wantInternet {
+				t.Errorf("internet = %q, want %q", internet, c.wantInternet)
+			}
+		})
 	}
 }
 

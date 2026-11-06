@@ -206,6 +206,31 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
   const [cablePkgId, setCablePkgId] = React.useState<string | undefined>();
   const [internetPkgId, setInternetPkgId] = React.useState<string | undefined>();
 
+  // The connection type decides which package columns are in use. Clear the
+  // disabled side so saving an edit cannot keep a package from an older
+  // assignment, which would make the subscriber detail and collection pages
+  // show different packages. The backend clears the same side on save.
+  React.useEffect(() => {
+    if (!showCable) {
+      if (form.getValues('packageCable')) {
+        form.setValue('packageCable', '', { shouldDirty: true });
+      }
+      if (Number(form.getValues('amount')) !== 0) {
+        form.setValue('amount', 0, { shouldDirty: true });
+      }
+      setCablePkgId(undefined);
+    }
+    if (!showInternet) {
+      if (form.getValues('packageInternet')) {
+        form.setValue('packageInternet', '', { shouldDirty: true });
+      }
+      if (Number(form.getValues('sameAmount')) !== 0) {
+        form.setValue('sameAmount', 0, { shouldDirty: true });
+      }
+      setInternetPkgId(undefined);
+    }
+  }, [connection, showCable, showInternet, form]);
+
   const resolvePackage = (name: string, id?: string) => {
     if (id) {
       const byId = packages.find(p => p.id === id);

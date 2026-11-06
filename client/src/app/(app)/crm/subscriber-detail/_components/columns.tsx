@@ -2,6 +2,7 @@
 
 import { type ColumnDef } from '@tanstack/react-table';
 import type { Connection } from '@/lib/types';
+import { connectionPackageSides, connectionUsesCable, connectionUsesInternet } from '@/lib/connection-package';
 import { MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -80,10 +81,11 @@ export const getColumns = ({ onEdit, onDelete, onChangeStatus, canUpdate = true,
     id: 'cableInternet',
     header: 'Cable / Internet',
     cell: ({ row }) => {
+      const { cable, internet } = connectionPackageSides(row.original);
       return (
         <div className="text-sm">
-          {row.original.packageCable && <div>C: {row.original.packageCable}</div>}
-          {row.original.packageInternet && <div>I: {row.original.packageInternet}</div>}
+          {connectionUsesCable(row.original) && cable && <div>C: {cable}</div>}
+          {connectionUsesInternet(row.original) && internet && <div>I: {internet}</div>}
         </div>
       );
     },
