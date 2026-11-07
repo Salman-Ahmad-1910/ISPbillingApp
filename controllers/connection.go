@@ -523,10 +523,27 @@ func updateConnection(c *gin.Context) {
 		updates["remaining_amount"] = *input.RemainingAmount
 	}
 
-	// Changing a package only changes the fee used by future bills. It must
-	// never rewrite the running balance: that balance already contains earlier
-	// dues, payments and advances, and the next bill adds the new fee on top.
-	newPackageFee, _ := packageUpdateBalance(old, input)
+	// A package change moves the running balance by the fee difference for the
+	// current month, so a downgrade (3000 -> 2000) credits the difference
+	// (1000) into advance and an upgrade adds it to what is owed. This happens
+	// automatically even when "Create balance" is not ticked; the manual
+	// create-balance path below handles the billed/unbilled day-proration case.
+	newPackageFee, packageChanged := packageUpdateBalance(old, input)
+
+	if packageChanged && !addBalance && input.RemainingAmount == nil {
+		oldPackageFee := roundToTwo(monthlyPackageFee(old.ConnectionType, old.Amount, old.SameAmount))
+		feeDiff := roundToTwo(newPackageFee - oldPackageFee)
+		newRemaining := roundToTwo(old.RemainingAmount + feeDiff)
+		updates["remaining_amount"] = newRemaining
+		updates["payment_status"] = paymentStatusForBalance(newRemaining)
+
+		balanceChange = &connChange{
+			FieldName:  "Balance",
+			ActionType: "Balance Adjusted for Package Change",
+			Old:        fmtNum(old.RemainingAmount),
+			New:        fmtNum(newRemaining) + " (" + fmtNum(feeDiff) + " package fee difference)",
+		}
+	}
 
 	// The operator can still create a balance by hand for a mid-month change,
 	// using the same formula as a new subscriber so both paths agree:
