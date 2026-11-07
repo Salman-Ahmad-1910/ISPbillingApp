@@ -595,6 +595,36 @@ func DeleteBills(c *gin.Context) {
 	})
 }
 
+// GetBillStatus tells the subscriber edit form whether a subscriber is already
+// billed for the current month, so it can preview what "Create balance" will
+// add (price difference when billed, full new fee when not).
+// GET /billing/bills/status?companyId=...&connectionId=...
+func GetBillStatus(c *gin.Context) {
+	companyID, err := uuid.Parse(c.Query("companyId"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid company ID"})
+		return
+	}
+	connID, err := uuid.Parse(c.Query("connectionId"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid connection ID"})
+		return
+	}
+	var conn models.Connection
+	if err := config.DB.Where("id = ? AND company_id = ?", connID, companyID).First(&conn).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"message": "Subscriber not found"})
+		return
+	}
+	now := time.Now()
+	month, year := now.Month().String(), now.Format("2006")
+	billed, err := subscriberBilledForMonth(config.DB, conn, month, year)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Failed to check bill status", "error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"billed": billed, "month": month, "year": year}})
+}
+
 // GetBillRecords returns bill records for the company
 func GetBillRecords(c *gin.Context) {
 	companyIDStr := c.Query("companyId")

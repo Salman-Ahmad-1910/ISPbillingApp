@@ -13,6 +13,7 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"time"
 
 	"awesomeProject/config"
 	"awesomeProject/models"
@@ -41,6 +42,7 @@ func newBillingEnv(t *testing.T) *billingEnv {
 	r.POST("/billing/bills/delete", DeleteBills)
 	r.POST("/billing/payments", CreatePayment)
 	r.DELETE("/billing/payments/:id", DeletePayment)
+	r.GET("/billing/bills/status", GetBillStatus)
 
 	return &billingEnv{t: t, router: r, company: company}
 }
@@ -551,4 +553,99 @@ func TestBillingSimultaneousCreateBill(t *testing.T) {
 		}
 	}
 	t.Logf("10 simultaneous requests x 12 subscribers: every subscriber billed exactly once")
+}
+
+// Mid-month package change with "Create balance" (fees paid in advance).
+// Example from the operator: 1100 -> 1800 on the 7th, 23 days left.
+// November = 7 days at 1100 (256.67) + 23 days at 1800 (1380) = 1636.67.
+// The November bill already charged 1100, so the box adds 536.67.
+func TestBillingMidMonthPackageChange(t *testing.T) {
+	e := newBillingEnv(t)
+	now := time.Now()
+	month := now.Month().String()
+	year := now.Format("2006")
+	createThisMonth := func(ids ...uuid.UUID) {
+		code, out := e.do("POST", "/billing/bills/create", map[string]interface{}{
+			"month": month, "year": year, "groupedBills": billGroups(map[string][]uuid.UUID{"Internet": ids}),
+		})
+		if code != http.StatusOK {
+			t.Fatalf("create bills: HTTP %d %v", code, out)
+		}
+	}
+	edit := func(id uuid.UUID, pkg string, fee float64, days int) {
+		code, out := e.do("PUT", "/admin/connections/"+id.String(), map[string]interface{}{
+			"connectionType": "internet", "packageInternet": pkg, "sameAmount": fee,
+			"createBalance": true, "balanceDays": days, "applyBalance": true,
+		})
+		if code != http.StatusOK {
+			t.Fatalf("edit: HTTP %d %v", code, out)
+		}
+	}
+	status := func(id uuid.UUID) bool {
+		_, out := e.do("GET", "/billing/bills/status?connectionId="+id.String(), nil)
+		data, _ := out["data"].(map[string]interface{})
+		return data["billed"] == true
+	}
+
+	// Upgrade after this month's bill: only the difference for the 23 days.
+	up := e.subscriber("Upgrade", "internet", 0, 1100, 0, "")
+	if status(up) {
+		t.Fatal("status: not billed yet, got billed")
+	}
+	createThisMonth(up)
+	wantRemaining(t, "month billed at old fee", e.remaining(up), 1100)
+	if !status(up) {
+		t.Fatal("status: billed this month, got not billed")
+	}
+	edit(up, "Premium", 1800, 23)
+	wantRemaining(t, "upgrade 1100->1800 with 23 days left: 1100 + 536.67", e.remaining(up), 1636.67)
+
+	// Downgrade after this month's bill: the difference is credited.
+	down := e.subscriber("Downgrade", "internet", 0, 1800, 0, "")
+	createThisMonth(down)
+	edit(down, "Basic", 1100, 23)
+	wantRemaining(t, "downgrade 1800->1100 with 23 days left: 1800 - 536.67", e.remaining(down), 1263.33)
+
+	// Downgrade on an advance: the credit increases the advance.
+	adv := e.subscriber("DownAdvance", "internet", 0, 1800, -2000, "")
+	createThisMonth(adv) // -2000 + 1800 = -200
+	edit(adv, "Basic", 1100, 23)
+	wantRemaining(t, "downgrade with advance: -200 - 536.67", e.remaining(adv), -736.67)
+
+	// Not billed this month: full new fee for the days (unchanged rule).
+	fresh := e.subscriber("NotBilledYet", "internet", 0, 1100, 0, "")
+	edit(fresh, "Premium", 1800, 23)
+	wantRemaining(t, "not billed this month: 1800 / 30 * 23", e.remaining(fresh), 1380)
+
+	// Billed this month by an OLD grouped record: also only the difference.
+	grp := e.subscriber("Grouped Sub", "internet", 0, 1100, 1100, "")
+	e.legacyGroupRecord(month, "internet", "All", "Someone", "Grouped Sub")
+	if !status(grp) {
+		t.Fatal("status: billed by old grouped record, got not billed")
+	}
+	edit(grp, "Premium", 1800, 23)
+	wantRemaining(t, "billed by old grouped record: 1100 + 536.67", e.remaining(grp), 1636.67)
+
+	// Same package, box ticked: difference is 0, nothing added.
+	same := e.subscriber("SamePkg", "internet", 0, 1800, 0, "")
+	createThisMonth(same)
+	edit(same, "Internet 1800", 1800, 23)
+	wantRemaining(t, "box ticked without a price change after billing", e.remaining(same), 1800)
+
+	// Two changes in one month add up correctly: 1100 -> 1800 on the 7th
+	// (23 days left), 1800 -> 2400 on the 15th (15 days left).
+	two := e.subscriber("TwoChanges", "internet", 0, 1100, 0, "")
+	createThisMonth(two)
+	edit(two, "Premium", 1800, 23)
+	edit(two, "Gold", 2400, 15)
+	// 1100 + 700/30*23 (536.67) + 600/30*15 (300) = 1936.67
+	wantRemaining(t, "two changes in one month", e.remaining(two), 1936.67)
+
+	// The change history explains the amount.
+	var log models.ConnectionLog
+	config.DB.Where("connection_id = ? AND action_type = ?", up, "Balance Created").First(&log)
+	t.Logf("history entry: %s -> %s", log.OldValue, log.NewValue)
+	if log.NewValue == "" {
+		t.Error("no 'Balance Created' history entry")
+	}
 }

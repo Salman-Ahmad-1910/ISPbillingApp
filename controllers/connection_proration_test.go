@@ -355,3 +355,26 @@ func TestManualBalanceAvoidsRoundingResidue(t *testing.T) {
 		t.Errorf("balance = %v, want 233.33", got)
 	}
 }
+
+// TestEditBalanceAmount: what an explicit "Create balance" adds on an edit.
+func TestEditBalanceAmount(t *testing.T) {
+	cases := []struct {
+		name           string
+		oldFee, newFee float64
+		days           int
+		billed         bool
+		want           float64
+	}{
+		{"upgrade after billing: difference", 1100, 1800, 23, true, 536.67},
+		{"downgrade after billing: credit", 1800, 1100, 23, true, -536.67},
+		{"no price change after billing", 1800, 1800, 23, true, 0},
+		{"not billed yet: full new fee", 1100, 1800, 23, false, 1380},
+		{"whole month not billed", 0, 1500, 30, false, 1500},
+		{"no days", 1100, 1800, 0, true, 0},
+	}
+	for _, c := range cases {
+		if got := editBalanceAmount(c.oldFee, c.newFee, c.days, c.billed); got != c.want {
+			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
+		}
+	}
+}

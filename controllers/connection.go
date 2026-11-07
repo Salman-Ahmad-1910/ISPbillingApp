@@ -536,7 +536,23 @@ func updateConnection(c *gin.Context) {
 	// (true on every save of a subscriber created with "Create balance", which
 	// re-added the prorated amount each time).
 	if addBalance {
-		manualBalance := roundToTwo(newPackageFee / 30 * float64(input.BalanceDays))
+		// Fees are paid in advance: when this month's bill was already
+		// created, it charged the whole month at the OLD fee. Only the price
+		// difference for the remaining days is added then, e.g. 1100 -> 1800
+		// on the 7th with 23 days left: (1800 - 1100) / 30 * 23 = 536.67, so
+		// November = 7 days at 1100 + 23 days at 1800. A downgrade gives a
+		// negative amount (credit). Not billed yet this month (e.g. a new
+		// subscriber): the full new fee for the days, as before.
+		// OLD: manualBalance := roundToTwo(newPackageFee / 30 * float64(input.BalanceDays))
+		now := time.Now()
+		billed, err := subscriberBilledForMonth(tx, old, now.Month().String(), now.Format("2006"))
+		if err != nil {
+			tx.Rollback()
+			utils.ErrorResponse(c, 500, "Failed to check this month's bill", err.Error())
+			return
+		}
+		oldFee := roundToTwo(monthlyPackageFee(old.ConnectionType, old.Amount, old.SameAmount))
+		manualBalance := editBalanceAmount(oldFee, newPackageFee, input.BalanceDays, billed)
 
 		base := old.RemainingAmount
 		if staged, ok := updates["remaining_amount"].(float64); ok {
@@ -552,7 +568,7 @@ func updateConnection(c *gin.Context) {
 			FieldName:  "Balance",
 			ActionType: "Balance Created",
 			Old:        fmtNum(old.RemainingAmount),
-			New:        fmtNum(newBalance) + " (+" + fmtNum(manualBalance) + " for " + fmtInt(input.BalanceDays) + " days at " + fmtNum(newPackageFee) + " per month)",
+			New:        fmtNum(newBalance) + " (" + editBalanceExplanation(oldFee, newPackageFee, input.BalanceDays, billed, manualBalance) + ")",
 		}
 	}
 
@@ -1015,6 +1031,58 @@ func packageUpdateBalance(old models.Connection, input connectionInput) (float64
 		fee != oldFee
 
 	return fee, changed
+}
+
+// editBalanceAmount is what an explicit "Create balance" adds during an edit
+// for the remaining days of the month.
+//   - This month already billed (at the old fee, paid in advance): only the
+//     difference, (newFee - oldFee) / 30 * days. Negative for a downgrade.
+//   - Not billed yet this month: the new fee for the days, newFee / 30 * days.
+func editBalanceAmount(oldFee, newFee float64, days int, billedThisMonth bool) float64 {
+	if days <= 0 {
+		return 0
+	}
+	if billedThisMonth {
+		return roundToTwo((newFee - oldFee) / 30 * float64(days))
+	}
+	return roundToTwo(newFee / 30 * float64(days))
+}
+
+// editBalanceExplanation is the change-history text for editBalanceAmount.
+func editBalanceExplanation(oldFee, newFee float64, days int, billedThisMonth bool, amount float64) string {
+	sign := "+"
+	if amount < 0 {
+		sign = ""
+	}
+	if billedThisMonth {
+		return sign + fmtNum(amount) + ": this month already billed at " + fmtNum(oldFee) +
+			", difference (" + fmtNum(newFee) + " - " + fmtNum(oldFee) + ") / 30 x " + fmtInt(days) + " days"
+	}
+	return sign + fmtNum(amount) + " for " + fmtInt(days) + " days at " + fmtNum(newFee) + " per month"
+}
+
+// subscriberBilledForMonth reports whether the subscriber already has a bill
+// for month/year: its own bill record, or an old grouped record that lists it
+// (same rules as Bill Creator).
+func subscriberBilledForMonth(tx *gorm.DB, conn models.Connection, month, year string) (bool, error) {
+	var own int64
+	if err := tx.Model(&models.BillRecord{}).Where(
+		"company_id = ? AND connection_id = ? AND month = ? AND year = ? AND status = 'Created'",
+		conn.CompanyID, conn.ID, month, year,
+	).Count(&own).Error; err != nil {
+		return false, err
+	}
+	if own > 0 {
+		return true, nil
+	}
+	var legacy []models.BillRecord
+	if err := tx.Where(
+		"company_id = ? AND connection_id = ? AND month = ? AND year = ? AND status = 'Created'",
+		conn.CompanyID, uuid.Nil, month, year,
+	).Find(&legacy).Error; err != nil {
+		return false, err
+	}
+	return legacyGroupedBill(legacy, conn) != nil, nil
 }
 
 // editAddsBalance reports whether an edit is an explicit request to add a

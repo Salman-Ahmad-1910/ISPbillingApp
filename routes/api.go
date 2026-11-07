@@ -224,6 +224,7 @@ func SetupRoutes(r *gin.Engine) {
 			billing.POST("/bills/create", middleware.RBACMiddleware(config.DB, "billing", "add"), controllers.CreateBills)
 			billing.POST("/bills/delete", middleware.RBACMiddleware(config.DB, "billing", "add"), controllers.DeleteBills)
 			billing.GET("/bills", controllers.GetBillRecords)
+			billing.GET("/bills/status", controllers.GetBillStatus)
 
 			billing.GET("/promises", controllers.GetPromises)
 			billing.POST("/promises", controllers.CreatePromise)

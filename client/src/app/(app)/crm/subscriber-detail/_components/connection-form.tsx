@@ -26,6 +26,8 @@ import { Loader2 } from 'lucide-react';
 import type { Connection, Area, DistributionBox, Package, Company, Splitter } from '@/lib/types';
 import { connectionSchema } from '@/lib/schemas';
 import { monthlyPackageFee } from '@/lib/package-proration';
+import api from '@/lib/api';
+import { useCompany } from '@/context/company-context';
 
 type ConnectionFormValues = z.infer<typeof connectionSchema>;
 
@@ -193,11 +195,37 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
     return monthlyPackageFee(connectionType, amount, sameAmount);
   }, [connectionType, amount, sameAmount]);
 
-  // Opening balance = package fee prorated for the remaining days of the month (fee / 30 * days).
+  // Editing: is this subscriber already billed for the current month? Fees are
+  // paid in advance, so a billed month was charged in full at the OLD fee and
+  // Create Balance then adds only the price difference for the remaining days
+  // (same rule as the backend, see editBalanceAmount in connection.go).
+  const { companyId } = useCompany();
+  const [billStatus, setBillStatus] = React.useState<{ billed: boolean; month: string } | null>(null);
+  React.useEffect(() => {
+    if (!connection?.id || !companyId) { setBillStatus(null); return; }
+    let cancelled = false;
+    api.get('/billing/bills/status', { params: { companyId, connectionId: connection.id } })
+      .then(res => { if (!cancelled) setBillStatus(res.data?.data ?? null); })
+      .catch(() => { if (!cancelled) setBillStatus(null); });
+    return () => { cancelled = true; };
+  }, [connection?.id, companyId]);
+
+  // Fee the subscriber was on before this edit.
+  const oldPackageFee = React.useMemo(
+    () => (connection ? monthlyPackageFee(connection.connectionType, connection.amount, connection.sameAmount) : 0),
+    [connection],
+  );
+  const billedThisMonth = !!connection && !!billStatus?.billed;
+
+  // OLD: always the new fee for the days:
+  //   Math.round((packageFeeTotal / 30) * Number(balanceDays) * 100) / 100
+  // Now: already billed this month -> (new fee - old fee) / 30 * days (negative
+  // for a downgrade = credit); otherwise new fee / 30 * days.
   const openingBalance = React.useMemo(() => {
     if (!createBalance || !(Number(balanceDays) > 0)) return 0;
-    return Math.round((packageFeeTotal / 30) * Number(balanceDays) * 100) / 100;
-  }, [createBalance, balanceDays, packageFeeTotal]);
+    const perMonth = billedThisMonth ? packageFeeTotal - oldPackageFee : packageFeeTotal;
+    return Math.round((perMonth / 30) * Number(balanceDays) * 100) / 100;
+  }, [createBalance, balanceDays, packageFeeTotal, billedThisMonth, oldPackageFee]);
 
   const showCable = connectionType === 'both' || connectionType === 'tv_cable';
   const showInternet = connectionType === 'both' || connectionType === 'internet';
@@ -836,12 +864,22 @@ export function ConnectionForm({ connection, areas, boxes, packages, companies, 
                   <Input type="number" value={field.value ?? ''} onChange={e => field.onChange(parseInt(e.target.value) || 0)} />
                 </FormControl>
                 <FormMessage />
-                <p className="text-xs text-muted-foreground">
-                  Opening balance: PKR {openingBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  {packageFeeTotal > 0 && balanceDays > 0 && (
-                    <span> (PKR {packageFeeTotal.toLocaleString()} ÷ 30 × {balanceDays} days)</span>
-                  )}
-                </p>
+                {billedThisMonth ? (
+                  <p className="text-xs text-muted-foreground">
+                    {billStatus?.month} is already billed at PKR {oldPackageFee.toLocaleString()}. For the remaining {balanceDays || 0} day(s),{' '}
+                    {openingBalance < 0 ? 'credit' : 'add'}: PKR {Math.abs(openingBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {balanceDays > 0 && (
+                      <span> ((PKR {packageFeeTotal.toLocaleString()} − PKR {oldPackageFee.toLocaleString()}) ÷ 30 × {balanceDays} days)</span>
+                    )}
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Opening balance: PKR {openingBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {packageFeeTotal > 0 && balanceDays > 0 && (
+                      <span> (PKR {packageFeeTotal.toLocaleString()} ÷ 30 × {balanceDays} days)</span>
+                    )}
+                  </p>
+                )}
               </FormItem>
             )}
           />
