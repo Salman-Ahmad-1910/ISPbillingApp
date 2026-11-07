@@ -516,37 +516,21 @@ func updateConnection(c *gin.Context) {
 		updates["remaining_amount"] = *input.RemainingAmount
 	}
 
-	// The package fee is the subscriber's monthly bill, so when the package
-	// changes the balance is set to the new fee: moving 1000 -> 1500 leaves
-	// 1500 remaining, not the old 1000. Only an actual change triggers this, so
-	// saving a subscriber's phone number does not reset what they owe.
-	newPackageFee, packageChanged := packageUpdateBalance(old, input)
+	// Changing a package only changes the fee used by future bills. It must
+	// never rewrite the running balance: that balance already contains earlier
+	// dues, payments and advances, and the next bill adds the new fee on top.
+	newPackageFee, _ := packageUpdateBalance(old, input)
 
-	if packageChanged {
-		updates["remaining_amount"] = newPackageFee
-		// Keep the status in step with the balance just written, otherwise the
-		// pending and advance pages disagree with what is actually owed.
-		updates["payment_status"] = paymentStatusForBalance(newPackageFee)
-
-		balanceChange = &connChange{
-			FieldName:  "Balance",
-			ActionType: "Balance Set to Package Fee",
-			Old:        fmtNum(old.RemainingAmount),
-			New:        fmtNum(newPackageFee) + " (new package fee)",
-		}
-	}
-
-	// On top of that the operator can still create a balance by hand for a
-	// mid-month change, using the same formula as a new subscriber so both paths
-	// agree: fee / 30 * days. It accumulates onto whatever the balance is about
-	// to be, which is the new package fee when the package also changed.
+	// The operator can still create a balance by hand for a mid-month change,
+	// using the same formula as a new subscriber so both paths agree:
+	// fee / 30 * days. It accumulates onto the existing balance (or an explicit
+	// remainingAmount sent by the caller) and never replaces it.
 	if input.CreateBalance != nil && *input.CreateBalance && input.BalanceDays > 0 {
 		manualBalance := roundToTwo(newPackageFee / 30 * float64(input.BalanceDays))
 
 		base := old.RemainingAmount
 		if staged, ok := updates["remaining_amount"].(float64); ok {
-			// Includes both the package fee above and an explicit balance from
-			// the caller, whichever was staged last.
+			// An explicit balance from the caller wins over the stored value.
 			base = staged
 		}
 		newBalance := roundToTwo(base + manualBalance)

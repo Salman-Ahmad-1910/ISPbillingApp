@@ -115,8 +115,8 @@ func roundPackageMoney(value float64) float64 {
 	return math.Round(value*100) / 100
 }
 
-// connectionMonthlyFee mirrors Bill Creator's rule so a balance is only moved
-// by the fee that connection is actually charged.
+// connectionMonthlyFee mirrors Bill Creator's rule so a fee shown on a
+// subscriber matches the amount the next bill will charge.
 func connectionMonthlyFee(connectionType string, amount, sameAmount float64) float64 {
 	switch strings.ToLower(strings.TrimSpace(connectionType)) {
 	case "internet":
@@ -128,67 +128,13 @@ func connectionMonthlyFee(connectionType string, amount, sameAmount float64) flo
 	}
 }
 
-func packageBalanceStatus(remaining float64) string {
-	switch {
-	case remaining > 0:
-		return "pending"
-	case remaining < 0:
-		return "advance"
-	default:
-		return ""
-	}
-}
-
-// connectionCatalogFee is the monthly fee a connection would have for a package
-// at the given catalog price, applying the connection's discounts to the sides
-// that are linked to that package. A side priced by another package, and a
-// custom price, keep the amount already stored on the connection.
-func connectionCatalogFee(price float64, conn Connection, internet, cable bool) float64 {
-	amount, sameAmount := conn.Amount, conn.SameAmount
-	if internet && !isCustomDiscount(conn.SameDiscount) {
-		sameAmount = roundPackageMoney(discountedPackageAmount(price, conn.SameDiscount))
-	}
-	if cable && !isCustomDiscount(conn.Discount) {
-		amount = roundPackageMoney(discountedPackageAmount(price, conn.Discount))
-	}
-	return roundPackageMoney(connectionMonthlyFee(conn.ConnectionType, amount, sameAmount))
-}
-
-// reconciledPackageBalance decides whether a price change should move an
-// outstanding balance.
-//
-// remaining_amount is a running balance: it can hold this month's fee plus
-// older dues, a partial payment, or an advance, and those cannot be told apart
-// from the number alone. Re-pricing the whole balance would rewrite older dues,
-// so a balance is only moved when it is exactly one month at a fee we
-// recognise: the fee stored on the connection, or the previous catalog fee
-// (the connection may already have been re-priced by an earlier save while the
-// balance was left behind). Anything else is left untouched, so Bill Creator
-// can keep adding each new month on top of what is already owed.
-func reconciledPackageBalance(remaining, storedFee, previousCatalogFee, newFee float64) (float64, bool) {
-	remaining = roundPackageMoney(remaining)
-	storedFee = roundPackageMoney(storedFee)
-	previousCatalogFee = roundPackageMoney(previousCatalogFee)
-	newFee = roundPackageMoney(newFee)
-
-	if remaining <= 0 || remaining == newFee {
-		return 0, false
-	}
-	if remaining != storedFee && remaining != previousCatalogFee {
-		return 0, false
-	}
-	return newFee, true
-}
-
 // syncConnectionsToPackage re-prices every connection that references the
 // package and renames the reference when the package itself was renamed.
 //
-// The monthly fee is the subscriber's bill, so a balance that is exactly one
-// month at the old fee is moved to the new fee. This keeps the Package and
-// Remaining sections equal for a subscriber who simply has not paid this month.
-// Balances made up of older dues, partial payments, advances or zero are left
-// untouched, so a package save never rewrites money from earlier months.
-// Custom-priced connections are skipped.
+// Only the package name and the monthly fee stored on the connection are
+// updated. Remaining is a running account balance made of earlier dues,
+// payments and advances, so a fee change must never rewrite it; the new fee is
+// charged by the next bill instead. Custom-priced connections are skipped.
 func syncConnectionsToPackage(tx *gorm.DB, previous, current Package) error {
 	// A package without a previous name cannot be matched to connections safely.
 	if previous.Name == "" {
@@ -196,7 +142,6 @@ func syncConnectionsToPackage(tx *gorm.DB, previous, current Package) error {
 	}
 
 	price := roundPackageMoney(effectivePackagePrice(current))
-	oldPrice := roundPackageMoney(effectivePackagePrice(previous))
 	nameChanged := previous.Name != current.Name
 
 	oldInternet, oldCable := packageSides(previous.PackageType)
@@ -258,19 +203,6 @@ func syncConnectionsToPackage(tx *gorm.DB, previous, current Package) error {
 					updates["amount"] = newAmount
 				}
 			}
-		}
-
-		oldFee := roundPackageMoney(connectionMonthlyFee(conn.ConnectionType, conn.Amount, conn.SameAmount))
-		newFee := roundPackageMoney(connectionMonthlyFee(conn.ConnectionType, newAmount, newSameAmount))
-		// The connection may already have been re-priced by an earlier save while
-		// the balance stayed at the old catalog fee, so recognise that fee as a
-		// one-month balance as well. Otherwise a subscriber stuck at 1800/1100
-		// would never be repaired by simply saving the package again.
-		previousCatalogFee := connectionCatalogFee(oldPrice, conn, priceInternet, priceCable)
-
-		if newRemaining, changed := reconciledPackageBalance(conn.RemainingAmount, oldFee, previousCatalogFee, newFee); changed {
-			updates["remaining_amount"] = newRemaining
-			updates["payment_status"] = packageBalanceStatus(newRemaining)
 		}
 
 		if len(updates) == 0 {
