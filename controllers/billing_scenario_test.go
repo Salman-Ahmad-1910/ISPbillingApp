@@ -1,4 +1,6 @@
-//go:build scenario
+// OLD: "//go:build scenario" - the file only compiled with -tags scenario
+// because it used the real database. It now uses the guarded test database
+// (requireTestDB) and runs with the other tests.
 
 package controllers
 
@@ -8,12 +10,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/joho/godotenv"
 
 	"awesomeProject/config"
 	"awesomeProject/models"
@@ -21,11 +21,10 @@ import (
 
 var scenarioCompanyID uuid.UUID
 
-func TestMain(m *testing.M) {
-	_ = godotenv.Load("../.env")
-	config.ConnectDatabase()
-	os.Exit(m.Run())
-}
+// OLD: a TestMain loaded ../.env and connected to the APPLICATION database,
+// so running the controller tests wrote test rows into the real database.
+// Database tests now call requireTestDB (testdb_test.go), which only connects
+// to a separate TEST_DB_NAME database and never falls back to DB_* / .env.
 
 func newConn(companyID uuid.UUID, name string, connType string, amount, sameAmount, remaining float64) models.Connection {
 	c := models.Connection{
@@ -84,17 +83,11 @@ func countBills(companyID uuid.UUID, connID uuid.UUID, month, year, ctype string
 }
 
 func TestBillingScenarios(t *testing.T) {
+	requireTestDB(t)
 	gin.SetMode(gin.TestMode)
-	company := models.Company{Name: "ScenarioCo", Email: "s@test.com"}
-	config.DB.Create(&company)
+	// Isolated company; all its rows are hard-deleted when the test ends.
+	company := models.Company{BaseModel: models.BaseModel{ID: newTestCompany(t, "ScenarioCo")}}
 	scenarioCompanyID = company.ID
-	defer func() {
-		config.DB.Where("company_id = ?", company.ID).Delete(&models.BillRecord{})
-		config.DB.Where("company_id = ?", company.ID).Delete(&models.Invoice{})
-		config.DB.Where("company_id = ?", company.ID).Delete(&models.Payment{})
-		config.DB.Where("company_id = ?", company.ID).Delete(&models.Connection{})
-		config.DB.Delete(&company)
-	}()
 
 	// Test 1: package change preserves remaining
 	t.Run("Test1_PackageChange", func(t *testing.T) {

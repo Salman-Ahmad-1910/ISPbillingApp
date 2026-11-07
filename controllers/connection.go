@@ -212,6 +212,10 @@ type connectionInput struct {
 	PaymentStatus      *string  `json:"paymentStatus"`
 	RemainingAmount    *float64 `json:"remainingAmount"`
 	TransactionId      string   `json:"transactionId"`
+	// ApplyBalance marks an edit as an explicit "Create balance now" request.
+	// The edit form (web and mobile) sends the stored createBalance/balanceDays
+	// back on every save, so those alone must never add money on an edit.
+	ApplyBalance *bool `json:"applyBalance"`
 }
 
 func createConnection(c *gin.Context) {
@@ -470,12 +474,15 @@ func updateConnection(c *gin.Context) {
 	if input.ConnectionType != "" || input.PackageInternet != "" {
 		updates["package_internet"] = newInternet
 	}
-	// Only touch the create-balance flag when the caller actually sent it;
-	// a partial update (e.g. resetting the balance) must not flip it off.
-	if input.CreateBalance != nil {
-		updates["create_balance"] = *input.CreateBalance
-	}
-	if input.BalanceDays != 0 {
+	// OLD: create_balance / balance_days were written from whatever the form
+	// sent back. They are now only written when a balance is actually added
+	// by an explicit request (see editAddsBalance), so a normal save keeps the
+	// values recorded when the subscriber was created.
+	//   if input.CreateBalance != nil { updates["create_balance"] = *input.CreateBalance }
+	//   if input.BalanceDays != 0 { updates["balance_days"] = input.BalanceDays }
+	addBalance := editAddsBalance(input)
+	if addBalance {
+		updates["create_balance"] = true
 		updates["balance_days"] = input.BalanceDays
 	}
 	if input.SameDiscount != "" {
@@ -525,7 +532,10 @@ func updateConnection(c *gin.Context) {
 	// using the same formula as a new subscriber so both paths agree:
 	// fee / 30 * days. It accumulates onto the existing balance (or an explicit
 	// remainingAmount sent by the caller) and never replaces it.
-	if input.CreateBalance != nil && *input.CreateBalance && input.BalanceDays > 0 {
+	// OLD condition: input.CreateBalance != nil && *input.CreateBalance && input.BalanceDays > 0
+	// (true on every save of a subscriber created with "Create balance", which
+	// re-added the prorated amount each time).
+	if addBalance {
 		manualBalance := roundToTwo(newPackageFee / 30 * float64(input.BalanceDays))
 
 		base := old.RemainingAmount
@@ -715,11 +725,15 @@ func connectionFieldChanges(old models.Connection, input connectionInput) []conn
 	if input.SameAmount != nil {
 		add("sameAmount", "Internet Price Changed", fmtNum(old.SameAmount), fmtNum(*input.SameAmount))
 	}
-	if input.BalanceDays != 0 {
-		add("balanceDays", "Balance Days Updated", fmtInt(old.BalanceDays), fmtInt(input.BalanceDays))
-	}
-	if input.CreateBalance != nil && *input.CreateBalance != old.CreateBalance {
-		add("createBalance", "Balance Setting Updated", fmtBool(old.CreateBalance), fmtBool(*input.CreateBalance))
+	// Only logged when an edit actually adds a balance; the form resends the
+	// stored values on every save, which previously produced noise entries.
+	if editAddsBalance(input) {
+		if input.BalanceDays != old.BalanceDays {
+			add("balanceDays", "Balance Days Updated", fmtInt(old.BalanceDays), fmtInt(input.BalanceDays))
+		}
+		if !old.CreateBalance {
+			add("createBalance", "Balance Setting Updated", fmtBool(old.CreateBalance), "true")
+		}
 	}
 	if input.SplitterPort != 0 && input.SplitterPort != old.SplitterPort {
 		add("splitterPort", "Splitter Port Changed", fmtInt(old.SplitterPort), fmtInt(input.SplitterPort))
@@ -1001,6 +1015,18 @@ func packageUpdateBalance(old models.Connection, input connectionInput) (float64
 		fee != oldFee
 
 	return fee, changed
+}
+
+// editAddsBalance reports whether an edit is an explicit request to add a
+// prorated balance now. createBalance and balanceDays alone are not enough:
+// the edit forms send the stored values back on every save. The request must
+// also carry applyBalance=true, which the web form only sends when the
+// operator ticks "Create balance" during this edit. Creating a subscriber
+// (createConnection) is unchanged and still applies createBalance directly.
+func editAddsBalance(input connectionInput) bool {
+	return input.ApplyBalance != nil && *input.ApplyBalance &&
+		input.CreateBalance != nil && *input.CreateBalance &&
+		input.BalanceDays > 0
 }
 
 func paymentStatusForBalance(remaining float64) string {

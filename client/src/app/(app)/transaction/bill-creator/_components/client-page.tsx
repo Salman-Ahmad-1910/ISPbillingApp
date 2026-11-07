@@ -203,14 +203,26 @@ export function ClientPage() {
         sublocality: row.sublocality,
       }));
 
-      await api.post(`/billing/bills/create?companyId=${companyId}`, {
+      const res = await api.post(`/billing/bills/create?companyId=${companyId}`, {
         groupedBills,
         month: filterMonth === 'all' ? undefined : filterMonth,
         year: filterYear === 'all' ? undefined : filterYear,
         billType: filterBillType === 'all' ? undefined : filterBillType,
         sublocalityId: filterSublocality === 'all' ? undefined : filterSublocality,
       });
-      toast({ title: 'Success', description: `${billRows.length} bill entry(ies) created for ${totalSubscribers} subscriber(s).` });
+      // OLD: toast({ title: 'Success', description: `${billRows.length} bill entry(ies) created for ${totalSubscribers} subscriber(s).` });
+      // Show what the server actually did: created / already billed / failed.
+      const result = res.data || {};
+      const failures: { name?: string; reason?: string }[] = Array.isArray(result.failures) ? result.failures : [];
+      toast({
+        variant: failures.length > 0 ? 'destructive' : undefined,
+        title: failures.length > 0 ? 'Bills created with errors' : 'Success',
+        description: [
+          result.message || `${billRows.length} bill entry(ies) created for ${totalSubscribers} subscriber(s).`,
+          ...failures.slice(0, 5).map(f => `${f.name || 'Subscriber'}: ${f.reason || 'failed'}`),
+          failures.length > 5 ? `...and ${failures.length - 5} more` : '',
+        ].filter(Boolean).join('\n'),
+      });
       queryClient.invalidateQueries({ queryKey: ['billing/bills', companyId] });
 
       const params = new URLSearchParams();
@@ -244,14 +256,15 @@ export function ClientPage() {
         sublocality: row.sublocality,
       }));
 
-      await api.post(`/billing/bills/delete?companyId=${companyId}`, {
+      const res = await api.post(`/billing/bills/delete?companyId=${companyId}`, {
         groupedBills,
         month: filterMonth === 'all' ? undefined : filterMonth,
         year: filterYear === 'all' ? undefined : filterYear,
         billType: filterBillType === 'all' ? undefined : filterBillType,
         sublocalityId: filterSublocality === 'all' ? undefined : filterSublocality,
       });
-      toast({ title: 'Success', description: `${billRows.length} bill entry(ies) deleted.` });
+      // OLD: toast({ title: 'Success', description: `${billRows.length} bill entry(ies) deleted.` });
+      toast({ title: 'Success', description: res.data?.message || `${billRows.length} bill entry(ies) deleted.` });
       queryClient.invalidateQueries({ queryKey: ['billing/bills', companyId] });
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.response?.data?.message || 'Failed to delete bills' });

@@ -1,6 +1,10 @@
 package controllers
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -67,16 +71,77 @@ func connectionBillAmount(conn models.Connection) float64 {
 	}
 }
 
+// Outcomes of billing one subscriber.
+const (
+	billOutcomeCreated = "created"
+	billOutcomeExists  = "already_billed"         // per-subscriber bill exists
+	billOutcomeLegacy  = "already_billed_grouped" // listed in an old grouped bill
+)
+
+// errInvalidArea marks a subscriber whose area reference is not a valid id.
+// Querying it would make PostgreSQL abort the transaction, so it is rejected
+// before any database work and reported back to the operator.
+var errInvalidArea = errors.New("invalid area id on subscriber; fix the subscriber's area and create the bill again")
+
+// legacyGroupedBill returns the old grouped bill record (connection_id = nil)
+// for the month that lists this subscriber, or nil.
+//
+// Before per-subscriber billing, Bill Creator saved ONE record per group whose
+// connection_name is the comma-separated list of the billed subscribers'
+// names (subscriber_ids was never filled). A subscriber is treated as billed by
+// such a record when its name appears in that list. The connection type and
+// area of the record are not required to match, because a subscriber may have
+// changed type or area since; a missed match would charge the month twice,
+// while a false match (two subscribers with the same name) only skips a bill,
+// is reported in the response, and can be corrected by the operator.
+func legacyGroupedBill(legacy []models.BillRecord, conn models.Connection) *models.BillRecord {
+	name := strings.TrimSpace(conn.Name)
+	for i := range legacy {
+		rec := &legacy[i]
+		if ids := strings.TrimSpace(rec.SubscriberIDs); ids != "" {
+			var list []string
+			if json.Unmarshal([]byte(ids), &list) == nil {
+				for _, id := range list {
+					if id == conn.ID.String() {
+						return rec
+					}
+				}
+				continue
+			}
+		}
+		if name == "" {
+			continue
+		}
+		if strings.Contains(", "+rec.ConnectionName+", ", ", "+name+", ") {
+			return rec
+		}
+	}
+	return nil
+}
+
+// loadLegacyGroupedBills returns the company's old grouped bill records for a
+// month (read-only historical data).
+func loadLegacyGroupedBills(companyID uuid.UUID, month, year string) ([]models.BillRecord, error) {
+	var legacy []models.BillRecord
+	err := config.DB.Where(
+		"company_id = ? AND connection_id = ? AND month = ? AND year = ? AND status = 'Created'",
+		companyID, uuid.Nil, month, year,
+	).Find(&legacy).Error
+	return legacy, err
+}
+
 // createBillForConnection creates one subscriber's bill inside the given
-// transaction, or skips it when an active bill already exists. It returns
-// created/skipped flags and any error that should abort the transaction.
-func createBillForConnection(tx *gorm.DB, companyID uuid.UUID, conn models.Connection, companyName, month, year string) (bool, bool, error) {
+// transaction, or skips it when the subscriber was already billed for the
+// month (per-subscriber record or old grouped record). It returns the outcome
+// and any error, which rolls back this subscriber's transaction only.
+// OLD signature: (tx, companyID, conn, companyName, month, year) (created, skipped bool, err error)
+func createBillForConnection(tx *gorm.DB, companyID uuid.UUID, conn models.Connection, companyName, month, year string, legacy []models.BillRecord) (string, error) {
 	// Lock the subscriber row so two concurrent requests cannot both create a
 	// bill for the same subscriber/month/type.
 	var locked models.Connection
 	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("id = ? AND company_id = ?", conn.ID, companyID).First(&locked).Error; err != nil {
-		return false, false, err
+		return "", err
 	}
 
 	typeLabel := connectionBillType(locked.ConnectionType)
@@ -85,6 +150,12 @@ func createBillForConnection(tx *gorm.DB, companyID uuid.UUID, conn models.Conne
 	// Resolve the subscriber's sublocality for the bill record.
 	sublocalityName := ""
 	if locked.SublocalityID != "" {
+		// A non-UUID value would abort the transaction (see errInvalidArea).
+		if _, err := uuid.Parse(locked.SublocalityID); err != nil {
+			return "", errInvalidArea
+		}
+		// A valid id whose area no longer exists only leaves the area label on
+		// the bill blank; it does not change what the subscriber owes.
 		var area models.Area
 		if err := tx.Where("id = ?", locked.SublocalityID).First(&area).Error; err == nil {
 			if area.SubLocality != "" {
@@ -101,7 +172,12 @@ func createBillForConnection(tx *gorm.DB, companyID uuid.UUID, conn models.Conne
 		"connection_id = ? AND month = ? AND year = ? AND connection_type = ? AND company_id = ? AND status = 'Created'",
 		locked.ID, month, year, typeLabel, companyID,
 	).First(&existing).Error; err == nil {
-		return false, true, nil
+		return billOutcomeExists, nil
+	}
+
+	// Billed for this month by an old grouped record: never charge it again.
+	if legacyGroupedBill(legacy, locked) != nil {
+		return billOutcomeLegacy, nil
 	}
 
 	billRecord := models.BillRecord{
@@ -119,7 +195,7 @@ func createBillForConnection(tx *gorm.DB, companyID uuid.UUID, conn models.Conne
 	}
 	billRecord.CompanyID = companyID
 	if err := tx.Create(&billRecord).Error; err != nil {
-		return false, false, err
+		return "", err
 	}
 
 	invoice := models.Invoice{
@@ -134,7 +210,7 @@ func createBillForConnection(tx *gorm.DB, companyID uuid.UUID, conn models.Conne
 	}
 	invoice.CompanyID = companyID
 	if err := tx.Create(&invoice).Error; err != nil {
-		return false, false, err
+		return "", err
 	}
 
 	// Add the bill's actual amount to the existing Remaining balance.
@@ -145,10 +221,17 @@ func createBillForConnection(tx *gorm.DB, companyID uuid.UUID, conn models.Conne
 			"remaining_amount": newRemaining,
 			"payment_status":   paymentStatusForBalance(newRemaining),
 		}).Error; err != nil {
-		return false, false, err
+		return "", err
 	}
 
-	return true, false, nil
+	return billOutcomeCreated, nil
+}
+
+// billFailure describes a subscriber that could not be billed.
+type billFailure struct {
+	SubscriberID string `json:"subscriberId"`
+	Name         string `json:"name"`
+	Reason       string `json:"reason"`
 }
 
 // CreateBills creates bill records per subscriber.
@@ -178,83 +261,88 @@ func CreateBills(c *gin.Context) {
 		year = now.Format("2006")
 	}
 
-	tx := config.DB.Begin()
-	if tx.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "Failed to start transaction", "error": tx.Error.Error()})
-		return
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
+	// OLD: every subscriber was billed inside ONE transaction, so a single
+	// failing subscriber rolled back the whole run and nobody was billed. Each
+	// subscriber now has its own transaction: a failure rolls back only that
+	// subscriber (no partial bill, invoice or balance change) and is reported.
 
 	createdCount := 0
 	skippedCount := 0
+	legacySkipped := 0
+	failures := []billFailure{}
 	seen := map[uuid.UUID]bool{}
+	legacyByPeriod := map[string][]models.BillRecord{}
 
-	abort := func(err error) {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "Failed to create bills", "error": err.Error()})
+	billOne := func(connID uuid.UUID, billMonth, billYear string) {
+		var conn models.Connection
+		if err := config.DB.Where("id = ? AND company_id = ?", connID, companyID).First(&conn).Error; err != nil {
+			// Unknown subscriber (deleted or another company): nothing to bill.
+			return
+		}
+
+		key := billMonth + " " + billYear
+		legacy, ok := legacyByPeriod[key]
+		if !ok {
+			var err error
+			if legacy, err = loadLegacyGroupedBills(companyID, billMonth, billYear); err != nil {
+				failures = append(failures, billFailure{conn.ID.String(), conn.Name, "could not read old bill records: " + err.Error()})
+				log.Printf("CreateBills: subscriber %s (%s) not billed: %v", conn.ID, conn.Name, err)
+				return
+			}
+			legacyByPeriod[key] = legacy
+		}
+
+		outcome := ""
+		err := config.DB.Transaction(func(tx *gorm.DB) error {
+			var err error
+			outcome, err = createBillForConnection(tx, companyID, conn, companyName, billMonth, billYear, legacy)
+			return err
+		})
+		if err != nil {
+			failures = append(failures, billFailure{conn.ID.String(), conn.Name, err.Error()})
+			log.Printf("CreateBills: subscriber %s (%s) not billed for %s: %v", conn.ID, conn.Name, key, err)
+			return
+		}
+		switch outcome {
+		case billOutcomeCreated:
+			createdCount++
+		case billOutcomeExists:
+			skippedCount++
+		case billOutcomeLegacy:
+			skippedCount++
+			legacySkipped++
+		}
 	}
 
 	if len(req.GroupedBills) > 0 {
 		for _, group := range req.GroupedBills {
-			if len(group.ConnectionIDs) == 0 {
-				continue
-			}
 			for _, connIDStr := range group.ConnectionIDs {
 				connID, err := uuid.Parse(connIDStr)
-				if err != nil {
-					continue
-				}
-				if seen[connID] {
+				if err != nil || seen[connID] {
 					continue
 				}
 				seen[connID] = true
-
-				var conn models.Connection
-				if err := tx.Where("id = ? AND company_id = ?", connID, companyID).First(&conn).Error; err != nil {
-					continue
-				}
-
-				created, skipped, err := createBillForConnection(tx, companyID, conn, companyName, month, year)
-				if err != nil {
-					abort(err)
-					return
-				}
-				if created {
-					createdCount++
-				}
-				if skipped {
-					skippedCount++
-				}
+				billOne(connID, month, year)
 			}
 		}
 	} else {
 		for _, connIDStr := range req.ConnectionIDs {
 			connID, err := uuid.Parse(connIDStr)
-			if err != nil {
-				continue
-			}
-			if seen[connID] {
+			if err != nil || seen[connID] {
 				continue
 			}
 			seen[connID] = true
 
-			var conn models.Connection
-			if err := tx.Where("id = ? AND company_id = ?", connID, companyID).First(&conn).Error; err != nil {
-				continue
-			}
-
-			billMonth := month
-			billYear := year
+			// Legacy format: without month/year the period comes from the
+			// subscriber's recharge / installation date.
+			billMonth, billYear := month, year
 			if req.Month == "" || req.Year == "" {
-				dateStr := conn.RechargeDate
-				if dateStr == "" {
-					dateStr = conn.InstallationDate
-				}
-				if dateStr != "" {
+				var conn models.Connection
+				if err := config.DB.Where("id = ? AND company_id = ?", connID, companyID).First(&conn).Error; err == nil {
+					dateStr := conn.RechargeDate
+					if dateStr == "" {
+						dateStr = conn.InstallationDate
+					}
 					if t, err := time.Parse("2006-01-02", dateStr); err == nil {
 						if req.Month == "" {
 							billMonth = t.Month().String()
@@ -265,30 +353,26 @@ func CreateBills(c *gin.Context) {
 					}
 				}
 			}
-
-			created, skipped, err := createBillForConnection(tx, companyID, conn, companyName, billMonth, billYear)
-			if err != nil {
-				abort(err)
-				return
-			}
-			if created {
-				createdCount++
-			}
-			if skipped {
-				skippedCount++
-			}
+			billOne(connID, billMonth, billYear)
 		}
 	}
 
-	if err := tx.Commit().Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "Failed to commit bills", "error": err.Error()})
-		return
+	message := "Bills created successfully"
+	if skippedCount > 0 || len(failures) > 0 {
+		message = fmt.Sprintf("%d bill(s) created, %d already billed for this month", createdCount, skippedCount)
+		if len(failures) > 0 {
+			message += fmt.Sprintf(", %d failed", len(failures))
+		}
+		message += "."
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Bills created successfully",
-		"count":   createdCount,
-		"skipped": skippedCount,
+		"message":        message,
+		"count":          createdCount,
+		"skipped":        skippedCount,
+		"skippedGrouped": legacySkipped,
+		"failed":         len(failures),
+		"failures":       failures,
 	})
 }
 
@@ -330,6 +414,7 @@ func DeleteBills(c *gin.Context) {
 
 	deletedCount := 0
 	skippedCount := 0
+	legacyKept := 0
 	abort := func(err error) {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "Failed to delete bills", "error": err.Error()})
@@ -447,41 +532,21 @@ func DeleteBills(c *gin.Context) {
 				skippedCount += s
 			}
 
-			// Remove any legacy group-level bill record for this month/type
-			// (connection_id is the zero UUID) so it cannot block recreation.
-			// Payments on its invoice are protected.
-			var legacyBills []models.BillRecord
-			if err := tx.Where(
+			// OLD: legacy group-level records (connection_id = nil) were deleted
+			// here WITHOUT reversing what they had charged, so recreating the
+			// month charged those subscribers a second time. Their per-
+			// subscriber amounts are not recorded, so they cannot be reversed
+			// exactly; they are now kept (historical record) and keep the
+			// listed subscribers from being billed twice.
+			var legacyCount int64
+			if err := tx.Model(&models.BillRecord{}).Where(
 				"connection_id = ? AND connection_type = ? AND month = ? AND year = ? AND company_id = ? AND status = 'Created'",
 				uuid.Nil, typeLabel, month, year, companyID,
-			).Find(&legacyBills).Error; err == nil {
-				for _, lb := range legacyBills {
-					legacyBatch := "bill-creator-" + month + "-" + year + "-" + typeLabel
-					var legacyInvoices []models.Invoice
-					tx.Where("subscriber_id = ? AND company_id = ? AND batch = ?", uuid.Nil, companyID, legacyBatch).
-						Find(&legacyInvoices)
-					blocked := false
-					for _, inv := range legacyInvoices {
-						var paidCount int64
-						tx.Model(&models.Payment{}).Where("invoice_id = ? AND company_id = ?", inv.ID, companyID).Count(&paidCount)
-						if paidCount > 0 || inv.PaidAmount > 0 {
-							blocked = true
-							break
-						}
-					}
-					if blocked {
-						skippedCount++
-						continue
-					}
-					if err := tx.Delete(&models.BillRecord{}, "id = ?", lb.ID).Error; err != nil {
-						abort(err)
-						return
-					}
-					tx.Where("subscriber_id = ? AND company_id = ? AND batch = ?", uuid.Nil, companyID, legacyBatch).
-						Delete(&models.Invoice{})
-					deletedCount++
-				}
+			).Count(&legacyCount).Error; err != nil {
+				abort(err)
+				return
 			}
+			legacyKept += int(legacyCount)
 		}
 	} else {
 		var connIDs []uuid.UUID
@@ -510,10 +575,23 @@ func DeleteBills(c *gin.Context) {
 		return
 	}
 
+	message := "Bills deleted successfully"
+	if skippedCount > 0 || legacyKept > 0 {
+		message = fmt.Sprintf("%d bill(s) deleted", deletedCount)
+		if skippedCount > 0 {
+			message += fmt.Sprintf(", %d kept because payments were received against them", skippedCount)
+		}
+		if legacyKept > 0 {
+			message += fmt.Sprintf(", %d old grouped bill record(s) kept (created by the previous version; their charges cannot be reversed exactly)", legacyKept)
+		}
+		message += "."
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Bills deleted successfully",
-		"count":   deletedCount,
-		"skipped": skippedCount,
+		"message":    message,
+		"count":      deletedCount,
+		"skipped":    skippedCount,
+		"legacyKept": legacyKept,
 	})
 }
 

@@ -193,7 +193,13 @@ export function ClientPage({ connections, initialConnectionId, initialPackageNam
     setIsSaving(true);
     try {
       if (selectedConnection) {
-        await api.put(`/admin/connections/${selectedConnection.id}?companyId=${companyId}`, formData);
+        // OLD: await api.put(`/admin/connections/${selectedConnection.id}?companyId=${companyId}`, formData);
+        // applyBalance tells the backend the operator ticked "Create balance"
+        // during THIS edit; without it an edit never adds a balance.
+        await api.put(`/admin/connections/${selectedConnection.id}?companyId=${companyId}`, {
+          ...formData,
+          applyBalance: !!formData.createBalance && Number(formData.balanceDays) > 0,
+        });
         setFeedback({ type: 'success', title: 'Success', message: 'Subscriber updated successfully.' });
       } else {
         await api.post(`/admin/connections?companyId=${companyId}`, { ...formData, companyId });
