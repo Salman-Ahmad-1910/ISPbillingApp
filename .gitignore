@@ -41,3 +41,10 @@ yarn-error.log*
 
 .DS_Store
 Thumbs.db
+
+# Temporary build/test archives (never commit)
+/_gc*.tgz
+/_gocache_tmp.tgz
+/_gosrc_tmp.tgz
+/_files*.txt
+/_*.tgz
