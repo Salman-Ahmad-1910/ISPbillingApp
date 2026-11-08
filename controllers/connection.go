@@ -516,10 +516,22 @@ func updateConnection(c *gin.Context) {
 		updates["remaining_amount"] = *input.RemainingAmount
 	}
 
-	// Changing a package only changes the fee used by future bills. It must
-	// never rewrite the running balance: that balance already contains earlier
-	// dues, payments and advances, and the next bill adds the new fee on top.
-	newPackageFee, _ := packageUpdateBalance(old, input)
+	// Changing a package sets the subscriber's Remaining to the new package fee,
+	// so the collection page shows the new fee directly. Previous dues/advance
+	// are intentionally not carried here (handled separately later).
+	newPackageFee, packageChanged := packageUpdateBalance(old, input)
+
+	if packageChanged {
+		updates["remaining_amount"] = newPackageFee
+		updates["payment_status"] = paymentStatusForBalance(newPackageFee)
+
+		balanceChange = &connChange{
+			FieldName:  "Balance",
+			ActionType: "Balance Set to Package Fee",
+			Old:        fmtNum(old.RemainingAmount),
+			New:        fmtNum(newPackageFee) + " (new package fee)",
+		}
+	}
 
 	// The operator can still create a balance by hand for a mid-month change,
 	// using the same formula as a new subscriber so both paths agree:
