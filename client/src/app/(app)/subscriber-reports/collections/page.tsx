@@ -835,6 +835,7 @@ export default function SubscriberReportPage() {
                             <TableHeader>
                               <TableRow>
                                 <TableHead>#</TableHead>
+                                <TableHead>Subscriber ID</TableHead>
                                 <TableHead>Subscriber Name</TableHead>
                                 <TableHead>Bill ID</TableHead>
                                 <TableHead>Amount (PKR)</TableHead>
@@ -850,6 +851,7 @@ export default function SubscriberReportPage() {
                               {group.records.map((item, i) => (
                                 <TableRow key={item.id}>
                                   <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                                   <TableCell className="text-xs text-muted-foreground">{item.subscriberId || item.connectionId || '-'}</TableCell>
                                   <TableCell className="font-medium">
                                     {item.connectionId ? (
                                       <Link
@@ -884,6 +886,7 @@ export default function SubscriberReportPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>#</TableHead>
+                        <TableHead>Subscriber ID</TableHead>
                         <TableHead>Subscriber Name</TableHead>
                         <TableHead>Bill ID</TableHead>
                         <TableHead>Amount</TableHead>
@@ -900,6 +903,7 @@ export default function SubscriberReportPage() {
                       {paginatedData.map((item, i) => (
                         <TableRow key={item.id}>
                           <TableCell className="text-muted-foreground">{showAll ? i + 1 : (safePage - 1) * pageSize + i + 1}</TableCell>
+                           <TableCell className="text-xs text-muted-foreground">{item.subscriberId || item.connectionId || '-'}</TableCell>
                           <TableCell className="font-medium">
                             {item.connectionId ? (
                               <Link
