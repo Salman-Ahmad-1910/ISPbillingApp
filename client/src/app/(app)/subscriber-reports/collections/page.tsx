@@ -366,7 +366,7 @@ export default function SubscriberReportPage() {
     let rows: (string | number)[][];
 
     if (reportType === 'transaction-wise') {
-      headers = ['Transaction Type', 'Subscriber Name', 'Bill ID', 'Amount', 'Collection Date', 'Address', 'Connection Type', 'Received By', 'Collected By', 'Transaction ID'];
+      headers = ['Transaction Type', 'Subscriber ID', 'Subscriber Name', 'Bill ID', 'Amount', 'Collection Date', 'Address', 'Connection Type', 'Received By', 'Collected By', 'Transaction ID'];
       rows = filteredData.map((item) => [
         item.transactionType,
         item.subscriberName,
@@ -380,7 +380,7 @@ export default function SubscriberReportPage() {
         item.transactionId || '-',
       ]);
     } else if (reportType === 'sublocality-wise') {
-      headers = ['Sublocality', 'Subscriber Name', 'Bill ID', 'Amount', 'Collection Date', 'Address', 'Connection Type', 'Received By', 'Collected By', 'Transaction ID'];
+      headers = ['Sublocality', 'Subscriber ID', 'Subscriber Name', 'Bill ID', 'Amount', 'Collection Date', 'Address', 'Connection Type', 'Received By', 'Collected By', 'Transaction ID'];
       rows = filteredData.map((item) => [
         item.sublocality,
         item.subscriberName,
@@ -402,7 +402,7 @@ export default function SubscriberReportPage() {
       headers = excel.headers;
       rows = excel.rows;
     } else if (reportType === 'package-wise') {
-      headers = ['Package', 'Subscriber Name', 'Bill ID', 'Amount', 'Collection Date', 'Address', 'Connection Type', 'Received By', 'Collected By', 'Transaction ID'];
+      headers = ['Package', 'Subscriber ID', 'Subscriber Name', 'Bill ID', 'Amount', 'Collection Date', 'Address', 'Connection Type', 'Received By', 'Collected By', 'Transaction ID'];
       rows = filteredData.map((item) => [
         item.packageName,
         item.subscriberName,
@@ -420,7 +420,7 @@ export default function SubscriberReportPage() {
       headers = excel.headers;
       rows = excel.rows;
     } else {
-      headers = ['Subscriber Name', 'Bill ID', 'Amount', 'Collection Date', 'Address', 'Connection Type', 'Discount', 'Received By', 'Collected By'];
+      headers = ['Subscriber ID', 'Subscriber Name', 'Bill ID', 'Amount', 'Collection Date', 'Address', 'Connection Type', 'Discount', 'Received By', 'Collected By'];
       rows = filteredData.map((item) => [
         item.subscriberName,
         item.billId || '',
@@ -851,7 +851,7 @@ export default function SubscriberReportPage() {
                               {group.records.map((item, i) => (
                                 <TableRow key={item.id}>
                                   <TableCell className="text-muted-foreground">{i + 1}</TableCell>
-                                   <TableCell className="text-xs text-muted-foreground">{item.subscriberId || item.connectionId || '-'}</TableCell>
+                                   <TableCell className="text-xs text-muted-foreground">{item.internetId || '-'}</TableCell>
                                   <TableCell className="font-medium">
                                     {item.connectionId ? (
                                       <Link
@@ -903,7 +903,7 @@ export default function SubscriberReportPage() {
                       {paginatedData.map((item, i) => (
                         <TableRow key={item.id}>
                           <TableCell className="text-muted-foreground">{showAll ? i + 1 : (safePage - 1) * pageSize + i + 1}</TableCell>
-                           <TableCell className="text-xs text-muted-foreground">{item.subscriberId || item.connectionId || '-'}</TableCell>
+                           <TableCell className="text-xs text-muted-foreground">{item.internetId || '-'}</TableCell>
                           <TableCell className="font-medium">
                             {item.connectionId ? (
                               <Link
@@ -1006,3 +1006,6 @@ export default function SubscriberReportPage() {
     </div>
   );
 }
+
+
+
