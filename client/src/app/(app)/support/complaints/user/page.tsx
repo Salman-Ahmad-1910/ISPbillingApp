@@ -68,6 +68,8 @@ export default function SubscriberComplaintPage() {
   const [pageSize, setPageSize] = useState('10');
   const [currentPage, setCurrentPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   const [showForm, setShowForm] = useState(false);
   const [internetSearch, setInternetSearch] = useState('');
@@ -107,13 +109,18 @@ export default function SubscriberComplaintPage() {
   ], [complaints]);
 
   const filteredData = useMemo(() => {
+    const from = fromDate ? new Date(fromDate + 'T00:00:00') : null;
+    const to = toDate ? new Date(toDate + 'T23:59:59') : null;
     return complaints.filter((c) => {
       if (search && !smartMatch(search, [c.id], [c.subscriberName, c.description])) {
         return false;
       }
+      const created = c.createdAt ? new Date(c.createdAt) : null;
+      if (from && created && created < from) return false;
+      if (to && created && created > to) return false;
       return true;
     });
-  }, [complaints, search]);
+  }, [complaints, search, fromDate, toDate]);
 
   const totalPages = Math.ceil(filteredData.length / parseInt(pageSize));
   const paginatedData = filteredData.slice(
@@ -369,6 +376,22 @@ export default function SubscriberComplaintPage() {
                   className="pl-8"
                 />
               </div>
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                value={fromDate}
+                onChange={(e) => { setFromDate(e.target.value); setCurrentPage(1); }}
+                className="w-36"
+                title="From date"
+              />
+              <Input
+                type="date"
+                value={toDate}
+                onChange={(e) => { setToDate(e.target.value); setCurrentPage(1); }}
+                className="w-36"
+                title="To date"
+              />
+            </div>
             <div className="flex items-center gap-2">
               {canCreate && (
                 <Button onClick={() => setShowForm(true)} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm">
