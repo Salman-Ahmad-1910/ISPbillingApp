@@ -750,6 +750,7 @@ func SetupRoutes(r *gin.Engine) {
 
 		// Support routes
 		customerSupport := api.Group("/support")
+		customerSupport.Use(middleware.OptionalAuthMiddleware())
 		customerSupport.Use(func(c *gin.Context) {
 			// Get company ID from header first, then query parameter
 			companyIDHeader := c.GetHeader("x-company-id")
