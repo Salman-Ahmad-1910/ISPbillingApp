@@ -240,7 +240,7 @@ function ThermalInvoice({ payment, company, logoUrl, subscriberName, collectorNa
   const now = new Date();
   const paymentDate = payment.paymentDate ? new Date(payment.paymentDate) : now;
   const dateStr = `${String(now.getDate()).padStart(2, '0')}-${now.toLocaleString('en-US', { month: 'short' }).toUpperCase()}-${now.getFullYear()}`;
-  const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
   const monthYear = paymentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const receiverName = collectorName || payment.collectedByName || payment.collectorId || '---';
   const connectionType = (payment as any).connectionType || (payment as any).type || 'internet';
@@ -300,12 +300,20 @@ function ThermalInvoice({ payment, company, logoUrl, subscriberName, collectorNa
             <div className="flex justify-between"><span>Balance:</span><span className="font-bold">PKR {Number(balance).toLocaleString()}</span></div>
           </div>
 
+          <div className="flex justify-center my-2">
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(String(payment.billNo || payment.id || ''))}`}
+              alt="QR"
+              style={{ width: '60px', height: '60px' }}
+            />
+          </div>
+
           <div className="text-center mt-3 mb-1">
             <div className="font-bold">THANK YOU</div>
           </div>
 
           <div className="text-center leading-tight">
-            <div>For any query contack:</div>
+            <div>For any query contact:</div>
             <div className="font-bold">{(company as any)?.contact1 || (company as any)?.contact2 || (company as any)?.phone || (company as any)?.mobile || '---'}</div>
           </div>
         </div>
