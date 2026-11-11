@@ -726,6 +726,7 @@ func GetPurchasedProducts(c *gin.Context) {
 		JOIN sales s ON s.id = si.sale_id AND s.deleted_at IS NULL
 		WHERE s.company_id = ?
 			AND si.deleted_at IS NULL
+			AND s.status = 'completed'
 	`, companyID).Scan(&soldRows).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch sold quantities", "details": err.Error()})
 		return
