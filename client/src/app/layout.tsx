@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { ClientToaster } from '@/components/shared/client-toaster';
 import Providers from '@/components/providers';
-import { AutoRefresh } from '@/components/auto-refresh';
 
 
 export const metadata: Metadata = {
@@ -30,9 +29,9 @@ export default function RootLayout({
         <Providers>
           {children}
           <ClientToaster />
-          <AutoRefresh />
         </Providers>
       </body>
     </html>
   );
 }
+

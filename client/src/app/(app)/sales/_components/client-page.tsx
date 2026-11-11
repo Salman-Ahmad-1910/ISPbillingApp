@@ -314,6 +314,8 @@ export function ClientPage({
     try {
       await api.post(`/pos/sales/${returnTarget.id}/return?companyId=${companyId}`);
       invalidateInventoryQueries();
+      await queryClient.refetchQueries({ queryKey: ['inventory/purchased-products', companyId] });
+      await queryClient.refetchQueries({ queryKey: ['inventory/products', companyId] });
       setReturnTarget(null);
       setViewSale((prev) =>
         prev && prev.id === returnTarget.id ? { ...prev, status: 'returned' } : prev,
