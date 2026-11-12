@@ -314,6 +314,10 @@ export function ClientPage({
     try {
       await api.post(`/pos/sales/${returnTarget.id}/return?companyId=${companyId}`);
       invalidateInventoryQueries();
+      // Force the stock/POS sources to refetch immediately so the returned
+      // quantity is visible as soon as the dialog closes.
+      await queryClient.refetchQueries({ queryKey: ['inventory/purchased-products', companyId], type: 'all' });
+      await queryClient.refetchQueries({ queryKey: ['inventory/products', companyId], type: 'all' });
       setReturnTarget(null);
       setViewSale((prev) =>
         prev && prev.id === returnTarget.id ? { ...prev, status: 'returned' } : prev,
