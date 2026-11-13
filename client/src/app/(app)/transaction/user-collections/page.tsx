@@ -106,6 +106,20 @@ const STATUS_OPTIONS = [
   { id: 'pending', name: 'Unpaid' },
 ];
 
+// Today's date on this device (its own clock and time zone), as YYYY-MM-DD.
+// OLD: new Date().toISOString().split('T')[0] - that is the UTC date, which in
+// Pakistan (UTC+5) is still "yesterday" between 12:00 am and 5:00 am.
+function todayOnDevice(): string {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
+// Only admins (company admin / owner) may change the Pay Date; everyone else
+// sees today's date read-only.
+const PAY_DATE_EDITOR_ROLES = ['admin', 'owner'];
+
 export default function SubscriberCollectionsPage() {
   const { companyId, companies } = useCompany();
   const currentCompany = companies.find(c => c.id === companyId);
@@ -128,7 +142,8 @@ export default function SubscriberCollectionsPage() {
   const [showReceiveDialog, setShowReceiveDialog] = useState(false);
 
   const [showPromiseDialog, setShowPromiseDialog] = useState(false);
-  const [promiseDate, setPromiseDate] = useState(new Date().toISOString().split('T')[0]);
+  // OLD: useState(new Date().toISOString().split('T')[0])
+  const [promiseDate, setPromiseDate] = useState(todayOnDevice());
   const [promiseDescription, setPromiseDescription] = useState('');
   const [isSavingPromise, setIsSavingPromise] = useState(false);
 
@@ -140,7 +155,9 @@ export default function SubscriberCollectionsPage() {
   const [isSavingPOSCollect, setIsSavingPOSCollect] = useState(false);
 
   const [receiveAmount, setReceiveAmount] = useState(0);
-  const [receiveDate, setReceiveDate] = useState(new Date().toISOString().split('T')[0]);
+  // OLD: useState(new Date().toISOString().split('T')[0])
+  const [receiveDate, setReceiveDate] = useState(todayOnDevice());
+  const canEditPayDate = PAY_DATE_EDITOR_ROLES.includes(String(user?.role || '').toLowerCase());
   const [receiveMethod, setReceiveMethod] = useState<string>('cash');
   const [receiveComment, setReceiveComment] = useState('');
   const [receiveTransactionId, setReceiveTransactionId] = useState('');
@@ -409,7 +426,8 @@ export default function SubscriberCollectionsPage() {
       });
       toast({ title: 'Success', description: 'Promise recorded successfully.' });
       setShowPromiseDialog(false);
-      setPromiseDate(new Date().toISOString().split('T')[0]);
+      // OLD: setPromiseDate(new Date().toISOString().split('T')[0]);
+      setPromiseDate(todayOnDevice());
       setPromiseDescription('');
       refetchPromises();
     } catch (error: any) {
@@ -462,7 +480,8 @@ export default function SubscriberCollectionsPage() {
       refetchPromises();
       queryClient.invalidateQueries({ queryKey: ['admin/connections'] });
       setReceiveAmount(0);
-      setReceiveDate(new Date().toISOString().split('T')[0]);
+      // OLD: setReceiveDate(new Date().toISOString().split('T')[0]);
+      setReceiveDate(todayOnDevice());
       setReceiveMethod('cash');
       setReceiveComment('');
       setReceiveTransactionId('');
@@ -525,7 +544,8 @@ export default function SubscriberCollectionsPage() {
   const handleReceivePromise = (promise: PromiseEntry) => {
     setSelectedPromiseId(promise.id);
     setReceiveAmount(promise.amount);
-    setReceiveDate(new Date().toISOString().split('T')[0]);
+    // OLD: setReceiveDate(new Date().toISOString().split('T')[0]);
+    setReceiveDate(todayOnDevice());
     setReceiveMethod('cash');
     setReceiveComment('');
     setReceiveTransactionId('');
@@ -828,7 +848,7 @@ export default function SubscriberCollectionsPage() {
                 <span>Receiving as: <span className="font-medium text-foreground">{recoveryOfficerName}</span></span>
               </div>
               <div className="flex-1" />
-              <Button onClick={() => { setSelectedPromiseId(null); setReceiveAmount(displayRemaining); setReceiveMethod('cash'); setReceiveTransactionId(''); setShowReceiveDialog(true); }} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
+              <Button onClick={() => { setSelectedPromiseId(null); setReceiveAmount(displayRemaining); setReceiveDate(todayOnDevice()); setReceiveMethod('cash'); setReceiveTransactionId(''); setShowReceiveDialog(true); }} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-105">
                 <DollarSign className="mr-2 h-4 w-4" />
                 Receive Payment
               </Button>
@@ -1170,11 +1190,14 @@ export default function SubscriberCollectionsPage() {
               <Input
                 type="date"
                 value={receiveDate}
-                // Date is always shown and pre-selected (today), but only users
-                // holding the update permission may open the picker / change it.
-                readOnly={!canUpdate}
-                onChange={(e) => setReceiveDate(e.target.value)}
-                className={canUpdate ? undefined : 'pointer-events-none opacity-70'}
+                // Date is always shown and pre-selected (today on this device),
+                // but only an admin may open the picker / change it.
+                // OLD: readOnly={!canUpdate}
+                // OLD: className={canUpdate ? undefined : 'pointer-events-none opacity-70'}
+                readOnly={!canEditPayDate}
+                tabIndex={canEditPayDate ? undefined : -1}
+                onChange={(e) => { if (canEditPayDate) setReceiveDate(e.target.value); }}
+                className={canEditPayDate ? undefined : 'pointer-events-none opacity-70'}
               />
             </div>
             <div className="space-y-1">

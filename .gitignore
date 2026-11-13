@@ -41,3 +41,7 @@ yarn-error.log*
 
 .DS_Store
 Thumbs.db
+
+# Temporary archives and file lists (never commit)
+/_*.tgz
+/_files*.txt
