@@ -14,6 +14,8 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { isActiveSubscriber } from '@/lib/subscriber-status';
+import { SubscriberStatusFilter, type SubscriberStatusScope } from '@/components/shared/subscriber-status-filter';
 import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
 import { SUBSCRIBER_REPORT_TYPE_OPTIONS, matchesReportType, type ReportTypeConn } from '@/lib/subscriber-report-types';
 import type { Connection, Area } from '@/lib/types';
@@ -75,6 +77,8 @@ export default function NotGeneratedCollectionsPage() {
   const [reportType, setReportType] = useState('all');
   const [sublocality, setSublocality] = useState('all');
   const [connectionType, setConnectionType] = useState('both');
+  // Active subscribers only by default; 'all' shows every status.
+  const [subscriberStatus, setSubscriberStatus] = useState<SubscriberStatusScope>('active');
 
   const [historyFromDate, setHistoryFromDate] = useState<Date>(() => new Date(new Date().getFullYear(), 0, 1));
   const [historyFromDateOpen, setHistoryFromDateOpen] = useState(false);
@@ -128,7 +132,10 @@ export default function NotGeneratedCollectionsPage() {
   const allRecords: NotGeneratedRecord[] = useMemo(() => {
     const result: NotGeneratedRecord[] = [];
     connections.forEach(c => {
-      if (c.status === 'deactivated') return;
+      // OLD: if (c.status === 'deactivated') return;
+      // Non-active subscribers are never billed, so they are left out unless
+      // "All statuses" is chosen.
+      if (subscriberStatus !== 'all' && !isActiveSubscriber(c)) return;
       if (generatedIds.ids.has(c.id)) return;
       if (generatedIds.names.has(c.name)) return;
 
@@ -149,7 +156,7 @@ export default function NotGeneratedCollectionsPage() {
       });
     });
     return result;
-  }, [connections, generatedIds, areas]);
+  }, [connections, generatedIds, areas, subscriberStatus]);
 
   const allSublocalities = useMemo(() => {
     const set = new Set<string>();
@@ -349,6 +356,7 @@ export default function NotGeneratedCollectionsPage() {
               </Select>
             </div>
 
+            <SubscriberStatusFilter value={subscriberStatus} onChange={setSubscriberStatus} />
             <div className="space-y-2">
               <Label>Sublocality</Label>
               <Select value={sublocality} onValueChange={setSublocality}>

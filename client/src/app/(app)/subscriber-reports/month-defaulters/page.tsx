@@ -15,6 +15,8 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { isActiveSubscriber } from '@/lib/subscriber-status';
+import { SubscriberStatusFilter, type SubscriberStatusScope } from '@/components/shared/subscriber-status-filter';
 import { usePagePermissions } from '@/hooks/usePermissions';
 import { SUBSCRIBER_REPORT_MONTH_DEFAULTERS_PERMISSIONS } from '@/lib/permission-pages';
 import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
@@ -108,6 +110,8 @@ export default function MonthDefaultersPage() {
   const [sublocality, setSublocality] = useState('all');
   const [reportType, setReportType] = useState('all');
   const [connectionType, setConnectionType] = useState('both');
+  // Active subscribers only by default; 'all' shows every status.
+  const [subscriberStatus, setSubscriberStatus] = useState<SubscriberStatusScope>('active');
   const [showInvoice, setShowInvoice] = useState(false);
 
   const [historyFromDate, setHistoryFromDate] = useState<Date>(() => {
@@ -177,9 +181,12 @@ export default function MonthDefaultersPage() {
       if (isNaN(itemDate.getTime())) return false;
       const typeMatch = matchesReportType({ reportType, itemDate, conn: connById.get(item.connectionId), from, to });
 
-      return monthMatch && sublocalityMatch && typeMatch && connectionMatch;
+      const statusMatch = subscriberStatus === 'all' || isActiveSubscriber(connById.get(item.connectionId) as any);
+
+      // OLD: return monthMatch && sublocalityMatch && typeMatch && connectionMatch;
+      return monthMatch && sublocalityMatch && typeMatch && connectionMatch && statusMatch;
     });
-  }, [allRecords, month, sublocality, reportType, connectionType, historyFromDate, historyToDate, connById]);
+  }, [allRecords, month, sublocality, reportType, connectionType, historyFromDate, historyToDate, connById, subscriberStatus]);
 
   const packageCounts = useMemo(() => {
     const base = (connections as any[]).filter((c: any) => connectionType === 'both' || c.connectionType === connectionType);
@@ -470,6 +477,7 @@ export default function MonthDefaultersPage() {
               </Select>
             </div>
 
+            <SubscriberStatusFilter value={subscriberStatus} onChange={setSubscriberStatus} />
             <div className="space-y-2">
               <Label>Sublocality</Label>
               <Select value={sublocality} onValueChange={setSublocality}>

@@ -14,6 +14,8 @@ import { useCompany } from '@/context/company-context';
 import { usePagePermissions } from '@/hooks/usePermissions';
 import { SUBSCRIBER_REPORT_CREATOR_SUMMARY_PERMISSIONS } from '@/lib/permission-pages';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { isActiveSubscriber } from '@/lib/subscriber-status';
+import { SubscriberStatusFilter, type SubscriberStatusScope } from '@/components/shared/subscriber-status-filter';
 import type { User, Connection } from '@/lib/types';
 import { smartMatch } from '@/lib/search';
 import { format } from 'date-fns';
@@ -38,12 +40,15 @@ export default function CreatorSummaryPage() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
+  // Active subscribers only by default; 'all' shows every status.
+  const [subscriberStatus, setSubscriberStatus] = useState<SubscriberStatusScope>('active');
   const [showInvoice, setShowInvoice] = useState(false);
 
   const creatorSummaries: CreatorSummary[] = useMemo(() => {
     const creatorsMap = new Map<string, Connection[]>();
 
     connections.forEach((conn) => {
+      if (subscriberStatus !== 'all' && !isActiveSubscriber(conn)) return;
       if (conn.createdBy) {
         const existing = creatorsMap.get(conn.createdBy) || [];
         existing.push(conn);
@@ -71,7 +76,7 @@ export default function CreatorSummaryPage() {
         return matchSearch && matchRole;
       })
       .sort((a, b) => b.totalCreated - a.totalCreated);
-  }, [connections, users, searchTerm, roleFilter]);
+  }, [connections, users, searchTerm, roleFilter, subscriberStatus]);
 
   const uniqueRoles = useMemo(() => {
     const set = new Set<string>();
@@ -203,6 +208,7 @@ export default function CreatorSummaryPage() {
                 />
               </div>
             </div>
+            <SubscriberStatusFilter value={subscriberStatus} onChange={setSubscriberStatus} />
             <div className="space-y-2">
               <Label>Role</Label>
               <Select value={roleFilter} onValueChange={setRoleFilter}>

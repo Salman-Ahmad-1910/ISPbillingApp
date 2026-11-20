@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,6 +11,7 @@ import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import { Loader2, PlusCircle, Trash2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { isActiveSubscriber } from '@/lib/subscriber-status';
 import { useCrudPermissions } from '@/hooks/usePermissions';
 
 import { DataTable } from './data-table';
@@ -58,6 +59,8 @@ export function ClientPage() {
   const { data: companiesData } = useGenericQuery<Company>('companies', companyId ?? undefined);
 
   const connections = connectionsData || [];
+  // Only active subscribers are billed (the server applies the same rule).
+  const activeConnections = useMemo(() => connections.filter(isActiveSubscriber), [connections]);
   const areas = areasData || [];
   const companies = companiesData || [];
 
@@ -88,7 +91,10 @@ export function ClientPage() {
     return Array.from(years).sort().reverse();
   }, [connections]);
 
-  const billRows = useMemo(() => {
+  // OLD: const billRows = useMemo(() => { ... connections.forEach(c => { ... }) ... }, [...]);
+  // Rows are built by one function so the visible/created rows (active only)
+  // and the rows used by Delete (every subscriber) follow the same grouping.
+  const buildBillRows = useCallback((list: Connection[]) => {
     const groups: Record<string, { amount: number; subscribers: number; connectionType: string; sublocality: string; connections: Connection[] }> = {};
 
     const isDefaultView = filterSublocality === 'all' && filterBillType === 'all';
@@ -96,7 +102,7 @@ export function ClientPage() {
     const selectedMonth = filterMonth === 'all' ? getCurrentMonthYear().month : filterMonth;
     const selectedYear = filterYear === 'all' ? getCurrentMonthYear().year : filterYear;
 
-    connections.forEach(c => {
+    list.forEach(c => {
       if (filterSublocality !== 'all' && c.sublocalityId !== filterSublocality) return;
 
       const subName = areas.find(a => a.id === c.sublocalityId)?.subLocality || areas.find(a => a.id === c.sublocalityId)?.locality || 'Unknown';
@@ -153,7 +159,18 @@ export function ClientPage() {
       createdBy: companyName,
       connections: group.connections,
     }));
-  }, [connections, areas, companyName, filterMonth, filterYear, filterBillType, filterSublocality]);
+  }, [areas, companyName, filterMonth, filterYear, filterBillType, filterSublocality]);
+
+  // Shown on the page and sent when creating bills: active subscribers only.
+  const billRows = useMemo(() => buildBillRows(activeConnections), [buildBillRows, activeConnections]);
+  // Delete covers every subscriber, so a bill created while a subscriber was
+  // active can still be removed after they were deactivated / suspended.
+  const deleteRows = useMemo(() => buildBillRows(connections), [buildBillRows, connections]);
+  // Subscribers matching the current filters who are left out because they are not active.
+  const notActiveCount = useMemo(
+    () => deleteRows.reduce((sum, r) => sum + r.subscribers, 0) - billRows.reduce((sum, r) => sum + r.subscribers, 0),
+    [deleteRows, billRows],
+  );
 
   const totalPages = Math.ceil(billRows.length / pageSize);
   const paginatedData = billRows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -203,14 +220,21 @@ export function ClientPage() {
         sublocality: row.sublocality,
       }));
 
-      await api.post(`/billing/bills/create?companyId=${companyId}`, {
+      // OLD: await api.post(...) without reading the response
+      const res = await api.post(`/billing/bills/create?companyId=${companyId}`, {
         groupedBills,
         month: filterMonth === 'all' ? undefined : filterMonth,
         year: filterYear === 'all' ? undefined : filterYear,
         billType: filterBillType === 'all' ? undefined : filterBillType,
         sublocalityId: filterSublocality === 'all' ? undefined : filterSublocality,
       });
-      toast({ title: 'Success', description: `${billRows.length} bill entry(ies) created for ${totalSubscribers} subscriber(s).` });
+      // OLD: toast({ title: 'Success', description: `${billRows.length} bill entry(ies) created for ${totalSubscribers} subscriber(s).` });
+      const notActive = Number(res?.data?.notActive) || 0;
+      toast({
+        title: 'Success',
+        description: `${billRows.length} bill entry(ies) created for ${totalSubscribers} subscriber(s).`
+          + (notActive > 0 ? ` ${notActive} non-active subscriber(s) were not billed.` : ''),
+      });
       queryClient.invalidateQueries({ queryKey: ['billing/bills', companyId] });
 
       const params = new URLSearchParams();
@@ -227,16 +251,17 @@ export function ClientPage() {
   };
 
   const handleDelete = async () => {
-    if (billRows.length === 0) {
+    // OLD: used billRows. Delete must include non-active subscribers too (see deleteRows).
+    if (deleteRows.length === 0) {
       toast({ variant: 'destructive', title: 'No subscribers', description: 'No subscribers match the current filters.' });
       return;
     }
-    const confirmed = window.confirm(`Delete ${billRows.length} bill entry(ies)?`);
+    const confirmed = window.confirm(`Delete ${deleteRows.length} bill entry(ies)?`);
     if (!confirmed) return;
 
     setIsDeleting(true);
     try {
-      const groupedBills = billRows.map(row => ({
+      const groupedBills = deleteRows.map(row => ({
         connectionIds: row.connections.map(c => c.id),
         connectionType: row.connectionType,
         amount: row.amount,
@@ -251,7 +276,7 @@ export function ClientPage() {
         billType: filterBillType === 'all' ? undefined : filterBillType,
         sublocalityId: filterSublocality === 'all' ? undefined : filterSublocality,
       });
-      toast({ title: 'Success', description: `${billRows.length} bill entry(ies) deleted.` });
+      toast({ title: 'Success', description: `${deleteRows.length} bill entry(ies) deleted.` });
       queryClient.invalidateQueries({ queryKey: ['billing/bills', companyId] });
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.response?.data?.message || 'Failed to delete bills' });
@@ -326,7 +351,10 @@ export function ClientPage() {
           </Select>
 
           <div className="flex items-center gap-2 ml-auto">
-            <span className="text-sm text-muted-foreground">{billRows.length} entry(ies) | {billRows.reduce((sum, r) => sum + r.subscribers, 0)} subscriber(s)</span>
+            <span className="text-sm text-muted-foreground">
+              {billRows.length} entry(ies) | {billRows.reduce((sum, r) => sum + r.subscribers, 0)} active subscriber(s)
+              {notActiveCount > 0 && <> | {notActiveCount} non-active not billed</>}
+            </span>
             {canCreate && (
               <Button
                 onClick={handleCreate}

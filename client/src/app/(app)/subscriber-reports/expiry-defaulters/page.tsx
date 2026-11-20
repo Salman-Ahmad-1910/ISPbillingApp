@@ -17,6 +17,8 @@ import { useCompany } from '@/context/company-context';
 import { usePagePermissions } from '@/hooks/usePermissions';
 import { SUBSCRIBER_REPORT_EXPIRY_DEFAULTERS_PERMISSIONS } from '@/lib/permission-pages';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { isActiveSubscriber } from '@/lib/subscriber-status';
+import { SubscriberStatusFilter, type SubscriberStatusScope } from '@/components/shared/subscriber-status-filter';
 import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
 
 interface RechargeRecord {
@@ -44,6 +46,8 @@ export default function ExpiryDefaultersPage() {
 
   const { data: connections = [], isLoading: loading } = useGenericQuery<any>('admin/connections', companyId ?? undefined);
   const { data: areas = [] } = useGenericQuery<any>('network/areas', companyId ?? undefined);
+  // Active subscribers only by default; 'all' shows every status.
+  const [subscriberStatus, setSubscriberStatus] = useState<SubscriberStatusScope>('active');
 
   const [filterFromDate, setFilterFromDate] = useState<Date>(() => {
     const d = new Date();
@@ -67,8 +71,10 @@ export default function ExpiryDefaultersPage() {
   }, [connections, areas]);
 
   const allRecords: RechargeRecord[] = useMemo(() => {
+    // OLD: connections.filter((c: any) => Number(c.remainingAmount) > 0)
     return connections
       .filter((c: any) => Number(c.remainingAmount) > 0)
+      .filter((c: any) => subscriberStatus === 'all' || isActiveSubscriber(c))
       .map((c: any) => ({
         id: c.id,
         subscriberName: c.name || '',
@@ -80,7 +86,7 @@ export default function ExpiryDefaultersPage() {
         amount: Number(c.remainingAmount) || 0,
         status: c.status || 'active',
       }));
-  }, [connections, areas]);
+  }, [connections, areas, subscriberStatus]);
 
   const filteredData = useMemo(() => allRecords.filter((item) => {
     const sublocalityMatch = sublocality === 'all' || item.sublocality === sublocality;
@@ -238,6 +244,7 @@ export default function ExpiryDefaultersPage() {
               </Popover>
             </div>
 
+            <SubscriberStatusFilter value={subscriberStatus} onChange={setSubscriberStatus} />
             <div className="space-y-2">
               <Label>Sublocality</Label>
               <Select value={sublocality} onValueChange={setSublocality}>

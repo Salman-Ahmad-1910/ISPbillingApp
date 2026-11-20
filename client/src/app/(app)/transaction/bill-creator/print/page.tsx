@@ -4,6 +4,7 @@ import { useMemo, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { isActiveSubscriber } from '@/lib/subscriber-status';
 import { Loader2, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Connection, Area, Company } from '@/lib/types';
@@ -39,7 +40,10 @@ export default function PrintBillPage() {
   const { data: areasData } = useGenericQuery<Area>('network/areas', companyId ?? undefined);
   const { data: companiesData } = useGenericQuery<Company>('companies', companyId ?? undefined);
 
-  const connections = connectionsData || [];
+  // OLD: const connections = connectionsData || [];
+  // The printed bill lists active subscribers only - the same subscribers
+  // Bill Creator bills (non-active ones are never billed).
+  const connections = useMemo(() => (connectionsData || []).filter(isActiveSubscriber), [connectionsData]);
   const areas = areasData || [];
   const companies = companiesData || [];
 

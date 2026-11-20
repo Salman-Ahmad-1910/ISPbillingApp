@@ -14,6 +14,8 @@ import { useCompany } from '@/context/company-context';
 import { usePagePermissions } from '@/hooks/usePermissions';
 import { SUBSCRIBER_REPORT_PACKAGE_WISE_PERMISSIONS } from '@/lib/permission-pages';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { isActiveSubscriber } from '@/lib/subscriber-status';
+import { SubscriberStatusFilter, type SubscriberStatusScope } from '@/components/shared/subscriber-status-filter';
 import { smartMatch } from '@/lib/search';
 import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
 
@@ -34,6 +36,8 @@ export default function PackageWiseReportsPage() {
 
   const [selectedPackage, setSelectedPackage] = useState('all');
   const [connectionType, setConnectionType] = useState('both');
+  // Active subscribers only by default; 'all' shows every status.
+  const [subscriberStatus, setSubscriberStatus] = useState<SubscriberStatusScope>('active');
   const [searchTerm, setSearchTerm] = useState('');
   const [showInvoice, setShowInvoice] = useState(false);
 
@@ -46,7 +50,9 @@ export default function PackageWiseReportsPage() {
         const typeMatch = connectionType === 'both' ||
           (connectionType === 'internet' && matchesInternet) ||
           (connectionType === 'tv_cable' && matchesCable);
-        return typeMatch && (matchesInternet || matchesCable);
+        const statusMatch = subscriberStatus === 'all' || isActiveSubscriber(c);
+        // OLD: return typeMatch && (matchesInternet || matchesCable);
+        return typeMatch && statusMatch && (matchesInternet || matchesCable);
       }).length;
 
       return {
@@ -55,7 +61,7 @@ export default function PackageWiseReportsPage() {
         subscriberCount: count,
       };
     }).filter((p: PackageData) => p.packageName);
-  }, [packages, connections, connectionType]);
+  }, [packages, connections, connectionType, subscriberStatus]);
 
   const filteredData = useMemo(() => packageData.filter((item) => {
     const pkgMatch = selectedPackage === 'all' || item.packageName === selectedPackage;
@@ -183,6 +189,7 @@ export default function PackageWiseReportsPage() {
               </Select>
             </div>
 
+            <SubscriberStatusFilter value={subscriberStatus} onChange={setSubscriberStatus} />
             <div className="space-y-2">
               <Label>Connection Type</Label>
               <Select value={connectionType} onValueChange={setConnectionType}>

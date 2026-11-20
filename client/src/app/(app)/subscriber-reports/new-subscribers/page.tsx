@@ -60,7 +60,9 @@ export default function NewSubscribersListPage() {
 
   const [sublocality, setSublocality] = useState('all');
   const [connectionType, setConnectionType] = useState('both');
-  const [statusFilter, setStatusFilter] = useState('all');
+  // Active subscribers by default (the Status filter can still show others).
+  // OLD: const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('active');
 
   const [showReport, setShowReport] = useState(false);
   const [showInvoice, setShowInvoice] = useState(false);

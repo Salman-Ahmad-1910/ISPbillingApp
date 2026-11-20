@@ -17,6 +17,8 @@ import { useCompany } from '@/context/company-context';
 import { usePagePermissions } from '@/hooks/usePermissions';
 import { SUBSCRIBER_REPORT_ALLOCATED_DEFAULTERS_PERMISSIONS } from '@/lib/permission-pages';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { isActiveSubscriber } from '@/lib/subscriber-status';
+import { SubscriberStatusFilter, type SubscriberStatusScope } from '@/components/shared/subscriber-status-filter';
 import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
 
 interface AllocatedDefaulterRecord {
@@ -41,6 +43,8 @@ export default function AllocatedDefaultersPage() {
   const [reportType, setReportType] = useState('defaulter');
   const [sublocality, setSublocality] = useState('all');
   const [connectionType, setConnectionType] = useState('both');
+  // Active subscribers only by default; 'all' shows every status.
+  const [subscriberStatus, setSubscriberStatus] = useState<SubscriberStatusScope>('active');
   const [showInvoice, setShowInvoice] = useState(false);
 
   const [historyFromDate, setHistoryFromDate] = useState<Date>(() => {
@@ -67,8 +71,10 @@ export default function AllocatedDefaultersPage() {
   };
 
   const allDefaulters: AllocatedDefaulterRecord[] = useMemo(() => {
+    // OLD: subscribers.filter((s: any) => Number(s.balance) > 0)
     return subscribers
       .filter((s: any) => Number(s.balance) > 0)
+      .filter((s: any) => subscriberStatus === 'all' || isActiveSubscriber(s))
       .map((s: any) => ({
         id: s.id,
         subscriberName: s.name || '',
@@ -81,7 +87,7 @@ export default function AllocatedDefaultersPage() {
         amount: Number(s.balance) || 0,
         status: s.status || 'active',
       }));
-  }, [subscribers]);
+  }, [subscribers, subscriberStatus]);
 
   const defaultersByType: AllocatedDefaulterRecord[] = useMemo(() => {
     return allDefaulters.filter((item) => {
@@ -261,6 +267,7 @@ export default function AllocatedDefaultersPage() {
               </Select>
             </div>
 
+            <SubscriberStatusFilter value={subscriberStatus} onChange={setSubscriberStatus} />
             <div className="space-y-2">
               <Label>Sublocality</Label>
               <Select value={sublocality} onValueChange={setSublocality}>

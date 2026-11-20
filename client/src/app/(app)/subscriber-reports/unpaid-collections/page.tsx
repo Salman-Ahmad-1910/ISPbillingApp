@@ -14,6 +14,8 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { isActiveSubscriber } from '@/lib/subscriber-status';
+import { SubscriberStatusFilter, type SubscriberStatusScope } from '@/components/shared/subscriber-status-filter';
 import { usePagePermissions } from '@/hooks/usePermissions';
 import { SUBSCRIBER_REPORT_UNPAID_COLLECTIONS_PERMISSIONS } from '@/lib/permission-pages';
 import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
@@ -82,6 +84,8 @@ export default function UnpaidCollectionsPage() {
 
   const [sublocality, setSublocality] = useState('all');
   const [reportType, setReportType] = useState('all');
+  // Active subscribers only by default; 'all' shows every status.
+  const [subscriberStatus, setSubscriberStatus] = useState<SubscriberStatusScope>('active');
 
   const [showReport, setShowReport] = useState(false);
   const [showInvoice, setShowInvoice] = useState(false);
@@ -112,6 +116,13 @@ export default function UnpaidCollectionsPage() {
     });
     return map;
   }, [connections, areas]);
+
+  // Raw connection (with its real status) by id, for the Subscribers filter.
+  const connectionById = useMemo(() => {
+    const map = new Map<string, Connection>();
+    (connections as Connection[]).forEach((c) => map.set(c.id, c));
+    return map;
+  }, [connections]);
 
   const unpaidRecords: UnpaidRecord[] = useMemo(() => {
     const map = new Map<string, UnpaidRecord>();
@@ -175,9 +186,12 @@ export default function UnpaidCollectionsPage() {
       const sublocalityMatch = sublocality === 'all' || item.sublocality === sublocality;
       const typeMatch = matchesReportType({ reportType, itemDate, conn: connMap[item.subscriberId], from, to });
 
-      return typeMatch && sublocalityMatch;
+      const statusMatch = subscriberStatus === 'all' || isActiveSubscriber(connectionById.get(item.subscriberId));
+
+      // OLD: return typeMatch && sublocalityMatch;
+      return typeMatch && sublocalityMatch && statusMatch;
     });
-  }, [unpaidRecords, filterFromDate, filterToDate, sublocality, reportType, showReport, connMap]);
+  }, [unpaidRecords, filterFromDate, filterToDate, sublocality, reportType, showReport, connMap, subscriberStatus, connectionById]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -470,6 +484,7 @@ export default function UnpaidCollectionsPage() {
               </Popover>
             </div>
 
+            <SubscriberStatusFilter value={subscriberStatus} onChange={setSubscriberStatus} />
             <div className="space-y-2">
               <Label>Sublocality</Label>
               <Select value={sublocality} onValueChange={setSublocality}>

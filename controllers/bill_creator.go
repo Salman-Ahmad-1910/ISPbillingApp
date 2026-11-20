@@ -40,6 +40,14 @@ type DeleteBillRequest struct {
 	SublocalityID string      `json:"sublocalityId"`
 }
 
+// isBillableStatus reports whether a subscriber may receive a monthly bill.
+// Only active subscribers are billed; suspended, inactive, deactivated,
+// expired (or any other status) are skipped. The comparison ignores case and
+// surrounding spaces so "Active" / " active " imported values still count.
+func isBillableStatus(status string) bool {
+	return strings.EqualFold(strings.TrimSpace(status), "active")
+}
+
 // connectionBillType returns the canonical bill-type label for a connection.
 func connectionBillType(connectionType string) string {
 	switch strings.ToLower(strings.TrimSpace(connectionType)) {
@@ -191,6 +199,8 @@ func CreateBills(c *gin.Context) {
 
 	createdCount := 0
 	skippedCount := 0
+	// Subscribers left out because they are not active (see isBillableStatus).
+	notActiveCount := 0
 	seen := map[uuid.UUID]bool{}
 
 	abort := func(err error) {
@@ -215,6 +225,11 @@ func CreateBills(c *gin.Context) {
 
 				var conn models.Connection
 				if err := tx.Where("id = ? AND company_id = ?", connID, companyID).First(&conn).Error; err != nil {
+					continue
+				}
+				// Only active subscribers are billed, whatever list the caller sent.
+				if !isBillableStatus(conn.Status) {
+					notActiveCount++
 					continue
 				}
 
@@ -244,6 +259,11 @@ func CreateBills(c *gin.Context) {
 
 			var conn models.Connection
 			if err := tx.Where("id = ? AND company_id = ?", connID, companyID).First(&conn).Error; err != nil {
+				continue
+			}
+			// Only active subscribers are billed, whatever list the caller sent.
+			if !isBillableStatus(conn.Status) {
+				notActiveCount++
 				continue
 			}
 
@@ -286,9 +306,10 @@ func CreateBills(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Bills created successfully",
-		"count":   createdCount,
-		"skipped": skippedCount,
+		"message":   "Bills created successfully",
+		"count":     createdCount,
+		"skipped":   skippedCount,
+		"notActive": notActiveCount,
 	})
 }
 

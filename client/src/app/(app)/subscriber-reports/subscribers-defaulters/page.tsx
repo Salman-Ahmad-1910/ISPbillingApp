@@ -15,6 +15,8 @@ import { format, parse } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCompany } from '@/context/company-context';
 import { useGenericQuery } from '@/hooks/api/use-generic-query';
+import { isActiveSubscriber } from '@/lib/subscriber-status';
+import { SubscriberStatusFilter, type SubscriberStatusScope } from '@/components/shared/subscriber-status-filter';
 import { SubscriberReportInvoice, type InvoiceColumn } from '@/components/shared/subscriber-report-print';
 import type { Invoice, Connection, Area } from '@/lib/types';
 import { usePagePermissions } from '@/hooks/usePermissions';
@@ -66,6 +68,8 @@ export default function SubscribersDefaultersPage() {
 
   const [sublocality, setSublocality] = useState('all');
   const [connectionType, setConnectionType] = useState('both');
+  // Active subscribers only by default; 'all' shows every status.
+  const [subscriberStatus, setSubscriberStatus] = useState<SubscriberStatusScope>('active');
   const [showInvoice, setShowInvoice] = useState(false);
 
   const connMap = useMemo(() => {
@@ -84,6 +88,13 @@ export default function SubscribersDefaultersPage() {
     });
     return map;
   }, [connections, areas]);
+
+  // Raw connection (with its real status) by id, for the Subscribers filter.
+  const connectionById = useMemo(() => {
+    const map = new Map<string, Connection>();
+    connections.forEach((c: Connection) => map.set(c.id, c));
+    return map;
+  }, [connections]);
 
   const allRecords: DefaulterRecord[] = useMemo(() => {
     const today = new Date();
@@ -147,8 +158,11 @@ export default function SubscribersDefaultersPage() {
     if (isNaN(itemDate.getTime())) return false;
     const dateMatch = itemDate >= from && itemDate <= to;
 
-    return sublocalityMatch && connectionMatch && dateMatch;
-  }), [allRecords, sublocality, connectionType, filterFromDate, filterToDate]);
+    const statusMatch = subscriberStatus === 'all' || isActiveSubscriber(connectionById.get(item.id));
+
+    // OLD: return sublocalityMatch && connectionMatch && dateMatch;
+    return sublocalityMatch && connectionMatch && dateMatch && statusMatch;
+  }), [allRecords, sublocality, connectionType, filterFromDate, filterToDate, subscriberStatus, connectionById]);
 
   const totalRecords = filteredData.length;
   const totalAmount = filteredData.reduce((sum, item) => sum + item.remainingAmount, 0);
@@ -292,6 +306,7 @@ export default function SubscribersDefaultersPage() {
               </Popover>
             </div>
 
+            <SubscriberStatusFilter value={subscriberStatus} onChange={setSubscriberStatus} />
             <div className="space-y-2">
               <Label>Sublocality</Label>
               <Select value={sublocality} onValueChange={setSublocality}>
