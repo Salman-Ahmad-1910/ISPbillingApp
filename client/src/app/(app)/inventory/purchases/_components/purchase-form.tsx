@@ -126,6 +126,24 @@ interface VendorProduct {
   batch: string;
 }
 
+// Amount of one purchase line: Quantity x Purchase Price (rounded to paisa).
+function lineAmount(quantity: unknown, purchasePrice: unknown): number {
+  const qty = Number(quantity) || 0;
+  const price = Number(purchasePrice) || 0;
+  return Math.round(qty * price * 100) / 100;
+}
+
+// Purchase price of a saved line. Older lines may have no purchase price
+// stored; their price is then worked out from the saved amount so the Amount
+// does not drop to 0 when the purchase is opened for editing.
+function editItemPurchasePrice(it: { purchasePrice?: number; subtotal?: number; quantity?: number }): number {
+  const stored = Number(it.purchasePrice) || 0;
+  if (stored > 0) return stored;
+  const qty = Number(it.quantity) || 0;
+  const subtotal = Number(it.subtotal) || 0;
+  return qty > 0 && subtotal > 0 ? Math.round((subtotal / qty) * 100) / 100 : 0;
+}
+
 interface PurchaseFormProps {
   purchase: Purchase | null;
   vendors: Vendor[];
@@ -155,12 +173,21 @@ export function PurchaseForm({
 
   const form = useForm<PurchaseFormValues>({
     resolver: zodResolver(purchaseSchema),
+    // OLD: items: (purchase.items || []).map(it => ({ ...it, quantity: Number(it.quantityEntered) || it.quantity })),
+    // Editing: the Amount is recalculated from the quantity shown and the
+    // purchase price, so Amount = Quantity x Purchase Price from the start.
     defaultValues: purchase ? {
       ...purchase,
-      items: (purchase.items || []).map(it => ({
-        ...it,
-        quantity: Number(it.quantityEntered) || it.quantity,
-      })),
+      items: (purchase.items || []).map(it => {
+        const quantity = Number(it.quantityEntered) || it.quantity;
+        const purchasePrice = editItemPurchasePrice(it);
+        return {
+          ...it,
+          quantity,
+          purchasePrice,
+          subtotal: lineAmount(quantity, purchasePrice),
+        };
+      }),
     } : {
       vendorId: '',
       vendorName: '',
@@ -315,7 +342,7 @@ export function PurchaseForm({
       const qty = Math.max(1, Number(item.quantity) || 1);
       if (isNoSN) {
         item.quantity = qty + 1;
-        item.subtotal = item.quantity * item.purchasePrice;
+        item.subtotal = lineAmount(item.quantity, item.purchasePrice);
       } else {
         const currentSNs = parseSerialNumbers(item.serialNumber || '');
         const haveSNs = new Set(currentSNs);
@@ -336,7 +363,7 @@ export function PurchaseForm({
             .filter(m => m)
             .join(', ');
           item.quantity = currentSNs.length;
-          item.subtotal = item.quantity * item.purchasePrice;
+          item.subtotal = lineAmount(item.quantity, item.purchasePrice);
         }
       }
       const updated = [...currentItems];
@@ -370,7 +397,7 @@ export function PurchaseForm({
       focNormal: 'normal',
       serialNumber: snString,
       model: modelString,
-      subtotal: vp.unitPrice * qty,
+      subtotal: lineAmount(qty, vp.unitPrice),
       saleTax: 0,
       wthTax: 0,
       disc: 0,
@@ -411,7 +438,7 @@ export function PurchaseForm({
       item.quantity = qty;
       item.serialNumber = snString;
       item.model = selectedModels.join(', ');
-      item.subtotal = qty * item.purchasePrice;
+      item.subtotal = lineAmount(qty, item.purchasePrice);
     } else {
       (item as any)[field] = value;
     }
@@ -562,11 +589,13 @@ export function PurchaseForm({
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
-                        <FormLabel className="text-xs">Selling Price (from vendor invoice)</FormLabel>
+                        {/* OLD: Selling Price (from vendor invoice) showing item.sellingPrice.
+                            The selling price is still saved with the line; it is just not shown here. */}
+                        <FormLabel className="text-xs">Purchase Price (from vendor invoice)</FormLabel>
                         <Input
                           readOnly
                           className="bg-muted text-sm"
-                          value={item.sellingPrice}
+                          value={item.purchasePrice}
                         />
                       </div>
                       <div>
@@ -627,7 +656,11 @@ export function PurchaseForm({
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div>
                         <FormLabel className="text-xs">Amount</FormLabel>
-                        <p className="font-medium text-sm mt-1.5">PKR {item.subtotal.toFixed(2)}</p>
+                        {/* OLD: <p className="font-medium text-sm mt-1.5">PKR {item.subtotal.toFixed(2)}</p> */}
+                        <p className="font-medium text-sm mt-1.5">PKR {(Number(item.subtotal) || 0).toFixed(2)}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {item.quantity} × PKR {(Number(item.purchasePrice) || 0).toLocaleString()}
+                        </p>
                       </div>
                     </div>
                   </div>

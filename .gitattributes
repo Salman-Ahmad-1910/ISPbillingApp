@@ -1,0 +1,2 @@
+# The deploy script must keep Linux line endings so it runs on the server.
+scripts/*.sh text eol=lf
