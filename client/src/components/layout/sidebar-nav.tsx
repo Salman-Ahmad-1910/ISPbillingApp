@@ -43,6 +43,7 @@ import {
   Warehouse,
   ShoppingCart,
   ShieldCheck,
+  HandHelping,
   FileCog,
   FileClock,
   FileText,
@@ -263,6 +264,14 @@ const navItems: NavItemGroup[] = [
       { title: 'Subscribers Defaulters', href: '/subscriber-reports/subscribers-defaulters', icon: TriangleAlert, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
       { title: 'New Subscribers List', href: '/subscriber-reports/new-subscribers', icon: UserPlus, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
       { title: 'Subscribers Creator Summary', href: '/subscriber-reports/creator-summary', icon: UserPlus, allowedRoles: ['admin', 'manager', 'dealer', 'sub_dealer', 'staff', 'recovery_officer'] },
+    ],
+  },
+  {
+    // Every account can ask its admin for permissions, so this page has no
+    // role limit and is always allowed (see ALWAYS_ALLOWED in permission-pages).
+    title: 'Permission Demands',
+    items: [
+      { title: 'Permission Demands', href: '/demands', icon: HandHelping },
     ],
   },
   {

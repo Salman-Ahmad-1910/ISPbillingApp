@@ -301,7 +301,9 @@ export const PERMISSION_PAGES: Record<string, string[]> = {
 
 // Compute the set of hrefs the user is allowed to see based on their granted
 // permission ids. Pages in `alwaysAllowed` are never filtered out.
-const ALWAYS_ALLOWED = ['/dashboard'];
+// '/demands' is always allowed so a user without permissions can still ask for them.
+// OLD: const ALWAYS_ALLOWED = ['/dashboard'];
+const ALWAYS_ALLOWED = ['/dashboard', '/demands'];
 
 export function getAllowedHrefs(permissionIds: string[]): Set<string> {
   const hrefs = new Set<string>(ALWAYS_ALLOWED);

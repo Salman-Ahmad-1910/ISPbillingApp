@@ -152,6 +152,17 @@ func SetupRoutes(r *gin.Engine) {
 	protected.Use(middleware.CompanyMiddleware(config.DB))
 
 	{
+		// Permission demands: every logged-in user may send one to their admin
+		// and see their own; admins see and answer the ones sent to them.
+		demands := protected.Group("/demands")
+		{
+			demands.POST("", controllers.CreatePermissionDemand)
+			demands.GET("/mine", controllers.GetMyPermissionDemands)
+			demands.GET("/received", controllers.GetReceivedPermissionDemands)
+			demands.PUT("/:id/respond", controllers.RespondPermissionDemand)
+			demands.DELETE("/:id", controllers.CancelPermissionDemand)
+		}
+
 		// Dashboard
 		protected.GET("/dashboard", controllers.GetDashboardData)
 		protected.GET("/dashboard/collection-chart", controllers.GetCollectionChart)
