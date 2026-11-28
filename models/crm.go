@@ -192,6 +192,10 @@ type Sale struct {
 	// unpaid) so the sales list can filter and label service charges.
 	PaymentStatus string `gorm:"type:varchar(20)" json:"paymentStatus"`
 
+	// ReturnedAmount is the total taken off this sale by partial returns (see
+	// SaleReturn). The sale stays "completed" while some items remain.
+	ReturnedAmount float64 `gorm:"type:decimal(10,2);not null;default:0" json:"returnedAmount"`
+
 	// PromisePayment marks a sale row that was created when a customer settled an
 	// existing POS promise at the counter. It has no product items and no stock
 	// effect; it exists so the money received shows up in the sales list with a

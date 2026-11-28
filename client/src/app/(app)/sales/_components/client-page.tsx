@@ -33,6 +33,8 @@ import type { Company } from '@/lib/types';
 import { DeleteAlertDialog } from '@/components/shared/delete-alert-dialog';
 import { ActionFeedbackDialog } from '@/components/shared/action-feedback-dialog';
 import { ReplaceSaleDialog } from './replace-sale-dialog';
+import { ReturnItemsDialog, SaleItemsTable, SaleReturnInvoice, canReturnItems } from './sale-returns';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface Sale {
   id: string;
@@ -50,6 +52,20 @@ interface Sale {
   saleType?: string;
   paidAmount?: number;
   paymentStatus?: string;
+  promisePayment?: boolean;
+  // Same shape as in columns.tsx (filled for promise sales by the backend).
+  promiseInfo?: {
+    promiseId: string;
+    pendingAmount: number;
+    paidAmount: number;
+    collectedAmount: number;
+    remainingAmount: number;
+    promiseDate?: string;
+    status?: string;
+    description?: string;
+  } | null;
+  /** Amount taken off by partial returns. */
+  returnedAmount?: number;
   items: {
     id: string;
     saleId: string;
@@ -62,6 +78,7 @@ interface Sale {
     wthTax?: number;
     serialNumber?: string;
     model?: string;
+    taxPercent?: number;
   }[];
 }
 
@@ -142,6 +159,10 @@ export function ClientPage({
   const [viewSaleInstallment, setViewSaleInstallment] = useState<InstallmentInfo | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [returnTarget, setReturnTarget] = useState<Sale | null>(null);
+  // Entry whose items are being returned (item-by-item return popup).
+  const [returnItemsTarget, setReturnItemsTarget] = useState<Sale | null>(null);
+  // Side panel tab: the sold invoice or what was returned.
+  const [viewTab, setViewTab] = useState<'sold' | 'returns'>('sold');
   const [isReturning, setIsReturning] = useState(false);
   const [replaceTarget, setReplaceTarget] = useState<Sale | null>(null);
   // OLD: paging state lived here; it is now owned by the parent page.
@@ -207,6 +228,7 @@ export function ClientPage({
   });
 
   const handleRowClick = (sale: Sale) => {
+    setViewTab('sold');
     setViewSale(sale);
   };
 
@@ -304,8 +326,29 @@ export function ClientPage({
     setDeleteTarget(id);
   };
 
+  // OLD: const openReturnDialog = (sale: Sale) => { setReturnTarget(sale); };
+  // Entries with products use the item return popup; promise sales, fiber
+  // jointing and dues rows keep the old full-return confirmation unchanged.
   const openReturnDialog = (sale: Sale) => {
-    setReturnTarget(sale);
+    if (canReturnItems(sale)) {
+      setReturnItemsTarget(sale);
+    } else {
+      setReturnTarget(sale);
+    }
+  };
+
+  const handleItemsReturned = async (info: { amount: number; allReturned: boolean }) => {
+    setReturnItemsTarget(null);
+    invalidateInventoryQueries();
+    await queryClient.refetchQueries({ queryKey: ['inventory/purchased-products', companyId], type: 'all' });
+    await queryClient.refetchQueries({ queryKey: ['inventory/products', companyId], type: 'all' });
+    setFeedback({
+      type: 'success',
+      title: info.allReturned ? 'Sale Returned' : 'Items Returned',
+      message: info.allReturned
+        ? `All items of this sale are now returned (PKR ${fmtPKR(info.amount)} in this return) and restored to stock.`
+        : `The selected items (PKR ${fmtPKR(info.amount)}) were returned and restored to stock. The rest stays in the sale.`,
+    });
   };
 
   const handleReturn = async () => {
@@ -581,29 +624,31 @@ export function ClientPage({
               data={pagedSales}
               onRowClick={handleRowClick}
               pagination={false}
-              getRowCanExpand={(sale) =>
-                (sale.items || []).some((item) => parseSerialNumbers(item.serialNumber).length > 1)
-              }
-              renderExpanded={(sale) => {
-                const entries = [];
-                for (const item of sale.items || []) {
-                  const sns = parseSerialNumbers(item.serialNumber);
-                  const models = String(item.model || '')
-                    .split(/[\s,\n\r\t,]+/)
-                    .map(s => s.trim())
-                    .filter(Boolean);
-                  for (let j = 0; j < sns.length; j++) {
-                    entries.push({
-                      key: `${item.id}-${sns[j]}`,
-                      productName: item.productName,
-                      serialNumber: sns[j],
-                      model: models[j] || '',
-                      price: Number(item.price) || 0,
-                    });
-                  }
-                }
-                return <SerialEntriesTable entries={entries} />;
-              }}
+              // OLD: rows expanded only when an item had several SNs, showing an SN list:
+              // getRowCanExpand={(sale) => (sale.items || []).some((item) => parseSerialNumbers(item.serialNumber).length > 1)}
+              // Now every entry with products expands to list its products.
+              getRowCanExpand={(sale) => (sale.items || []).length > 0}
+              renderExpanded={(sale) => <SaleItemsTable sale={sale} />}
+              // OLD renderExpanded={(sale) => {
+              //   const entries = [];
+              //   for (const item of sale.items || []) {
+              //     const sns = parseSerialNumbers(item.serialNumber);
+              //     const models = String(item.model || '')
+              //       .split(/[\s,\n\r\t,]+/)
+              //       .map(s => s.trim())
+              //       .filter(Boolean);
+              //     for (let j = 0; j < sns.length; j++) {
+              //       entries.push({
+              //         key: `${item.id}-${sns[j]}`,
+              //         productName: item.productName,
+              //         serialNumber: sns[j],
+              //         model: models[j] || '',
+              //         price: Number(item.price) || 0,
+              //       });
+              //     }
+              //   }
+              //   return <SerialEntriesTable entries={entries} />;
+              // }}
             />
           </div>
           <div className="px-4 pb-4">
@@ -665,6 +710,9 @@ export function ClientPage({
                   {viewSale.status === 'returned' && (
                     <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300">Returned</Badge>
                   )}
+                  {viewSale.status !== 'returned' && (Number(viewSale.returnedAmount) || 0) > 0 && (
+                    <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300">Partial Returned</Badge>
+                  )}
                   {viewSale.status === 'replaced' && (
                     <Badge variant="secondary" className="text-xs bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-300">Replaced</Badge>
                   )}
@@ -681,8 +729,30 @@ export function ClientPage({
                 </div>
               </SheetHeader>
 
+              {/* Two tabs: the sold invoice (unchanged content) and what was returned. */}
+              <Tabs value={viewTab} onValueChange={(v) => setViewTab(v === 'returns' ? 'returns' : 'sold')} className="flex min-h-0 flex-1 flex-col">
+                <TabsList className="mx-5 mt-3 grid shrink-0 grid-cols-2">
+                  <TabsTrigger value="sold">Sold Invoice</TabsTrigger>
+                  <TabsTrigger value="returns">
+                    Return Invoice
+                    {(viewSale.status === 'returned' || (Number(viewSale.returnedAmount) || 0) > 0) && (
+                      <span className="ml-1.5 h-2 w-2 rounded-full bg-orange-500" />
+                    )}
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="returns" className="mt-0 min-h-0 flex-1 data-[state=active]:flex data-[state=active]:flex-col">
+                  <ScrollArea className="flex-1">
+                    <SaleReturnInvoice sale={viewSale} companyId={companyId} />
+                  </ScrollArea>
+                </TabsContent>
+                <TabsContent value="sold" className="mt-0 min-h-0 flex-1 data-[state=active]:flex data-[state=active]:flex-col">
               <ScrollArea className="flex-1">
                 <div className="px-5 py-4 space-y-4">
+                  {(Number(viewSale.returnedAmount) || 0) > 0 && (
+                    <p className="rounded-md bg-orange-50 px-3 py-2 text-xs text-orange-800 dark:bg-orange-950/40 dark:text-orange-300">
+                      PKR {fmtPKR(Number(viewSale.returnedAmount) || 0)} of this sale was returned. The items and totals below are what the customer kept; see the Return Invoice tab for the returned items.
+                    </p>
+                  )}
                   {/* Items — one row per SN, each carrying its product info */}
                   {viewSale.items.map((item, idx) => {
                     const price = Number(item.price) || 0;
@@ -824,6 +894,8 @@ export function ClientPage({
                   </div>
                 </div>
               </ScrollArea>
+                </TabsContent>
+              </Tabs>
 
               {/* Action Buttons */}
               <div className="border-t p-4 shrink-0">
@@ -904,6 +976,15 @@ export function ClientPage({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Item-by-item return (entries with products, not on promise) */}
+      <ReturnItemsDialog
+        sale={returnItemsTarget}
+        companyId={companyId}
+        onClose={() => setReturnItemsTarget(null)}
+        onReturned={handleItemsReturned}
+        onError={(message) => setFeedback({ type: 'error', title: 'Error', message })}
+      />
 
       <ReplaceSaleDialog
         sale={replaceTarget}

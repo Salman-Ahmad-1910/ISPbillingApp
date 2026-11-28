@@ -480,10 +480,12 @@ func applyPOSSalesFilters(db *gorm.DB, c *gin.Context, companyID uuid.UUID) *gor
 	}
 
 	switch salesType := strings.ToLower(strings.TrimSpace(c.Query("salesType"))); salesType {
+	// Only lines still in the sale count (a line fully returned or replaced is
+	// soft-deleted). OLD: the two subqueries had no "si.deleted_at IS NULL".
 	case "good":
-		db = db.Where("EXISTS (SELECT 1 FROM sale_items si WHERE si.sale_id = sales.id AND si.original_price > 0 AND si.price > si.original_price)")
+		db = db.Where("EXISTS (SELECT 1 FROM sale_items si WHERE si.sale_id = sales.id AND si.deleted_at IS NULL AND si.original_price > 0 AND si.price > si.original_price)")
 	case "bad":
-		db = db.Where("NOT EXISTS (SELECT 1 FROM sale_items si WHERE si.sale_id = sales.id AND si.original_price > 0 AND si.price > si.original_price)")
+		db = db.Where("NOT EXISTS (SELECT 1 FROM sale_items si WHERE si.sale_id = sales.id AND si.deleted_at IS NULL AND si.original_price > 0 AND si.price > si.original_price)")
 	case "replaced":
 		db = db.Where("sales.status = ?", "replaced")
 	}
@@ -608,6 +610,16 @@ func GetPOSSales(c *gin.Context) {
 		return
 	}
 
+	// Returned amount of the filtered sales: what partial returns took off,
+	// plus the total of sales returned in full.
+	var returnedRow struct{ Total float64 }
+	if err := applyPOSSalesFilters(config.DB.Model(&models.Sale{}), c, companyID).
+		Select("COALESCE(SUM(sales.returned_amount), 0) + COALESCE(SUM(CASE WHEN sales.status = 'returned' THEN sales.total_amount ELSE 0 END), 0) AS total").
+		Scan(&returnedRow).Error; err != nil {
+		utils.ErrorResponse(c, 500, "Failed to sum returns", err.Error())
+		return
+	}
+
 	query := applyPOSSalesFilters(config.DB.Model(&models.Sale{}), c, companyID).
 		Preload("Items").Order("created_at DESC")
 	if pageSizeParam != "all" {
@@ -627,11 +639,12 @@ func GetPOSSales(c *gin.Context) {
 	attachPromiseInfo(companyID, sales)
 
 	utils.SuccessResponse(c, "Records retrieved", gin.H{
-		"sales":        sales,
-		"total":        total,
-		"totalRevenue": sumRow.Total,
-		"page":         page,
-		"pageSize":     pageSizeParam,
+		"sales":          sales,
+		"total":          total,
+		"totalRevenue":   sumRow.Total,
+		"returnedAmount": returnedRow.Total,
+		"page":           page,
+		"pageSize":       pageSizeParam,
 	})
 }
 

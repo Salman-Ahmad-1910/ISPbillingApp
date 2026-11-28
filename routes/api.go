@@ -746,6 +746,9 @@ func SetupRoutes(r *gin.Engine) {
 			pos.GET("/sales/:id", controllers.GetPOSSale)
 			pos.DELETE("/sales/:id", controllers.DeletePOSSale)
 			pos.POST("/sales/:id/return", controllers.ReturnPOSSale)
+			// Return some of the items of a sale (the route above returns the whole sale).
+			pos.POST("/sales/:id/return-items", controllers.ReturnPOSSaleItems)
+			pos.GET("/sales/:id/returns", controllers.GetPOSSaleReturns)
 			pos.POST("/sales/:id/replace", controllers.ReplacePOSSale)
 			pos.PATCH("/sales/:id/status", controllers.UpdatePOSSaleStatus)
 			pos.GET("/installment/:subscriberId", controllers.GetSubscriberInstallment)

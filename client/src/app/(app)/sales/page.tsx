@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 // OLD: import { useGenericQuery } from '@/hooks/api/use-generic-query';
 import api from '@/lib/api';
-import { Loader2, ShoppingCart, TrendingUp, DollarSign, Receipt } from 'lucide-react';
+import { Loader2, ShoppingCart, TrendingUp, DollarSign, Receipt, RotateCcw } from 'lucide-react';
 
 import { ClientPage, type SaleFilters } from './_components/client-page';
 import { useCompany } from '@/context/company-context';
@@ -14,6 +14,8 @@ interface PagedSalesResponse {
   sales: any[];
   total: number;
   totalRevenue: number;
+  /** Amount returned from the filtered sales (partial returns + full returns). */
+  returnedAmount?: number;
   page: number;
   pageSize: string;
 }
@@ -99,6 +101,7 @@ export default function SalesPage() {
   const sales = Array.isArray(data?.sales) ? data!.sales : [];
   const totalTransactions = Number(data?.total) || 0;
   const totalRevenue = Number(data?.totalRevenue) || 0;
+  const returnedAmount = Number(data?.returnedAmount) || 0;
 
   // Full-page loader only on the very first load, never while searching.
   if (isLoading && !data) {
@@ -126,7 +129,8 @@ export default function SalesPage() {
 
       <div className="h-0.5 bg-gradient-to-r from-emerald-500/50 via-green-500/30 to-transparent" />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      {/* OLD: <div className="grid grid-cols-1 gap-4 sm:grid-cols-3"> */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
@@ -159,6 +163,17 @@ export default function SalesPage() {
               <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
                 PKR {totalTransactions > 0 ? Math.round(totalRevenue / totalTransactions).toLocaleString() : 0}
               </p>
+            </div>
+          </div>
+        </div>
+        <div className="group rounded-xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-gradient-to-br from-orange-500 to-rose-600 p-2.5 text-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-md">
+              <RotateCcw className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Returned Amount</p>
+              <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">PKR {returnedAmount.toLocaleString()}</p>
             </div>
           </div>
         </div>

@@ -26,37 +26,20 @@ interface ExpandableDataTableProps<TData, TValue> {
   data: TData[];
   getRowCanExpand?: (row: TData) => boolean;
   renderExpanded?: (row: TData) => ReactNode;
+  /**
+   * Show the chevron (arrow) column. Off by default so pages that expand by
+   * clicking the row keep their layout; the Sales page turns it on because its
+   * row click opens the details panel.
+   */
+  showExpandColumn?: boolean;
   onRowClick?: (row: TData) => void;
   pagination?: boolean;
   emptyMessage?: string;
 }
 
-/**
- * A tanstack table that supports expanding rows. When a row is expandable the
- * whole row click toggles expansion (unless onRowClick is provided, in which
- * case row click keeps its own behaviour and the chevron toggles expansion).
- */
-export function ExpandableDataTable<TData, TValue>({
-  columns,
-  data,
-  getRowCanExpand,
-  renderExpanded,
-  onRowClick,
-  pagination = false,
-  emptyMessage = 'No results.',
-}: ExpandableDataTableProps<TData, TValue>) {
-  const table = useReactTable({
-    data,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getExpandedRowModel: getExpandedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getRowCanExpand: getRowCanExpand
-      ? (row) => getRowCanExpand(row.original)
-      : undefined,
-  });
-
-  const expandColumn: ColumnDef<TData, TValue> = {
+// Chevron column that opens / closes a row's expanded content.
+function expandColumnFor<TData, TValue>(): ColumnDef<TData, TValue> {
+  return {
     id: 'expand',
     header: () => null,
     cell: ({ row }) => {
@@ -81,7 +64,37 @@ export function ExpandableDataTable<TData, TValue>({
       );
     },
   };
+}
 
+/**
+ * A tanstack table that supports expanding rows. When a row is expandable the
+ * whole row click toggles expansion (unless onRowClick is provided, in which
+ * case row click keeps its own behaviour and the chevron toggles expansion).
+ */
+export function ExpandableDataTable<TData, TValue>({
+  columns,
+  data,
+  getRowCanExpand,
+  renderExpanded,
+  onRowClick,
+  pagination = false,
+  emptyMessage = 'No results.',
+  showExpandColumn = false,
+}: ExpandableDataTableProps<TData, TValue>) {
+  // OLD: useReactTable({ data, columns, ... }) - the chevron column below was
+  // built but never given to the table, so it never appeared.
+  const table = useReactTable({
+    data,
+    columns: showExpandColumn ? [expandColumnFor<TData, TValue>(), ...columns] : columns,
+    getCoreRowModel: getCoreRowModel(),
+    getExpandedRowModel: getExpandedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getRowCanExpand: getRowCanExpand
+      ? (row) => getRowCanExpand(row.original)
+      : undefined,
+  });
+
+  const expandColumn = expandColumnFor<TData, TValue>();
   const allColumns = [expandColumn, ...columns];
 
   return (

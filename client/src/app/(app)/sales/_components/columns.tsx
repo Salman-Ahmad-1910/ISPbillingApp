@@ -26,6 +26,8 @@ interface Sale {
   items: SaleItem[];
   promisePayment?: boolean;
   saleType?: string;
+  /** Amount taken off by partial returns (0 when nothing was returned). */
+  returnedAmount?: number;
   paidAmount?: number;
   paymentStatus?: string;
   promiseInfo?: {
@@ -131,6 +133,15 @@ export function getColumns(onDelete?: (id: string) => void, onPay?: (sale: Sale)
             ) : (
               <Badge variant="outline">
                 {method}
+              </Badge>
+            )}
+            {!isReturned && (Number(row.original.returnedAmount) || 0) > 0 && (
+              <Badge
+                variant="secondary"
+                title={`PKR ${Number(row.original.returnedAmount).toLocaleString()} returned`}
+                className="text-[10px] bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300"
+              >
+                Partial Returned
               </Badge>
             )}
             {isGoodSale && (

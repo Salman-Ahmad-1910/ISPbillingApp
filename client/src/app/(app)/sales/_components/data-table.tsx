@@ -29,6 +29,8 @@ export function DataTable<TData, TValue>({
       onRowClick={onRowClick}
       getRowCanExpand={getRowCanExpand}
       renderExpanded={renderExpanded}
+      // The row click opens the details panel, so rows expand with the arrow.
+      showExpandColumn
       pagination={pagination}
       emptyMessage="No sales found."
     />

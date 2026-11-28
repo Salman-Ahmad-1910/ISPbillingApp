@@ -113,6 +113,8 @@ func RunMigrations() {
 		&models.PricingPlan{},
 		&models.Sale{},
 		&models.SaleItem{},
+		&models.SaleReturn{},
+		&models.SaleReturnItem{},
 		&models.AlertTemplate{},
 		&models.SystemConfig{},
 		&models.SupportTicket{},
